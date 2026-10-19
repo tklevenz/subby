@@ -62,6 +62,8 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
         <Stack.Screen name="child/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Child' }} />
+        {/* Reachable from onboarding too, so it isn't guarded. */}
+        <Stack.Screen name="import/babybuddy" options={{ headerShown: true, title: 'Import' }} />
       </Stack>
     </>
   );

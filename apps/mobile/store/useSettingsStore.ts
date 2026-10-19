@@ -9,6 +9,8 @@ export type Settings = {
   feedReminderMin: number | null;
   /** Entitlement stub until payments exist (gates CSV export, multiple children). */
   isPremium: boolean;
+  /** Last Baby Buddy server used for import (the API key is never stored). */
+  bbUrl: string | null;
 };
 
 const DEFAULTS: Settings = {
@@ -17,6 +19,7 @@ const DEFAULTS: Settings = {
   activeChildId: null,
   feedReminderMin: null,
   isPremium: false,
+  bbUrl: null,
 };
 
 interface SettingsState extends Settings {

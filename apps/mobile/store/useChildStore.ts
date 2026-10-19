@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { asc, eq, notInArray } from 'drizzle-orm';
+import { File } from 'expo-file-system';
+import { and, asc, count, eq, notInArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import type { Child } from '@kindred-log/shared';
+import type { Child, LogPayload, LogType } from '@kindred-log/shared';
 import { db, schema } from '../db/client';
 
 export type ChildInput = Pick<Child, 'name' | 'birthDate'> &
@@ -12,7 +13,33 @@ interface ChildState {
   hydrate: () => Promise<void>;
   addChild: (input: ChildInput) => Promise<Child>;
   updateChild: (id: string, patch: Partial<ChildInput>) => Promise<void>;
-  softDeleteChild: (id: string) => Promise<void>;
+  /**
+   * Permanently delete a child and everything logged for them. The child row stays as a
+   * scrubbed tombstone (so a future sync can propagate the delete); logs, reminders and
+   * photos are removed outright.
+   */
+  deleteChild: (id: string) => Promise<void>;
+}
+
+/** Number of (non-deleted) entries per type for a child, for the delete warning. */
+export async function countChildLogs(childId: string): Promise<Partial<Record<LogType, number>>> {
+  const t = schema.logsTable;
+  const rows = await db
+    .select({ logType: t.logType, n: count() })
+    .from(t)
+    .where(and(eq(t.childId, childId), eq(t.isDeleted, false)))
+    .groupBy(t.logType);
+  return Object.fromEntries(rows.map((r) => [r.logType, r.n]));
+}
+
+function deleteFile(uri: string | null | undefined) {
+  if (!uri) return;
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  } catch {
+    // A missing or foreign file shouldn't block deleting the data.
+  }
 }
 
 export const useChildStore = create<ChildState>((set, get) => ({
@@ -45,11 +72,12 @@ export const useChildStore = create<ChildState>((set, get) => ({
     await db.insert(schema.childrenTable).values(child);
 
     // Logs recorded before children existed (v0 placeholder child id) belong to the first child.
+    // Only logs whose child row doesn't exist at all; deleted children keep theirs.
     if (isFirst) {
       await db
         .update(schema.logsTable)
         .set({ childId: child.id, updatedAt: Date.now(), syncStatus: 'pending' })
-        .where(notInArray(schema.logsTable.childId, [child.id]));
+        .where(notInArray(schema.logsTable.childId, db.select({ id: schema.childrenTable.id }).from(schema.childrenTable)));
     }
 
     set((state) => ({ children: [...state.children, child] }));
@@ -67,11 +95,26 @@ export const useChildStore = create<ChildState>((set, get) => ({
     }));
   },
 
-  softDeleteChild: async (id) => {
-    await db
-      .update(schema.childrenTable)
-      .set({ isDeleted: true, updatedAt: Date.now(), syncStatus: 'pending' })
-      .where(eq(schema.childrenTable.id, id));
+  deleteChild: async (id) => {
+    const child = get().children.find((c) => c.id === id);
+    const notes = await db
+      .select({ payload: schema.logsTable.payload })
+      .from(schema.logsTable)
+      .where(and(eq(schema.logsTable.childId, id), eq(schema.logsTable.logType, 'note')));
+
+    db.transaction((tx) => {
+      tx.delete(schema.logsTable).where(eq(schema.logsTable.childId, id)).run();
+      tx.delete(schema.remindersTable).where(eq(schema.remindersTable.childId, id)).run();
+      // Scrub personal data; importRef is cleared so a later re-import starts fresh.
+      tx.update(schema.childrenTable)
+        .set({ name: '', birthDate: '', birthTime: null, dueDate: null, sex: null, photoUri: null, importRef: null, isDeleted: true, updatedAt: Date.now(), syncStatus: 'pending' })
+        .where(eq(schema.childrenTable.id, id))
+        .run();
+    });
+
+    deleteFile(child?.photoUri);
+    for (const { payload } of notes) deleteFile((payload as Extract<LogPayload, { type: 'note' }>).photoUri);
+
     set((state) => ({ children: state.children.filter((c) => c.id !== id) }));
   },
 }));

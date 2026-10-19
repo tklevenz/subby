@@ -1,7 +1,9 @@
 import React from 'react';
 import { ScrollView, Text } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChildForm from '../components/ChildForm';
+import { Button } from '../components/ui';
 import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 
@@ -28,6 +30,8 @@ export default function Onboarding() {
           // The protected route guard swaps to the tabs once a child exists.
         }}
       />
+      <Text className="text-slate-500 text-center mt-8">Coming from Baby Buddy?</Text>
+      <Button label="Import from Baby Buddy" variant="ghost" onPress={() => router.push('/import/babybuddy')} />
     </ScrollView>
   );
 }

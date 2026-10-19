@@ -7,3 +7,4 @@ export * from './domain/feedTimer';
 export * from './domain/recent';
 export * from './domain/milestones';
 export * from './domain/validate';
+export * from './domain/babybuddy';

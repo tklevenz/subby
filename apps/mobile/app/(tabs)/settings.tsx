@@ -38,6 +38,11 @@ export default function SettingsScreen() {
         <Row label="Add child" onPress={() => router.push('/child/new')} right={chevron} />
       </Card>
 
+      <SectionTitle>Data</SectionTitle>
+      <Card>
+        <Row label="Import from Baby Buddy" onPress={() => router.push('/import/babybuddy')} right={chevron} />
+      </Card>
+
       <SectionTitle>Units</SectionTitle>
       <Segmented
         options={[{ value: 'metric', label: 'Metric (ml, kg, °C)' }, { value: 'imperial', label: 'Imperial (oz, lb, °F)' }]}
