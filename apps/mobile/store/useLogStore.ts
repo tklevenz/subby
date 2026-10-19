@@ -1,89 +1,135 @@
 import { create } from 'zustand';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gte, isNull, or, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
-import { LogEntry, LogPayload } from '@kindred/shared';
+import { TIMED_LOG_TYPES, type LogEntry, type LogPayload } from '@kindred-log/shared';
+
+const DAY_MS = 86_400_000;
+const WINDOW_DAYS = 30;
+
+export type LogPatch = {
+  payload?: Partial<LogPayload>;
+  startedAt?: number;
+  endedAt?: number | null;
+};
 
 interface LogState {
-  activeChildId: string;
+  activeChildId: string | null;
   logs: LogEntry[];
   isLoading: boolean;
+  /** Oldest startedAt currently loaded; older entries are paged in by loadOlder(). */
+  loadedSince: number;
 
   loadLogs: (childId: string) => Promise<void>;
-  addLog: (payload: LogPayload, startedAt?: number) => Promise<void>;
-  updateLog: (id: string, payload: Partial<LogPayload>) => Promise<void>;
+  loadOlder: () => Promise<void>;
+  /** Log a completed entry. Timed types default endedAt to startedAt (an instant event). */
+  addLog: (payload: LogPayload, times?: { startedAt?: number; endedAt?: number | null }) => Promise<LogEntry>;
+  /** Start a live timer: a timed entry with endedAt = null. */
+  startTimer: (payload: LogPayload, startedAt?: number) => Promise<LogEntry>;
+  stopTimer: (id: string, patch?: Omit<LogPatch, 'endedAt'>) => Promise<void>;
+  updateLog: (id: string, patch: LogPatch) => Promise<void>;
   softDeleteLog: (id: string) => Promise<void>;
 }
 
+const byStartedDesc = (a: LogEntry, b: LogEntry) => b.startedAt - a.startedAt;
+
 export const useLogStore = create<LogState>((set, get) => ({
-  activeChildId: 'default-child-uuid', // Replaced during onboarding
+  activeChildId: null,
   logs: [],
   isLoading: false,
+  loadedSince: 0,
 
   loadLogs: async (childId: string) => {
     set({ isLoading: true, activeChildId: childId });
+    const since = Date.now() - WINDOW_DAYS * DAY_MS;
+    const t = schema.logsTable;
     const rows = await db
       .select()
-      .from(schema.logsTable)
+      .from(t)
       .where(
         and(
-          eq(schema.logsTable.childId, childId),
-          eq(schema.logsTable.isDeleted, false),
-        )
+          eq(t.childId, childId),
+          eq(t.isDeleted, false),
+          // Always include running timers, however old.
+          or(gte(t.startedAt, since), and(isNull(t.endedAt), inArray(t.logType, [...TIMED_LOG_TYPES]))),
+        ),
       )
-      .orderBy(desc(schema.logsTable.startedAt))
-      .limit(100);
+      .orderBy(desc(t.startedAt));
 
-    set({ logs: rows, isLoading: false });
+    // Ignore results for a child that's no longer active (fast switching).
+    if (get().activeChildId !== childId) return;
+    set({ logs: rows, isLoading: false, loadedSince: since });
   },
 
-  addLog: async (payload: LogPayload, startedAt = Date.now()) => {
+  loadOlder: async () => {
+    const { activeChildId: childId, loadedSince } = get();
+    if (!childId) return;
+    const since = loadedSince - WINDOW_DAYS * DAY_MS;
+    const t = schema.logsTable;
+    const rows = await db
+      .select()
+      .from(t)
+      .where(and(eq(t.childId, childId), eq(t.isDeleted, false), gte(t.startedAt, since)))
+      .orderBy(desc(t.startedAt));
+    if (get().activeChildId !== childId) return;
+    set({ logs: rows, loadedSince: since });
+  },
+
+  addLog: async (payload, times = {}) => {
+    const childId = get().activeChildId;
+    if (!childId) throw new Error('No active child');
     const now = Date.now();
-    const newEntry: LogEntry = {
+    const startedAt = times.startedAt ?? now;
+    const timed = TIMED_LOG_TYPES.includes(payload.type);
+    const entry: LogEntry = {
       id: uuidv7(),
-      childId: get().activeChildId,
+      childId,
       logType: payload.type,
       startedAt,
+      endedAt: times.endedAt !== undefined ? times.endedAt : timed ? startedAt : null,
       updatedAt: now,
       isDeleted: false,
       syncStatus: 'pending',
+      importRef: null,
+      createdBy: null,
       payload,
     };
 
-    // 1. Write to encrypted local SQLite
-    await db.insert(schema.logsTable).values(newEntry);
-
-    // 2. Update Zustand state immediately and keep sorted by startedAt DESC
-    set((state) => ({
-      logs: [newEntry, ...state.logs].sort((a, b) => b.startedAt - a.startedAt),
-    }));
+    await db.insert(schema.logsTable).values(entry);
+    set((state) => ({ logs: [entry, ...state.logs].sort(byStartedDesc) }));
+    return entry;
   },
 
-  updateLog: async (id: string, payloadPatch: Partial<LogPayload>) => {
-    const now = Date.now();
+  startTimer: (payload, startedAt) => get().addLog(payload, { startedAt, endedAt: null }),
+
+  stopTimer: (id, patch = {}) => get().updateLog(id, { ...patch, endedAt: Date.now() }),
+
+  updateLog: async (id, patch) => {
     const current = get().logs.find((l) => l.id === id);
     if (!current) return;
 
-    const mergedPayload: LogPayload = {
-      ...current.payload,
-      ...payloadPatch,
-    } as LogPayload;
+    const updated: LogEntry = {
+      ...current,
+      payload: patch.payload ? ({ ...current.payload, ...patch.payload } as LogPayload) : current.payload,
+      startedAt: patch.startedAt ?? current.startedAt,
+      endedAt: patch.endedAt !== undefined ? patch.endedAt : current.endedAt,
+      updatedAt: Date.now(),
+      syncStatus: 'pending',
+    };
 
-    // 1. Upsert in SQLite
     await db
       .update(schema.logsTable)
       .set({
-        payload: mergedPayload,
-        updatedAt: now,
+        payload: updated.payload,
+        startedAt: updated.startedAt,
+        endedAt: updated.endedAt,
+        updatedAt: updated.updatedAt,
         syncStatus: 'pending',
       })
       .where(eq(schema.logsTable.id, id));
 
-    // 2. Reflect in Zustand
     set((state) => ({
-      logs: state.logs.map((l) =>
-        l.id === id ? { ...l, payload: mergedPayload, updatedAt: now } : l,
-      ),
+      logs: state.logs.map((l) => (l.id === id ? updated : l)).sort(byStartedDesc),
     }));
   },
 

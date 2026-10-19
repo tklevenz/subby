@@ -1,50 +1,55 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSettingsStore } from './useSettingsStore';
 
-/** Milliseconds-based stopwatch that stays in sync with real elapsed time. */
-export function useLiveDuration(startMs: number | null) {
-  const [elapsed, setElapsed] = useState(0);
-  const frameRef = useRef<number>(0);
+export { formatDuration, formatRelative, formatAge } from '@kindred-log/shared';
 
+/** Current time, re-rendering every `intervalMs` (1 s is plenty for h/m/s timers). */
+export function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (startMs === null) {
-      setElapsed(0);
-      return;
-    }
-
-    const tick = () => {
-      setElapsed(Date.now() - startMs);
-      frameRef.current = requestAnimationFrame(tick);
-    };
-    frameRef.current = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [startMs]);
-
-  return elapsed;
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
 }
 
-export function formatDuration(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+export function formatTimeShort(epochMs: number, clock: '12h' | '24h' = '24h'): string {
+  return new Date(epochMs).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: clock === '12h',
+  });
 }
 
-export function formatRelative(msAgo: number): string {
-  const totalSec = Math.floor(msAgo / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-
-  if (h > 0) return `${h}h ${m}m ago`;
-  if (m > 0) return `${m}m ago`;
-  return 'Just now';
-}
-
-export function formatTimeShort(epochMs: number): string {
+export function formatDayLabel(epochMs: number, now = Date.now()): string {
   const d = new Date(epochMs);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const today = new Date(now);
+  const yesterday = new Date(now - 86_400_000);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+  });
+}
+
+/** Local calendar date as YYYY-MM-DD. */
+export function toIsoDate(epochMs: number): string {
+  const d = new Date(epochMs);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** YYYY-MM-DD to local midnight epoch ms. */
+export function fromIsoDate(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
+}
+
+/** formatTimeShort bound to the user's clock preference. */
+export function useFormatTime() {
+  const clock = useSettingsStore((s) => s.clock);
+  return (epochMs: number) => formatTimeShort(epochMs, clock);
 }

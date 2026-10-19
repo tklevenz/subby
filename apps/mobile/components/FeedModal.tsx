@@ -43,12 +43,24 @@ export default function FeedModal({ visible, onClose }: { visible: boolean; onCl
 
   const handleSave = async (amount: number | undefined, duration: number | undefined) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await addLog({
-      type: 'feed',
-      method,
-      amountMl: amount,
-      durationSeconds: duration !== undefined ? duration * 60 : undefined,
-    });
+    const now = Date.now();
+    if (method === 'bottle') {
+      await addLog({ type: 'feed', method: 'bottle', amountMl: amount });
+    } else {
+      // The feed just finished: it started `duration` minutes ago.
+      const secs = (duration ?? 0) * 60;
+      const half = Math.round(secs / 2);
+      await addLog(
+        {
+          type: 'feed',
+          method: 'breast',
+          leftSeconds: method === 'breast_left' ? secs : method === 'breast_both' ? half : undefined,
+          rightSeconds: method === 'breast_right' ? secs : method === 'breast_both' ? secs - half : undefined,
+          lastSide: method === 'breast_left' ? 'left' : method === 'breast_right' ? 'right' : undefined,
+        },
+        { startedAt: now - secs * 1000, endedAt: now },
+      );
+    }
     handleDismiss();
   };
 

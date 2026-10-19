@@ -1,0 +1,110 @@
+import React from 'react';
+import { View, Text, Pressable, TextInput, type TextInputProps } from 'react-native';
+import * as Haptics from 'expo-haptics';
+
+export function Chip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync();
+        onPress();
+      }}
+      className={`px-4 py-2 rounded-full border ${
+        selected ? 'bg-violet-500/30 border-violet-400/60' : 'bg-slate-800 border-slate-700'
+      }`}
+    >
+      <Text className={selected ? 'text-violet-100 font-medium' : 'text-slate-400'}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Single-choice chip row. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { value: T; label: string }[];
+  value: T | null | undefined;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {options.map((o) => (
+        <Chip key={o.value} label={o.label} selected={value === o.value} onPress={() => onChange(o.value)} />
+      ))}
+    </View>
+  );
+}
+
+export function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <Text className="text-xs text-slate-400 font-medium mb-2 mt-4">{children}</Text>;
+}
+
+export function TextField(props: TextInputProps) {
+  return (
+    <TextInput
+      placeholderTextColor="#64748b"
+      {...props}
+      className={`bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-base ${props.className ?? ''}`}
+    />
+  );
+}
+
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'danger' | 'ghost';
+  disabled?: boolean;
+}) {
+  const bg = { primary: 'bg-violet-600', danger: 'bg-red-600/80', ghost: 'bg-slate-800' }[variant];
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
+      className={`${bg} rounded-xl py-3.5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
+    >
+      <Text className="text-white font-semibold text-base">{label}</Text>
+    </Pressable>
+  );
+}
+
+export function Card({ children }: { children: React.ReactNode }) {
+  return <View className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">{children}</View>;
+}
+
+export function Row({
+  label,
+  value,
+  onPress,
+  right,
+}: {
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  right?: React.ReactNode;
+}) {
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} className="flex-row items-center px-4 py-3.5 border-b border-slate-800">
+      <Text className="flex-1 text-white text-base">{label}</Text>
+      {value ? <Text className="text-slate-400 text-base">{value}</Text> : null}
+      {right}
+    </Pressable>
+  );
+}

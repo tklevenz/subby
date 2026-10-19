@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useLogStore } from '../store/useLogStore';
-import { LogPayload } from '@kindred/shared';
+import { activeSleep, type LogPayload } from '@kindred-log/shared';
 import { Droplets, Moon, Baby } from 'lucide-react-native';
 
 interface QuickBtnProps {
@@ -29,18 +28,11 @@ function QuickBtn({ icon, label, sub, bg, onPress }: QuickBtnProps) {
   );
 }
 
-export default function QuickActionDock({
-  onFeedPress,
-  activeSleepId,
-  onEndSleep,
-}: {
-  onFeedPress: () => void;
-  activeSleepId: string | undefined;
-  onEndSleep: (id: string) => void;
-}) {
-  const insets = useSafeAreaInsets();
+export default function QuickActionDock({ onFeedPress }: { onFeedPress: () => void }) {
   const addLog = useLogStore((s) => s.addLog);
-  const updateLog = useLogStore((s) => s.updateLog);
+  const startTimer = useLogStore((s) => s.startTimer);
+  const stopTimer = useLogStore((s) => s.stopTimer);
+  const activeSleepId = useLogStore((s) => activeSleep(s.logs)?.id);
 
   const tapDiaper = async (condition: 'wet' | 'dirty' | 'both') => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -50,20 +42,20 @@ export default function QuickActionDock({
 
   const tapSleep = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const payload: LogPayload = { type: 'sleep', endedAt: null };
-    await addLog(payload);
+    // Daytime sleeps default to naps; editable afterwards.
+    const hour = new Date().getHours();
+    await startTimer({ type: 'sleep', nap: hour >= 7 && hour < 19 });
   };
 
   const tapWakeUp = async () => {
     if (!activeSleepId) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await updateLog(activeSleepId, { endedAt: Date.now() });
+    await stopTimer(activeSleepId);
   };
 
   return (
     <View
       className="bg-slate-900/95 border-t border-slate-800 backdrop-blur"
-      style={{ paddingBottom: insets.bottom + 4 }}
     >
       {/* Diaper row */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-3 pt-2 gap-2">

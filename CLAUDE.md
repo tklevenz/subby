@@ -11,34 +11,52 @@
 - **State & Local Persistence:** Zustand (in-memory UI state) backed by `expo-sqlite` via `drizzle-orm/expo-sqlite` (unencrypted in Expo Go). Schema is bootstrapped with `CREATE TABLE IF NOT EXISTS` in `db/client.ts` — keep it in sync with `db/schema.ts` until a migration runner is added.
 - **Runtime Environment:** Node.js v24.9.0 on macOS (Apple Silicon)[cite: 4]
 
-## 3. Repository & File Structure (`apps/mobile`)
+## 3. Repository & File Structure
 
-### Configuration Files
-- `apps/mobile/app.json`: Expo configuration (name, slug, `expo-router` plugin, New Architecture enabled)[cite: 4].
-- `apps/mobile/babel.config.js`: `babel-preset-expo` with `jsxImportSource: 'nativewind'` + `nativewind/babel` preset.
-- `apps/mobile/metro.config.js`: `withNativeWind(config, { input: './global.css' })`; `global.css` is imported in `app/_layout.tsx`.
-- pnpm note: `react-native-css-interop` must stay a direct dependency or Metro can't resolve the NativeWind JSX runtime.
-- `apps/mobile/tailwind.config.js`: NativeWind v4 configuration, content paths, and dark mode setup[cite: 4].
+Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy, phases 1–6) is summarized there.
 
-### State & Data Layer
-- **Store (Zustand + SQLite sync):**
-  - `updateLog` method: Merges `payloadPatch` into the existing log entry's `payload`, sets `syncStatus: 'pending'`, performs an upsert into the local SQLite database, and updates the Zustand store state immediately[cite: 4].
+### `packages/shared` (`@kindred-log/shared`, consumed as TS source)
+- `src/schemas/log.schema.ts`: `LogEntry` + discriminated `LogPayload` union (feed, diaper, sleep, pumping, growth, temperature, medication, potty, activity, milestone, note). Canonical units only: ml, g, cm, °C, seconds, epoch ms.
+- **`endedAt` rule:** for `TIMED_LOG_TYPES` (sleep, feed, pumping, activity), `endedAt` is always set once the entry is complete (= `startedAt` for instant ones like a bottle), and `null` means a running timer. For other types it's always `null`.
+- `src/schemas/child.schema.ts`: `Child`.
+- `src/domain/`: pure, RN-free helpers (`units`, `time`, `summary`). Put new business logic here and test it with vitest (`src/__tests__`).
 
-### UI Components (`bg-slate-950` theme, muted cards, pastel accents)
-- `StatusHeader.tsx`: Renders 3 summary status cards at the top of the screen:
-  1. Last feed (relative time + feed detail)[cite: 4]
-  2. Last diaper (condition: Wet / Dirty / Both)[cite: 4]
-  3. Sleep / wake-window (live-ticking timer)[cite: 4]
-- `LogTimeline.tsx`: `FlatList` displaying historical log entries with swipe-to-delete (triggers a confirmation alert), activity-type-colored icons, and compact timestamps[cite: 4].
-- `QuickActionDock.tsx`: Fixed bottom action bar providing 1-tap diaper logging (`Wet` / `Dirty` / `Both`), a sleep toggle, and a trigger to open the feed modal[cite: 4].
-- `FeedModal.tsx`: Bottom sheet modal for logging feeds, featuring quick bottle volume presets (`60` / `90` / `120` / `150` / `180` ml) with a `±10 ml` stepper, plus breast feeding duration presets (`5` / `10` / `15` / `20` / `25` min)[cite: 4].
+### `apps/mobile`
+- **Config:**
+  - `app.json`: plugins `expo-router`, `expo-sqlite`, `expo-secure-store`, datetimepicker.
+  - `babel.config.js`: `babel-preset-expo` with `jsxImportSource: 'nativewind'`, `nativewind/babel`, and `inline-import` for `.sql`.
+  - `metro.config.js`: `withNativeWind(... './global.css')`, plus `sql` in `sourceExts`.
+  - pnpm note: `react-native-css-interop` must stay a direct dependency or Metro can't resolve the NativeWind JSX runtime.
+- **DB:**
+  - `db/schema.ts` (Drizzle): tables `children`, `logs` (generic, JSON `payload`, `ended_at`, `import_ref` unique), `settings` (kv), `reminders`.
+  - `db/client.ts`: `initDatabase()` runs migrations at startup and upgrades pre-migration v0 databases via `db/legacy.ts`.
+  - **Schema changes:** edit `db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`. Commit the generated `db/migrations/*`, and never edit an applied migration.
+- **Stores (Zustand, write-through to SQLite):**
+  - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`.
+  - `useChildStore`, `useSettingsStore` (units, clock, activeChildId, isPremium stub), `useActiveChild`.
+- **Routes (expo-router):**
+  - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
+  - `app/(tabs)/`: `index` (Home dashboard), `history`, `trends` (placeholder), `settings`.
+  - `app/entry/[id].tsx`: edit/backdate any entry.
+  - `app/child/[id].tsx`: add (`new`) or edit a child.
+- **Components:**
+  - `StatusHeader` (+ `ChildSwitcher`), `ActiveTimers`, `LogTimeline` (day-grouped) / `LogRow` (tap to edit, swipe to delete), `QuickActionDock`, `FeedModal`.
+  - `logDisplay.tsx`: icon/label per log type.
+  - `editors/`: per-type edit fields, registered in `EDITORS`.
+  - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
+  - `DateTimeField`.
+- **Utilities:** `store/timeHelpers.ts` (`useNow`, `useFormatTime`, `formatDayLabel`, ISO date helpers; re-exports the shared formatters).
+- **UX rule:** 2-tap maximum for common logs.
 
-### Utilities
-- `timeHelpers.ts`: Time formatting functions (`formatDuration`, `formatRelative`, `formatTimeShort` — unused imports cleaned up)[cite: 4].
+### Commands
+- `pnpm test` / `pnpm typecheck` from the root (turbo).
+- `cd apps/mobile && npx expo install --check` after adding dependencies. Use `npx expo install` for anything Expo-managed.
 
 ---
 
 ## 4. Current State
 
-- 2026-10-19: SDK 57 alignment done. All Expo packages match SDK 57, `op-sqlite` replaced by `expo-sqlite`, NativeWind v4 fully wired, `tsc --noEmit` passes, and `pnpm run dev` serves iOS + Android bundles. (The earlier exit-code-7 crash was `expo-router@6` (SDK 54) running against SDK 57's `@expo/router-server`, which requires `expo-router/internal/routing`.)
+- 2026-10-19: SDK 57 alignment done. (The earlier exit-code-7 crash was `expo-router@6` (SDK 54) running against SDK 57's `@expo/router-server`.)
+- 2026-10-19: **Phase 1 (foundation) done**: schema v2, Drizzle migrations, children + onboarding, settings (units/clock), tabs, edit/backdate, persistent timers, History tab. Tests and typecheck pass; iOS + Android bundles build.
 - Not yet verified on a physical device in Expo Go.
+- **Next: Phase 2** (tracking parity: FeedModal rework with a live L/R breast timer, sheets for pumping/growth/temperature/medication/potty/activity/milestone/note, a "+" sheet on the dock, editors for the new types).
