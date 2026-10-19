@@ -23,6 +23,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `units`, `time`, `summary`, `validate` (`isCompletePayload` gates Save).
   - `feedTimer`: breastfeeding L/R timer state lives in the feed payload (`timerSide`, `timerSideSince`); `toggleSide`/`pauseFeed`.
   - `recent` (food/tag/medication suggestions, `medicationsDue`), `milestones` (bundled checklist).
+  - `stats` (`dailyStats` per-day totals, splitting sleep across midnight; `averageStats` over tracked days; `sleepSegments`; `solidsReport`; DST-safe `addDays`/`dayRange`).
+  - `growth`: WHO LMS z-scores/percentiles (0–24 months, corrected age via due date), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
+  - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
 
 ### `apps/mobile`
@@ -37,14 +40,21 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - **Schema changes:** edit `db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`. Commit the generated `db/migrations/*`, and never edit an applied migration.
 - **Stores (Zustand, write-through to SQLite):**
   - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`.
+  - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads whenever the store's logs change. Use these for anything beyond the store's 30-day window (History day/week, Trends, Growth, Solids, Export).
   - `useChildStore` (`deleteChild` hard-deletes the child's logs, reminders and photos and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub), `useActiveChild`.
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
-  - `app/(tabs)/`: `index` (Home dashboard), `history`, `trends` (placeholder), `settings`.
+  - `app/(tabs)/`:
+    - `index`: Home dashboard.
+    - `history`: List, Day (24 h lanes) and Week (sleep pattern + totals) views.
+    - `trends`: 7/14/30-day averages and charts.
+    - `settings`: includes a `__DEV__`-only Premium stub toggle.
+  - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV, Premium-gated).
   - `app/entry/[id].tsx`: edit/backdate any entry.
   - `app/child/[id].tsx`: add (`new`) or edit a child; danger zone deletes a child after the user types its name.
   - `app/import/babybuddy.tsx`: import wizard (connect → review children/units → progress → summary). Not route-guarded, so onboarding can link to it.
 - **Components:**
+  - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `DayTimeline`, `WeekPattern`, `GrowthChart`.
   - `StatusHeader` (+ `ChildSwitcher`), `ActiveTimers`, `LogTimeline` (day-grouped) / `LogRow` (tap to edit, swipe to delete), `QuickActionDock`.
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
@@ -72,4 +82,6 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - Not yet verified on a physical device in Expo Go.
 - 2026-10-19: **Phase 2 (tracking parity) done**: all 11 types can be logged and edited; live L/R breastfeeding timer; diaper long-press for details; "More" grid; medication-due cards. Tests and typecheck pass; iOS + Android bundles build.
 - 2026-10-19: **Phase 3 (Baby Buddy import) done**: the wizard is reachable from Settings and onboarding. Verified against the user's live server: all 10,500 records page and map with 0 failures, units detected as ml/g/cm/°C. The DB write path still needs a run on a device.
-- **Next: Phase 4**: history day/week views, trends, WHO growth charts, CSV export.
+- 2026-10-19: deleting a child (type-the-name confirmation) added.
+- 2026-10-19: **Phase 4 (history, trends, growth, export) done**: aggregations checked against the real Baby Buddy export. Tests and typecheck pass; iOS + Android bundles build. Not yet tried on a device.
+- **Next: Phase 5**: reminders (expo-notifications) and on-device nap prediction.

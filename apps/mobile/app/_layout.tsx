@@ -57,6 +57,9 @@ export default function RootLayout() {
         <Stack.Protected guard={hasChild}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="entry/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Edit entry' }} />
+          <Stack.Screen name="growth" options={{ headerShown: true, title: 'Growth', headerBackTitle: 'Trends' }} />
+          <Stack.Screen name="solids" options={{ headerShown: true, title: 'Solids', headerBackTitle: 'Trends' }} />
+          <Stack.Screen name="export" options={{ headerShown: true, title: 'Export CSV', headerBackTitle: 'Trends' }} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />

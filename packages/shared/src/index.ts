@@ -8,3 +8,6 @@ export * from './domain/recent';
 export * from './domain/milestones';
 export * from './domain/validate';
 export * from './domain/babybuddy';
+export * from './domain/stats';
+export * from './domain/growth';
+export * from './domain/csv';

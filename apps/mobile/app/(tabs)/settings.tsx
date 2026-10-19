@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronRight } from 'lucide-react-native';
@@ -17,6 +17,7 @@ export default function SettingsScreen() {
   const children = useChildStore((s) => s.children);
   const units = useSettingsStore((s) => s.units);
   const clock = useSettingsStore((s) => s.clock);
+  const isPremium = useSettingsStore((s) => s.isPremium);
   const setSetting = useSettingsStore((s) => s.set);
   const chevron = <ChevronRight color="#475569" size={16} />;
 
@@ -40,6 +41,7 @@ export default function SettingsScreen() {
 
       <SectionTitle>Data</SectionTitle>
       <Card>
+        <Row label="Export CSV" value={isPremium ? undefined : 'Premium'} onPress={() => router.push('/export')} right={chevron} />
         <Row label="Import from Baby Buddy" onPress={() => router.push('/import/babybuddy')} right={chevron} />
       </Card>
 
@@ -56,6 +58,15 @@ export default function SettingsScreen() {
         value={clock}
         onChange={(v) => setSetting('clock', v)}
       />
+
+      {__DEV__ ? (
+        <>
+          <SectionTitle>Developer</SectionTitle>
+          <Card>
+            <Row label="Premium (stub)" right={<Switch value={isPremium} onValueChange={(v) => setSetting('isPremium', v)} />} />
+          </Card>
+        </>
+      ) : null}
 
       <View className="mt-10 items-center">
         <Text className="text-slate-600 text-xs">Kindred Log · data stays on this device</Text>

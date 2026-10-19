@@ -44,3 +44,11 @@ export function formatAge(birthDate: string, now: number): string {
   if (months < 24) return `${months} months`;
   return `${Math.floor(months / 12)} years`;
 }
+
+/** Hours and minutes only ("13h 20m", "45m"), for totals where seconds are noise. */
+export function formatHoursMinutes(ms: number): string {
+  const totalMin = Math.max(0, Math.round(ms / 60_000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
