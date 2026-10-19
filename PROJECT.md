@@ -84,7 +84,7 @@ The app utilizes a freemium model that gates collaboration, hardware scaling, an
 * **Phase 1: Local-First Solo App (MVP v0.1) — *In Progress***
 * Feature parity with Huckleberry + Baby Buddy, in sub-phases:
   * 1.1 Foundation (done 2026-10-19): schema v2 (11 log types, canonical units), migrations, multiple children, settings, tabs, edit/backdate, persistent timers.
-  * 1.2 Tracking parity: live breastfeeding L/R timer, bottle milk type, solids, pumping, growth, temperature, medication, potty, activities, milestones, notes/tags.
+  * 1.2 Tracking parity (done 2026-10-19): live breastfeeding L/R timer, bottle milk type, solids, pumping, growth, temperature, medication, potty, activities, milestones, notes/tags.
   * 1.3 Baby Buddy import: in-app, over Baby Buddy's REST API (URL + token), re-runnable without duplicates via `import_ref`.
   * 1.4 History, trends, WHO growth percentiles, CSV export (premium).
   * 1.5 Local reminders (feeds, medication) + on-device nap prediction (SweetSpot equivalent; no cloud AI).

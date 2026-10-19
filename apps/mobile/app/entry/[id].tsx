@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { TIMED_LOG_TYPES, type LogEntry, type LogPayload } from '@kindred-log/shared';
+import { TIMED_LOG_TYPES, isCompletePayload, type LogEntry, type LogPayload } from '@kindred-log/shared';
 import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
-import { activityLabel } from '../../components/logDisplay';
-import { Button, FieldLabel, TextField } from '../../components/ui';
+import { CommonFields } from '../../components/sheets/LogSheet';
+import { TYPE_META, activityLabel } from '../../components/logTypes';
+import { Button, FieldLabel } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
-
-const TITLES: Record<LogPayload['type'], string> = {
-  feed: 'Feed', diaper: 'Diaper', sleep: 'Sleep', pumping: 'Pumping', growth: 'Growth',
-  temperature: 'Temperature', medication: 'Medication', potty: 'Potty', activity: 'Activity',
-  milestone: 'Milestone', note: 'Note',
-};
 
 /** Edit/backdate any log entry. */
 export default function EntryScreen() {
@@ -52,7 +47,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
       },
     ]);
 
-  const title = payload.type === 'activity' ? activityLabel(payload.kind) : TITLES[payload.type];
+  const title = payload.type === 'activity' ? activityLabel(payload.kind) : TYPE_META[payload.type].label;
 
   return (
     <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
@@ -78,16 +73,9 @@ function EntryForm({ entry }: { entry: LogEntry }) {
 
       <PayloadEditor payload={payload} onChange={patch} />
 
-      <FieldLabel>Notes</FieldLabel>
-      <TextField
-        value={payload.notes ?? ''}
-        onChangeText={(notes) => patch({ notes: notes || undefined })}
-        placeholder="Optional"
-        multiline
-        style={{ minHeight: 72, textAlignVertical: 'top' }}
-      />
+      <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={invalid} />
+      <Button label="Save" onPress={save} disabled={invalid || !isCompletePayload(payload)} />
       <Button label="Delete" variant="danger" onPress={confirmDelete} />
     </ScrollView>
   );

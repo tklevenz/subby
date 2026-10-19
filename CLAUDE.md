@@ -19,7 +19,10 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - `src/schemas/log.schema.ts`: `LogEntry` + discriminated `LogPayload` union (feed, diaper, sleep, pumping, growth, temperature, medication, potty, activity, milestone, note). Canonical units only: ml, g, cm, °C, seconds, epoch ms.
 - **`endedAt` rule:** for `TIMED_LOG_TYPES` (sleep, feed, pumping, activity), `endedAt` is always set once the entry is complete (= `startedAt` for instant ones like a bottle), and `null` means a running timer. For other types it's always `null`.
 - `src/schemas/child.schema.ts`: `Child`.
-- `src/domain/`: pure, RN-free helpers (`units`, `time`, `summary`). Put new business logic here and test it with vitest (`src/__tests__`).
+- `src/domain/`: pure, RN-free helpers. Put new business logic here and test it with vitest (`src/__tests__`).
+  - `units`, `time`, `summary`, `validate` (`isCompletePayload` gates Save).
+  - `feedTimer`: breastfeeding L/R timer state lives in the feed payload (`timerSide`, `timerSideSince`); `toggleSide`/`pauseFeed`.
+  - `recent` (food/tag/medication suggestions, `medicationsDue`), `milestones` (bundled checklist).
 
 ### `apps/mobile`
 - **Config:**
@@ -41,8 +44,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `app/child/[id].tsx`: add (`new`) or edit a child.
 - **Components:**
   - `StatusHeader` (+ `ChildSwitcher`), `ActiveTimers`, `LogTimeline` (day-grouped) / `LogRow` (tap to edit, swipe to delete), `QuickActionDock`, `FeedModal`.
-  - `logDisplay.tsx`: icon/label per log type.
-  - `editors/`: per-type edit fields, registered in `EDITORS`.
+  - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
+  - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
+  - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags), `AddLogSheet` (type grid). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
   - `DateTimeField`.
 - **Utilities:** `store/timeHelpers.ts` (`useNow`, `useFormatTime`, `formatDayLabel`, ISO date helpers; re-exports the shared formatters).
@@ -59,4 +63,5 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-19: SDK 57 alignment done. (The earlier exit-code-7 crash was `expo-router@6` (SDK 54) running against SDK 57's `@expo/router-server`.)
 - 2026-10-19: **Phase 1 (foundation) done**: schema v2, Drizzle migrations, children + onboarding, settings (units/clock), tabs, edit/backdate, persistent timers, History tab. Tests and typecheck pass; iOS + Android bundles build.
 - Not yet verified on a physical device in Expo Go.
-- **Next: Phase 2** (tracking parity: FeedModal rework with a live L/R breast timer, sheets for pumping/growth/temperature/medication/potty/activity/milestone/note, a "+" sheet on the dock, editors for the new types).
+- 2026-10-19: **Phase 2 (tracking parity) done**: all 11 types can be logged and edited; live L/R breastfeeding timer; diaper long-press for details; "More" grid; medication-due cards. Tests and typecheck pass; iOS + Android bundles build.
+- **Next: Phase 3**, the Baby Buddy import (see PROJECT.md 1.3).

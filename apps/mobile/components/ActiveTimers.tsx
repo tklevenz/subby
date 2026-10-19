@@ -6,6 +6,7 @@ import { Square } from 'lucide-react-native';
 import { activeTimers, formatDuration } from '@kindred-log/shared';
 import { useLogStore } from '../store/useLogStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useSheetStore } from '../store/useSheetStore';
 import { useFormatTime, useNow } from '../store/timeHelpers';
 import { logDisplay } from './logDisplay';
 
@@ -13,6 +14,7 @@ import { logDisplay } from './logDisplay';
 export default function ActiveTimers() {
   const logs = useLogStore((s) => s.logs);
   const stopTimer = useLogStore((s) => s.stopTimer);
+  const openSheet = useSheetStore((s) => s.open);
   const units = useSettingsStore((s) => s.units);
   const formatTime = useFormatTime();
   const now = useNow();
@@ -27,7 +29,10 @@ export default function ActiveTimers() {
         return (
           <Pressable
             key={t.id}
-            onPress={() => router.push(`/entry/${t.id}`)}
+            // A running breastfeed opens the side-switching controls; other timers open the editor.
+            onPress={() =>
+              t.payload.type === 'feed' ? openSheet({ kind: 'feed', tab: 'breast' }) : router.push(`/entry/${t.id}`)
+            }
             className={`flex-row items-center rounded-xl border px-3 py-2.5 ${d.bg}`}
           >
             {d.icon}
@@ -35,9 +40,11 @@ export default function ActiveTimers() {
             <Text className="text-white font-semibold mr-3">{formatDuration(now - t.startedAt)}</Text>
             <Pressable
               hitSlop={10}
-              onPress={() => {
+              onPress={async () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                stopTimer(t.id);
+                await stopTimer(t.id);
+                // Pumped amount is only known at the end: go straight to the editor.
+                if (t.payload.type === 'pumping') router.push(`/entry/${t.id}`);
               }}
               className="bg-slate-800 rounded-full p-2"
             >

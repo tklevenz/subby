@@ -3,3 +3,7 @@ export * from './schemas/child.schema';
 export * from './domain/units';
 export * from './domain/time';
 export * from './domain/summary';
+export * from './domain/feedTimer';
+export * from './domain/recent';
+export * from './domain/milestones';
+export * from './domain/validate';

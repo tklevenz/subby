@@ -2,7 +2,13 @@ import { create } from 'zustand';
 import { eq, and, desc, gte, isNull, or, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
-import { TIMED_LOG_TYPES, type LogEntry, type LogPayload } from '@kindred-log/shared';
+import {
+  TIMED_LOG_TYPES,
+  pauseFeed,
+  type LogEntry,
+  type LogPayload,
+  type PayloadOf,
+} from '@kindred-log/shared';
 
 const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 30;
@@ -102,7 +108,15 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   startTimer: (payload, startedAt) => get().addLog(payload, { startedAt, endedAt: null }),
 
-  stopTimer: (id, patch = {}) => get().updateLog(id, { ...patch, endedAt: Date.now() }),
+  stopTimer: (id, patch = {}) => {
+    const now = Date.now();
+    const current = get().logs.find((l) => l.id === id);
+    // Breastfeeding: fold the running side's elapsed time into its total.
+    const payload = current?.payload.type === 'feed'
+      ? pauseFeed({ ...current.payload, ...(patch.payload as Partial<PayloadOf<'feed'>>) }, now)
+      : patch.payload;
+    return get().updateLog(id, { ...patch, payload, endedAt: now });
+  },
 
   updateLog: async (id, patch) => {
     const current = get().logs.find((l) => l.id === id);

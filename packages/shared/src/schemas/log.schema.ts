@@ -28,6 +28,9 @@ export const FeedPayloadSchema = z.object({
   leftSeconds: z.number().int().nonnegative().optional(),
   rightSeconds: z.number().int().nonnegative().optional(),
   lastSide: z.enum(['left', 'right']).optional(),
+  // Live breastfeeding timer state (only while the entry is running; see domain/feedTimer.ts).
+  timerSide: z.enum(['left', 'right']).optional(),
+  timerSideSince: z.number().int().optional(),
   foods: z.array(z.string()).optional(),
   reaction: z.string().optional(),
   allergen: z.boolean().optional(),

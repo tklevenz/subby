@@ -6,8 +6,9 @@ import {
   describeFeed,
   lastOfType,
   lastWakeAt,
+  medicationsDue,
 } from '@kindred-log/shared';
-import { Droplets, Moon, Sun, Timer } from 'lucide-react-native';
+import { Droplets, Moon, Pill, Sun, Timer } from 'lucide-react-native';
 import { useLogStore } from '../store/useLogStore';
 import { formatDuration, formatRelative, useNow } from '../store/timeHelpers';
 import ChildSwitcher from './ChildSwitcher';
@@ -49,6 +50,7 @@ export default function StatusHeader() {
       diaper: diaper ? { at: diaper.startedAt, detail: describeDiaper(diaper.payload) } : null,
       sleepStart: activeSleep(logs)?.startedAt ?? null,
       wakeAt: lastWakeAt(logs),
+      meds: medicationsDue(logs),
     };
   }, [logs]);
 
@@ -99,6 +101,19 @@ export default function StatusHeader() {
             <Text className="text-sm text-slate-500">No sleep tracked</Text>
           )}
         </Card>
+
+        {/* Next doses: shown until 12 h past due, then assumed finished. */}
+        {summary.meds
+          .filter((m) => now - m.dueAt < 12 * 3_600_000)
+          .map((m) => (
+            <Card key={m.name} wide icon={<Pill color="#93c5fd" size={16} />} title={m.name}>
+              <Text className={`text-sm font-medium ${m.dueAt <= now ? 'text-red-300' : 'text-blue-200'}`}>
+                {m.dueAt <= now
+                  ? `Next dose due · overdue by ${formatDuration(now - m.dueAt)}`
+                  : `Next dose in ${formatDuration(m.dueAt - now)}`}
+              </Text>
+            </Card>
+          ))}
       </View>
     </View>
   );
