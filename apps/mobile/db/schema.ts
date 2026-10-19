@@ -12,7 +12,8 @@ export const logsTable = sqliteTable(
     isDeleted: integer('is_deleted', { mode: 'boolean' }).notNull().default(false),
     syncStatus: text('sync_status', { enum: ['pending', 'synced'] }).notNull().default('pending'),
     // Drizzle automatically serializes/deserializes the JSON column locally.
-    // Because op-sqlite uses SQLCipher, this entire database file is encrypted on disk.
+    // NOTE: expo-sqlite in Expo Go is unencrypted. SQLCipher (useSQLCipher plugin option)
+    // requires a dev client build.
     payload: text('payload', { mode: 'json' }).$type<LogPayload>().notNull(),
   },
   (table) => ({

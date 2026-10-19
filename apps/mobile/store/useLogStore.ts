@@ -1,16 +1,17 @@
 import { create } from 'zustand';
 import { eq, and, desc } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import { db } from '../db/client';
-import { logsTable } from '../db/schema';
+import { db, schema } from '../db/client';
 import { LogEntry, LogPayload } from '@kindred/shared';
 
 interface LogState {
   activeChildId: string;
   logs: LogEntry[];
   isLoading: boolean;
+
   loadLogs: (childId: string) => Promise<void>;
   addLog: (payload: LogPayload, startedAt?: number) => Promise<void>;
+  updateLog: (id: string, payload: Partial<LogPayload>) => Promise<void>;
   softDeleteLog: (id: string) => Promise<void>;
 }
 
@@ -23,9 +24,14 @@ export const useLogStore = create<LogState>((set, get) => ({
     set({ isLoading: true, activeChildId: childId });
     const rows = await db
       .select()
-      .from(logsTable)
-      .where(and(eq(logsTable.childId, childId), eq(logsTable.isDeleted, false)))
-      .orderBy(desc(logsTable.startedAt))
+      .from(schema.logsTable)
+      .where(
+        and(
+          eq(schema.logsTable.childId, childId),
+          eq(schema.logsTable.isDeleted, false),
+        )
+      )
+      .orderBy(desc(schema.logsTable.startedAt))
       .limit(100);
 
     set({ logs: rows, isLoading: false });
@@ -45,7 +51,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     };
 
     // 1. Write to encrypted local SQLite
-    await db.insert(logsTable).values(newEntry);
+    await db.insert(schema.logsTable).values(newEntry);
 
     // 2. Update Zustand state immediately and keep sorted by startedAt DESC
     set((state) => ({
@@ -53,12 +59,40 @@ export const useLogStore = create<LogState>((set, get) => ({
     }));
   },
 
+  updateLog: async (id: string, payloadPatch: Partial<LogPayload>) => {
+    const now = Date.now();
+    const current = get().logs.find((l) => l.id === id);
+    if (!current) return;
+
+    const mergedPayload: LogPayload = {
+      ...current.payload,
+      ...payloadPatch,
+    } as LogPayload;
+
+    // 1. Upsert in SQLite
+    await db
+      .update(schema.logsTable)
+      .set({
+        payload: mergedPayload,
+        updatedAt: now,
+        syncStatus: 'pending',
+      })
+      .where(eq(schema.logsTable.id, id));
+
+    // 2. Reflect in Zustand
+    set((state) => ({
+      logs: state.logs.map((l) =>
+        l.id === id ? { ...l, payload: mergedPayload, updatedAt: now } : l,
+      ),
+    }));
+  },
+
   softDeleteLog: async (id: string) => {
     const now = Date.now();
     await db
-      .update(logsTable)
+      .update(schema.logsTable)
       .set({ isDeleted: true, updatedAt: now, syncStatus: 'pending' })
-      .where(eq(logsTable.id, id));
+      .where(eq(schema.logsTable.id, id));
 
     set((state) => ({
       logs: state.logs.filter((log) => log.id !== id),
