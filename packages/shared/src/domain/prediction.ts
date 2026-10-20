@@ -5,7 +5,7 @@ import { isNap, addDays } from './stats';
 import { startOfDay } from './time';
 
 // SweetSpot-style nap prediction, entirely on device: typical wake windows for the
-// baby's (corrected) age, nudged towards the baby's own last 7 days.
+// baby's age, nudged towards the baby's own last 7 days.
 
 const MIN = 60_000;
 const H = 60 * MIN;
@@ -186,7 +186,7 @@ const atClock = (ref: number, minutes: number) => addDays(startOfDay(ref), Math.
  */
 export function predictNextSleep(
   logs: LogEntry[],
-  child: Pick<Child, 'birthDate' | 'dueDate'>,
+  child: Pick<Child, 'birthDate'>,
   now: number,
 ): SleepPrediction | null {
   const sleeps = logs.filter(isSleep);
@@ -257,7 +257,7 @@ export type ScheduleItem =
  */
 export function suggestedSchedule(
   logs: LogEntry[],
-  child: Pick<Child, 'birthDate' | 'dueDate'>,
+  child: Pick<Child, 'birthDate'>,
   now: number,
 ): { items: ScheduleItem[]; basis: 'age' | 'personal'; norms: AgeNorms } {
   const norms = ageNorms(growthAgeMonths(child, now));

@@ -13,12 +13,9 @@ const isoToMs = (iso: string) => {
   return new Date(y, m - 1, d).getTime();
 };
 
-/**
- * Age in fractional months at `at`. Uses the due date when set (corrected age for babies
- * born early, as pediatricians do through 24 months).
- */
-export function growthAgeMonths(child: Pick<Child, 'birthDate' | 'dueDate'>, at: number): number {
-  const from = isoToMs(child.dueDate ?? child.birthDate);
+/** Age in fractional months at `at`, from the birth date (corrected age isn't supported). */
+export function growthAgeMonths(child: Pick<Child, 'birthDate'>, at: number): number {
+  const from = isoToMs(child.birthDate);
   // Calendar time: a DST change in between shouldn't shift the age by an hour.
   const dstShift = (new Date(from).getTimezoneOffset() - new Date(at).getTimezoneOffset()) * 60_000;
   return (at - from + dstShift) / 86_400_000 / DAYS_PER_MONTH;
@@ -92,7 +89,7 @@ export function percentileCurves(measure: GrowthMeasure, sex: WhoSex, step = 0.5
 export type GrowthPoint = { id: string; at: number; months: number; value: number };
 
 /** Measurements of one kind in chart units (kg / cm), oldest first. */
-export function growthPoints(logs: LogEntry[], child: Pick<Child, 'birthDate' | 'dueDate'>, measure: GrowthMeasure): GrowthPoint[] {
+export function growthPoints(logs: LogEntry[], child: Pick<Child, 'birthDate'>, measure: GrowthMeasure): GrowthPoint[] {
   const out: GrowthPoint[] = [];
   for (const l of logs) {
     const p = l.payload;

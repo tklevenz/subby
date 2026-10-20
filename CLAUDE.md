@@ -24,7 +24,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `feedTimer`: breastfeeding L/R timer state lives in the feed payload (`timerSide`, `timerSideSince`); `toggleSide`/`pauseFeed`.
   - `recent` (food/tag/medication suggestions, `medicationsDue`), `milestones` (bundled checklist).
   - `stats` (`dailyStats` per-day totals, splitting sleep across midnight; `averageStats` over tracked days; `sleepSegments`; `solidsReport`; DST-safe `addDays`/`dayRange`).
-  - `growth`: WHO LMS z-scores/percentiles (0–24 months, corrected age via due date), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
+  - `growth`: WHO LMS z-scores/percentiles (0–24 months, from the birth date; corrected age for preterm babies was dropped on purpose, and `dueDate` is stored but unused), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
   - `prediction`: on-device nap prediction. Age norms (`ageNorms`), plus `sleepHabits` (the last 7 days; night sleep logged in pieces is merged into one night), `predictNextSleep` and `suggestedSchedule`. Heuristic, verified against the real Baby Buddy history.
   - `reminders`: `planReminders` (pure) turns `ReminderSettings` + per-child state into the notifications to schedule (stable `kl:` ids).
   - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).

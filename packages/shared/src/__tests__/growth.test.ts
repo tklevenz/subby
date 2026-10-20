@@ -34,16 +34,15 @@ describe('WHO LMS', () => {
 });
 
 describe('growth helpers', () => {
-  it('uses corrected age when a due date is set', () => {
+  it('measures age from the birth date (across a DST change)', () => {
     const at = new Date(2026, 3, 1).getTime();
-    expect(growthAgeMonths({ birthDate: '2026-01-01', dueDate: null }, at)).toBeCloseTo(90 / 30.4375, 6);
-    expect(growthAgeMonths({ birthDate: '2026-01-01', dueDate: '2026-02-01' }, at)).toBeCloseTo(59 / 30.4375, 6);
+    expect(growthAgeMonths({ birthDate: '2026-01-01' }, at)).toBeCloseTo(90 / 30.4375, 6);
   });
 
   it('extracts points in chart units', () => {
     const logs = [entry({ type: 'growth', weightG: 5000, headCm: 40 }, new Date(2026, 2, 1).getTime())];
-    expect(growthPoints(logs, { birthDate: '2026-01-01', dueDate: null }, 'weightKg')[0].value).toBe(5);
-    expect(growthPoints(logs, { birthDate: '2026-01-01', dueDate: null }, 'lengthCm')).toEqual([]);
+    expect(growthPoints(logs, { birthDate: '2026-01-01' }, 'weightKg')[0].value).toBe(5);
+    expect(growthPoints(logs, { birthDate: '2026-01-01' }, 'lengthCm')).toEqual([]);
   });
 
   it('formats percentiles', () => {

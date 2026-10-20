@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, View, Switch, Text } from 'react-native';
+import { Pressable, View, Text } from 'react-native';
 import { Camera } from 'lucide-react-native';
 import type { Child } from '@kindred-log/shared';
 import type { ChildInput } from '../store/useChildStore';
@@ -27,7 +27,6 @@ export default function ChildForm({
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [birthDate, setBirthDate] = useState(initial?.birthDate ?? toIsoDate(Date.now()));
-  const [dueDate, setDueDate] = useState<string | null>(initial?.dueDate ?? null);
   const [sex, setSex] = useState<Child['sex']>(initial?.sex ?? null);
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photoUri ?? null);
   const [menu, setMenu] = useState(false);
@@ -57,21 +56,10 @@ export default function ChildForm({
       <FieldLabel>Sex (for growth percentiles)</FieldLabel>
       <Segmented options={SEX_OPTIONS} value={sex} onChange={setSex} />
 
-      <View className="flex-row items-center justify-between mt-4">
-        <Text className="text-slate-300 text-sm flex-1">Born early? Use due date for corrected age</Text>
-        <Switch value={dueDate !== null} onValueChange={(on) => setDueDate(on ? birthDate : null)} />
-      </View>
-      {dueDate !== null ? (
-        <>
-          <FieldLabel>Due date</FieldLabel>
-          <DateTimeField mode="date" value={fromIsoDate(dueDate)} onChange={(ms) => setDueDate(toIsoDate(ms))} />
-        </>
-      ) : null}
-
       <Button
         label={submitLabel}
         disabled={name.trim().length === 0}
-        onPress={() => onSubmit({ name: name.trim(), birthDate, dueDate, sex, photoUri })}
+        onPress={() => onSubmit({ name: name.trim(), birthDate, sex, photoUri })}
       />
     </View>
   );

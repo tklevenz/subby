@@ -7,7 +7,7 @@ export const ChildSchema = z.object({
   name: z.string().min(1),
   birthDate: isoDate,
   birthTime: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
-  dueDate: isoDate.nullable(),    // enables corrected-age calculations
+  dueDate: isoDate.nullable(),    // stored (e.g. from imports) but not used; ages are from birthDate
   sex: z.enum(['female', 'male', 'other']).nullable(),
   photoUri: z.string().nullable(),
   updatedAt: z.number().int(),

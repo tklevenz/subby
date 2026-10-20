@@ -51,7 +51,7 @@ export default function GrowthChart({
   const [width, setWidth] = useState(0);
   const lastMonths = points.length ? points[points.length - 1].months : 0;
   const xMax = Math.max(6, Math.min(WHO_MAX_MONTHS, Math.ceil(lastMonths) + 2), Math.ceil(lastMonths));
-  // Corrected age is negative for measurements before the due date.
+  // Only negative for a measurement dated before the birth date (a data-entry slip).
   const xMin = Math.min(0, Math.floor(points[0]?.months ?? 0));
 
   const curves = useMemo(

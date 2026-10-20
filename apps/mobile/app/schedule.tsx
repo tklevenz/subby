@@ -63,8 +63,7 @@ export default function ScheduleScreen() {
 
       <Text className="text-slate-500 text-xs mt-4 leading-5">
         Typical at this age: {norms.naps} nap{norms.naps === 1 ? '' : 's'} a day, awake{' '}
-        {formatHoursMinutes(norms.wakeMin * 60_000)}–{formatHoursMinutes(norms.wakeMax * 60_000)} between sleeps
-        {child.dueDate ? ' (using corrected age)' : ''}.{' '}
+        {formatHoursMinutes(norms.wakeMin * 60_000)}–{formatHoursMinutes(norms.wakeMax * 60_000)} between sleeps.{' '}
         {schedule.basis === 'personal'
           ? `Adjusted towards ${child.name}'s own rhythm from the last 7 days.`
           : 'Log a few days of sleep to personalize this.'}

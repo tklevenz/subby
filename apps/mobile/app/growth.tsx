@@ -76,7 +76,7 @@ export default function GrowthScreen() {
       <View ref={chartRef} collapsable={false} className="mt-4 bg-slate-950 py-3">
         <Text className="text-white font-semibold text-base">{child.name} · {TITLES[measure]}</Text>
         <Text className="text-slate-500 text-xs mb-3">
-          {chartUnitLabel(measure, units)} by age in months{child.dueDate ? ' (corrected for due date)' : ''}
+          {chartUnitLabel(measure, units)} by age in months
           {sex ? ` · WHO ${sex === 'female' ? 'girls' : 'boys'} 3rd–97th percentile` : ''}
         </Text>
         <GrowthChart measure={measure} sex={sex} points={points} units={units} />

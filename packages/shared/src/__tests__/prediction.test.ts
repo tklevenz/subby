@@ -7,7 +7,7 @@ const MIN = 60_000;
 const today = new Date(2026, 9, 20).getTime();
 const at = (day: number, h: number, m = 0) => addDays(today, day) + (h * 60 + m) * MIN;
 // About 8 months old.
-const child = { birthDate: '2026-02-15', dueDate: null };
+const child = { birthDate: '2026-02-15' };
 
 /** A regular 2-nap day: wake 07:00, naps 09:30–10:30 and 13:30–15:00, bed 19:30. */
 function week(days: number) {

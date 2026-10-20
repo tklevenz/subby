@@ -119,7 +119,6 @@ function Profile({ child }: { child: Child }) {
         <Text className="text-violet-200 mt-1">{formatAgeLong(child.birthDate, now)}</Text>
         <Text className="text-slate-400 text-xs mt-1">
           Born {fmtDate(isoToMs(child.birthDate))}
-          {child.dueDate && child.dueDate !== child.birthDate ? ` · corrected age ${formatAgeLong(child.dueDate, now)}` : ''}
         </Text>
         {celebrate ? (
           <View className="flex-row items-center mt-3 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40">
