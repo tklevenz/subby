@@ -17,7 +17,7 @@ import {
 import { Button, Card, FieldLabel, Row, Segmented, TextField } from '../../components/ui';
 import { BBClient, BBError } from '../../features/import/babybuddy/client';
 import { previewImport, runImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../features/import/babybuddy/importer';
-import { useChildStore } from '../../store/useChildStore';
+import { canAddChild, useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
@@ -28,6 +28,7 @@ const LABELS: Record<BBEndpoint, string> = {
 };
 
 const NEW = 'new';
+const SKIP = 'skip';
 
 type Step =
   | { kind: 'connect' }
@@ -136,7 +137,7 @@ export default function BabyBuddyImport() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setStep({ kind: 'done', result });
             } catch (e) {
-              setStep({ kind: 'done', result: { imported: 0, skipped: 0, cancelled: false, failed: [{ ref: 'import', reason: e instanceof Error ? e.message : String(e) }] } });
+              setStep({ kind: 'done', result: { imported: 0, skipped: 0, excluded: 0, cancelled: false, failed: [{ ref: 'import', reason: e instanceof Error ? e.message : String(e) }] } });
             } finally {
               await useChildStore.getState().hydrate();
               const active = useSettingsStore.getState().activeChildId;
@@ -172,6 +173,7 @@ export default function BabyBuddyImport() {
           <Card>
             <Row label="Imported" value={String(step.result.imported)} />
             <Row label="Already imported (skipped)" value={String(step.result.skipped)} />
+            {step.result.excluded ? <Row label="Left out (children not imported)" value={String(step.result.excluded)} /> : null}
             <Row label="Couldn't import" value={String(step.result.failed.length)} />
           </Card>
           {step.result.failed.slice(0, 5).map((f) => (
@@ -194,7 +196,7 @@ function Review({
 }: {
   client: BBClient;
   preview: ImportPreview;
-  onStart: (units: ImportUnits, childMap: Map<number, string>, fallbackChildId: string) => void;
+  onStart: (units: ImportUnits, childMap: Map<number, string | null>, fallbackChildId: string) => void;
 }) {
   const kindredChildren = useChildStore((s) => s.children);
   const { addChild, updateChild } = useChildStore.getState();
@@ -202,29 +204,45 @@ function Review({
   const [units, setUnits] = useState(preview.units);
   const total = BB_ENDPOINTS.reduce((n, e) => n + preview.counts[e], 0);
 
-  // Default mapping: previously imported child → same child; else same birth date; else new.
-  const [mapping, setMapping] = useState<Record<number, string>>(() =>
-    Object.fromEntries(
+  // Default mapping: previously imported child → same child; else same birth date; else new
+  // (or "don't import" once the free child limit is reached).
+  const [mapping, setMapping] = useState<Record<number, string>>(() => {
+    let created = 0;
+    return Object.fromEntries(
       preview.children.map((bb) => {
         const ref = bbRef(client.host, 'children', bb.id);
         const match = kindredChildren.find((k) => k.importRef === ref) ?? kindredChildren.find((k) => k.birthDate === bb.birth_date);
-        return [bb.id, match?.id ?? NEW];
+        if (match) return [bb.id, match.id];
+        if (!canAddChild(kindredChildren.length + created, settings.isPremium)) return [bb.id, SKIP];
+        created++;
+        return [bb.id, NEW];
       }),
-    ),
-  );
+    );
+  });
+
+  // Free covers one child: extra Baby Buddy children must go into an existing one.
+  const newCount = preview.children.filter((bb) => mapping[bb.id] === NEW).length;
+  const allSkipped = preview.children.length > 0 && preview.children.every((bb) => mapping[bb.id] === SKIP);
+  const overLimit = newCount > 0 && !canAddChild(kindredChildren.length + newCount - 1, settings.isPremium);
 
   const childOptions = useMemo(
-    () => [{ value: NEW, label: 'New child' }, ...kindredChildren.map((k) => ({ value: k.id, label: k.name }))],
+    () => [
+      { value: NEW, label: 'New child' },
+      ...kindredChildren.map((k) => ({ value: k.id, label: k.name })),
+      { value: SKIP, label: "Don't import" },
+    ],
     [kindredChildren],
   );
 
   const start = async () => {
     // Resolve mapping: create new children, tag matched ones with their BB ref for future re-runs.
-    const childMap = new Map<number, string>();
+    const childMap = new Map<number, string | null>();
     for (const bb of preview.children) {
       const ref = bbRef(client.host, 'children', bb.id);
       const target = mapping[bb.id];
-      if (target === NEW) {
+      if (target === SKIP) {
+        childMap.set(bb.id, null);
+      } else if (target === NEW) {
         const child = await addChild(bbChildInput(bb, ref));
         childMap.set(bb.id, child.id);
       } else {
@@ -233,7 +251,7 @@ function Review({
         childMap.set(bb.id, target);
       }
     }
-    const fallback = childMap.values().next().value ?? kindredChildren[0]?.id;
+    const fallback = [...childMap.values()].find((id) => id !== null) ?? kindredChildren[0]?.id;
     if (!fallback) return;
     if (!settings.activeChildId) await settings.set('activeChildId', fallback);
     onStart(units, childMap, fallback);
@@ -270,7 +288,12 @@ function Review({
         </View>
       ))}
 
-      <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0} />
+      {overLimit ? (
+        <Text className="text-amber-300 mt-2 leading-5">
+          The free version tracks one child. Import the others into an existing child, choose "Don't import", or get Premium to add them as their own.
+        </Text>
+      ) : null}
+      <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0 || overLimit || allSkipped} />
       {preview.children.length === 0 ? <Text className="text-amber-300 mt-2">No children found on this server.</Text> : null}
     </View>
   );

@@ -3,6 +3,7 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { LOG_TYPES, logsToCsv, type LogType } from '@kindred-log/shared';
+import PremiumGate from '../components/PremiumGate';
 import { TYPE_META } from '../components/logTypes';
 import { Button, Chip, FieldLabel, Segmented } from '../components/ui';
 import { fetchLogs } from '../store/queries';
@@ -21,7 +22,6 @@ const RANGES = [
 export default function ExportScreen() {
   const child = useActiveChild();
   const isPremium = useSettingsStore((s) => s.isPremium);
-  const setSetting = useSettingsStore((s) => s.set);
   const [range, setRange] = useState<(typeof RANGES)[number]['value']>('all');
   const [counts, setCounts] = useState<Partial<Record<LogType, number>>>({});
   const [selected, setSelected] = useState<Set<LogType> | null>(null);
@@ -39,14 +39,10 @@ export default function ExportScreen() {
 
   if (!isPremium) {
     return (
-      <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20 }}>
-        <Text className="text-white text-lg font-semibold">CSV export is a Premium feature</Text>
-        <Text className="text-slate-400 mt-2 leading-6">
-          Export every entry as a spreadsheet to share with your pediatrician or keep your own backup.
-        </Text>
-        <Text className="text-slate-500 mt-4">Premium isn't available yet.</Text>
-        {__DEV__ ? <Button label="Enable Premium (dev build)" variant="ghost" onPress={() => setSetting('isPremium', true)} /> : null}
-      </ScrollView>
+      <PremiumGate
+        title="CSV export is a Premium feature"
+        description="Export every entry as a spreadsheet to share with your pediatrician or keep your own backup."
+      />
     );
   }
 

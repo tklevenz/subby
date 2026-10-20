@@ -7,9 +7,38 @@ import { activeReminderCount, formatAge } from '@kindred-log/shared';
 import { remindersAvailable, setRemindersEnabled } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';
-import { useChildStore } from '../../store/useChildStore';
+import { useCanAddChild, useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Card, Row, Segmented } from '../../components/ui';
+
+/** Card in the children strip. Same slots for every card, so they line up. */
+function ChildCard({
+  avatar,
+  title,
+  subtitle,
+  subtitleAccent,
+  dashed,
+  onPress,
+}: {
+  avatar: React.ReactNode;
+  title: string;
+  subtitle: string;
+  subtitleAccent?: boolean;
+  dashed?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`items-center w-28 py-4 px-2 rounded-2xl border ${dashed ? 'border-dashed border-slate-700' : 'bg-slate-900 border-slate-800'}`}
+    >
+      <View className="w-16 h-16">{avatar}</View>
+      <Text className={`font-semibold mt-2 ${dashed ? 'text-slate-300' : 'text-white'}`} numberOfLines={1}>{title}</Text>
+      {/* Always rendered (even empty) so every card has the same height. */}
+      <Text className={`text-xs ${subtitleAccent ? 'text-violet-300' : 'text-slate-400'}`} numberOfLines={1}>{subtitle || ' '}</Text>
+    </Pressable>
+  );
+}
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <Text className="text-xs font-semibold text-slate-400 uppercase mt-6 mb-2 ml-1">{children}</Text>;
@@ -19,6 +48,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const children = useChildStore((s) => s.children);
   const activeChild = useActiveChild();
+  const canAddChild = useCanAddChild();
   const units = useSettingsStore((s) => s.units);
   const clock = useSettingsStore((s) => s.clock);
   const isPremium = useSettingsStore((s) => s.isPremium);
@@ -35,25 +65,26 @@ export default function SettingsScreen() {
       <SectionTitle>Children</SectionTitle>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
         {children.map((c) => (
-          <Pressable
+          <ChildCard
             key={c.id}
             onPress={() => router.push(`/child/${c.id}`)}
-            className="items-center w-28 py-4 px-2 rounded-2xl bg-slate-900 border border-slate-800"
-          >
-            <ChildAvatar child={c} size={64} ring={c.id === activeChild?.id} />
-            <Text className="text-white font-semibold mt-2" numberOfLines={1}>{c.name}</Text>
-            <Text className="text-slate-400 text-xs" numberOfLines={1}>{formatAge(c.birthDate, Date.now())}</Text>
-          </Pressable>
+            avatar={<ChildAvatar child={c} size={64} ring={c.id === activeChild?.id} />}
+            title={c.name}
+            subtitle={formatAge(c.birthDate, Date.now())}
+          />
         ))}
-        <Pressable
+        <ChildCard
+          dashed
           onPress={() => router.push('/child/new')}
-          className="items-center justify-center w-28 py-4 px-2 rounded-2xl border border-dashed border-slate-700"
-        >
-          <View className="w-16 h-16 rounded-full bg-slate-800 items-center justify-center">
-            <Plus color="#94a3b8" size={24} />
-          </View>
-          <Text className="text-slate-300 mt-2">Add child</Text>
-        </Pressable>
+          avatar={
+            <View className="w-16 h-16 rounded-full bg-slate-800 items-center justify-center">
+              <Plus color="#94a3b8" size={24} />
+            </View>
+          }
+          title="Add child"
+          subtitle={canAddChild ? '' : 'Premium'}
+          subtitleAccent
+        />
       </ScrollView>
 
       <SectionTitle>Notifications</SectionTitle>

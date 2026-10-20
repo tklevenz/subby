@@ -64,6 +64,7 @@ export type ImportProgress = { endpoint: BBEndpoint; done: number; total: number
 export type ImportResult = {
   imported: number;
   skipped: number; // already imported earlier (same server + record id)
+  excluded: number; // belongs to a Baby Buddy child the user chose not to import
   failed: { ref: string; reason: string }[];
   cancelled: boolean;
 };
@@ -77,14 +78,15 @@ export async function runImport(opts: {
   units: ImportUnits;
   counts: Record<BBEndpoint, number>;
   /** Baby Buddy child id → Kindred child id. */
-  childMap: Map<number, string>;
+  /** BB child id → Kindred child id, or null to leave that child's records out. */
+  childMap: Map<number, string | null>;
   /** For records without a child (BB allows that on feedings/sleep/pumping…). */
   fallbackChildId: string;
   onProgress: (p: ImportProgress) => void;
   isCancelled: () => boolean;
 }): Promise<ImportResult> {
   const { client, units, childMap, fallbackChildId, onProgress, isCancelled } = opts;
-  const result: ImportResult = { imported: 0, skipped: 0, failed: [], cancelled: false };
+  const result: ImportResult = { imported: 0, skipped: 0, excluded: 0, failed: [], cancelled: false };
 
   for (const endpoint of BB_ENDPOINTS) {
     const total = opts.counts[endpoint];
@@ -100,7 +102,12 @@ export async function runImport(opts: {
       for (const record of page.results) {
         try {
           const m = mapRecord(endpoint, record, client.host, units);
-          const childId = (m.bbChildId !== null && childMap.get(m.bbChildId)) || fallbackChildId;
+          const mapped = m.bbChildId !== null && childMap.has(m.bbChildId) ? childMap.get(m.bbChildId)! : fallbackChildId;
+          if (mapped === null) {
+            result.excluded++;
+            continue;
+          }
+          const childId = mapped;
           rows.push({
             id: uuidv7(),
             childId,

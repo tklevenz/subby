@@ -55,7 +55,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `app/schedule.tsx` (next sleep + suggested day; the Home wake-window card links here), `app/reminders.tsx`.
   - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV, Premium-gated).
   - `app/entry/[id].tsx`: edit/backdate any entry.
-  - `app/child/new.tsx`: add a child (modal).
+  - `app/child/new.tsx`: add a child (modal). It shows `PremiumGate` instead once the free limit is reached.
+  - **Premium gates** (`isPremium` stub; dev toggle in Settings):
+    - CSV export.
+    - More than `FREE_CHILD_LIMIT` (1) children. This is checked by `useCanAddChild` in the UI and enforced again in `useChildStore.addChild`.
+    - The Baby Buddy import defaults extra children to "Don't import" for free users.
   - `app/child/[id]/index.tsx`: the child's profile page (photo, age, next age milestone, growth and milestones at a glance, switch-to).
   - `app/child/[id]/edit.tsx`: edit details; the danger zone deletes a child after the user types its name.
   - Settings shows children as an avatar strip linking to their profiles. App-wide settings stay in Settings.

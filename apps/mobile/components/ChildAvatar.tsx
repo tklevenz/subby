@@ -36,7 +36,7 @@ export default function ChildAvatar({
   const showPhoto = child.photoUri && failed !== child.photoUri;
 
   return (
-    <View style={[style, ring ? { borderWidth: 2, borderColor: '#a78bfa', padding: 2 } : null]}>
+    <View style={style}>
       {showPhoto ? (
         <Image
           source={{ uri: child.photoUri! }}
@@ -50,6 +50,13 @@ export default function ChildAvatar({
           </Text>
         </View>
       )}
+      {/* Overlay rather than border/padding, so a ringed avatar keeps its exact size. */}
+      {ring ? (
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: size / 2, borderWidth: 2.5, borderColor: '#a78bfa' }}
+        />
+      ) : null}
     </View>
   );
 }
