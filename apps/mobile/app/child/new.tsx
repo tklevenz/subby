@@ -22,7 +22,7 @@ export default function NewChildScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <ChildForm
         submitLabel="Add child"
         onSubmit={async (input) => {

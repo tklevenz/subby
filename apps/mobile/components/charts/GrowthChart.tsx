@@ -10,6 +10,7 @@ import {
   type UnitSystem,
   type WhoSex,
 } from '@kindred-log/shared';
+import { colors } from '../../theme/colors';
 
 const PAD = { left: 34, right: 26, top: 8, bottom: 22 };
 const KG_PER_LB = 0.453592;
@@ -86,14 +87,14 @@ export default function GrowthChart({
         <Svg width={width} height={height}>
           {ticks(yMin, yMax, 5).map((v) => (
             <G key={`y${v}`}>
-              <Line x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke="#1e293b" />
-              <SvgText x={PAD.left - 6} y={y(v) + 3} fontSize={10} fill="#64748b" textAnchor="end">{String(v)}</SvgText>
+              <Line x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={colors.line} />
+              <SvgText x={PAD.left - 6} y={y(v) + 3} fontSize={10} fill={colors.inkFaint} textAnchor="end">{String(v)}</SvgText>
             </G>
           ))}
           {monthTicks.map((m) => (
             <G key={`x${m}`}>
-              <Line x1={x(m)} x2={x(m)} y1={PAD.top} y2={height - PAD.bottom} stroke="#1e293b" />
-              <SvgText x={x(m)} y={height - 6} fontSize={10} fill="#64748b" textAnchor="middle">{String(m)}</SvgText>
+              <Line x1={x(m)} x2={x(m)} y1={PAD.top} y2={height - PAD.bottom} stroke={colors.line} />
+              <SvgText x={x(m)} y={height - 6} fontSize={10} fill={colors.inkFaint} textAnchor="middle">{String(m)}</SvgText>
             </G>
           ))}
           {curves.map((c) => {
@@ -102,21 +103,21 @@ export default function GrowthChart({
             const median = c.percentile === 50;
             return (
               <G key={c.percentile}>
-                <Path d={d} stroke={median ? '#94a3b8' : '#475569'} strokeWidth={median ? 1.5 : 1} strokeDasharray={c.percentile === 3 || c.percentile === 97 ? '4 3' : undefined} fill="none" />
-                <SvgText x={x(last.months) + 4} y={y(last.value) + 3} fontSize={9} fill="#64748b">{String(c.percentile)}</SvgText>
+                <Path d={d} stroke={median ? colors.inkMuted : colors.inkGhost} strokeWidth={median ? 1.5 : 1} strokeDasharray={c.percentile === 3 || c.percentile === 97 ? '4 3' : undefined} fill="none" />
+                <SvgText x={x(last.months) + 4} y={y(last.value) + 3} fontSize={9} fill={colors.inkFaint}>{String(c.percentile)}</SvgText>
               </G>
             );
           })}
           {points.length > 1 ? (
             <Polyline
               points={points.map((p) => `${x(p.months)},${y(toChartUnit(measure, p.value, units))}`).join(' ')}
-              stroke="#a78bfa"
+              stroke={colors.violetStrong}
               strokeWidth={2}
               fill="none"
             />
           ) : null}
           {points.map((p) => (
-            <Circle key={p.id} cx={x(p.months)} cy={y(toChartUnit(measure, p.value, units))} r={4} fill="#a78bfa" stroke="#020617" strokeWidth={1.5} />
+            <Circle key={p.id} cx={x(p.months)} cy={y(toChartUnit(measure, p.value, units))} r={4} fill={colors.violetStrong} stroke={colors.ground} strokeWidth={1.5} />
           ))}
         </Svg>
       ) : null}

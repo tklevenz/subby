@@ -14,12 +14,12 @@ export default function Onboarding() {
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-950"
+      className="flex-1 bg-ground"
       contentContainerStyle={{ paddingTop: insets.top + 32, paddingHorizontal: 20, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-3xl font-bold text-white">Welcome to Kindred Log</Text>
-      <Text className="text-slate-400 mt-2 leading-6">
+      <Text className="text-3xl font-bold text-ink">Welcome to Kindred Log</Text>
+      <Text className="text-ink-muted mt-2 leading-6">
         Private, offline baby tracking. Everything stays on this device. Let's start with your little one.
       </Text>
       <ChildForm
@@ -30,7 +30,7 @@ export default function Onboarding() {
           // The protected route guard swaps to the tabs once a child exists.
         }}
       />
-      <Text className="text-slate-500 text-center mt-8">Coming from Baby Buddy?</Text>
+      <Text className="text-ink-faint text-center mt-8">Coming from Baby Buddy?</Text>
       <Button label="Import from Baby Buddy" variant="ghost" onPress={() => router.push('/import/babybuddy')} />
     </ScrollView>
   );

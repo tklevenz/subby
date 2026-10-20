@@ -1,0 +1,277 @@
+import React, { useMemo } from 'react';
+import { Alert, Pressable, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { Activity, Baby, CalendarClock, ChevronRight, Droplets, History, Milk, Moon, Pill, Plus } from 'lucide-react-native';
+import {
+  activeSleep,
+  describeDiaper,
+  describeFeed,
+  formatDuration,
+  formatHoursMinutes,
+  formatRelative,
+  isRunning,
+  lastOfType,
+  lastWakeAt,
+  medicationsDue,
+  predictNextSleep,
+  startOfDay,
+  suggestedNextSide,
+  type Child,
+  type LogEntry,
+} from '@kindred-log/shared';
+import { useLogStore } from '../../store/useLogStore';
+import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
+import { useSheetStore } from '../../store/useSheetStore';
+import { useFormatTime, useNow } from '../../store/timeHelpers';
+import { colors } from '../../theme/colors';
+
+const TILES: HomeTile[] = ['sleep', 'feed', 'diaper'];
+const LABEL: Record<HomeTile, string> = { sleep: 'Sleep', feed: 'Feed', diaper: 'Diaper' };
+
+type TileContent = {
+  /** Small line above the value ("Awake for"). */
+  eyebrow?: string;
+  value: string;
+  lines: string[];
+  /** What a tap does, shown on the large tile. */
+  hint: string;
+  active?: boolean;
+  onPress: () => void;
+};
+
+/**
+ * Home: the pinned tile on top (sleep by default), the other two side by side below, then
+ * what's coming up and shortcuts. Long-press a tile to pin it; saved per child.
+ */
+export default function HomeTiles({ child }: { child: Child }) {
+  const logs = useLogStore((s) => s.logs);
+  const homeTop = useSettingsStore((s) => s.homeTop);
+  const setSetting = useSettingsStore((s) => s.set);
+  const now = useNow();
+  const top = homeTop[child.id] ?? 'sleep';
+  const content = useTileContent(logs, child, now);
+
+  const longPress = (tile: HomeTile) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    if (tile === top) {
+      Alert.alert(`${LABEL[tile]} is the top tile`, 'Long-press another tile to move it to the top.');
+      return;
+    }
+    Alert.alert(LABEL[tile], undefined, [
+      { text: 'Make this the top tile', onPress: () => setSetting('homeTop', { ...homeTop, [child.id]: tile }) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const others = TILES.filter((t) => t !== top);
+  return (
+    <View className="flex-1 px-4 pb-3 gap-2.5">
+      <Tile tile={top} large content={content[top]} onLongPress={() => longPress(top)} />
+      <View className="flex-1 flex-row gap-2.5">
+        {others.map((t) => (
+          <Tile key={t} tile={t} content={content[t]} onLongPress={() => longPress(t)} />
+        ))}
+      </View>
+      <UpNext logs={logs} now={now} />
+      <Shortcuts />
+    </View>
+  );
+}
+
+function useTileContent(logs: LogEntry[], child: Child, now: number): Record<HomeTile, TileContent> {
+  const formatTime = useFormatTime();
+  const startTimer = useLogStore((s) => s.startTimer);
+  const stopTimer = useLogStore((s) => s.stopTimer);
+  const open = useSheetStore((s) => s.open);
+  const minute = Math.floor(now / 60_000);
+  const prediction = useMemo(() => predictNextSleep(logs, child, minute * 60_000), [logs, child, minute]);
+
+  // "2h 15m ago" → value "2h 15m", first line "ago · <detail>".
+  const since = (at: number, detail: string) => {
+    const rel = formatRelative(now - at);
+    return rel.endsWith(' ago') ? { value: rel.slice(0, -4), first: `ago · ${detail}` } : { value: rel, first: detail };
+  };
+
+  const sleeping = activeSleep(logs);
+  const wakeAt = lastWakeAt(logs);
+  let sleep: TileContent;
+  if (sleeping) {
+    sleep = {
+      eyebrow: `${sleeping.payload.nap ? 'Napping' : 'Asleep'} since ${formatTime(sleeping.startedAt)}`,
+      value: formatDuration(now - sleeping.startedAt),
+      lines: [],
+      hint: 'Tap to wake up',
+      active: true,
+      onPress: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        stopTimer(sleeping.id);
+      },
+    };
+  } else {
+    const lines: string[] = [];
+    if (prediction?.kind === 'nap') {
+      lines.push(`Down for nap ${prediction.napIndex + 1} around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
+      if (prediction.napMinutes) lines.push(`Naps usually ~${formatHoursMinutes(prediction.napMinutes * 60_000)}`);
+    } else if (prediction) {
+      lines.push(`Bedtime around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
+    }
+    sleep = {
+      eyebrow: wakeAt !== null ? 'Awake for' : undefined,
+      value: wakeAt !== null ? formatHoursMinutes(now - wakeAt) : '–',
+      lines: wakeAt !== null ? lines : ['No sleep logged yet'],
+      hint: 'Tap to start sleep',
+      onPress: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        // Daytime sleeps default to naps; editable afterwards.
+        const hour = new Date().getHours();
+        startTimer({ type: 'sleep', nap: hour >= 7 && hour < 19 });
+      },
+    };
+  }
+
+  const runningFeed = logs.find((l) => l.logType === 'feed' && isRunning(l));
+  const lastFeed = logs.find((l) => l.logType === 'feed' && l.endedAt !== null);
+  const side = suggestedNextSide(logs);
+  let feed: TileContent;
+  if (runningFeed?.payload.type === 'feed') {
+    feed = {
+      eyebrow: 'Feeding',
+      value: formatDuration(now - runningFeed.startedAt),
+      lines: [describeFeed(runningFeed.payload)],
+      hint: 'Tap for sides',
+      active: true,
+      onPress: () => open({ kind: 'feed', tab: 'breast' }),
+    };
+  } else if (lastFeed?.payload.type === 'feed') {
+    const s = since(lastFeed.startedAt, describeFeed(lastFeed.payload));
+    feed = {
+      value: s.value,
+      lines: [s.first, ...(side ? [`Breast next: ${side === 'left' ? 'Left' : 'Right'}`] : [])],
+      hint: 'Tap to log a feed',
+      onPress: () => open({ kind: 'feed' }),
+    };
+  } else {
+    feed = { value: '–', lines: ['No feeds yet'], hint: 'Tap to log a feed', onPress: () => open({ kind: 'feed' }) };
+  }
+
+  const lastDiaper = lastOfType(logs, 'diaper');
+  const today = logs.filter((l) => l.logType === 'diaper' && l.startedAt >= startOfDay(now)).length;
+  const diaperPress = () => open({ kind: 'diaper' });
+  let diaper: TileContent;
+  if (lastDiaper) {
+    const s = since(lastDiaper.startedAt, describeDiaper(lastDiaper.payload));
+    diaper = { value: s.value, lines: [s.first, `${today} today`], hint: 'Tap to log a change', onPress: diaperPress };
+  } else {
+    diaper = { value: '–', lines: ['No changes yet'], hint: 'Tap to log a change', onPress: diaperPress };
+  }
+
+  return { sleep, feed, diaper };
+}
+
+const STYLE: Record<HomeTile, { box: string; boxActive: string; label: string; icon: () => string; Icon: typeof Moon }> = {
+  sleep: { box: 'bg-violet/10 border-violet/40', boxActive: 'bg-violet/20 border-violet-strong/60', label: 'text-violet-soft', icon: () => colors.violetStrong, Icon: Moon },
+  feed: { box: 'bg-cyan/10 border-cyan/40', boxActive: 'bg-cyan/20 border-cyan-soft/60', label: 'text-cyan-soft', icon: () => colors.cyanSoft, Icon: Baby },
+  diaper: { box: 'bg-amber/10 border-amber/40', boxActive: 'bg-amber/20 border-amber-strong/60', label: 'text-amber-strong', icon: () => colors.amberStrong, Icon: Droplets },
+};
+
+function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: TileContent; large?: boolean; onLongPress: () => void }) {
+  const s = STYLE[tile];
+  return (
+    <Pressable
+      onPress={content.onPress}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      accessibilityRole="button"
+      accessibilityLabel={`${LABEL[tile]}: ${[content.eyebrow, content.value, ...content.lines].filter(Boolean).join(', ')}`}
+      accessibilityHint={`${content.hint}. Long-press to make this the top tile.`}
+      className={`flex-1 border justify-between ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center">
+          <s.Icon color={s.icon()} size={20} />
+          <Text className={`text-sm font-semibold ml-2 ${s.label}`}>{LABEL[tile]}</Text>
+        </View>
+        {large ? <Text className="text-ink-muted text-xs">{content.hint}</Text> : null}
+      </View>
+      <View>
+        {content.eyebrow ? (
+          <Text className={`text-[13px] font-medium ${tile === 'sleep' && !content.active ? 'text-amber-pale/80' : 'text-ink-muted'}`}>
+            {content.eyebrow}
+          </Text>
+        ) : null}
+        <Text
+          className={`text-ink font-bold ${large ? 'text-[44px] leading-[48px]' : 'text-[28px] leading-8'}`}
+          style={{ fontVariant: ['tabular-nums'] }}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {content.value}
+        </Text>
+        {content.lines.map((line) => (
+          <Text key={line} className="text-ink-muted text-xs mt-0.5" numberOfLines={large ? 2 : 1}>
+            {line}
+          </Text>
+        ))}
+      </View>
+    </Pressable>
+  );
+}
+
+/** Medication doses due (until 12 h past due), the sleep schedule and today's full log. */
+function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
+  const formatTime = useFormatTime();
+  const meds = medicationsDue(logs).filter((m) => now - m.dueAt < 12 * 3_600_000);
+  const today = logs.filter((l) => l.startedAt >= startOfDay(now)).length;
+  return (
+    <View className="bg-surface border border-line rounded-2xl">
+      {meds.map((m) => (
+        <View key={m.name} className="flex-row items-center px-3.5 py-3 border-b border-line">
+          <Pill color={colors.blueSoft} size={16} />
+          <Text className="flex-1 text-ink text-sm ml-2.5" numberOfLines={1}>{m.name}</Text>
+          <Text className={`text-xs ${m.dueAt <= now ? 'text-red-soft' : 'text-blue-pale'}`}>
+            {m.dueAt <= now ? `Overdue by ${formatDuration(now - m.dueAt)}` : `Due at ${formatTime(m.dueAt)}`}
+          </Text>
+        </View>
+      ))}
+      <Pressable onPress={() => router.push('/schedule')} className="flex-row items-center px-3.5 py-3 border-b border-line">
+        <CalendarClock color={colors.violetSoft} size={16} />
+        <Text className="flex-1 text-ink text-sm ml-2.5">Sleep schedule</Text>
+        <ChevronRight color={colors.inkGhost} size={16} />
+      </Pressable>
+      <Pressable onPress={() => router.push('/history')} className="flex-row items-center px-3.5 py-3">
+        <History color={colors.inkSoft} size={16} />
+        <Text className="flex-1 text-ink text-sm ml-2.5">Today's log</Text>
+        <Text className="text-ink-muted text-xs mr-1">{today === 1 ? '1 entry' : `${today} entries`}</Text>
+        <ChevronRight color={colors.inkGhost} size={16} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** Second-tier log types, one tap away; More opens every type. */
+function Shortcuts() {
+  const open = useSheetStore((s) => s.open);
+  const items = [
+    { label: 'Pump', Icon: Milk, color: () => colors.fuchsiaSoft, box: 'bg-fuchsia/10 border-fuchsia/40', onPress: () => open({ kind: 'log', type: 'pumping' }) },
+    { label: 'Meds', Icon: Pill, color: () => colors.blueSoft, box: 'bg-blue/10 border-blue/40', onPress: () => open({ kind: 'log', type: 'medication' }) },
+    { label: 'Tummy', Icon: Activity, color: () => colors.tealSoft, box: 'bg-teal/10 border-teal/40', onPress: () => open({ kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } }) },
+  ];
+  return (
+    <View className="flex-row gap-2">
+      {items.map(({ label, Icon, color, box, onPress }) => (
+        <Pressable key={label} onPress={onPress} className={`flex-1 h-12 rounded-xl border flex-row items-center justify-center ${box}`}>
+          <Icon color={color()} size={16} />
+          <Text className="text-ink text-[13px] font-medium ml-1.5">{label}</Text>
+        </Pressable>
+      ))}
+      <Pressable
+        onPress={() => open({ kind: 'add' })}
+        accessibilityLabel="More log types"
+        className="w-12 h-12 rounded-xl border border-line-strong bg-raised items-center justify-center"
+      >
+        <Plus color={colors.inkSoft} size={18} />
+      </Pressable>
+    </View>
+  );
+}

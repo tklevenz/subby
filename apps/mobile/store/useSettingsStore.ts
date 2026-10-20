@@ -12,7 +12,11 @@ export type Settings = {
   isPremium: boolean;
   /** Last Baby Buddy server used for import (the API key is never stored). */
   bbUrl: string | null;
+  /** Home tile pinned to the top, per child id (default sleep). Set by long-pressing a tile. */
+  homeTop: Record<string, HomeTile>;
 };
+
+export type HomeTile = 'sleep' | 'feed' | 'diaper';
 
 const DEFAULTS: Settings = {
   units: 'metric',
@@ -21,6 +25,7 @@ const DEFAULTS: Settings = {
   reminders: DEFAULT_REMINDERS,
   isPremium: false,
   bbUrl: null,
+  homeTop: {},
 };
 
 interface SettingsState extends Settings {

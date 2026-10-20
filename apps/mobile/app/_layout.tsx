@@ -9,8 +9,8 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useLogStore } from '../store/useLogStore';
 import { useActiveChild } from '../store/useActiveChild';
 import { useReminderSync } from '../features/reminders/scheduler';
+import { colors } from '../theme/colors';
 
-const BG = '#020617';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -35,12 +35,12 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG }} className="justify-center items-center px-8">
+      <View style={{ flex: 1, backgroundColor: colors.ground }} className="justify-center items-center px-8">
         <StatusBar style="light" />
         {error ? (
-          <Text className="text-red-400 text-center">Failed to open database: {error}</Text>
+          <Text className="text-red-strong text-center">Failed to open database: {error}</Text>
         ) : (
-          <ActivityIndicator size="large" color="#a78bfa" />
+          <ActivityIndicator size="large" color={colors.violetStrong} />
         )}
       </View>
     );
@@ -52,9 +52,9 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: BG },
-          headerStyle: { backgroundColor: BG },
-          headerTintColor: '#e2e8f0',
+          contentStyle: { backgroundColor: colors.ground },
+          headerStyle: { backgroundColor: colors.ground },
+          headerTintColor: colors.inkLight,
         }}
       >
         <Stack.Protected guard={hasChild}>
@@ -65,7 +65,7 @@ export default function RootLayout() {
           <Stack.Screen name="export" options={{ headerShown: true, title: 'Export CSV', headerBackTitle: 'Trends' }} />
           <Stack.Screen name="schedule" options={{ headerShown: true, title: 'Sleep schedule' }} />
           <Stack.Screen name="child/new" options={{ presentation: 'modal', headerShown: true, title: 'Add child' }} />
-          <Stack.Screen name="child/[id]/index" options={{ headerShown: true, title: 'Child', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="child/[id]/index" options={{ headerShown: false }} />
           <Stack.Screen name="child/[id]/edit" options={{ presentation: 'modal', headerShown: true, title: 'Edit' }} />
           <Stack.Screen name="reminders" options={{ headerShown: true, title: 'Reminders', headerBackTitle: 'Settings' }} />
         </Stack.Protected>

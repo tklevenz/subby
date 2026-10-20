@@ -4,6 +4,7 @@ import type { LogPayload, LogType } from '@kindred-log/shared';
 export type SheetRequest =
   | { kind: 'feed'; tab?: 'breast' | 'bottle' | 'solids' }
   | { kind: 'add' }
+  | { kind: 'diaper' }
   | { kind: 'log'; type: LogType; payload?: Partial<LogPayload> };
 
 /** Which logging sheet is open on the Home screen (opened from the dock, header, timers…). */

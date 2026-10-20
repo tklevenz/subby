@@ -7,10 +7,10 @@ import { Button } from './ui';
 export default function PremiumGate({ title, description }: { title: string; description: string }) {
   const setSetting = useSettingsStore((s) => s.set);
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20 }}>
-      <Text className="text-white text-lg font-semibold">{title}</Text>
-      <Text className="text-slate-400 mt-2 leading-6">{description}</Text>
-      <Text className="text-slate-500 mt-4">Premium isn't available yet.</Text>
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20 }}>
+      <Text className="text-ink text-lg font-semibold">{title}</Text>
+      <Text className="text-ink-muted mt-2 leading-6">{description}</Text>
+      <Text className="text-ink-faint mt-4">Premium isn't available yet.</Text>
       {__DEV__ ? <Button label="Enable Premium (dev build)" variant="ghost" onPress={() => setSetting('isPremium', true)} /> : null}
     </ScrollView>
   );

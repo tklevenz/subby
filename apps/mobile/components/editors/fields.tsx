@@ -5,6 +5,7 @@ import { recentTags } from '@kindred-log/shared';
 import { pickPhoto } from '../../features/photos';
 import { useLogStore } from '../../store/useLogStore';
 import { Chip, TextField } from '../ui';
+import { colors } from '../../theme/colors';
 
 const parse = (t: string) => {
   const n = parseFloat(t.replace(',', '.'));
@@ -43,7 +44,7 @@ export function NumberField({
           onChange(parse(t));
         }}
       />
-      {suffix ? <Text className="text-slate-400 ml-3 w-10">{suffix}</Text> : null}
+      {suffix ? <Text className="text-ink-muted ml-3 w-10">{suffix}</Text> : null}
     </View>
   );
 }
@@ -92,9 +93,9 @@ export function TagsField({ value, onChange }: { value: string[] | undefined; on
     <View>
       <View className="flex-row flex-wrap gap-2">
         {tags.map((t) => (
-          <Pressable key={t} onPress={() => set(tags.filter((x) => x !== t))} className="flex-row items-center px-3 py-1.5 rounded-full bg-violet-500/30 border border-violet-400/60">
-            <Text className="text-violet-100 mr-1">{t}</Text>
-            <X color="#ddd6fe" size={12} />
+          <Pressable key={t} onPress={() => set(tags.filter((x) => x !== t))} className="flex-row items-center px-3 py-1.5 rounded-full bg-violet/30 border border-violet-strong/60">
+            <Text className="text-violet-faint mr-1">{t}</Text>
+            <X color={colors.violetPale} size={12} />
           </Pressable>
         ))}
         {suggestions.map((t) => (
@@ -103,8 +104,8 @@ export function TagsField({ value, onChange }: { value: string[] | undefined; on
       </View>
       <View className="flex-row items-center mt-2">
         <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder="Add tag" onSubmitEditing={add} returnKeyType="done" />
-        <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-slate-800" hitSlop={6}>
-          <Plus color="#cbd5e1" size={18} />
+        <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-raised" hitSlop={6}>
+          <Plus color={colors.inkSoft} size={18} />
         </Pressable>
       </View>
     </View>
@@ -121,21 +122,21 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
     return (
       <View>
         <Image source={{ uri: value }} className="w-full h-48 rounded-xl" resizeMode="cover" />
-        <Pressable onPress={() => onChange(undefined)} className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
-          <X color="#fff" size={16} />
+        <Pressable onPress={() => onChange(undefined)} className="absolute top-2 right-2 bg-scrim/60 rounded-full p-1.5">
+          <X color={colors.ink} size={16} />
         </Pressable>
       </View>
     );
   }
   return (
     <View className="flex-row gap-2">
-      <Pressable onPress={() => pick(false)} className="flex-row items-center px-4 py-3 rounded-xl bg-slate-800 border border-slate-700">
-        <ImagePlus color="#cbd5e1" size={18} />
-        <Text className="text-slate-300 ml-2">Library</Text>
+      <Pressable onPress={() => pick(false)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
+        <ImagePlus color={colors.inkSoft} size={18} />
+        <Text className="text-ink-soft ml-2">Library</Text>
       </Pressable>
-      <Pressable onPress={() => pick(true)} className="flex-row items-center px-4 py-3 rounded-xl bg-slate-800 border border-slate-700">
-        <Camera color="#cbd5e1" size={18} />
-        <Text className="text-slate-300 ml-2">Camera</Text>
+      <Pressable onPress={() => pick(true)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
+        <Camera color={colors.inkSoft} size={18} />
+        <Text className="text-ink-soft ml-2">Camera</Text>
       </Pressable>
     </View>
   );

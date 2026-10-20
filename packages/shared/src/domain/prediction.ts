@@ -105,6 +105,8 @@ export type SleepHabits = {
   wakeClock: number | null;
   /** Median nap length per nap index, minutes. */
   napLengths: Map<number, number>;
+  /** Median length of any nap, minutes. */
+  napLength: number | null;
   napsPerDay: number | null;
 };
 
@@ -149,6 +151,7 @@ export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabit
     napLengths: new Map(
       [...napLengths].filter(([, xs]) => xs.length >= MIN_SAMPLES).map(([i, xs]) => [i, median(xs)!]),
     ),
+    napLength: naps.length >= MIN_SAMPLES ? median(naps.map((n) => (n.endedAt! - n.startedAt) / MIN)) : null,
     // Naps per day over complete days with a logged morning wake-up (so zero-nap days count too).
     napsPerDay: (() => {
       const days = [...new Set(nights.map((n) => startOfDay(n.endedAt!)))].filter((d) => d < startOfDay(now));
@@ -167,6 +170,8 @@ export type SleepPrediction = {
   wakeAt: number;
   /** Nap number today (0-based) when kind is 'nap'. */
   napIndex: number;
+  /** Expected nap length in minutes (this nap index, else any nap, else the age norm); null for bedtime. */
+  napMinutes: number | null;
 };
 
 /** Personal median pulled 30 % towards the age norm, kept within a sane band around it. */
@@ -233,6 +238,7 @@ export function predictNextSleep(
       basis: bed.personal || bedtimeClock !== null ? 'personal' : 'age',
       wakeAt,
       napIndex,
+      napMinutes: null,
     };
   }
 
@@ -243,6 +249,7 @@ export function predictNextSleep(
     basis: nap.personal ? 'personal' : 'age',
     wakeAt,
     napIndex,
+    napMinutes: habits.napLengths.get(napIndex) ?? habits.napLength ?? norms.napLength,
   };
 }
 

@@ -1,15 +1,16 @@
 import { Tabs } from 'expo-router';
 import { ChartLine, History, House, Settings } from 'lucide-react-native';
+import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#0f172a', borderTopColor: '#1e293b' },
-        tabBarActiveTintColor: '#c4b5fd',
-        tabBarInactiveTintColor: '#64748b',
-        sceneStyle: { backgroundColor: '#020617' },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
+        tabBarActiveTintColor: colors.violetSoft,
+        tabBarInactiveTintColor: colors.inkFaint,
+        sceneStyle: { backgroundColor: colors.ground },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }} />

@@ -83,8 +83,8 @@ export default function ExportScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-      <Text className="text-slate-400 leading-6">
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <Text className="text-ink-muted leading-6">
         One CSV with {child.name}'s entries, oldest first. Values are in ml, g, cm and °C; times are local.
       </Text>
 
@@ -97,10 +97,10 @@ export default function ExportScreen() {
           <Chip key={t} label={`${TYPE_META[t].label} · ${counts[t]!.toLocaleString()}`} selected={selected?.has(t) ?? false} onPress={() => toggle(t)} />
         ))}
       </View>
-      {types.length === 0 ? <Text className="text-slate-500 mt-2">Nothing logged yet.</Text> : null}
+      {types.length === 0 ? <Text className="text-ink-faint mt-2">Nothing logged yet.</Text> : null}
 
       <Button label={busy ? 'Exporting…' : 'Export CSV'} disabled={busy || !selected?.size} onPress={exportCsv} />
-      <Text className="text-slate-600 text-xs mt-3 leading-5">
+      <Text className="text-ink-ghost text-xs mt-3 leading-5">
         The file isn't encrypted. Whoever you share it with can read it.
       </Text>
     </ScrollView>

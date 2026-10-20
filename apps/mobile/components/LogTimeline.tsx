@@ -9,7 +9,7 @@ import LogRow from './LogRow';
 function EmptyState() {
   return (
     <View className="flex-1 justify-center items-center px-8 py-16">
-      <Text className="text-slate-500 text-center leading-6">
+      <Text className="text-ink-faint text-center leading-6">
         No logs yet. Use the buttons below to start tracking.
       </Text>
     </View>
@@ -51,7 +51,7 @@ export default function LogTimeline({
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => <LogRow entry={item} />}
       renderSectionHeader={({ section }) => (
-        <Text className="text-xs font-semibold text-slate-400 uppercase px-5 pt-3 pb-1 bg-slate-950">
+        <Text className="text-xs font-semibold text-ink-muted uppercase px-5 pt-3 pb-1 bg-ground">
           {section.title} · {section.data.length}
         </Text>
       )}

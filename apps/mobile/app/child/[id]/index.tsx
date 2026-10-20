@@ -1,33 +1,39 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Cake, Camera, ChevronRight, PartyPopper } from 'lucide-react-native';
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Baby, Camera, ChevronLeft, ChevronRight, Flag, Ruler, Sparkles } from 'lucide-react-native';
 import {
-  MILESTONES,
-  ageInDays,
+  childStory,
   formatAgeLong,
   formatLength,
   formatPercentile,
   formatWeight,
-  growthAgeMonths,
   growthPercentile,
-  milestoneLabel,
-  nextAgeMilestone,
+  growthPoints,
   type Child,
   type GrowthMeasure,
   type LogEntry,
-  type LogType,
+  type StoryItem,
 } from '@kindred-log/shared';
-import ChildAvatar from '../../../components/ChildAvatar';
+import { avatarColors } from '../../../components/ChildAvatar';
+import GrowthChart from '../../../components/charts/GrowthChart';
 import PhotoMenu from '../../../components/PhotoMenu';
-import { Button, Card, Row } from '../../../components/ui';
-import { fetchLogs } from '../../../store/queries';
-import { childSummary, useChildStore } from '../../../store/useChildStore';
+import { Button, Segmented } from '../../../components/ui';
+import { HAS_FOODS, fetchLogs } from '../../../store/queries';
 import { useActiveChild } from '../../../store/useActiveChild';
+import { useChildStore } from '../../../store/useChildStore';
 import { useLogStore } from '../../../store/useLogStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { colors } from '../../../theme/colors';
 
-const PROFILE_TYPES: LogType[] = ['growth', 'milestone'];
+const MEASURES = [
+  { value: 'weightKg', label: 'Weight' },
+  { value: 'lengthCm', label: 'Length' },
+  { value: 'headCm', label: 'Head' },
+] as const;
+const STORY_PAGE = 12;
+
 const fmtDate = (ms: number, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) =>
   new Date(ms).toLocaleDateString([], opts);
 const isoToMs = (iso: string) => {
@@ -35,11 +41,11 @@ const isoToMs = (iso: string) => {
   return new Date(y, m - 1, d).getTime();
 };
 
-/** A child's own page: photo, age, growth and milestones at a glance, and their settings. */
+/** A child's own page: photo cover, growth chart and their story of firsts. */
 export default function ChildProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const child = useChildStore((s) => s.children.find((c) => c.id === id));
-  if (!child) return <Stack.Screen options={{ title: 'Child' }} />;
+  if (!child) return <View className="flex-1 bg-ground" />;
   return <Profile child={child} />;
 }
 
@@ -49,89 +55,27 @@ function Profile({ child }: { child: Child }) {
   const revision = useLogStore((s) => s.revision);
   const [menu, setMenu] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [summary, setSummary] = useState<{ total: number; firstAt: number | null } | null>(null);
-  const now = Date.now();
+  const [shown, setShown] = useState(STORY_PAGE);
 
   // Read straight from the database: this child may not be the active one.
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchLogs(child.id, { types: PROFILE_TYPES }), childSummary(child.id)]).then(([rows, s]) => {
-      if (!alive) return;
-      setLogs(rows);
-      setSummary(s);
+    Promise.all([
+      fetchLogs(child.id, { types: ['growth', 'milestone'] }),
+      fetchLogs(child.id, { types: ['feed'], where: HAS_FOODS }),
+    ]).then(([rows, solids]) => {
+      if (alive) setLogs([...rows, ...solids]);
     });
     return () => {
       alive = false;
     };
   }, [child.id, revision]);
 
-  const latest = useMemo(() => {
-    const pick = (measure: GrowthMeasure) => {
-      for (let i = logs.length - 1; i >= 0; i--) {
-        const p = logs[i].payload;
-        if (p.type !== 'growth') continue;
-        const value = measure === 'weightKg' ? p.weightG && p.weightG / 1000 : measure === 'lengthCm' ? p.heightCm : p.headCm;
-        if (value) {
-          const pct = growthPercentile(measure, child.sex, growthAgeMonths(child, logs[i].startedAt), value);
-          return { value, at: logs[i].startedAt, pct };
-        }
-      }
-      return null;
-    };
-    return { weight: pick('weightKg'), length: pick('lengthCm'), head: pick('headCm') };
-  }, [logs, child]);
-
-  const milestones = useMemo(() => {
-    const done = logs.filter((l) => l.payload.type === 'milestone').reverse();
-    const checklist = new Set(done.flatMap((l) => (l.payload.type === 'milestone' && l.payload.key ? [l.payload.key] : [])));
-    return { recent: done.slice(0, 3), checklist: checklist.size };
-  }, [logs]);
-
-  const next = nextAgeMilestone(child.birthDate, now);
-  const celebrate = next.days === 0 ? `${next.label} old today!` : next.days <= (next.label.includes('year') ? 30 : 7) ? `Turns ${next.label} in ${next.days} day${next.days === 1 ? '' : 's'}` : null;
-
-  const openGrowth = async () => {
-    if (!isActive) await useSettingsStore.getState().set('activeChildId', child.id);
-    router.push('/growth');
-  };
+  const story = useMemo(() => childStory(logs, child, units), [logs, child, units]);
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      <Stack.Screen
-        options={{
-          title: child.name,
-          headerRight: () => (
-            <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} hitSlop={10}>
-              <Text className="text-violet-300 text-base">Edit</Text>
-            </Pressable>
-          ),
-        }}
-      />
-
-      <View className="items-center rounded-3xl bg-violet-500/10 border border-violet-500/30 px-4 pt-6 pb-5">
-        <Pressable onPress={() => setMenu(true)}>
-          <ChildAvatar child={child} size={120} ring={isActive} />
-          <View className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-slate-900 border border-slate-700 items-center justify-center">
-            <Camera color="#c4b5fd" size={16} />
-          </View>
-        </Pressable>
-        <Text className="text-white text-2xl font-bold mt-3">{child.name}</Text>
-        <Text className="text-violet-200 mt-1">{formatAgeLong(child.birthDate, now)}</Text>
-        <Text className="text-slate-400 text-xs mt-1">
-          Born {fmtDate(isoToMs(child.birthDate))}
-        </Text>
-        {celebrate ? (
-          <View className="flex-row items-center mt-3 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40">
-            {next.days === 0 ? <PartyPopper color="#fcd34d" size={14} /> : <Cake color="#fcd34d" size={14} />}
-            <Text className="text-amber-200 text-xs font-medium ml-1.5">{celebrate}</Text>
-          </View>
-        ) : null}
-        {!isActive ? (
-          <View className="self-stretch">
-            <Button label={`Switch to ${child.name}`} onPress={() => useSettingsStore.getState().set('activeChildId', child.id)} />
-          </View>
-        ) : null}
-      </View>
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingBottom: 40 }}>
+      <Cover child={child} isActive={isActive} onPhoto={() => setMenu(true)} />
       <PhotoMenu
         visible={menu}
         hasPhoto={child.photoUri !== null}
@@ -139,91 +83,164 @@ function Profile({ child }: { child: Child }) {
         onChange={(photoUri) => useChildStore.getState().updateChild(child.id, { photoUri })}
       />
 
-      <View className="flex-row gap-2 mt-4">
-        <Stat label="Days old" value={Math.max(0, ageInDays(child.birthDate, now)).toLocaleString()} />
-        <Stat label="Entries" value={summary ? summary.total.toLocaleString() : '–'} />
-        <Stat label="Tracking since" value={summary?.firstAt ? fmtDate(summary.firstAt, { month: 'short', year: 'numeric' }) : '–'} />
+      <View className="px-4">
+        {!isActive ? (
+          <Button label={`Switch to ${child.name}`} variant="ghost" onPress={() => useSettingsStore.getState().set('activeChildId', child.id)} />
+        ) : null}
+
+        <Growth child={child} logs={logs} isActive={isActive} />
+
+        <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-3 ml-1">{child.name}'s story</Text>
+        {story.slice(0, shown).map((item, i) => (
+          <StoryRow key={item.id} item={item} child={child} last={i === Math.min(shown, story.length) - 1} />
+        ))}
+        {story.length > shown ? (
+          <Button label="Show more" variant="ghost" onPress={() => setShown((n) => n + STORY_PAGE)} />
+        ) : null}
+        {story.length === 1 ? (
+          <Text className="text-ink-faint text-sm mt-1 ml-10">Milestones, measurements and first foods you log appear here.</Text>
+        ) : null}
       </View>
-
-      <SectionTitle>Growth</SectionTitle>
-      <Pressable onPress={openGrowth} className="flex-row bg-slate-900 border border-slate-800 rounded-2xl p-3 gap-2">
-        <GrowthTile label="Weight" m={latest.weight} format={(v) => formatWeight(v * 1000, units)} />
-        <GrowthTile label="Length" m={latest.length} format={(v) => formatLength(v, units)} />
-        <GrowthTile label="Head" m={latest.head} format={(v) => formatLength(v, units)} />
-        <View className="justify-center">
-          <ChevronRight color="#475569" size={16} />
-        </View>
-      </Pressable>
-      {!child.sex || child.sex === 'other' ? (
-        <Text className="text-slate-500 text-xs mt-2 ml-1">Set girl or boy under Edit to see WHO percentiles.</Text>
-      ) : null}
-
-      <SectionTitle>Milestones</SectionTitle>
-      <View className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-        <View className="flex-row items-baseline justify-between">
-          <Text className="text-white font-semibold">{milestones.checklist} of {MILESTONES.length} checklist milestones</Text>
-        </View>
-        <View className="h-2 rounded-full bg-slate-800 mt-2 overflow-hidden">
-          <View className="h-2 rounded-full bg-orange-300" style={{ width: `${(milestones.checklist / MILESTONES.length) * 100}%` }} />
-        </View>
-        {milestones.recent.length ? (
-          milestones.recent.map((l) => (
-            <Pressable key={l.id} onPress={() => router.push(`/entry/${l.id}`)} className="flex-row items-center mt-3">
-              <View className="w-1.5 h-1.5 rounded-full bg-orange-300 mr-2" />
-              <Text className="flex-1 text-slate-200 text-sm" numberOfLines={1}>
-                {l.payload.type === 'milestone' ? (l.payload.custom ?? (l.payload.key ? milestoneLabel(l.payload.key) : 'Milestone')) : ''}
-              </Text>
-              <Text className="text-slate-500 text-xs">{fmtDate(l.startedAt)}</Text>
-            </Pressable>
-          ))
-        ) : (
-          <Text className="text-slate-500 text-sm mt-3">Log milestones from Home → More → Milestone.</Text>
-        )}
-      </View>
-
-      <SectionTitle>Settings</SectionTitle>
-      <Card>
-        <Row label="Edit details" onPress={() => router.push(`/child/${child.id}/edit`)} right={<ChevronRight color="#475569" size={16} />} />
-      </Card>
     </ScrollView>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <Text className="text-xs font-semibold text-slate-400 uppercase mt-6 mb-2 ml-1">{children}</Text>;
-}
+function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; onPhoto: () => void }) {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const [failed, setFailed] = useState<string | null>(null);
+  const { bg, fg } = avatarColors(child.id);
+  const showPhoto = child.photoUri && failed !== child.photoUri;
+  const height = Math.round(Math.min(width, 420) * 0.92);
 
-function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-3">
-      <Text className="text-slate-400 text-[11px]">{label}</Text>
-      <Text className="text-white text-base font-semibold mt-0.5" numberOfLines={1}>{value}</Text>
+    <View style={{ height, backgroundColor: bg }} className="overflow-hidden">
+      {showPhoto ? (
+        <Image source={{ uri: child.photoUri! }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onError={() => setFailed(child.photoUri)} />
+      ) : (
+        <Pressable onPress={onPhoto} className="flex-1 items-center justify-center">
+          <Text style={{ color: fg, fontSize: 120, fontWeight: '700', opacity: 0.5 }}>{child.name.trim().charAt(0).toUpperCase() || '?'}</Text>
+          <View className="flex-row items-center mt-2 px-3.5 py-2 rounded-full bg-ground/50">
+            <Camera color={colors.ink} size={16} />
+            <Text className="text-ink text-sm font-medium ml-2">Add a photo</Text>
+          </View>
+        </Pressable>
+      )}
+
+      <View style={{ top: insets.top + 8 }} className="absolute left-4 right-4 flex-row justify-between">
+        <Pressable onPress={() => router.back()} accessibilityLabel="Back" hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
+          <ChevronLeft color={colors.ink} size={22} />
+        </Pressable>
+        <View className="flex-row gap-2">
+          {showPhoto ? (
+            <Pressable onPress={onPhoto} accessibilityLabel="Change photo" hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
+              <Camera color={colors.ink} size={18} />
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} hitSlop={8} className="h-10 px-4 rounded-full bg-ground/55 items-center justify-center">
+            <Text className="text-ink text-[15px] font-medium">Edit</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View className="absolute left-0 right-0 bottom-0 px-5 pt-4 pb-4 bg-ground/70 flex-row items-end justify-between">
+        <View className="flex-1">
+          <Text className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1}>{child.name}</Text>
+          <Text className="text-violet-pale text-[15px] mt-0.5">
+            {formatAgeLong(child.birthDate, Date.now())} · born {fmtDate(isoToMs(child.birthDate), { day: 'numeric', month: 'short' })}
+          </Text>
+        </View>
+        {isActive ? (
+          <View className="px-2.5 py-1.5 rounded-full bg-violet/30 border border-violet-strong/60 ml-3">
+            <Text className="text-violet-faint text-xs font-semibold">Active</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
 
-function GrowthTile({
-  label,
-  m,
-  format,
-}: {
-  label: string;
-  m: { value: number; at: number; pct: number | null } | null;
-  format: (v: number) => string;
-}) {
+function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isActive: boolean }) {
+  const units = useSettingsStore((s) => s.units);
+  const [measure, setMeasure] = useState<GrowthMeasure>('weightKg');
+  const points = useMemo(() => growthPoints(logs, child, measure), [logs, child, measure]);
+  const sex = child.sex === 'male' || child.sex === 'female' ? child.sex : null;
+  const last = points.at(-1);
+  const pct = last ? growthPercentile(measure, child.sex, last.months, last.value) : null;
+  const format = (v: number) => (measure === 'weightKg' ? formatWeight(v * 1000, units) : formatLength(v, units));
+
+  const openGrowth = async () => {
+    if (!isActive) await useSettingsStore.getState().set('activeChildId', child.id);
+    router.push('/growth');
+  };
+
   return (
-    <View className="flex-1">
-      <Text className="text-slate-400 text-[11px]">{label}</Text>
-      {m ? (
-        <>
-          <Text className="text-white text-sm font-semibold mt-0.5" numberOfLines={1}>{format(m.value)}</Text>
-          <Text className="text-slate-500 text-[10px]" numberOfLines={1}>
-            {m.pct !== null ? `${formatPercentile(m.pct)} · ` : ''}{fmtDate(m.at, { month: 'short', year: '2-digit' })}
-          </Text>
-        </>
-      ) : (
-        <Text className="text-slate-600 text-sm mt-0.5">–</Text>
-      )}
-    </View>
+    <>
+      <View className="flex-row items-baseline justify-between mt-6 mb-2 mx-1">
+        <Text className="text-xs font-semibold text-ink-muted uppercase">Growth</Text>
+        <Pressable onPress={openGrowth} hitSlop={8}>
+          <Text className="text-violet-soft text-[13px]">All charts ›</Text>
+        </Pressable>
+      </View>
+      <View className="bg-surface border border-line rounded-2xl p-3.5">
+        <Segmented options={MEASURES} value={measure} onChange={setMeasure} />
+        {last ? (
+          <>
+            <View className="flex-row items-baseline justify-between mt-3">
+              <Text className="text-ink text-[28px] leading-[34px] font-bold">{format(last.value)}</Text>
+              {pct !== null ? <Text className="text-violet-soft text-sm font-semibold">{formatPercentile(pct)} percentile</Text> : null}
+            </View>
+            <View className="mt-2">
+              <GrowthChart measure={measure} sex={sex} points={points} units={units} height={180} />
+            </View>
+            <Text className="text-ink-muted text-xs mt-2">
+              Last measured {fmtDate(last.at)}
+              {sex ? ` · WHO ${sex === 'female' ? 'girls' : 'boys'}, 3rd–97th percentile` : ''}
+            </Text>
+          </>
+        ) : (
+          <Text className="text-ink-faint text-sm mt-3">No measurements yet. Log one from Home → More → Growth.</Text>
+        )}
+      </View>
+      {!sex ? (
+        <Pressable onPress={() => router.push(`/child/${child.id}/edit`)}>
+          <Text className="text-ink-faint text-xs mt-2 ml-1">Set girl or boy under Edit to see WHO percentiles.</Text>
+        </Pressable>
+      ) : null}
+    </>
+  );
+}
+
+const STORY_STYLE: Record<StoryItem['kind'], { box: string; Icon: typeof Flag; color: () => string }> = {
+  milestone: { box: 'bg-orange/10 border-orange/40', Icon: Flag, color: () => colors.orangeSoft },
+  growth: { box: 'bg-green/10 border-green/40', Icon: Ruler, color: () => colors.greenSoft },
+  solids: { box: 'bg-cyan/10 border-cyan/40', Icon: Baby, color: () => colors.cyanSoft },
+  birth: { box: 'bg-violet/10 border-violet/40', Icon: Sparkles, color: () => colors.violetSoft },
+};
+
+function StoryRow({ item, child, last }: { item: StoryItem; child: Child; last: boolean }) {
+  const s = STORY_STYLE[item.kind];
+  const when =
+    item.kind === 'birth'
+      ? fmtDate(item.at, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+      : `${fmtDate(item.at)} · ${formatAgeLong(child.birthDate, item.at)}`;
+  return (
+    <Pressable disabled={!item.logId} onPress={() => item.logId && router.push(`/entry/${item.logId}`)} className="flex-row" style={{ minHeight: 62 }}>
+      <View className="w-7 items-center">
+        <View className={`w-7 h-7 rounded-full border items-center justify-center ${s.box}`}>
+          <s.Icon color={s.color()} size={14} />
+        </View>
+        {!last ? <View className="flex-1 w-0.5 bg-line" /> : null}
+      </View>
+      <View className="flex-1 ml-3 pt-1 pb-3">
+        <Text className="text-ink text-[15px] font-medium">{item.title}</Text>
+        <Text className="text-ink-muted text-xs mt-0.5">{when}</Text>
+      </View>
+      {item.logId ? (
+        <View className="pt-1.5">
+          <ChevronRight color={colors.inkGhost} size={14} />
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

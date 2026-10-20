@@ -8,6 +8,7 @@ import { useCanAddChild, useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useActiveChild } from '../store/useActiveChild';
 import ChildAvatar from './ChildAvatar';
+import { colors } from '../theme/colors';
 
 /** Header showing the active child; tap to switch child, open a profile or add a child. */
 export default function ChildSwitcher() {
@@ -27,25 +28,25 @@ export default function ChildSwitcher() {
     <>
       <Pressable onPress={() => setOpen(true)} className="flex-row items-center mb-4" hitSlop={8}>
         {active ? <ChildAvatar child={active} size={34} /> : null}
-        <Text className="text-xl font-bold text-white ml-2.5">{active?.name ?? 'Kindred Log'}</Text>
+        <Text className="text-xl font-bold text-ink ml-2.5">{active?.name ?? 'Kindred Log'}</Text>
         {active ? (
-          <Text className="text-sm text-slate-400 ml-2">{formatAge(active.birthDate, Date.now())}</Text>
+          <Text className="text-sm text-ink-muted ml-2">{formatAge(active.birthDate, Date.now())}</Text>
         ) : null}
-        <ChevronDown color="#64748b" size={18} style={{ marginLeft: 4 }} />
+        <ChevronDown color={colors.inkFaint} size={18} style={{ marginLeft: 4 }} />
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable className="flex-1 bg-black/60 justify-center px-8" onPress={() => setOpen(false)}>
-          <View className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden">
+        <Pressable className="flex-1 bg-scrim/60 justify-center px-8" onPress={() => setOpen(false)}>
+          <View className="bg-surface rounded-2xl border border-line-strong overflow-hidden">
             {children.map((c) => (
-              <View key={c.id} className="flex-row items-center border-b border-slate-800">
+              <View key={c.id} className="flex-row items-center border-b border-line">
                 <Pressable onPress={() => choose(c.id)} className="flex-1 flex-row items-center pl-4 py-3">
                   <ChildAvatar child={c} size={36} />
                   <View className="flex-1 ml-3">
-                    <Text className="text-white text-base">{c.name}</Text>
-                    <Text className="text-slate-500 text-xs">{formatAge(c.birthDate, Date.now())}</Text>
+                    <Text className="text-ink text-base">{c.name}</Text>
+                    <Text className="text-ink-faint text-xs">{formatAge(c.birthDate, Date.now())}</Text>
                   </View>
-                  {c.id === active?.id ? <Check color="#a78bfa" size={18} /> : null}
+                  {c.id === active?.id ? <Check color={colors.violetStrong} size={18} /> : null}
                 </Pressable>
                 {/* Separate target so switching stays a single tap. */}
                 <Pressable
@@ -56,8 +57,8 @@ export default function ChildSwitcher() {
                   hitSlop={6}
                   className="flex-row items-center px-4 py-3"
                 >
-                  <Text className="text-slate-400 text-xs mr-0.5">Profile</Text>
-                  <ChevronRight color="#64748b" size={14} />
+                  <Text className="text-ink-muted text-xs mr-0.5">Profile</Text>
+                  <ChevronRight color={colors.inkFaint} size={14} />
                 </Pressable>
               </View>
             ))}
@@ -68,9 +69,9 @@ export default function ChildSwitcher() {
               }}
               className="flex-row items-center px-4 py-3.5"
             >
-              <Plus color="#94a3b8" size={18} />
-              <Text className="flex-1 text-slate-300 text-base ml-2">Add child</Text>
-              {!canAddChild ? <Text className="text-violet-300 text-xs">Premium</Text> : null}
+              <Plus color={colors.inkMuted} size={18} />
+              <Text className="flex-1 text-ink-soft text-base ml-2">Add child</Text>
+              {!canAddChild ? <Text className="text-violet-soft text-xs">Premium</Text> : null}
             </Pressable>
           </View>
         </Pressable>

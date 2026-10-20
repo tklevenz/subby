@@ -22,6 +22,7 @@ import { formatDuration, useNow } from '../../store/timeHelpers';
 import DateTimeField from '../DateTimeField';
 import FoodPicker from '../editors/FoodPicker';
 import { Button, Chip, FieldLabel, Segmented } from '../ui';
+import { colors } from '../../theme/colors';
 
 type Tab = 'breast' | 'bottle' | 'solids';
 type Feed = PayloadOf<'feed'>;
@@ -36,13 +37,13 @@ function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: n
   return (
     <Pressable
       onPress={onPress}
-      className={`flex-1 items-center rounded-2xl border py-6 ${active ? 'bg-cyan-500/30 border-cyan-300' : 'bg-slate-800 border-slate-700'}`}
+      className={`flex-1 items-center rounded-2xl border py-6 ${active ? 'bg-cyan/30 border-cyan-soft' : 'bg-raised border-line-strong'}`}
     >
-      <Text className="text-slate-300 text-sm font-medium">{side === 'left' ? 'Left' : 'Right'}</Text>
-      <Text className="text-white text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{mmss(secs)}</Text>
+      <Text className="text-ink-soft text-sm font-medium">{side === 'left' ? 'Left' : 'Right'}</Text>
+      <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{mmss(secs)}</Text>
       <View className="flex-row items-center mt-1 h-4">
-        {active ? <Pause color="#a5f3fc" size={12} /> : null}
-        <Text className="text-xs text-cyan-200 ml-1">{active ? 'tap to pause' : hint ? 'suggested' : ''}</Text>
+        {active ? <Pause color={colors.cyanPale} size={12} /> : null}
+        <Text className="text-xs text-cyan-pale ml-1">{active ? 'tap to pause' : hint ? 'suggested' : ''}</Text>
       </View>
     </Pressable>
   );
@@ -67,7 +68,7 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
 
   return (
     <View>
-      <Text className="text-slate-400 text-sm mt-3 mb-3">
+      <Text className="text-ink-muted text-sm mt-3 mb-3">
         {running
           ? `Feeding for ${formatDuration(now - running.startedAt)}. Tap the other side to switch.`
           : next ? `Last feed ended on the ${next === 'left' ? 'right' : 'left'}. Offer ${next} first.` : 'Tap a side to start the timer.'}
@@ -141,14 +142,14 @@ function BottleTab({ onDone }: { onDone: () => void }) {
         ))}
       </View>
       <View className="flex-row items-center justify-center mt-3 gap-4">
-        <Pressable onPress={() => setAmountMl((a) => Math.max(step, a - step))} className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 items-center justify-center">
-          <Minus color="#94a3b8" size={18} />
+        <Pressable onPress={() => setAmountMl((a) => Math.max(step, a - step))} className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center">
+          <Minus color={colors.inkMuted} size={18} />
         </Pressable>
-        <Text className="text-lg font-bold text-white w-24 text-center">
+        <Text className="text-lg font-bold text-ink w-24 text-center">
           {metric ? `${Math.round(amountMl)} ml` : `${Math.round(mlToOz(amountMl) * 2) / 2} oz`}
         </Text>
-        <Pressable onPress={() => setAmountMl((a) => a + step)} className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 items-center justify-center">
-          <Plus color="#94a3b8" size={18} />
+        <Pressable onPress={() => setAmountMl((a) => a + step)} className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center">
+          <Plus color={colors.inkMuted} size={18} />
         </Pressable>
       </View>
       <Button

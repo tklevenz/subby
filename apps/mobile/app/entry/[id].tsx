@@ -8,6 +8,7 @@ import { CommonFields } from '../../components/sheets/LogSheet';
 import { TYPE_META, activityLabel } from '../../components/logTypes';
 import { Button, FieldLabel } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
+import { colors } from '../../theme/colors';
 
 /** Edit/backdate any log entry, including ones older than the loaded window. */
 export default function EntryScreen() {
@@ -18,7 +19,7 @@ export default function EntryScreen() {
     useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
   }, [id]);
 
-  if (entry === undefined) return <ActivityIndicator className="mt-10" color="#a78bfa" />;
+  if (entry === undefined) return <ActivityIndicator className="mt-10" color={colors.violetStrong} />;
   return entry ? <EntryForm entry={entry} /> : <Stack.Screen options={{ title: 'Entry not found' }} />;
 }
 
@@ -58,7 +59,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const title = payload.type === 'activity' ? activityLabel(payload.kind) : TYPE_META[payload.type].label;
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title }} />
 
       <FieldLabel>{timed ? 'Started' : 'Time'}</FieldLabel>
@@ -69,13 +70,13 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           <FieldLabel>Ended</FieldLabel>
           {running ? (
             <View className="flex-row items-center gap-3">
-              <Text className="text-violet-300">Still running</Text>
+              <Text className="text-violet-soft">Still running</Text>
               <Button label="Stop now" variant="ghost" onPress={() => setEndedAt(Date.now())} />
             </View>
           ) : (
             <DateTimeField value={endedAt!} onChange={setEndedAt} />
           )}
-          {invalid ? <Text className="text-red-400 mt-2">End must be after start.</Text> : null}
+          {invalid ? <Text className="text-red-strong mt-2">End must be after start.</Text> : null}
         </>
       ) : null}
 

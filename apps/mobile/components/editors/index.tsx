@@ -103,7 +103,7 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
   );
 }
 
-const COLOR_SWATCH: Record<(typeof DIAPER_COLORS)[number], string> = {
+export const COLOR_SWATCH: Record<(typeof DIAPER_COLORS)[number], string> = {
   black: '#0a0a0a', brown: '#7c4a1e', gray: '#9ca3af', green: '#4d7c0f',
   orange: '#f97316', red: '#dc2626', white: '#f8fafc', yellow: '#facc15',
 };
@@ -125,10 +125,10 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
               <Pressable
                 key={c}
                 onPress={() => onChange({ color: p.color === c ? undefined : c })}
-                className={`items-center rounded-xl p-1.5 border ${p.color === c ? 'border-violet-400' : 'border-transparent'}`}
+                className={`items-center rounded-xl p-1.5 border ${p.color === c ? 'border-violet-strong' : 'border-transparent'}`}
               >
-                <View style={{ backgroundColor: COLOR_SWATCH[c] }} className="w-8 h-8 rounded-full border border-slate-600" />
-                <Text className="text-slate-400 text-[10px] mt-1">{c}</Text>
+                <View style={{ backgroundColor: COLOR_SWATCH[c] }} className="w-8 h-8 rounded-full border border-line-heavy" />
+                <Text className="text-ink-muted text-[10px] mt-1">{c}</Text>
               </Pressable>
             ))}
           </View>
@@ -141,7 +141,7 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
 function SleepEditor({ payload: p, onChange }: EditorProps<'sleep'>) {
   return (
     <View className="flex-row items-center justify-between mt-4">
-      <Text className="text-slate-300 text-base">Nap (off = night sleep)</Text>
+      <Text className="text-ink-soft text-base">Nap (off = night sleep)</Text>
       <Switch value={p.nap !== false} onValueChange={(nap) => onChange({ nap })} />
     </View>
   );
@@ -265,7 +265,7 @@ function PottyEditor({ payload: p, onChange }: EditorProps<'potty'>) {
         onChange={(location) => onChange({ location })}
       />
       <View className="flex-row items-center justify-between mt-4">
-        <Text className="text-slate-300 text-base">Accident</Text>
+        <Text className="text-ink-soft text-base">Accident</Text>
         <Switch value={p.accident ?? false} onValueChange={(accident) => onChange({ accident: accident || undefined })} />
       </View>
     </View>
@@ -300,10 +300,10 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
             <Pressable
               key={m.key}
               onPress={() => onChange({ key: selected ? undefined : m.key, custom: undefined })}
-              className={`flex-row items-center px-3 py-2.5 rounded-xl border ${selected ? 'bg-orange-500/20 border-orange-400/60' : 'bg-slate-800 border-slate-700'}`}
+              className={`flex-row items-center px-3 py-2.5 rounded-xl border ${selected ? 'bg-orange/20 border-orange-strong/60' : 'bg-raised border-line-strong'}`}
             >
-              <Text className={`flex-1 ${done ? 'text-slate-500 line-through' : 'text-white'}`}>{m.label}</Text>
-              <Text className="text-slate-500 text-xs">~{m.months} mo</Text>
+              <Text className={`flex-1 ${done ? 'text-ink-faint line-through' : 'text-ink'}`}>{m.label}</Text>
+              <Text className="text-ink-faint text-xs">~{m.months} mo</Text>
             </Pressable>
           );
         })}

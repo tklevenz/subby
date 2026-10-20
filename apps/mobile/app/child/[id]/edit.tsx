@@ -16,7 +16,7 @@ export default function EditChildScreen() {
   const updateChild = useChildStore((s) => s.updateChild);
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: child ? `Edit ${child.name}` : 'Child' }} />
       {child ? (
         <>
@@ -48,7 +48,7 @@ function DeleteChild({ child }: { child: Child }) {
 
   if (!open) {
     return (
-      <View className="mt-10 pt-6 border-t border-slate-800">
+      <View className="mt-10 pt-6 border-t border-line">
         <Button label="Delete child…" variant="ghost" onPress={() => setOpen(true)} />
       </View>
     );
@@ -80,19 +80,19 @@ function DeleteChild({ child }: { child: Child }) {
   };
 
   return (
-    <View className="mt-10 rounded-2xl border border-red-500/40 bg-red-500/10 p-4">
-      <Text className="text-red-300 font-semibold text-base">Delete {child.name} permanently?</Text>
-      <Text className="text-slate-300 mt-2 leading-5">
+    <View className="mt-10 rounded-2xl border border-red/40 bg-red/10 p-4">
+      <Text className="text-red-soft font-semibold text-base">Delete {child.name} permanently?</Text>
+      <Text className="text-ink-soft mt-2 leading-5">
         {counts === null
           ? 'Counting entries…'
           : total === 0
             ? `${child.name}'s profile will be deleted.`
             : `${child.name}'s profile and all ${total.toLocaleString()} entries will be deleted from this device, including photos.`}
       </Text>
-      {breakdown ? <Text className="text-slate-400 text-xs mt-2 leading-4">{breakdown}</Text> : null}
-      <Text className="text-slate-300 mt-2 leading-5">This can't be undone.</Text>
+      {breakdown ? <Text className="text-ink-muted text-xs mt-2 leading-4">{breakdown}</Text> : null}
+      <Text className="text-ink-soft mt-2 leading-5">This can't be undone.</Text>
       {child.importRef ? (
-        <Text className="text-slate-400 text-xs mt-2 leading-4">Imported data can be imported again from Baby Buddy.</Text>
+        <Text className="text-ink-muted text-xs mt-2 leading-4">Imported data can be imported again from Baby Buddy.</Text>
       ) : null}
 
       <FieldLabel>Type "{child.name}" to confirm</FieldLabel>

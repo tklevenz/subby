@@ -11,6 +11,7 @@ import { useLogQuery } from '../../store/queries';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { formatDayLabel, useNow } from '../../store/timeHelpers';
+import { colors } from '../../theme/colors';
 
 type Mode = 'list' | 'day' | 'week';
 const MODES = [
@@ -26,9 +27,9 @@ export default function HistoryScreen() {
   const [anchor, setAnchor] = useState(() => startOfDay(Date.now()));
 
   return (
-    <View className="flex-1 bg-slate-950" style={{ paddingTop: insets.top }}>
+    <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-center justify-between mx-4 mt-2 mb-2">
-        <Text className="text-xl font-bold text-white">History</Text>
+        <Text className="text-xl font-bold text-ink">History</Text>
         <Segmented options={MODES} value={mode} onChange={setMode} />
       </View>
       {mode === 'list' ? (
@@ -76,12 +77,12 @@ function Calendar({
   return (
     <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
       <View className="flex-row items-center justify-between my-2">
-        <NavButton icon={<ChevronLeft color="#cbd5e1" size={20} />} onPress={() => setAnchor(addDays(anchor, -span))} />
+        <NavButton icon={<ChevronLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -span))} />
         <Pressable onPress={() => setAnchor(today)} disabled={anchor === today}>
-          <Text className="text-white font-semibold text-base">{title}</Text>
+          <Text className="text-ink font-semibold text-base">{title}</Text>
         </Pressable>
         <NavButton
-          icon={<ChevronRight color={anchor >= today ? '#334155' : '#cbd5e1'} size={20} />}
+          icon={<ChevronRight color={anchor >= today ? colors.lineStrong : colors.inkSoft} size={20} />}
           disabled={anchor >= today}
           onPress={() => setAnchor(Math.min(addDays(anchor, span), today))}
         />
@@ -94,7 +95,7 @@ function Calendar({
             <DayTimeline logs={logs} day={anchor} now={now} clock={clock} />
           </View>
           {!stats[0].tracked && stats[0].sleepMs === 0 ? (
-            <Text className="text-slate-500 text-center mt-4">Nothing logged this day.</Text>
+            <Text className="text-ink-faint text-center mt-4">Nothing logged this day.</Text>
           ) : null}
         </>
       ) : (
@@ -109,7 +110,7 @@ function Calendar({
 
 function NavButton({ icon, onPress, disabled }: { icon: React.ReactNode; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={10} className="w-9 h-9 rounded-full bg-slate-900 items-center justify-center">
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={10} className="w-9 h-9 rounded-full bg-surface items-center justify-center">
       {icon}
     </Pressable>
   );
@@ -124,10 +125,10 @@ function Totals({ stats, units }: { stats: DayStats; units: 'metric' | 'imperial
   return (
     <View className="flex-row gap-2">
       {items.map((i) => (
-        <View key={i.label} className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-3">
-          <Text className="text-slate-400 text-xs">{i.label}</Text>
-          <Text className="text-white text-lg font-semibold">{i.value}</Text>
-          {i.sub ? <Text className="text-slate-500 text-[11px]" numberOfLines={1}>{i.sub}</Text> : null}
+        <View key={i.label} className="flex-1 bg-surface border border-line rounded-xl p-3">
+          <Text className="text-ink-muted text-xs">{i.label}</Text>
+          <Text className="text-ink text-lg font-semibold">{i.value}</Text>
+          {i.sub ? <Text className="text-ink-faint text-[11px]" numberOfLines={1}>{i.sub}</Text> : null}
         </View>
       ))}
     </View>
@@ -138,15 +139,15 @@ function WeekTable({ stats, units }: { stats: DayStats[]; units: 'metric' | 'imp
   const showBottle = stats.some((s) => s.bottleMl > 0);
   const cols = ['Day', 'Sleep', 'Naps', 'Feeds', ...(showBottle ? ['Bottle'] : []), 'Diapers'];
   return (
-    <View className="mt-6 bg-slate-900 border border-slate-800 rounded-2xl px-3 py-2">
-      <View className="flex-row py-1.5 border-b border-slate-800">
+    <View className="mt-6 bg-surface border border-line rounded-2xl px-3 py-2">
+      <View className="flex-row py-1.5 border-b border-line">
         {cols.map((c, i) => (
-          <Text key={c} className={`flex-1 text-slate-500 text-[11px] ${i ? 'text-right' : ''}`}>{c}</Text>
+          <Text key={c} className={`flex-1 text-ink-faint text-[11px] ${i ? 'text-right' : ''}`}>{c}</Text>
         ))}
       </View>
       {[...stats].reverse().map((s) => (
         <View key={s.day} className="flex-row py-1.5">
-          <Text className="flex-1 text-slate-400 text-xs">{new Date(s.day).toLocaleDateString([], { weekday: 'short' })}</Text>
+          <Text className="flex-1 text-ink-muted text-xs">{new Date(s.day).toLocaleDateString([], { weekday: 'short' })}</Text>
           <Cell>{s.sleepMs ? formatHoursMinutes(s.sleepMs) : '–'}</Cell>
           <Cell>{s.naps || '–'}</Cell>
           <Cell>{s.feeds || '–'}</Cell>
@@ -159,5 +160,5 @@ function WeekTable({ stats, units }: { stats: DayStats[]; units: 'metric' | 'imp
 }
 
 const Cell = ({ children }: { children: React.ReactNode }) => (
-  <Text className="flex-1 text-right text-slate-200 text-xs">{children}</Text>
+  <Text className="flex-1 text-right text-ink-light text-xs">{children}</Text>
 );

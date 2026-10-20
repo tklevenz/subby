@@ -20,6 +20,7 @@ import { previewImport, runImport, type ImportPreview, type ImportProgress, type
 import { canAddChild, useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { colors } from '../../theme/colors';
 
 const LABELS: Record<BBEndpoint, string> = {
   feedings: 'Feedings', changes: 'Diaper changes', sleep: 'Sleep', 'tummy-times': 'Tummy time',
@@ -93,12 +94,12 @@ export default function BabyBuddyImport() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Import from Baby Buddy', headerShown: true, gestureEnabled: step.kind !== 'running' }} />
 
       {step.kind === 'connect' ? (
         <View>
-          <Text className="text-slate-300 leading-6">
+          <Text className="text-ink-soft leading-6">
             Copies your history from a Baby Buddy server onto this device. It only reads from Baby Buddy, and you can run
             it again later to pick up new entries without creating duplicates.
           </Text>
@@ -106,12 +107,12 @@ export default function BabyBuddyImport() {
           <TextField value={url} onChangeText={setUrl} placeholder="https://babybuddy.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
           <FieldLabel>API key (Baby Buddy → User Settings)</FieldLabel>
           <TextField value={token} onChangeText={setToken} placeholder="API key" autoCapitalize="none" autoCorrect={false} secureTextEntry />
-          <Text className="text-slate-500 text-xs mt-2">The key is used for this import only and is not saved.</Text>
+          <Text className="text-ink-faint text-xs mt-2">The key is used for this import only and is not saved.</Text>
           {url.trim().toLowerCase().startsWith('http://') ? (
-            <Text className="text-amber-300 text-xs mt-2">This address isn't encrypted (http). Your key and data travel in plain text.</Text>
+            <Text className="text-amber-soft text-xs mt-2">This address isn't encrypted (http). Your key and data travel in plain text.</Text>
           ) : null}
-          {error ? <Text className="text-red-400 mt-3">{error}</Text> : null}
-          {busy ? <ActivityIndicator className="mt-4" color="#a78bfa" /> : (
+          {error ? <Text className="text-red-strong mt-3">{error}</Text> : null}
+          {busy ? <ActivityIndicator className="mt-4" color={colors.violetStrong} /> : (
             <Button label="Connect" onPress={connect} disabled={!url.trim() || !token.trim()} />
           )}
         </View>
@@ -149,27 +150,27 @@ export default function BabyBuddyImport() {
 
       {step.kind === 'running' ? (
         <View className="items-center mt-8">
-          <ActivityIndicator size="large" color="#a78bfa" />
+          <ActivityIndicator size="large" color={colors.violetStrong} />
           {step.progress ? (
             <>
-              <Text className="text-white text-base mt-4">{LABELS[step.progress.endpoint]}</Text>
-              <Text className="text-slate-400 mt-1">{step.progress.done} / {step.progress.total}</Text>
-              <View className="w-full h-2 bg-slate-800 rounded-full mt-3 overflow-hidden">
-                <View className="h-2 bg-violet-500" style={{ width: `${Math.round((step.progress.done / Math.max(1, step.progress.total)) * 100)}%` }} />
+              <Text className="text-ink text-base mt-4">{LABELS[step.progress.endpoint]}</Text>
+              <Text className="text-ink-muted mt-1">{step.progress.done} / {step.progress.total}</Text>
+              <View className="w-full h-2 bg-raised rounded-full mt-3 overflow-hidden">
+                <View className="h-2 bg-violet" style={{ width: `${Math.round((step.progress.done / Math.max(1, step.progress.total)) * 100)}%` }} />
               </View>
-              <Text className="text-slate-500 text-xs mt-2">
+              <Text className="text-ink-faint text-xs mt-2">
                 Step {BB_ENDPOINTS.indexOf(step.progress.endpoint) + 1} of {BB_ENDPOINTS.length}
               </Text>
             </>
-          ) : <Text className="text-slate-400 mt-4">Starting…</Text>}
+          ) : <Text className="text-ink-muted mt-4">Starting…</Text>}
           <Button label="Cancel" variant="ghost" onPress={() => (cancelled.current = true)} />
-          <Text className="text-slate-500 text-xs mt-2 text-center">Already imported entries stay; run the import again to continue.</Text>
+          <Text className="text-ink-faint text-xs mt-2 text-center">Already imported entries stay; run the import again to continue.</Text>
         </View>
       ) : null}
 
       {step.kind === 'done' ? (
         <View>
-          <Text className="text-xl font-bold text-white">{step.result.cancelled ? 'Import cancelled' : 'Import finished'}</Text>
+          <Text className="text-xl font-bold text-ink">{step.result.cancelled ? 'Import cancelled' : 'Import finished'}</Text>
           <Card>
             <Row label="Imported" value={String(step.result.imported)} />
             <Row label="Already imported (skipped)" value={String(step.result.skipped)} />
@@ -177,9 +178,9 @@ export default function BabyBuddyImport() {
             <Row label="Couldn't import" value={String(step.result.failed.length)} />
           </Card>
           {step.result.failed.slice(0, 5).map((f) => (
-            <Text key={f.ref} className="text-red-300 text-xs mt-2">{f.ref}: {f.reason}</Text>
+            <Text key={f.ref} className="text-red-soft text-xs mt-2">{f.ref}: {f.reason}</Text>
           ))}
-          <Text className="text-slate-400 mt-4 leading-5">
+          <Text className="text-ink-muted mt-4 leading-5">
             Done with Baby Buddy? Regenerate your API key there (User Settings) so the copied key stops working.
           </Text>
           <Button label="Done" onPress={() => router.replace('/')} />
@@ -259,7 +260,7 @@ function Review({
 
   return (
     <View>
-      <Text className="text-white text-lg font-semibold">Found {total.toLocaleString()} entries</Text>
+      <Text className="text-ink text-lg font-semibold">Found {total.toLocaleString()} entries</Text>
       <Card>
         {BB_ENDPOINTS.filter((e) => preview.counts[e] > 0).map((e) => (
           <Row key={e} label={LABELS[e]} value={preview.counts[e].toLocaleString()} />
@@ -269,7 +270,7 @@ function Review({
       <FieldLabel>Children</FieldLabel>
       {preview.children.map((bb) => (
         <View key={bb.id} className="mb-3">
-          <Text className="text-slate-200 mb-2">{bb.first_name} {bb.last_name} · born {bb.birth_date} → import into</Text>
+          <Text className="text-ink-light mb-2">{bb.first_name} {bb.last_name} · born {bb.birth_date} → import into</Text>
           <Segmented options={childOptions} value={mapping[bb.id]} onChange={(v) => setMapping((m) => ({ ...m, [bb.id]: v }))} />
         </View>
       ))}
@@ -277,8 +278,8 @@ function Review({
       <FieldLabel>Units in Baby Buddy (detected — check the examples)</FieldLabel>
       {(Object.keys(UNIT_OPTIONS) as (keyof ImportUnits)[]).map((measure) => (
         <View key={measure} className="mb-3">
-          <Text className="text-slate-300 mb-1.5 capitalize">
-            {measure} <Text className="text-slate-500">· {unitExample(measure, preview.examples[measure], units, settings.units)}</Text>
+          <Text className="text-ink-soft mb-1.5 capitalize">
+            {measure} <Text className="text-ink-faint">· {unitExample(measure, preview.examples[measure], units, settings.units)}</Text>
           </Text>
           <Segmented
             options={UNIT_OPTIONS[measure] as { value: string; label: string }[]}
@@ -289,12 +290,12 @@ function Review({
       ))}
 
       {overLimit ? (
-        <Text className="text-amber-300 mt-2 leading-5">
+        <Text className="text-amber-soft mt-2 leading-5">
           The free version tracks one child. Import the others into an existing child, choose "Don't import", or get Premium to add them as their own.
         </Text>
       ) : null}
       <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0 || overLimit || allSkipped} />
-      {preview.children.length === 0 ? <Text className="text-amber-300 mt-2">No children found on this server.</Text> : null}
+      {preview.children.length === 0 ? <Text className="text-amber-soft mt-2">No children found on this server.</Text> : null}
     </View>
   );
 }

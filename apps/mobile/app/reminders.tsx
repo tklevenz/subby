@@ -66,26 +66,26 @@ export default function RemindersScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       {!remindersAvailable ? (
-        <View className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 mb-4">
-          <Text className="text-amber-200 text-sm leading-5">
+        <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
+          <Text className="text-amber-pale text-sm leading-5">
             Reminders can't run in Expo Go on Android. They work in the iOS Expo Go app and in development builds.
           </Text>
         </View>
       ) : allowed === false ? (
-        <View className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 mb-4">
-          <Text className="text-amber-200 text-sm leading-5">
+        <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
+          <Text className="text-amber-pale text-sm leading-5">
             Notifications are turned off for Kindred Log.{' '}
             <Text className="underline" onPress={() => Linking.openSettings()}>Open Settings</Text> to allow them.
           </Text>
         </View>
       ) : null}
 
-      <View className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-5 flex-row items-center">
+      <View className="bg-surface border border-line rounded-2xl p-4 mb-5 flex-row items-center">
         <View className="flex-1 pr-3">
-          <Text className="text-white text-base font-semibold">Allow reminders</Text>
-          <Text className="text-slate-400 text-xs mt-1 leading-4">Turn off to pause them all; your choices below are kept.</Text>
+          <Text className="text-ink text-base font-semibold">Allow reminders</Text>
+          <Text className="text-ink-muted text-xs mt-1 leading-4">Turn off to pause them all; your choices below are kept.</Text>
         </View>
         <Switch value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(refresh)} disabled={!remindersAvailable} />
       </View>
@@ -141,20 +141,20 @@ export default function RemindersScreen() {
         />
       </View>
 
-      <Text className="text-xs font-semibold text-slate-400 uppercase mt-6 mb-2 ml-1">Coming up</Text>
+      <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-2 ml-1">Coming up</Text>
       <Card>
         {upcoming.length === 0 ? (
-          <Text className="text-slate-500 px-4 py-3.5">No reminders scheduled.</Text>
+          <Text className="text-ink-faint px-4 py-3.5">No reminders scheduled.</Text>
         ) : (
           upcoming.map((u) => (
-            <View key={u.id} className="flex-row px-4 py-3 border-b border-slate-800">
-              <Text className="flex-1 text-white">{u.title}</Text>
-              {u.at ? <Text className="text-slate-400">{formatDayLabel(u.at)} {formatTime(u.at)}</Text> : null}
+            <View key={u.id} className="flex-row px-4 py-3 border-b border-line">
+              <Text className="flex-1 text-ink">{u.title}</Text>
+              {u.at ? <Text className="text-ink-muted">{formatDayLabel(u.at)} {formatTime(u.at)}</Text> : null}
             </View>
           ))
         )}
       </Card>
-      <Text className="text-slate-600 text-xs mt-3 leading-5">
+      <Text className="text-ink-ghost text-xs mt-3 leading-5">
         Reminders are set on this phone only and move automatically as you log.
       </Text>
     </ScrollView>
@@ -195,11 +195,11 @@ function Section({
   children?: React.ReactNode;
 }) {
   return (
-    <View className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3">
+    <View className="bg-surface border border-line rounded-2xl p-4 mb-3">
       <View className="flex-row items-center">
         <View className="flex-1 pr-3">
-          <Text className="text-white text-base font-semibold">{title}</Text>
-          <Text className="text-slate-400 text-xs mt-1 leading-4">{description}</Text>
+          <Text className="text-ink text-base font-semibold">{title}</Text>
+          <Text className="text-ink-muted text-xs mt-1 leading-4">{description}</Text>
         </View>
         <Switch value={enabled} onValueChange={onToggle} disabled={!remindersAvailable} />
       </View>

@@ -12,7 +12,7 @@ const child: ReminderChild = {
   lastPumpAt: null,
   timers: [],
   meds: [{ name: 'Ibuprofen', lastAt: now - 2 * 60 * MIN, dueAt: now + 4 * 60 * MIN }],
-  nextSleep: { kind: 'nap', earliest: now + 30 * MIN, latest: now + 60 * MIN, basis: 'personal', wakeAt: now - 120 * MIN, napIndex: 1 },
+  nextSleep: { kind: 'nap', earliest: now + 30 * MIN, latest: now + 60 * MIN, basis: 'personal', wakeAt: now - 120 * MIN, napIndex: 1, napMinutes: 75 },
 };
 const all = {
   ...DEFAULT_REMINDERS,

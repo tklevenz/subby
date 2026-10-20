@@ -10,6 +10,7 @@ import { useActiveChild } from '../../store/useActiveChild';
 import { useCanAddChild, useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Card, Row, Segmented } from '../../components/ui';
+import { colors } from '../../theme/colors';
 
 /** Card in the children strip. Same slots for every card, so they line up. */
 function ChildCard({
@@ -30,18 +31,18 @@ function ChildCard({
   return (
     <Pressable
       onPress={onPress}
-      className={`items-center w-28 py-4 px-2 rounded-2xl border ${dashed ? 'border-dashed border-slate-700' : 'bg-slate-900 border-slate-800'}`}
+      className={`items-center w-28 py-4 px-2 rounded-2xl border ${dashed ? 'border-dashed border-line-strong' : 'bg-surface border-line'}`}
     >
       <View className="w-16 h-16">{avatar}</View>
-      <Text className={`font-semibold mt-2 ${dashed ? 'text-slate-300' : 'text-white'}`} numberOfLines={1}>{title}</Text>
+      <Text className={`font-semibold mt-2 ${dashed ? 'text-ink-soft' : 'text-ink'}`} numberOfLines={1}>{title}</Text>
       {/* Always rendered (even empty) so every card has the same height. */}
-      <Text className={`text-xs ${subtitleAccent ? 'text-violet-300' : 'text-slate-400'}`} numberOfLines={1}>{subtitle || ' '}</Text>
+      <Text className={`text-xs ${subtitleAccent ? 'text-violet-soft' : 'text-ink-muted'}`} numberOfLines={1}>{subtitle || ' '}</Text>
     </Pressable>
   );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <Text className="text-xs font-semibold text-slate-400 uppercase mt-6 mb-2 ml-1">{children}</Text>;
+  return <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-2 ml-1">{children}</Text>;
 }
 
 export default function SettingsScreen() {
@@ -55,11 +56,11 @@ export default function SettingsScreen() {
   const reminders = useSettingsStore((s) => s.reminders);
   const reminderCount = activeReminderCount(reminders);
   const setSetting = useSettingsStore((s) => s.set);
-  const chevron = <ChevronRight color="#475569" size={16} />;
+  const chevron = <ChevronRight color={colors.inkGhost} size={16} />;
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
-      <Text className="text-xl font-bold text-white mt-2">Settings</Text>
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
+      <Text className="text-xl font-bold text-ink mt-2">Settings</Text>
 
       {/* Each child has their own profile page; this screen is for app-wide settings. */}
       <SectionTitle>Children</SectionTitle>
@@ -77,8 +78,8 @@ export default function SettingsScreen() {
           dashed
           onPress={() => router.push('/child/new')}
           avatar={
-            <View className="w-16 h-16 rounded-full bg-slate-800 items-center justify-center">
-              <Plus color="#94a3b8" size={24} />
+            <View className="w-16 h-16 rounded-full bg-raised items-center justify-center">
+              <Plus color={colors.inkMuted} size={24} />
             </View>
           }
           title="Add child"
@@ -131,7 +132,7 @@ export default function SettingsScreen() {
       ) : null}
 
       <View className="mt-10 items-center">
-        <Text className="text-slate-600 text-xs">Kindred Log · data stays on this device</Text>
+        <Text className="text-ink-ghost text-xs">Kindred Log · data stays on this device</Text>
       </View>
     </ScrollView>
   );

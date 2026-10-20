@@ -4,6 +4,7 @@ import { Plus, TriangleAlert } from 'lucide-react-native';
 import { flaggedFoods, recentFoods, type PayloadOf } from '@kindred-log/shared';
 import { HAS_FOODS, useLogQuery } from '../../store/queries';
 import { Chip, FieldLabel, TextField } from '../ui';
+import { colors } from '../../theme/colors';
 
 type Solids = Pick<PayloadOf<'feed'>, 'foods' | 'allergen' | 'reaction'>;
 
@@ -38,15 +39,15 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
       </View>
       <View className="flex-row items-center mt-2">
         <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder="New food" onSubmitEditing={add} returnKeyType="done" />
-        <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-slate-800" hitSlop={6}>
-          <Plus color="#cbd5e1" size={18} />
+        <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-raised" hitSlop={6}>
+          <Plus color={colors.inkSoft} size={18} />
         </Pressable>
       </View>
 
       <View className="flex-row items-center justify-between mt-4">
         <View className="flex-row items-center">
-          <TriangleAlert color="#fbbf24" size={16} />
-          <Text className="text-slate-300 ml-2">Possible allergen / first try</Text>
+          <TriangleAlert color={colors.amberStrong} size={16} />
+          <Text className="text-ink-soft ml-2">Possible allergen / first try</Text>
         </View>
         <Switch value={value.allergen ?? false} onValueChange={(allergen) => onChange({ allergen: allergen || undefined })} />
       </View>

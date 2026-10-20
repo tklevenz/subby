@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Modal, Platform, Pressable, Text, View } from 'react-native';
 import { Camera, ImagePlus, Trash2 } from 'lucide-react-native';
 import { pickPhoto } from '../features/photos';
+import { colors } from '../theme/colors';
 
 /**
  * Take / choose / remove photo menu (a modal, since Android alerts allow only 3 buttons).
@@ -41,25 +42,25 @@ export default function PhotoMenu({
     });
 
   const items = [
-    { label: 'Take photo', icon: <Camera color="#cbd5e1" size={18} />, onPress: () => pick('camera') },
-    { label: 'Choose from library', icon: <ImagePlus color="#cbd5e1" size={18} />, onPress: () => pick('library') },
+    { label: 'Take photo', icon: <Camera color={colors.inkSoft} size={18} />, onPress: () => pick('camera') },
+    { label: 'Choose from library', icon: <ImagePlus color={colors.inkSoft} size={18} />, onPress: () => pick('library') },
     ...(hasPhoto
-      ? [{ label: 'Remove photo', icon: <Trash2 color="#f87171" size={18} />, onPress: () => after(() => onChange(null)), danger: true }]
+      ? [{ label: 'Remove photo', icon: <Trash2 color={colors.redStrong} size={18} />, onPress: () => after(() => onChange(null)), danger: true }]
       : []),
   ];
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} onDismiss={runPending}>
-      <Pressable className="flex-1 bg-black/60 justify-end px-4 pb-10" onPress={onClose}>
-        <View className="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden">
+      <Pressable className="flex-1 bg-scrim/60 justify-end px-4 pb-10" onPress={onClose}>
+        <View className="bg-surface rounded-2xl border border-line-strong overflow-hidden">
           {items.map((item) => (
-            <Pressable key={item.label} onPress={item.onPress} className="flex-row items-center px-4 py-4 border-b border-slate-800">
+            <Pressable key={item.label} onPress={item.onPress} className="flex-row items-center px-4 py-4 border-b border-line">
               {item.icon}
-              <Text className={`ml-3 text-base ${'danger' in item ? 'text-red-300' : 'text-white'}`}>{item.label}</Text>
+              <Text className={`ml-3 text-base ${'danger' in item ? 'text-red-soft' : 'text-ink'}`}>{item.label}</Text>
             </Pressable>
           ))}
           <Pressable onPress={onClose} className="px-4 py-4 items-center">
-            <Text className="text-slate-400 text-base">Cancel</Text>
+            <Text className="text-ink-muted text-base">Cancel</Text>
           </Pressable>
         </View>
       </Pressable>

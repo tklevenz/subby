@@ -1,21 +1,17 @@
 import React, { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import type { Child } from '@kindred-log/shared';
+import { colors, type ColorName } from '../theme/colors';
 
-// Pastel pairs that fit the slate palette; picked per child so siblings differ.
-const PALETTE = [
-  { bg: '#4c1d95', fg: '#ddd6fe' },
-  { bg: '#164e63', fg: '#a5f3fc' },
-  { bg: '#713f12', fg: '#fde68a' },
-  { bg: '#14532d', fg: '#bbf7d0' },
-  { bg: '#831843', fg: '#fbcfe8' },
-  { bg: '#1e3a8a', fg: '#bfdbfe' },
-];
+// Six fill/initial pairs (avatar1Bg/avatar1Ink …); picked per child so siblings differ.
+const SLOTS = 6;
 
-function colorsFor(id: string) {
+/** Fill and initial colors for a child without a photo. */
+export function avatarColors(id: string) {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETTE[h % PALETTE.length];
+  const n = (h % SLOTS) + 1;
+  return { bg: colors[`avatar${n}Bg` as ColorName], fg: colors[`avatar${n}Ink` as ColorName] };
 }
 
 /** Round child photo, or their initial on a per-child color. */
@@ -31,7 +27,7 @@ export default function ChildAvatar({
 }) {
   // Fall back to the initial if the file has gone missing.
   const [failed, setFailed] = useState<string | null>(null);
-  const { bg, fg } = colorsFor(child.id);
+  const { bg, fg } = avatarColors(child.id);
   const style = { width: size, height: size, borderRadius: size / 2 };
   const showPhoto = child.photoUri && failed !== child.photoUri;
 
@@ -54,7 +50,7 @@ export default function ChildAvatar({
       {ring ? (
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: size / 2, borderWidth: 2.5, borderColor: '#a78bfa' }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: size / 2, borderWidth: 2.5, borderColor: colors.violetStrong }}
         />
       ) : null}
     </View>

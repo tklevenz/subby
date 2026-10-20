@@ -36,6 +36,7 @@ describe('sleep habits', () => {
     expect(h.bedtimeClock).toBe(19.5 * 60);
     expect(h.wakeClock).toBe(7 * 60);
     expect(h.napLengths.get(1)).toBe(90);
+    expect(h.napLength).toBe(75);
     expect(h.napsPerDay).toBe(2);
   });
 });
@@ -45,7 +46,7 @@ describe('predictNextSleep', () => {
     const p = predictNextSleep(week(7), child, at(0, 8))!;
     const norms = ageNorms(8);
     const center = 150 * 0.7 + ((norms.wakeMin + norms.wakeMax) / 2) * 0.3;
-    expect(p).toMatchObject({ kind: 'nap', basis: 'personal', napIndex: 0 });
+    expect(p).toMatchObject({ kind: 'nap', basis: 'personal', napIndex: 0, napMinutes: 60 });
     expect(p.earliest).toBe(at(0, 7) + (center - 15) * MIN);
   });
 

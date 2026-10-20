@@ -60,8 +60,8 @@ export default function DateTimeField({
   };
 
   return (
-    <Pressable onPress={openAndroid} className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 self-start">
-      <Text className="text-white text-base">
+    <Pressable onPress={openAndroid} className="bg-raised border border-line-strong rounded-xl px-4 py-3 self-start">
+      <Text className="text-ink text-base">
         {formatDayLabel(value)}
         {mode === 'datetime' ? ` · ${formatTime(value)}` : ''}
       </Text>

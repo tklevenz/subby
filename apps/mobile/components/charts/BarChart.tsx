@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Line, Rect } from 'react-native-svg';
+import { colors as theme } from '../../theme/colors';
 
 export type Bar = { label: string; values: number[]; dim?: boolean };
 
@@ -41,14 +42,14 @@ export default function BarChart({
   return (
     <View>
       <View className="flex-row justify-end">
-        <Text className="text-slate-500 text-[10px]">{formatValue(max)}</Text>
+        <Text className="text-ink-faint text-[10px]">{formatValue(max)}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height }}>
         {width > 0 ? (
           <Svg width={width} height={height}>
-            <Line x1={0} x2={width} y1={0.5} y2={0.5} stroke="#1e293b" />
-            <Line x1={0} x2={width} y1={height / 2} y2={height / 2} stroke="#1e293b" />
-            <Line x1={0} x2={width} y1={height - 0.5} y2={height - 0.5} stroke="#334155" />
+            <Line x1={0} x2={width} y1={0.5} y2={0.5} stroke={theme.line} />
+            <Line x1={0} x2={width} y1={height / 2} y2={height / 2} stroke={theme.line} />
+            <Line x1={0} x2={width} y1={height - 0.5} y2={height - 0.5} stroke={theme.lineStrong} />
             {bars.map((b, i) => {
               let acc = 0;
               const x = i * slot + (slot - barW) / 2;
@@ -63,14 +64,14 @@ export default function BarChart({
               });
             })}
             {average !== undefined && average > 0 ? (
-              <Line x1={0} x2={width} y1={y(average)} y2={y(average)} stroke="#e2e8f0" strokeOpacity={0.5} strokeDasharray="4 4" />
+              <Line x1={0} x2={width} y1={y(average)} y2={y(average)} stroke={theme.inkLight} strokeOpacity={0.5} strokeDasharray="4 4" />
             ) : null}
           </Svg>
         ) : null}
       </View>
       <View className="flex-row mt-1">
         {bars.map((b, i) => (
-          <Text key={i} className="text-slate-500 text-[10px] text-center" style={{ width: slot }} numberOfLines={1}>
+          <Text key={i} className="text-ink-faint text-[10px] text-center" style={{ width: slot }} numberOfLines={1}>
             {i % labelEvery === 0 ? b.label : ''}
           </Text>
         ))}

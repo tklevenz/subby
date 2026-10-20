@@ -8,6 +8,7 @@ import ChildAvatar from './ChildAvatar';
 import DateTimeField from './DateTimeField';
 import PhotoMenu from './PhotoMenu';
 import { Button, FieldLabel, Segmented, TextField } from './ui';
+import { colors } from '../theme/colors';
 
 const SEX_OPTIONS = [
   { value: 'female', label: 'Girl' },
@@ -36,8 +37,8 @@ export default function ChildForm({
       <Pressable onPress={() => setMenu(true)} className="items-center mt-2 mb-2">
         <ChildAvatar child={{ id: initial?.id ?? 'new', name: name || '?', photoUri }} size={96} />
         <View className="flex-row items-center mt-2">
-          <Camera color="#a78bfa" size={14} />
-          <Text className="text-violet-300 text-sm ml-1.5">{photoUri ? 'Change photo' : 'Add a photo'}</Text>
+          <Camera color={colors.violetStrong} size={14} />
+          <Text className="text-violet-soft text-sm ml-1.5">{photoUri ? 'Change photo' : 'Add a photo'}</Text>
         </View>
       </Pressable>
       <PhotoMenu visible={menu} hasPhoto={photoUri !== null} onClose={() => setMenu(false)} onChange={setPhotoUri} />

@@ -24,7 +24,7 @@ export default function AddLogSheet() {
               style={{ width: '30.5%' }}
             >
               <Icon color={color} size={24} />
-              <Text className="text-white text-xs font-medium mt-2">{label}</Text>
+              <Text className="text-ink text-xs font-medium mt-2">{label}</Text>
             </Pressable>
           );
         })}

@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { addDays, isNap, type LogEntry, type LogType, type PayloadOf } from '@kindred-log/shared';
 import { TYPE_META } from '../logTypes';
+import { colors } from '../../theme/colors';
 
 const HOUR_H = 32;
 const DOT = 12;
@@ -39,20 +40,20 @@ export default function DayTimeline({
     <View>
       <View className="flex-row ml-10 mb-1">
         {LANES.map((l) => (
-          <Text key={l.key} className="flex-1 text-center text-slate-500 text-[11px]">{l.label}</Text>
+          <Text key={l.key} className="flex-1 text-center text-ink-faint text-[11px]">{l.label}</Text>
         ))}
       </View>
       <View className="flex-row" style={{ height }}>
         <View className="w-10">
           {Array.from({ length: 9 }, (_, i) => i * 3).map((h) => (
-            <Text key={h} className="absolute text-slate-500 text-[10px]" style={{ top: Math.min(h * HOUR_H - 6, height - 12) }}>
+            <Text key={h} className="absolute text-ink-faint text-[10px]" style={{ top: Math.min(h * HOUR_H - 6, height - 12) }}>
               {hourLabel(h, clock)}
             </Text>
           ))}
         </View>
         <View className="flex-1 flex-row">
           {Array.from({ length: 25 }, (_, h) => (
-            <View key={h} className={`absolute left-0 right-0 h-px ${h % 6 === 0 ? 'bg-slate-700' : 'bg-slate-800/70'}`} style={{ top: Math.min(h * HOUR_H, height - 1) }} />
+            <View key={h} className={`absolute left-0 right-0 h-px ${h % 6 === 0 ? 'bg-raised-high' : 'bg-raised/70'}`} style={{ top: Math.min(h * HOUR_H, height - 1) }} />
           ))}
           {LANES.map((lane) => (
             <View key={lane.key} className="flex-1 mx-1">
@@ -75,7 +76,7 @@ export default function DayTimeline({
                       {isBlock ? (
                         <View
                           className="w-full flex-1 rounded-md border"
-                          style={{ backgroundColor: meta.color, opacity: faded ? 0.55 : 0.9, borderColor: l.endedAt === null ? '#fff' : 'transparent' }}
+                          style={{ backgroundColor: meta.color, opacity: faded ? 0.55 : 0.9, borderColor: l.endedAt === null ? colors.ink : 'transparent' }}
                         />
                       ) : (
                         <View style={{ width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: meta.color }} />
@@ -86,7 +87,7 @@ export default function DayTimeline({
             </View>
           ))}
           {now >= day && now < dayEnd ? (
-            <View className="absolute left-0 right-0 h-0.5 bg-red-400" style={{ top: y(now) }} />
+            <View className="absolute left-0 right-0 h-0.5 bg-red-strong" style={{ top: y(now) }} />
           ) : null}
         </View>
       </View>

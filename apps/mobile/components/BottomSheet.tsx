@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
+import { colors } from '../theme/colors';
 
 /** Slide-up modal sheet with drag handle, title row and scrollable body. */
 export default function BottomSheet({
@@ -43,23 +44,23 @@ export default function BottomSheet({
   return (
     <Modal transparent animationType="none" visible={visible} statusBarTranslucent onRequestClose={dismiss}>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={dismiss} className="absolute inset-0 bg-black/60" />
+        <Pressable onPress={dismiss} className="absolute inset-0 bg-scrim/60" />
 
         <Animated.View
           style={{ transform: [{ translateY: slideY }], maxHeight: height * 0.9 }}
-          className="bg-slate-900 border-t border-slate-700/50 rounded-t-2xl"
+          className="bg-surface border-t border-line-strong/50 rounded-t-2xl"
         >
           <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1.5 bg-slate-600 rounded-full" />
+            <View className="w-10 h-1.5 bg-raised-top rounded-full" />
           </View>
 
           <View className="flex-row items-center justify-between px-5 pb-2">
             <View className="flex-row items-center">
               {icon}
-              <Text className="text-lg font-bold text-white ml-2">{title}</Text>
+              <Text className="text-lg font-bold text-ink ml-2">{title}</Text>
             </View>
             <Pressable onPress={dismiss} hitSlop={10}>
-              <X color="#94a3b8" size={22} />
+              <X color={colors.inkMuted} size={22} />
             </Pressable>
           </View>
 

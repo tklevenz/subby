@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, TextInput, type TextInputProps } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { colors } from '../theme/colors';
 
 export function Chip({
   label,
@@ -18,10 +19,10 @@ export function Chip({
         onPress();
       }}
       className={`px-4 py-2 rounded-full border ${
-        selected ? 'bg-violet-500/30 border-violet-400/60' : 'bg-slate-800 border-slate-700'
+        selected ? 'bg-violet/30 border-violet-strong/60' : 'bg-raised border-line-strong'
       }`}
     >
-      <Text className={selected ? 'text-violet-100 font-medium' : 'text-slate-400'}>{label}</Text>
+      <Text className={selected ? 'text-violet-faint font-medium' : 'text-ink-muted'}>{label}</Text>
     </Pressable>
   );
 }
@@ -46,15 +47,15 @@ export function Segmented<T extends string>({
 }
 
 export function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <Text className="text-xs text-slate-400 font-medium mb-2 mt-4">{children}</Text>;
+  return <Text className="text-xs text-ink-muted font-medium mb-2 mt-4">{children}</Text>;
 }
 
 export function TextField(props: TextInputProps) {
   return (
     <TextInput
-      placeholderTextColor="#64748b"
+      placeholderTextColor={colors.inkFaint}
       {...props}
-      className={`bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-base ${props.className ?? ''}`}
+      className={`bg-raised border border-line-strong rounded-xl px-4 py-3 text-ink text-base ${props.className ?? ''}`}
     />
   );
 }
@@ -70,7 +71,7 @@ export function Button({
   variant?: 'primary' | 'danger' | 'ghost';
   disabled?: boolean;
 }) {
-  const bg = { primary: 'bg-violet-600', danger: 'bg-red-600/80', ghost: 'bg-slate-800' }[variant];
+  const bg = { primary: 'bg-violet-deep', danger: 'bg-red-deep/80', ghost: 'bg-raised' }[variant];
   return (
     <Pressable
       disabled={disabled}
@@ -80,13 +81,13 @@ export function Button({
       }}
       className={`${bg} rounded-xl py-3.5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
     >
-      <Text className="text-white font-semibold text-base">{label}</Text>
+      <Text className="text-ink font-semibold text-base">{label}</Text>
     </Pressable>
   );
 }
 
 export function Card({ children }: { children: React.ReactNode }) {
-  return <View className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">{children}</View>;
+  return <View className="bg-surface rounded-2xl border border-line overflow-hidden">{children}</View>;
 }
 
 export function Row({
@@ -101,9 +102,9 @@ export function Row({
   right?: React.ReactNode;
 }) {
   return (
-    <Pressable onPress={onPress} disabled={!onPress} className="flex-row items-center px-4 py-3.5 border-b border-slate-800">
-      <Text className="flex-1 text-white text-base">{label}</Text>
-      {value ? <Text className="text-slate-400 text-base">{value}</Text> : null}
+    <Pressable onPress={onPress} disabled={!onPress} className="flex-row items-center px-4 py-3.5 border-b border-line">
+      <Text className="flex-1 text-ink text-base">{label}</Text>
+      {value ? <Text className="text-ink-muted text-base">{value}</Text> : null}
       {right}
     </Pressable>
   );

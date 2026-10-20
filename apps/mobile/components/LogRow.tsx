@@ -6,6 +6,7 @@ import type { LogEntry } from '@kindred-log/shared';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime } from '../store/timeHelpers';
 import { logDisplay } from './logDisplay';
+import { colors } from '../theme/colors';
 
 /** Timeline row: tap to open the entry (edit or delete it there). */
 export default function LogRow({ entry }: { entry: LogEntry }) {
@@ -21,13 +22,13 @@ export default function LogRow({ entry }: { entry: LogEntry }) {
       >
         <View className="justify-center">{display.icon}</View>
         <View className="flex-1 ml-3">
-          <Text className="text-sm font-medium text-white" numberOfLines={1}>{display.label}</Text>
+          <Text className="text-sm font-medium text-ink" numberOfLines={1}>{display.label}</Text>
           {display.detail ? (
-            <Text className="text-xs text-slate-400 mt-0.5" numberOfLines={1}>{display.detail}</Text>
+            <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>{display.detail}</Text>
           ) : null}
         </View>
-        <Text className="text-xs text-slate-500">{formatTime(entry.startedAt)}</Text>
-        <ChevronRight color="#475569" size={14} />
+        <Text className="text-xs text-ink-faint">{formatTime(entry.startedAt)}</Text>
+        <ChevronRight color={colors.inkGhost} size={14} />
       </Pressable>
     </View>
   );

@@ -20,6 +20,7 @@ import { Card, Row, Segmented } from '../../components/ui';
 import { useLogQuery } from '../../store/queries';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useNow } from '../../store/timeHelpers';
+import { colors } from '../../theme/colors';
 
 const RANGES = [
   { value: '7', label: '7 days' },
@@ -42,7 +43,7 @@ export default function TrendsScreen() {
   const stats = useMemo(() => (logs ? dailyStats(logs, days, now) : null), [logs, days, now]);
   // Today is still in progress: drawn faded and left out of the averages.
   const avg = useMemo(() => (stats ? averageStats(stats.slice(0, -1)) : null), [stats]);
-  const chevron = <ChevronRight color="#475569" size={16} />;
+  const chevron = <ChevronRight color={colors.inkGhost} size={16} />;
 
   const bars = (values: (s: DayStats) => number[]): Bar[] =>
     (stats ?? []).map((s) => ({
@@ -55,13 +56,13 @@ export default function TrendsScreen() {
   const any = (k: keyof DayStats) => stats?.some((s) => (s[k] as number) > 0) ?? false;
 
   return (
-    <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
-      <Text className="text-xl font-bold text-white mt-2 mb-3">Trends</Text>
+    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
+      <Text className="text-xl font-bold text-ink mt-2 mb-3">Trends</Text>
       <Segmented options={RANGES} value={range} onChange={setRange} />
 
       {stats && avg ? (
         avg.days === 0 && !stats[stats.length - 1].tracked ? (
-          <Text className="text-slate-500 mt-6">Nothing logged in this period yet.</Text>
+          <Text className="text-ink-faint mt-6">Nothing logged in this period yet.</Text>
         ) : (
           <>
             {any('sleepMs') ? (
@@ -76,7 +77,7 @@ export default function TrendsScreen() {
               >
                 <BarChart
                   bars={bars((s) => [s.nightMs / H, s.napMs / H])}
-                  colors={['#7c3aed', '#c4b5fd']}
+                  colors={[colors.violetDeep, colors.violetSoft]}
                   average={avg.sleepMs / H}
                   formatValue={(v) => `${v}h`}
                 />
@@ -94,13 +95,13 @@ export default function TrendsScreen() {
                   ...(any('solids') ? [['Solids / day', avg.solids.toFixed(1)] as [string, string]] : []),
                 ]}
               >
-                <BarChart bars={bars((s) => [s.feeds, s.solids])} colors={[TYPE_META.feed.color, '#fde68a']} average={avg.feeds} />
+                <BarChart bars={bars((s) => [s.feeds, s.solids])} colors={[TYPE_META.feed.color, colors.amberPale]} average={avg.feeds} />
                 {any('bottleMl') ? (
                   <View className="mt-4">
-                    <Text className="text-slate-400 text-xs mb-1">Bottle volume</Text>
+                    <Text className="text-ink-muted text-xs mb-1">Bottle volume</Text>
                     <BarChart
                       bars={bars((s) => [volume(s.bottleMl)])}
-                      colors={['#22d3ee']}
+                      colors={[colors.cyanStrong]}
                       average={volume(avg.bottleMl)}
                       formatValue={(v) => (units === 'metric' ? `${v} ml` : `${v} oz`)}
                     />
@@ -140,7 +141,7 @@ export default function TrendsScreen() {
               </Section>
             ) : null}
 
-            <Text className="text-slate-600 text-xs mt-3">
+            <Text className="text-ink-ghost text-xs mt-3">
               Averages over {avg.days} logged day{avg.days === 1 ? '' : 's'}, not counting today.
             </Text>
           </>
@@ -171,16 +172,16 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <View className="mt-5 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+    <View className="mt-5 bg-surface border border-line rounded-2xl p-4">
       <View className="flex-row items-center gap-2 mb-3">
         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-        <Text className="text-white font-semibold text-base">{title}</Text>
+        <Text className="text-ink font-semibold text-base">{title}</Text>
       </View>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2 mb-4">
         {stats.map(([label, value]) => (
           <View key={label}>
-            <Text className="text-slate-500 text-[11px]">{label}</Text>
-            <Text className="text-slate-100 text-base font-semibold">{value}</Text>
+            <Text className="text-ink-faint text-[11px]">{label}</Text>
+            <Text className="text-ink-bright text-base font-semibold">{value}</Text>
           </View>
         ))}
       </View>

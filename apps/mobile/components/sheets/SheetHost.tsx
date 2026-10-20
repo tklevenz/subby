@@ -1,18 +1,22 @@
 import React from 'react';
-import { Baby, Plus } from 'lucide-react-native';
+import { Baby, Droplets, Plus } from 'lucide-react-native';
 import { useSheetStore, type SheetRequest } from '../../store/useSheetStore';
 import BottomSheet from '../BottomSheet';
 import { TYPE_META } from '../logTypes';
 import AddLogSheet from './AddLogSheet';
+import DiaperSheet from './DiaperSheet';
 import FeedSheet from './FeedSheet';
 import LogSheet from './LogSheet';
+import { colors } from '../../theme/colors';
 
 function header(sheet: SheetRequest): { title: string; icon: React.ReactNode } {
   switch (sheet.kind) {
     case 'feed':
-      return { title: 'Log feed', icon: <Baby color="#67e8f9" size={20} /> };
+      return { title: 'Log feed', icon: <Baby color={colors.cyanSoft} size={20} /> };
     case 'add':
-      return { title: 'Log something', icon: <Plus color="#c4b5fd" size={20} /> };
+      return { title: 'Log something', icon: <Plus color={colors.violetSoft} size={20} /> };
+    case 'diaper':
+      return { title: 'Diaper', icon: <Droplets color={colors.amberStrong} size={20} /> };
     case 'log': {
       const { label, Icon, color } = TYPE_META[sheet.type];
       return { title: `Log ${label.toLowerCase()}`, icon: <Icon color={color} size={20} /> };
@@ -33,6 +37,7 @@ export default function SheetHost() {
     <BottomSheet visible={sheet !== null} onClose={close} title={title} icon={icon}>
       {sheet?.kind === 'feed' ? <FeedSheet key="feed" initialTab={sheet.tab} onClose={close} /> : null}
       {sheet?.kind === 'add' ? <AddLogSheet key="add" /> : null}
+      {sheet?.kind === 'diaper' ? <DiaperSheet key="diaper" onClose={close} /> : null}
       {/* Keyed so switching from one type to another resets the form state. */}
       {sheet?.kind === 'log' ? <LogSheet key={`log-${sheet.type}`} type={sheet.type} initial={sheet.payload} onClose={close} /> : null}
     </BottomSheet>

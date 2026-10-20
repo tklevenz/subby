@@ -7,7 +7,12 @@
 - **Monorepo / Package Manager:** `pnpm` workspaces (Turborepo / `pnpm run dev` task runner)[cite: 4]
 - **Mobile Framework:** Expo SDK 57 (recently upgraded from an earlier SDK to match the latest Expo Go client)[cite: 4]
 - **Core Libraries (SDK 57):** React 19.2.3, React Native 0.86.3, TypeScript 6, `expo-router` ~57.0.28, Reanimated 4.5.1 / Worklets 0.10.1, New Architecture enabled. Use `npx expo install <pkg>` (not `pnpm add`) for anything Expo-managed; verify with `npx expo install --check`.
-- **Styling:** NativeWind v4 (`nativewind/babel` preset) + Tailwind CSS (`dark` mode, `bg-slate-950` base palette with muted cards and pastel accents)[cite: 4]
+- **Styling:** NativeWind v4 (`nativewind/babel` preset) + Tailwind CSS. Dark only for launch (slate ground, muted cards, pastel accents), but built for themes:
+  - `apps/mobile/theme/palette.js` is the single source of every UI color, by role (`ground`, `surface`, `raised`, `line`, `ink`/`inkMuted`/`inkFaint`…, and per hue `violet` (500, for tints and borders with opacity), `violetSoft` (300), `violetPale` (200), `violetStrong` (400), `violetDeep` (600), `violetFaint` (100); plus `avatarNBg`/`avatarNInk`).
+  - `tailwind.config.js` replaces Tailwind's palette with these roles as CSS variables: write `bg-surface`, `text-ink-muted`, `border-violet/40`, never `bg-slate-900` (raw palette classes no longer exist and silently do nothing).
+  - Color props in JS (icons, charts, navigation) use `colors.<role>` from `theme/colors`, read at render time (no module-level copies; `TYPE_META.color` is a getter). No hex literals except data colors (diaper swatches).
+  - `theme/palette.test.ts` fails on raw palette classes or hex literals in `app/`, `components/`, `features/`.
+  - Adding a theme later: add a map next to `dark` with the same keys (the test checks), switch the CSS variables (NativeWind `vars()` or a `.dark:root`/class block) and swap `colors`.
 - **State & Local Persistence:** Zustand (in-memory UI state) backed by `expo-sqlite` via `drizzle-orm/expo-sqlite` (unencrypted in Expo Go), with Drizzle migrations (see §3 DB).
 - **Runtime Environment:** Node.js v24.9.0 on macOS (Apple Silicon)[cite: 4]
 
@@ -25,8 +30,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `recent` (food/tag/medication suggestions, `medicationsDue`), `milestones` (bundled checklist).
   - `stats` (`dailyStats` per-day totals, splitting sleep across midnight; `averageStats` over tracked days; `sleepSegments`; `solidsReport`; DST-safe `addDays`/`dayRange`).
   - `growth`: WHO LMS z-scores/percentiles (0–24 months, from the birth date; corrected age for preterm babies was dropped on purpose, and `dueDate` is stored but unused), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
-  - `prediction`: on-device nap prediction. Age norms (`ageNorms`), plus `sleepHabits` (the last 7 days; night sleep logged in pieces is merged into one night), `predictNextSleep` and `suggestedSchedule`. Heuristic, verified against the real Baby Buddy history.
+  - `prediction`: on-device nap prediction. Age norms (`ageNorms`), plus `sleepHabits` (the last 7 days; night sleep logged in pieces is merged into one night), `predictNextSleep` (put-down window plus `napMinutes`, the expected nap length) and `suggestedSchedule`. Heuristic, verified against the real Baby Buddy history.
   - `reminders`: `planReminders` (pure) turns `ReminderSettings` + per-child state into the notifications to schedule (stable `kl:` ids).
+  - `story`: `childStory` builds a child's story of firsts (milestones, measurements, first solid food, birth), newest first. No counts or completion: we don't gamify childcare.
   - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
 
@@ -48,11 +54,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
   - `app/(tabs)/`:
-    - `index`: Home dashboard.
+    - `index`: Home: `components/home/HomeTiles` shows Sleep, Feed and Diaper as big tiles. The pinned tile sits on top (sleep by default; long-press a tile to pin it; `settings.homeTop` per child) and the other two side by side. Below: medication due, links to the sleep schedule and today's log, and shortcuts (Pump, Meds, Tummy, More). Running pumping/activity timers show above the tiles via `ActiveTimers`.
     - `history`: List, Day (24 h lanes) and Week (sleep pattern + totals) views.
     - `trends`: 7/14/30-day averages and charts.
     - `settings`: includes a `__DEV__`-only Premium stub toggle.
-  - `app/schedule.tsx` (next sleep + suggested day; the Home wake-window card links here), `app/reminders.tsx`.
+  - `app/schedule.tsx` (next sleep + suggested day; linked from Home's "Sleep schedule" row), `app/reminders.tsx`.
   - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV, Premium-gated).
   - `app/entry/[id].tsx`: edit/backdate any entry.
   - `app/child/new.tsx`: add a child (modal). It shows `PremiumGate` instead once the free limit is reached.
@@ -60,17 +66,17 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - CSV export.
     - More than `FREE_CHILD_LIMIT` (1) children. This is checked by `useCanAddChild` in the UI and enforced again in `useChildStore.addChild`.
     - The Baby Buddy import defaults extra children to "Don't import" for free users.
-  - `app/child/[id]/index.tsx`: the child's profile page (photo, age, next age milestone, growth and milestones at a glance, switch-to).
+  - `app/child/[id]/index.tsx`: the child's profile page (no stack header). Full-width photo cover with name and age, a growth chart (Weight/Length/Head, WHO band), and the story of firsts (`childStory`).
   - `app/child/[id]/edit.tsx`: edit details; the danger zone deletes a child after the user types its name.
   - Settings shows children as an avatar strip linking to their profiles. App-wide settings stay in Settings.
   - `app/import/babybuddy.tsx`: import wizard (connect → review children/units → progress → summary). Not route-guarded, so onboarding can link to it.
 - **Components:**
   - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `DayTimeline`, `WeekPattern`, `GrowthChart`.
-  - `StatusHeader` (+ `ChildSwitcher`: avatar, switch child, open a profile), `ActiveTimers`, `LogTimeline` (day-grouped) / `LogRow` (tap to open; delete only from the entry screen), `QuickActionDock`.
+  - `ChildSwitcher` (avatar, switch child, open a profile), `ActiveTimers`, `LogTimeline` (day-grouped, History) / `LogRow` (tap to open; delete only from the entry screen).
   - `ChildAvatar`: the photo, or the child's initial on a per-child color. `PhotoMenu`: take/choose/remove; it runs the picker only after its modal has dismissed (iOS).
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
-  - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags), `AddLogSheet` (type grid). Keep one Modal (iOS can't present while another dismisses).
+  - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags), `AddLogSheet` (type grid), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
   - `DateTimeField`.
 - **Reminders (`features/reminders/scheduler.ts`):** expo-notifications, local only. `useReminderSync` (in `_layout`) re-plans on log/child/settings changes and app foreground, debounced and serialized. Reminder settings are device-local (`settings.reminders`), not the synced `reminders` table, which is still unused. Kinds: feed, diaper and pumping intervals, medication due, nap/bedtime, and forgotten timers. A master `enabled` switch also appears in Settings. Tapping a notification switches to that child; forgotten-timer reminders also open the entry. expo-notifications is `require`d lazily and skipped in Expo Go on Android (it crashes on import there); `remindersAvailable` is false in that case. Never import it statically.
@@ -80,7 +86,15 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - The API key is never persisted. Only `settings.bbUrl` is remembered.
   - Opt-in tests that hit real data (kept outside the repo): `BB_DUMP=<all.json> pnpm --filter @kindred-log/shared test`, `BB_URL=… BB_TOKEN=… npx vitest run client` in `apps/mobile`.
 - **Utilities:** `store/timeHelpers.ts` (`useNow`, `useFormatTime`, `formatDayLabel`, ISO date helpers; re-exports the shared formatters).
-- **UX rule:** 2-tap maximum for common logs.
+- **UX rule:** 2-tap maximum for common logs (sleep: 1 tap on its tile; diaper: tile + type; feed: tile + sheet).
+- **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.
+
+### Native builds (local, no EAS)
+- `expo-dev-client` is installed, so `pnpm run dev` / `expo start` now targets the **Kindred Log dev build**. Use `pnpm --filter @kindred-log/mobile dev:go` (or press `s`) for Expo Go.
+- `android/` and `ios/` are generated (Continuous Native Generation) and gitignored. Never edit them: change `app.json` or a config plugin instead.
+- Build and install on a USB-connected phone or an emulator: `cd apps/mobile && pnpm android`. After native changes (new native package, `app.json` plugins), run `pnpm android:clean`.
+- Rebuild only for native changes; JS changes hot-reload as usual.
+- Toolchain (Android): JDK 17, Android SDK 36, build-tools 36.0.0, NDK 27.1.12297006 (Gradle fetches the NDK). `JAVA_HOME` and `ANDROID_HOME` must be set.
 
 ### Commands
 - `pnpm test` / `pnpm typecheck` from the root (turbo).

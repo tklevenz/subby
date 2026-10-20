@@ -21,7 +21,7 @@ export default function SolidsScreen() {
 
   return (
     <FlatList
-      className="flex-1 bg-slate-950"
+      className="flex-1 bg-ground"
       contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
       data={logs ? shown : []}
       keyExtractor={(f) => f.name.toLowerCase()}
@@ -36,23 +36,23 @@ export default function SolidsScreen() {
       }
       ListEmptyComponent={
         logs ? (
-          <Text className="text-slate-500 text-center mt-6 leading-6">
+          <Text className="text-ink-faint text-center mt-6 leading-6">
             {filter === 'all' ? 'No foods logged yet. Log solids with foods from the Feed sheet.' : 'No reactions or allergens noted.'}
           </Text>
         ) : null
       }
       renderItem={({ item: f }) => (
-        <View className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 mb-2">
+        <View className="bg-surface border border-line rounded-xl px-4 py-3 mb-2">
           <View className="flex-row items-center">
-            <Text className="flex-1 text-white text-base">{f.name}</Text>
+            <Text className="flex-1 text-ink text-base">{f.name}</Text>
             {f.allergen ? (
-              <Text className="text-red-200 text-[11px] bg-red-500/20 border border-red-500/40 rounded-full px-2 py-0.5 overflow-hidden">Allergen</Text>
+              <Text className="text-red-pale text-[11px] bg-red/20 border border-red/40 rounded-full px-2 py-0.5 overflow-hidden">Allergen</Text>
             ) : null}
           </View>
-          <Text className="text-slate-500 text-xs mt-1">
+          <Text className="text-ink-faint text-xs mt-1">
             {f.count}× · first {fmt(f.firstAt)}{f.count > 1 ? ` · last ${fmt(f.lastAt)}` : ''}
           </Text>
-          {f.reactions.length ? <Text className="text-amber-200 text-xs mt-1">Reaction: {f.reactions.join('; ')}</Text> : null}
+          {f.reactions.length ? <Text className="text-amber-pale text-xs mt-1">Reaction: {f.reactions.join('; ')}</Text> : null}
         </View>
       )}
     />
@@ -61,9 +61,9 @@ export default function SolidsScreen() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <View className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-3">
-      <Text className="text-slate-400 text-xs">{label}</Text>
-      <Text className="text-white text-xl font-semibold">{value}</Text>
+    <View className="flex-1 bg-surface border border-line rounded-xl p-3">
+      <Text className="text-ink-muted text-xs">{label}</Text>
+      <Text className="text-ink text-xl font-semibold">{value}</Text>
     </View>
   );
 }
