@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { and, asc, eq, gte, inArray, isNull, lt, or, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { TIMED_LOG_TYPES, type LogEntry, type LogType } from '@kindred-log/shared';
 import { db, schema } from '../db/client';
 import { useLogStore } from './useLogStore';
+
+/** Feeds with foods; avoids parsing thousands of milk feeds. Use with `types: ['feed']`. */
+export const HAS_FOODS = sql`json_extract(payload, '$.foods') IS NOT NULL`;
 
 export type LogQuery = {
   /** Entries that overlap [from, to): started in it, or still running/ending inside it. */
@@ -27,12 +30,12 @@ export async function fetchLogs(childId: string, q: LogQuery = {}): Promise<LogE
 }
 
 /**
- * Entries for the active child matching `q`, re-read whenever the store's logs change
- * (any add/edit/delete). `null` while loading.
+ * Entries for the active child matching `q`, re-read after every write (any add/edit/delete,
+ * even outside the store's window). `null` while loading.
  */
 export function useLogQuery(q: LogQuery): LogEntry[] | null {
   const childId = useLogStore((s) => s.activeChildId);
-  const version = useLogStore((s) => s.logs);
+  const revision = useLogStore((s) => s.revision);
   const key = JSON.stringify({ childId, from: q.from, to: q.to, types: q.types });
   const [data, setData] = useState<{ key: string; rows: LogEntry[] } | null>(null);
 
@@ -45,7 +48,7 @@ export function useLogQuery(q: LogQuery): LogEntry[] | null {
     };
     // `where` is expected to be stable per call site; the rest is captured by `key`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, version]);
+  }, [key, revision]);
 
   // Keep showing the previous result while an edit re-reads, but not another child's/range's.
   return data?.key === key ? data.rows : null;

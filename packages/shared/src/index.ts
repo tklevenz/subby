@@ -11,3 +11,5 @@ export * from './domain/babybuddy';
 export * from './domain/stats';
 export * from './domain/growth';
 export * from './domain/csv';
+export * from './domain/prediction';
+export * from './domain/reminders';

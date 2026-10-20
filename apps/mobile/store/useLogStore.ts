@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { eq, and, desc, gte, isNull, or, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
+import { deletePhoto } from '../features/photos';
 import {
   TIMED_LOG_TYPES,
   pauseFeed,
@@ -25,6 +26,8 @@ interface LogState {
   isLoading: boolean;
   /** Oldest startedAt currently loaded; older entries are paged in by loadOlder(). */
   loadedSince: number;
+  /** Bumped on every write, including to entries outside the loaded window (see useLogQuery). */
+  revision: number;
 
   loadLogs: (childId: string) => Promise<void>;
   loadOlder: () => Promise<void>;
@@ -33,9 +36,14 @@ interface LogState {
   /** Start a live timer: a timed entry with endedAt = null. */
   startTimer: (payload: LogPayload, startedAt?: number) => Promise<LogEntry>;
   stopTimer: (id: string, patch?: Omit<LogPatch, 'endedAt'>) => Promise<void>;
+  /** Works for any entry, loaded or not. */
   updateLog: (id: string, patch: LogPatch) => Promise<void>;
   softDeleteLog: (id: string) => Promise<void>;
+  /** An entry from memory, else from the database (e.g. older than the loaded window). */
+  getLog: (id: string) => Promise<LogEntry | undefined>;
 }
+
+const photoOf = (p: LogPayload) => (p.type === 'note' ? p.photoUri : undefined);
 
 const byStartedDesc = (a: LogEntry, b: LogEntry) => b.startedAt - a.startedAt;
 
@@ -44,6 +52,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   logs: [],
   isLoading: false,
   loadedSince: 0,
+  revision: 0,
 
   loadLogs: async (childId: string) => {
     set({ isLoading: true, activeChildId: childId });
@@ -64,7 +73,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
     // Ignore results for a child that's no longer active (fast switching).
     if (get().activeChildId !== childId) return;
-    set({ logs: rows, isLoading: false, loadedSince: since });
+    set((s) => ({ logs: rows, isLoading: false, loadedSince: since, revision: s.revision + 1 }));
   },
 
   loadOlder: async () => {
@@ -78,7 +87,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       .where(and(eq(t.childId, childId), eq(t.isDeleted, false), gte(t.startedAt, since)))
       .orderBy(desc(t.startedAt));
     if (get().activeChildId !== childId) return;
-    set({ logs: rows, loadedSince: since });
+    set((s) => ({ logs: rows, loadedSince: since, revision: s.revision + 1 }));
   },
 
   addLog: async (payload, times = {}) => {
@@ -102,7 +111,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     };
 
     await db.insert(schema.logsTable).values(entry);
-    set((state) => ({ logs: [entry, ...state.logs].sort(byStartedDesc) }));
+    set((state) => ({ logs: [entry, ...state.logs].sort(byStartedDesc), revision: state.revision + 1 }));
     return entry;
   },
 
@@ -119,7 +128,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   updateLog: async (id, patch) => {
-    const current = get().logs.find((l) => l.id === id);
+    const current = await get().getLog(id);
     if (!current) return;
 
     const updated: LogEntry = {
@@ -141,21 +150,39 @@ export const useLogStore = create<LogState>((set, get) => ({
         syncStatus: 'pending',
       })
       .where(eq(schema.logsTable.id, id));
+    if (photoOf(current.payload) !== photoOf(updated.payload)) deletePhoto(photoOf(current.payload));
 
-    set((state) => ({
-      logs: state.logs.map((l) => (l.id === id ? updated : l)).sort(byStartedDesc),
-    }));
+    set((state) => {
+      // Keep the in-memory window consistent: an entry may move into or out of it.
+      const others = state.logs.filter((l) => l.id !== id);
+      const inWindow = updated.childId === state.activeChildId && updated.startedAt >= state.loadedSince;
+      return {
+        logs: inWindow ? [...others, updated].sort(byStartedDesc) : others,
+        revision: state.revision + 1,
+      };
+    });
   },
 
   softDeleteLog: async (id: string) => {
+    const current = await get().getLog(id);
     const now = Date.now();
     await db
       .update(schema.logsTable)
       .set({ isDeleted: true, updatedAt: now, syncStatus: 'pending' })
       .where(eq(schema.logsTable.id, id));
+    if (current) deletePhoto(photoOf(current.payload));
 
     set((state) => ({
       logs: state.logs.filter((log) => log.id !== id),
+      revision: state.revision + 1,
     }));
   },
+
+  getLog: async (id) =>
+    get().logs.find((l) => l.id === id) ??
+    (await db
+      .select()
+      .from(schema.logsTable)
+      .where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.isDeleted, false)))
+      .get()),
 }));

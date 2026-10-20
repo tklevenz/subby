@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { TIMED_LOG_TYPES, isCompletePayload, type LogEntry, type LogPayload } from '@kindred-log/shared';
+import { TIMED_LOG_TYPES, isCompletePayload, pauseFeed, type LogEntry, type LogPayload } from '@kindred-log/shared';
 import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
 import { CommonFields } from '../../components/sheets/LogSheet';
@@ -9,10 +9,16 @@ import { TYPE_META, activityLabel } from '../../components/logTypes';
 import { Button, FieldLabel } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
 
-/** Edit/backdate any log entry. */
+/** Edit/backdate any log entry, including ones older than the loaded window. */
 export default function EntryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const entry = useLogStore((s) => s.logs.find((l) => l.id === id));
+  const [entry, setEntry] = useState<LogEntry | null | undefined>(undefined);
+
+  useEffect(() => {
+    useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
+  }, [id]);
+
+  if (entry === undefined) return <ActivityIndicator className="mt-10" color="#a78bfa" />;
   return entry ? <EntryForm entry={entry} /> : <Stack.Screen options={{ title: 'Entry not found' }} />;
 }
 
@@ -30,7 +36,9 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
 
   const save = async () => {
-    await updateLog(entry.id, { payload, startedAt, endedAt });
+    // Stopping a running breastfeed here: fold the running side's time into its total.
+    const stopped = entry.endedAt === null && endedAt !== null && payload.type === 'feed';
+    await updateLog(entry.id, { payload: stopped ? pauseFeed(payload, endedAt) : payload, startedAt, endedAt });
     router.back();
   };
 

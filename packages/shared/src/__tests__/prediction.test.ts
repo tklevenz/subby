@@ -1,0 +1,116 @@
+import { describe, expect, it } from 'vitest';
+import { ageNorms, predictNextSleep, sleepHabits, suggestedSchedule, wakeWindows } from '../domain/prediction';
+import { addDays } from '../domain/stats';
+import { entry } from './fixtures';
+
+const MIN = 60_000;
+const today = new Date(2026, 9, 20).getTime();
+const at = (day: number, h: number, m = 0) => addDays(today, day) + (h * 60 + m) * MIN;
+// About 8 months old.
+const child = { birthDate: '2026-02-15', dueDate: null };
+
+/** A regular 2-nap day: wake 07:00, naps 09:30–10:30 and 13:30–15:00, bed 19:30. */
+function week(days: number) {
+  const logs = [];
+  for (let d = -days; d < 0; d++) {
+    logs.push(entry({ type: 'sleep', nap: false }, at(d - 1, 19, 30), at(d, 7)));
+    logs.push(entry({ type: 'sleep', nap: true }, at(d, 9, 30), at(d, 10, 30)));
+    logs.push(entry({ type: 'sleep', nap: true }, at(d, 13, 30), at(d, 15)));
+  }
+  logs.push(entry({ type: 'sleep', nap: false }, at(-1, 19, 30), at(0, 7)));
+  return logs;
+}
+
+describe('sleep habits', () => {
+  it('measures wake windows by nap index', () => {
+    const w = wakeWindows(week(7), at(-7, 0));
+    expect(w.filter((x) => x.index === 0 && !x.beforeNight).every((x) => x.minutes === 150)).toBe(true);
+    expect(w.filter((x) => x.beforeNight).every((x) => x.minutes === 270)).toBe(true);
+  });
+
+  it('summarizes the last 7 days', () => {
+    const h = sleepHabits(week(7), at(0, 8));
+    expect(h.napWindows.get(0)).toBe(150);
+    expect(h.napWindows.get(1)).toBe(180);
+    expect(h.bedtimeWindow).toBe(270);
+    expect(h.bedtimeClock).toBe(19.5 * 60);
+    expect(h.wakeClock).toBe(7 * 60);
+    expect(h.napLengths.get(1)).toBe(90);
+    expect(h.napsPerDay).toBe(2);
+  });
+});
+
+describe('predictNextSleep', () => {
+  it('blends the personal window with the age norm', () => {
+    const p = predictNextSleep(week(7), child, at(0, 8))!;
+    const norms = ageNorms(8);
+    const center = 150 * 0.7 + ((norms.wakeMin + norms.wakeMax) / 2) * 0.3;
+    expect(p).toMatchObject({ kind: 'nap', basis: 'personal', napIndex: 0 });
+    expect(p.earliest).toBe(at(0, 7) + (center - 15) * MIN);
+  });
+
+  it('predicts bedtime after the usual number of naps', () => {
+    const logs = [
+      ...week(7),
+      entry({ type: 'sleep', nap: true }, at(0, 9, 30), at(0, 10, 30)),
+      entry({ type: 'sleep', nap: true }, at(0, 13, 30), at(0, 15)),
+    ];
+    const p = predictNextSleep(logs, child, at(0, 16))!;
+    expect(p).toMatchObject({ kind: 'bedtime', earliest: at(0, 19, 15), latest: at(0, 19, 45) });
+  });
+
+  it('moves on to bedtime once the nap window has passed', () => {
+    const p = predictNextSleep(week(7), child, at(0, 16))!;
+    expect(p.kind).toBe('bedtime');
+  });
+
+  it('learns that naps are not taken (or not logged)', () => {
+    const nightsOnly = week(7).filter((l) => l.payload.type === 'sleep' && l.payload.nap === false);
+    expect(sleepHabits(nightsOnly, at(0, 8)).napsPerDay).toBe(0);
+    expect(predictNextSleep(nightsOnly, child, at(0, 8))).toMatchObject({ kind: 'bedtime', earliest: at(0, 19, 15) });
+  });
+
+  it('falls back to age norms without history', () => {
+    const p = predictNextSleep([entry({ type: 'sleep', nap: false }, at(-1, 20), at(0, 7))], child, at(0, 8))!;
+    const n = ageNorms(8);
+    expect(p).toMatchObject({ kind: 'nap', basis: 'age', earliest: at(0, 7) + n.wakeMin * MIN, latest: at(0, 7) + n.wakeMax * MIN });
+  });
+
+  it('is null while asleep, after a night waking, or without a recent wake-up', () => {
+    expect(predictNextSleep([...week(7), entry({ type: 'sleep', nap: true }, at(0, 9), null)], child, at(0, 10))).toBeNull();
+    expect(predictNextSleep([entry({ type: 'sleep', nap: false }, at(-1, 20), at(0, 2))], child, at(0, 2, 10))).toBeNull();
+    expect(predictNextSleep(week(7), child, at(0, 20))).toBeNull();
+  });
+});
+
+describe('suggestedSchedule', () => {
+  it('lays out the day from the habits', () => {
+    const { items, basis } = suggestedSchedule(week(7), child, at(0, 8));
+    expect(basis).toBe('personal');
+    expect(items.map((i) => i.kind)).toEqual(['wake', 'nap', 'nap', 'bedtime']);
+    expect(items[0]).toEqual({ kind: 'wake', at: at(0, 7) });
+    expect(items[3]).toEqual({ kind: 'bedtime', at: at(0, 19, 30) });
+  });
+
+  it('starts from the usual wake-up while still asleep after a night waking', () => {
+    const logs = [...week(7).slice(0, -1), entry({ type: 'sleep', nap: false }, at(-1, 19, 30), at(0, 2)), entry({ type: 'sleep', nap: false }, at(0, 2, 30), null)];
+    expect(suggestedSchedule(logs, child, at(0, 5)).items[0]).toEqual({ kind: 'wake', at: at(0, 7) });
+  });
+});
+
+describe('night wakings', () => {
+  it('treats night sleep logged in pieces as one night', () => {
+    const logs = week(7).flatMap((l) => {
+      if (l.payload.type !== 'sleep' || l.payload.nap !== false) return [l];
+      // Split each night with a 30 min waking at 01:00.
+      const oneAm = startOfNight(l.endedAt!) + 60 * MIN;
+      return [entry({ type: 'sleep', nap: false }, l.startedAt, oneAm), entry({ type: 'sleep', nap: false }, oneAm + 30 * MIN, l.endedAt)];
+    });
+    const h = sleepHabits(logs, at(0, 8));
+    expect(h.bedtimeClock).toBe(19.5 * 60);
+    expect(h.wakeClock).toBe(7 * 60);
+    expect(h.bedtimeWindow).toBe(270);
+  });
+});
+
+const startOfNight = (wake: number) => new Date(new Date(wake).setHours(0, 0, 0, 0)).getTime();

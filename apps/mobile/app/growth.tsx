@@ -65,7 +65,7 @@ export default function GrowthScreen() {
       <Segmented options={MEASURES} value={measure} onChange={setMeasure} />
 
       {!sex ? (
-        <Pressable onPress={() => router.push(`/child/${child.id}`)} className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+        <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
           <Text className="text-amber-200 text-sm leading-5">
             WHO percentiles differ for girls and boys. Set it in {child.name}'s profile to see them. Tap to edit.
           </Text>

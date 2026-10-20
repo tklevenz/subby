@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
-import { sql } from 'drizzle-orm';
 import { solidsReport } from '@kindred-log/shared';
 import { Segmented } from '../components/ui';
-import { useLogQuery } from '../store/queries';
+import { HAS_FOODS, useLogQuery } from '../store/queries';
 
 const FILTERS = [
   { value: 'all', label: 'All foods' },
@@ -11,8 +10,6 @@ const FILTERS = [
 ] as const;
 
 const FEEDS = ['feed'] as const;
-// Only entries with foods; skips parsing thousands of milk feeds.
-const HAS_FOODS = sql`json_extract(payload, '$.foods') IS NOT NULL`;
 
 export default function SolidsScreen() {
   const logs = useLogQuery({ types: FEEDS, where: HAS_FOODS });

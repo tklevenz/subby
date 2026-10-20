@@ -17,6 +17,7 @@ import {
   type LogPayload,
   type PayloadOf,
 } from '@kindred-log/shared';
+import { useLogQuery } from '../../store/queries';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { activityLabel } from '../logTypes';
@@ -282,8 +283,11 @@ function ActivityEditor({ payload: p, onChange }: EditorProps<'activity'>) {
   );
 }
 
+const MILESTONE_TYPES = ['milestone'] as const;
+
 function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
-  const logs = useLogStore((s) => s.logs);
+  // All-time, so milestones reached long ago still show as done.
+  const logs = useLogQuery({ types: MILESTONE_TYPES }) ?? [];
   const achieved = new Set(logs.flatMap((l) => (l.payload.type === 'milestone' && l.payload.key ? [l.payload.key] : [])));
   return (
     <View>

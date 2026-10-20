@@ -87,7 +87,7 @@ The app utilizes a freemium model that gates collaboration, hardware scaling, an
   * 1.2 Tracking parity (done 2026-10-19): live breastfeeding L/R timer, bottle milk type, solids, pumping, growth, temperature, medication, potty, activities, milestones, notes/tags.
   * 1.3 Baby Buddy import (done 2026-10-19): in-app, over Baby Buddy's REST API (URL + token), re-runnable without duplicates via `import_ref`.
   * 1.4 History, trends, WHO growth percentiles, CSV export (premium) (done 2026-10-19).
-  * 1.5 Local reminders (feeds, medication) + on-device nap prediction (SweetSpot equivalent; no cloud AI).
+  * 1.5 Local reminders (feeds, medication, nap window) + on-device nap prediction (SweetSpot equivalent; no cloud AI) (done 2026-10-20).
   * 1.6 Native build: SQLCipher, widgets, Live Activities, Siri shortcuts (Watch + contraction timer are stretch goals).
 * Monorepo setup, Zod schemas, encrypted SQLite/Drizzle integration, and Zustand store configured.
 * 3 AM Dashboard UI: Status summary header, recent activity timeline, and thumb-zone quick action dock.

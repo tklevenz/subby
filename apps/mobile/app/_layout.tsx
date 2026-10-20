@@ -8,6 +8,7 @@ import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useLogStore } from '../store/useLogStore';
 import { useActiveChild } from '../store/useActiveChild';
+import { useReminderSync } from '../features/reminders/scheduler';
 
 const BG = '#020617';
 
@@ -25,6 +26,8 @@ export default function RootLayout() {
       setReady(true);
     })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
+
+  useReminderSync(ready);
 
   useEffect(() => {
     if (activeChild) loadLogs(activeChild.id);
@@ -60,11 +63,15 @@ export default function RootLayout() {
           <Stack.Screen name="growth" options={{ headerShown: true, title: 'Growth', headerBackTitle: 'Trends' }} />
           <Stack.Screen name="solids" options={{ headerShown: true, title: 'Solids', headerBackTitle: 'Trends' }} />
           <Stack.Screen name="export" options={{ headerShown: true, title: 'Export CSV', headerBackTitle: 'Trends' }} />
+          <Stack.Screen name="schedule" options={{ headerShown: true, title: 'Sleep schedule' }} />
+          <Stack.Screen name="child/new" options={{ presentation: 'modal', headerShown: true, title: 'Add child' }} />
+          <Stack.Screen name="child/[id]/index" options={{ headerShown: true, title: 'Child', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="child/[id]/edit" options={{ presentation: 'modal', headerShown: true, title: 'Edit' }} />
+          <Stack.Screen name="reminders" options={{ headerShown: true, title: 'Reminders', headerBackTitle: 'Settings' }} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
-        <Stack.Screen name="child/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Child' }} />
         {/* Reachable from onboarding too, so it isn't guarded. */}
         <Stack.Screen name="import/babybuddy" options={{ headerShown: true, title: 'Import' }} />
       </Stack>

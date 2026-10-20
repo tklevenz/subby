@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text } from 'react-native';
+import { Pressable, View, Text } from 'react-native';
+import { router } from 'expo-router';
 import {
   activeSleep,
   describeDiaper,
@@ -7,10 +8,12 @@ import {
   lastOfType,
   lastWakeAt,
   medicationsDue,
+  predictNextSleep,
 } from '@kindred-log/shared';
 import { Droplets, Moon, Pill, Sun, Timer } from 'lucide-react-native';
 import { useLogStore } from '../store/useLogStore';
-import { formatDuration, formatRelative, useNow } from '../store/timeHelpers';
+import { useActiveChild } from '../store/useActiveChild';
+import { formatDuration, formatRelative, useFormatTime, useNow } from '../store/timeHelpers';
 import ChildSwitcher from './ChildSwitcher';
 
 function Card({
@@ -40,6 +43,10 @@ function Card({
 export default function StatusHeader() {
   const logs = useLogStore((s) => s.logs);
   const now = useNow();
+  const child = useActiveChild();
+  const formatTime = useFormatTime();
+  const minute = Math.floor(now / 60_000);
+  const nextSleep = useMemo(() => (child ? predictNextSleep(logs, child, minute * 60_000) : null), [logs, child, minute]);
 
   const summary = useMemo(() => {
     // Completed feeds only; a running breastfeed shows in the timers bar instead.
@@ -81,26 +88,33 @@ export default function StatusHeader() {
           )}
         </Card>
 
-        <Card
-          wide
-          icon={summary.sleepStart !== null ? <Moon color="#a78bfa" size={16} /> : <Sun color="#fcd34d" size={16} />}
-          title={summary.sleepStart !== null ? 'Sleeping' : 'Wake Window'}
-        >
-          {summary.sleepStart !== null ? (
-            <View className="flex-row items-center">
-              <Timer color="#a78bfa" size={14} />
-              <Text className="text-sm font-semibold text-violet-300 ml-1.5">
-                {formatDuration(now - summary.sleepStart)}
+        <Pressable className="w-full" onPress={() => router.push('/schedule')}>
+          <Card
+            wide
+            icon={summary.sleepStart !== null ? <Moon color="#a78bfa" size={16} /> : <Sun color="#fcd34d" size={16} />}
+            title={summary.sleepStart !== null ? 'Sleeping' : 'Wake Window'}
+          >
+            {summary.sleepStart !== null ? (
+              <View className="flex-row items-center">
+                <Timer color="#a78bfa" size={14} />
+                <Text className="text-sm font-semibold text-violet-300 ml-1.5">
+                  {formatDuration(now - summary.sleepStart)}
+                </Text>
+              </View>
+            ) : summary.wakeAt !== null ? (
+              <Text className="text-sm text-amber-200/80 font-medium">
+                Awake for {formatDuration(now - summary.wakeAt)}
               </Text>
-            </View>
-          ) : summary.wakeAt !== null ? (
-            <Text className="text-sm text-amber-200/80 font-medium">
-              Awake for {formatDuration(now - summary.wakeAt)}
-            </Text>
-          ) : (
-            <Text className="text-sm text-slate-500">No sleep tracked</Text>
-          )}
-        </Card>
+            ) : (
+              <Text className="text-sm text-slate-500">No sleep tracked</Text>
+            )}
+            {nextSleep ? (
+              <Text className="text-xs text-slate-400 mt-0.5">
+                {nextSleep.kind === 'bedtime' ? 'Bedtime' : 'Next nap'} ~{formatTime(nextSleep.earliest)}–{formatTime(nextSleep.latest)}
+              </Text>
+            ) : null}
+          </Card>
+        </Pressable>
 
         {/* Next doses: shown until 12 h past due, then assumed finished. */}
         {summary.meds

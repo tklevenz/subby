@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { Directory, File, Paths } from 'expo-file-system';
 import { Camera, ImagePlus, Plus, X } from 'lucide-react-native';
 import { recentTags } from '@kindred-log/shared';
+import { pickPhoto } from '../../features/photos';
 import { useLogStore } from '../../store/useLogStore';
 import { Chip, TextField } from '../ui';
 
@@ -112,25 +111,10 @@ export function TagsField({ value, onChange }: { value: string[] | undefined; on
   );
 }
 
-/** Copy a picked image into the app's document dir so it outlives the picker cache. */
-async function persistPhoto(uri: string): Promise<string> {
-  const dir = new Directory(Paths.document, 'photos');
-  dir.create({ idempotent: true, intermediates: true });
-  const ext = uri.split('.').pop()?.split('?')[0] || 'jpg';
-  const dest = new File(dir, `${Date.now()}.${ext}`);
-  await new File(uri).copy(dest);
-  return dest.uri;
-}
-
 export function PhotoField({ value, onChange }: { value: string | undefined; onChange: (uri: string | undefined) => void }) {
   const pick = async (camera: boolean) => {
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
-    if (camera) {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) return;
-    }
-    const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-    if (!res.canceled && res.assets[0]) onChange(await persistPhoto(res.assets[0].uri));
+    const uri = await pickPhoto(camera ? 'camera' : 'library');
+    if (uri) onChange(uri);
   };
 
   if (value) {

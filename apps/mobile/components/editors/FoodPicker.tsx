@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { Plus, TriangleAlert } from 'lucide-react-native';
 import { flaggedFoods, recentFoods, type PayloadOf } from '@kindred-log/shared';
-import { useLogStore } from '../../store/useLogStore';
+import { HAS_FOODS, useLogQuery } from '../../store/queries';
 import { Chip, FieldLabel, TextField } from '../ui';
 
 type Solids = Pick<PayloadOf<'feed'>, 'foods' | 'allergen' | 'reaction'>;
 
+const FEEDS = ['feed'] as const;
+
 /** Food chips (recent foods + new), allergen flag and reaction note for a solids feed. */
 export default function FoodPicker({ value, onChange }: { value: Solids; onChange: (patch: Solids) => void }) {
-  const logs = useLogStore((s) => s.logs);
+  // All-time, newest first: an allergen flagged months ago must still warn.
+  const rows = useLogQuery({ types: FEEDS, where: HAS_FOODS });
+  const logs = useMemo(() => (rows ? [...rows].reverse() : []), [rows]);
   const [draft, setDraft] = useState('');
   const foods = value.foods ?? [];
   const flagged = new Set(flaggedFoods(logs).map((f) => f.toLowerCase()));

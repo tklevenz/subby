@@ -25,6 +25,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `recent` (food/tag/medication suggestions, `medicationsDue`), `milestones` (bundled checklist).
   - `stats` (`dailyStats` per-day totals, splitting sleep across midnight; `averageStats` over tracked days; `sleepSegments`; `solidsReport`; DST-safe `addDays`/`dayRange`).
   - `growth`: WHO LMS z-scores/percentiles (0–24 months, corrected age via due date), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
+  - `prediction`: on-device nap prediction. Age norms (`ageNorms`), plus `sleepHabits` (the last 7 days; night sleep logged in pieces is merged into one night), `predictNextSleep` and `suggestedSchedule`. Heuristic, verified against the real Baby Buddy history.
+  - `reminders`: `planReminders` (pure) turns `ReminderSettings` + per-child state into the notifications to schedule (stable `kl:` ids).
   - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
 
@@ -39,8 +41,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `db/client.ts`: `initDatabase()` runs migrations at startup and upgrades pre-migration v0 databases via `db/legacy.ts`.
   - **Schema changes:** edit `db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`. Commit the generated `db/migrations/*`, and never edit an applied migration.
 - **Stores (Zustand, write-through to SQLite):**
-  - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`.
-  - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads whenever the store's logs change. Use these for anything beyond the store's 30-day window (History day/week, Trends, Growth, Solids, Export).
+  - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`, `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
+  - Note photos are deleted from disk when their entry is deleted or the photo is replaced (`features/photos.ts`).
+  - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads on every `revision`. Use these for anything beyond the store's 30-day window: History day/week, Trends, Growth, Solids, Export, and all-time lookups such as allergens in `FoodPicker` and milestones done. `HAS_FOODS` filters feeds that have foods.
   - `useChildStore` (`deleteChild` hard-deletes the child's logs, reminders and photos and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub), `useActiveChild`.
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
@@ -49,18 +52,24 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - `history`: List, Day (24 h lanes) and Week (sleep pattern + totals) views.
     - `trends`: 7/14/30-day averages and charts.
     - `settings`: includes a `__DEV__`-only Premium stub toggle.
+  - `app/schedule.tsx` (next sleep + suggested day; the Home wake-window card links here), `app/reminders.tsx`.
   - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV, Premium-gated).
   - `app/entry/[id].tsx`: edit/backdate any entry.
-  - `app/child/[id].tsx`: add (`new`) or edit a child; danger zone deletes a child after the user types its name.
+  - `app/child/new.tsx`: add a child (modal).
+  - `app/child/[id]/index.tsx`: the child's profile page (photo, age, next age milestone, growth and milestones at a glance, switch-to).
+  - `app/child/[id]/edit.tsx`: edit details; the danger zone deletes a child after the user types its name.
+  - Settings shows children as an avatar strip linking to their profiles. App-wide settings stay in Settings.
   - `app/import/babybuddy.tsx`: import wizard (connect → review children/units → progress → summary). Not route-guarded, so onboarding can link to it.
 - **Components:**
   - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `DayTimeline`, `WeekPattern`, `GrowthChart`.
-  - `StatusHeader` (+ `ChildSwitcher`), `ActiveTimers`, `LogTimeline` (day-grouped) / `LogRow` (tap to edit, swipe to delete), `QuickActionDock`.
+  - `StatusHeader` (+ `ChildSwitcher`: avatar, switch child, open a profile), `ActiveTimers`, `LogTimeline` (day-grouped) / `LogRow` (tap to open; delete only from the entry screen), `QuickActionDock`.
+  - `ChildAvatar`: the photo, or the child's initial on a per-child color. `PhotoMenu`: take/choose/remove; it runs the picker only after its modal has dismissed (iOS).
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
   - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags), `AddLogSheet` (type grid). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
   - `DateTimeField`.
+- **Reminders (`features/reminders/scheduler.ts`):** expo-notifications, local only. `useReminderSync` (in `_layout`) re-plans on log/child/settings changes and app foreground, debounced and serialized. Reminder settings are device-local (`settings.reminders`), not the synced `reminders` table, which is still unused. Kinds: feed, diaper and pumping intervals, medication due, nap/bedtime, and forgotten timers. A master `enabled` switch also appears in Settings. Tapping a notification switches to that child; forgotten-timer reminders also open the entry. expo-notifications is `require`d lazily and skipped in Expo Go on Android (it crashes on import there); `remindersAvailable` is false in that case. Never import it statically.
 - **Baby Buddy import (`features/import/babybuddy/`):**
   - `client.ts`: read-only REST client (token auth, paging; rewrites `next` links to the user's base URL).
   - `importer.ts`: `previewImport` (counts, children, unit detection) and `runImport` (one transaction per page, `onConflictDoNothing` on `import_ref`, so re-runs only add new records and never overwrite local edits).
@@ -84,4 +93,12 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-19: **Phase 3 (Baby Buddy import) done**: the wizard is reachable from Settings and onboarding. Verified against the user's live server: all 10,500 records page and map with 0 failures, units detected as ml/g/cm/°C. The DB write path still needs a run on a device.
 - 2026-10-19: deleting a child (type-the-name confirmation) added.
 - 2026-10-19: **Phase 4 (history, trends, growth, export) done**: aggregations checked against the real Baby Buddy export. Tests and typecheck pass; iOS + Android bundles build. Not yet tried on a device.
-- **Next: Phase 5**: reminders (expo-notifications) and on-device nap prediction.
+- 2026-10-20: **Phase 5 (reminders + nap prediction) done**: tests and typecheck pass; iOS + Android bundles build. Notifications not yet tried on a device.
+- 2026-10-20: review pass:
+  - Old entries can now be opened and edited.
+  - Allergen warnings and milestones read all-time data.
+  - Swipe-to-delete removed.
+  - Deleted or replaced note photos are removed from disk.
+  - Reminders got a master switch and new kinds.
+  - Child profile pages with photos.
+- **Next: Phase 6** (needs an EAS dev build, leaving Expo Go): SQLCipher encryption, widgets, Live Activities, Siri shortcuts.

@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { File } from 'expo-file-system';
-import { and, asc, count, eq, notInArray } from 'drizzle-orm';
+import { and, asc, count, eq, min, notInArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogPayload, LogType } from '@kindred-log/shared';
 import { db, schema } from '../db/client';
+import { deletePhoto } from '../features/photos';
 
 export type ChildInput = Pick<Child, 'name' | 'birthDate'> &
   Partial<Pick<Child, 'birthTime' | 'dueDate' | 'sex' | 'photoUri' | 'importRef'>>;
@@ -32,14 +32,14 @@ export async function countChildLogs(childId: string): Promise<Partial<Record<Lo
   return Object.fromEntries(rows.map((r) => [r.logType, r.n]));
 }
 
-function deleteFile(uri: string | null | undefined) {
-  if (!uri) return;
-  try {
-    const file = new File(uri);
-    if (file.exists) file.delete();
-  } catch {
-    // A missing or foreign file shouldn't block deleting the data.
-  }
+/** Total entries and the first entry's time, for the profile page. */
+export async function childSummary(childId: string): Promise<{ total: number; firstAt: number | null }> {
+  const t = schema.logsTable;
+  const [row] = await db
+    .select({ total: count(), firstAt: min(t.startedAt) })
+    .from(t)
+    .where(and(eq(t.childId, childId), eq(t.isDeleted, false)));
+  return { total: row?.total ?? 0, firstAt: row?.firstAt ?? null };
 }
 
 export const useChildStore = create<ChildState>((set, get) => ({
@@ -86,6 +86,9 @@ export const useChildStore = create<ChildState>((set, get) => ({
 
   updateChild: async (id, patch) => {
     const now = Date.now();
+    const before = get().children.find((c) => c.id === id);
+    // A replaced or removed photo is no longer referenced anywhere.
+    if (patch.photoUri !== undefined && before?.photoUri && before.photoUri !== patch.photoUri) deletePhoto(before.photoUri);
     await db
       .update(schema.childrenTable)
       .set({ ...patch, updatedAt: now, syncStatus: 'pending' })
@@ -112,8 +115,8 @@ export const useChildStore = create<ChildState>((set, get) => ({
         .run();
     });
 
-    deleteFile(child?.photoUri);
-    for (const { payload } of notes) deleteFile((payload as Extract<LogPayload, { type: 'note' }>).photoUri);
+    deletePhoto(child?.photoUri);
+    for (const { payload } of notes) deletePhoto((payload as Extract<LogPayload, { type: 'note' }>).photoUri);
 
     set((state) => ({ children: state.children.filter((c) => c.id !== id) }));
   },

@@ -1,0 +1,198 @@
+import { useEffect } from 'react';
+import { AppState, Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import type * as NotificationsModule from 'expo-notifications';
+import { router } from 'expo-router';
+import {
+  REMINDER_ID_PREFIX,
+  activeReminderCount,
+  isNap,
+  isRunning,
+  type LogType,
+  medicationsDue,
+  planReminders,
+  predictNextSleep,
+  type ReminderChild,
+} from '@kindred-log/shared';
+import { fetchLogs } from '../../store/queries';
+import { formatTimeShort } from '../../store/timeHelpers';
+import { useChildStore } from '../../store/useChildStore';
+import { useLogStore } from '../../store/useLogStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+
+const CHANNEL = 'reminders';
+const DAY = 86_400_000;
+
+/**
+ * expo-notifications crashes on import in Expo Go on Android (missing native module since
+ * SDK 53), so it's loaded lazily and reminders are disabled where it can't run.
+ */
+function loadNotifications(): typeof NotificationsModule | null {
+  if (Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
+  try {
+    return require('expo-notifications') as typeof NotificationsModule;
+  } catch {
+    return null;
+  }
+}
+
+const Notifications = loadNotifications();
+
+/** False in Expo Go on Android; reminders need a development build there. */
+export const remindersAvailable = Notifications !== null;
+
+Notifications?.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+export async function notificationsAllowed(): Promise<boolean> {
+  if (!Notifications) return false;
+  return (await Notifications.getPermissionsAsync()).granted;
+}
+
+async function ensureChannel() {
+  if (!Notifications || Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(CHANNEL, {
+    name: 'Reminders',
+    importance: Notifications.AndroidImportance.HIGH,
+  });
+}
+
+/** Ask for permission (shown by the OS only once). Returns whether notifications are allowed. */
+export async function requestNotifications(): Promise<boolean> {
+  if (!Notifications) return false;
+  await ensureChannel();
+  const current = await Notifications.getPermissionsAsync();
+  if (current.granted) return true;
+  if (!current.canAskAgain) return false;
+  return (await Notifications.requestPermissionsAsync()).granted;
+}
+
+/** Master switch. Turning it on asks for permission if any reminder kind is set up. */
+export async function setRemindersEnabled(on: boolean) {
+  const { reminders, set } = useSettingsStore.getState();
+  if (on && activeReminderCount({ ...reminders, enabled: true }) > 0) await requestNotifications();
+  await set('reminders', { ...reminders, enabled: on });
+}
+
+/** What each child's reminders need, read from SQLite (not just the active child's window). */
+async function reminderChild(id: string, name: string, now: number): Promise<ReminderChild> {
+  const [recent, meds] = await Promise.all([
+    // Includes running timers of any age.
+    fetchLogs(id, { from: now - 8 * DAY }),
+    fetchLogs(id, { from: now - 30 * DAY, types: ['medication'] }),
+  ]);
+  const lastStart = (type: LogType) => recent.filter((l) => l.logType === type && !isRunning(l)).at(-1)?.startedAt ?? null;
+  const child = useChildStore.getState().children.find((c) => c.id === id)!;
+  return {
+    id,
+    name,
+    lastFeedAt: lastStart('feed'),
+    feedRunning: recent.some((l) => l.logType === 'feed' && isRunning(l)),
+    lastDiaperAt: lastStart('diaper'),
+    lastPumpAt: lastStart('pumping'),
+    timers: recent.filter(isRunning).map((l) => ({
+      id: l.id,
+      type: l.logType,
+      startedAt: l.startedAt,
+      nap: l.payload.type === 'sleep' ? isNap(l as Parameters<typeof isNap>[0]) : undefined,
+    })),
+    meds: medicationsDue([...meds].reverse()),
+    nextSleep: predictNextSleep(recent.filter((l) => l.logType === 'sleep'), child, now),
+  };
+}
+
+/** Replace our scheduled notifications with the current plan. */
+async function sync() {
+  if (!Notifications) return;
+  const { reminders, clock } = useSettingsStore.getState();
+  const anyEnabled = activeReminderCount(reminders) > 0;
+  const scheduled = (await Notifications.getAllScheduledNotificationsAsync()).filter((n) =>
+    n.identifier.startsWith(REMINDER_ID_PREFIX),
+  );
+
+  const now = Date.now();
+  const plan =
+    anyEnabled && (await notificationsAllowed())
+      ? planReminders({
+          now,
+          settings: reminders,
+          children: await Promise.all(useChildStore.getState().children.map((c) => reminderChild(c.id, c.name, now))),
+          formatTime: (ms) => formatTimeShort(ms, clock),
+        })
+      : [];
+
+  if (plan.length) await ensureChannel();
+  const wanted = new Set(plan.map((p) => p.id));
+  await Promise.all(
+    scheduled.filter((n) => !wanted.has(n.identifier)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+  );
+  // Scheduling with an existing identifier replaces that notification.
+  for (const p of plan) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: p.id,
+      content: { title: p.title, body: p.body, data: { childId: p.childId, entryId: p.entryId ?? null } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: CHANNEL },
+    });
+  }
+}
+
+let running: Promise<void> = Promise.resolve();
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+/** Debounced, serialized re-plan. Call after anything that could move a reminder. */
+export function scheduleReminderSync(delayMs = 1000) {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e));
+  }, delayMs);
+}
+
+/** Pending reminders, soonest first (for the settings screen). */
+export async function upcomingReminders() {
+  if (!Notifications) return [];
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  return all
+    .filter((n) => n.identifier.startsWith(REMINDER_ID_PREFIX))
+    .map((n) => {
+      const t = n.trigger as { type?: string; value?: number; date?: number } | null;
+      return { id: n.identifier, title: n.content.title ?? '', at: t?.value ?? t?.date ?? null };
+    })
+    .sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+}
+
+/**
+ * Keeps notifications in step with the data: re-plans when logs, children or reminder
+ * settings change and when the app comes back to the foreground. Tapping a reminder
+ * switches to that child (and opens the entry for forgotten timers).
+ */
+export function useReminderSync(ready: boolean) {
+  useEffect(() => {
+    if (!ready || !Notifications) return;
+    scheduleReminderSync(0);
+    const unsubs = [
+      useLogStore.subscribe((s, prev) => s.revision !== prev.revision && scheduleReminderSync()),
+      useChildStore.subscribe((s, prev) => s.children !== prev.children && scheduleReminderSync()),
+      useSettingsStore.subscribe((s, prev) => (s.reminders !== prev.reminders || s.clock !== prev.clock) && scheduleReminderSync(0)),
+    ];
+    const appState = AppState.addEventListener('change', (state) => state === 'active' && scheduleReminderSync());
+    const tap = Notifications.addNotificationResponseReceivedListener(async (res) => {
+      const { childId, entryId } = res.notification.request.content.data ?? {};
+      if (typeof childId === 'string' && useChildStore.getState().children.some((c) => c.id === childId)) {
+        await useSettingsStore.getState().set('activeChildId', childId);
+      }
+      // Forgotten-timer reminders open the entry so it can be stopped or corrected.
+      if (typeof entryId === 'string') router.push(`/entry/${entryId}`);
+    });
+    return () => {
+      unsubs.forEach((u) => u());
+      appState.remove();
+      tap.remove();
+    };
+  }, [ready]);
+}

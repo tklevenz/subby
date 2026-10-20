@@ -2,40 +2,35 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { Child, LogType } from '@kindred-log/shared';
-import ChildForm from '../../components/ChildForm';
-import { TYPE_META } from '../../components/logTypes';
-import { Button, FieldLabel, TextField } from '../../components/ui';
-import { countChildLogs, useChildStore } from '../../store/useChildStore';
-import { useLogStore } from '../../store/useLogStore';
-import { useSettingsStore } from '../../store/useSettingsStore';
+import ChildForm from '../../../components/ChildForm';
+import { TYPE_META } from '../../../components/logTypes';
+import { Button, FieldLabel, TextField } from '../../../components/ui';
+import { countChildLogs, useChildStore } from '../../../store/useChildStore';
+import { useLogStore } from '../../../store/useLogStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 
-/** Add (`/child/new`) or edit a child profile. */
-export default function ChildScreen() {
+/** Edit a child's details; also home of the delete action. */
+export default function EditChildScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const isNew = id === 'new';
   const child = useChildStore((s) => s.children.find((c) => c.id === id));
-  const { addChild, updateChild } = useChildStore.getState();
-  const setSetting = useSettingsStore((s) => s.set);
+  const updateChild = useChildStore((s) => s.updateChild);
 
   return (
     <ScrollView className="flex-1 bg-slate-950" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: isNew ? 'Add child' : (child?.name ?? 'Child') }} />
-      {isNew || child ? (
-        <ChildForm
-          initial={child}
-          submitLabel={isNew ? 'Add child' : 'Save'}
-          onSubmit={async (input) => {
-            if (isNew) {
-              const created = await addChild(input);
-              await setSetting('activeChildId', created.id);
-            } else {
+      <Stack.Screen options={{ title: child ? `Edit ${child.name}` : 'Child' }} />
+      {child ? (
+        <>
+          <ChildForm
+            initial={child}
+            submitLabel="Save"
+            onSubmit={async (input) => {
               await updateChild(id, input);
-            }
-            router.back();
-          }}
-        />
+              router.back();
+            }}
+          />
+          <DeleteChild child={child} />
+        </>
       ) : null}
-      {!isNew && child ? <DeleteChild child={child} /> : null}
     </ScrollView>
   );
 }
@@ -79,8 +74,9 @@ function DeleteChild({ child }: { child: Child }) {
     if (settings.activeChildId === child.id) {
       await settings.set('activeChildId', children.find((c) => c.id !== child.id)?.id ?? null);
     }
-    // With no children left, the route guard switches to onboarding on its own.
-    if (router.canGoBack()) router.back();
+    // Leave both the edit and the profile screen. With no children left, the route
+    // guard switches to onboarding on its own.
+    if (router.canDismiss()) router.dismissAll();
   };
 
   return (

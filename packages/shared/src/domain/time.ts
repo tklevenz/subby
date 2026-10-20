@@ -52,3 +52,61 @@ export function formatHoursMinutes(ms: number): string {
   const m = totalMin % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+
+const fromIso = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+/** Same day-of-month `n` months later, clamped (31 Jan + 1 month = 28/29 Feb). */
+function addMonths(date: Date, n: number): Date {
+  const target = new Date(date.getFullYear(), date.getMonth() + n, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(date.getDate(), lastDay));
+  return target;
+}
+
+const daysBetween = (a: Date, b: Date) => Math.round((startOfDay(b.getTime()) - startOfDay(a.getTime())) / 86_400_000);
+
+/** Calendar age: whole months since birth plus the remaining days. */
+export function ageParts(birthDate: string, now: number): { months: number; days: number } {
+  const birth = fromIso(birthDate);
+  const today = new Date(startOfDay(now));
+  let months = (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth();
+  if (addMonths(birth, months) > today) months--;
+  if (months < 0) return { months: 0, days: Math.max(0, daysBetween(birth, today)) };
+  return { months, days: daysBetween(addMonths(birth, months), today) };
+}
+
+const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+
+/** "12 days", "5 weeks, 2 days", "8 months, 12 days", "2 years, 3 months". */
+export function formatAgeLong(birthDate: string, now: number): string {
+  const totalDays = ageInDays(birthDate, now);
+  if (totalDays < 0) return 'Not born yet';
+  if (totalDays < 14) return plural(totalDays, 'day');
+  const { months, days } = ageParts(birthDate, now);
+  if (months < 3) {
+    const rest = totalDays % 7;
+    return rest ? `${plural(Math.floor(totalDays / 7), 'week')}, ${plural(rest, 'day')}` : plural(totalDays / 7, 'week');
+  }
+  if (months < 24) return days ? `${plural(months, 'month')}, ${plural(days, 'day')}` : plural(months, 'month');
+  const years = Math.floor(months / 12);
+  return months % 12 ? `${plural(years, 'year')}, ${plural(months % 12, 'month')}` : plural(years, 'year');
+}
+
+/**
+ * The next age worth celebrating: each month in the first year, then birthdays.
+ * `days` is 0 on the day itself.
+ */
+export function nextAgeMilestone(birthDate: string, now: number): { label: string; at: number; days: number } {
+  const birth = fromIso(birthDate);
+  const today = new Date(startOfDay(now));
+  const { months, days } = ageParts(birthDate, now);
+  const next = (m: number) => {
+    const at = addMonths(birth, m);
+    return { label: m < 12 ? plural(m, 'month') : plural(m / 12, 'year'), at: at.getTime(), days: daysBetween(today, at) };
+  };
+  if (days === 0 && months > 0 && (months < 12 || months % 12 === 0)) return next(months);
+  return months < 11 ? next(months + 1) : next((Math.floor(months / 12) + 1) * 12);
+}

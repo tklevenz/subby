@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { addDays, startOfDay } from '@kindred-log/shared';
 import { useSettingsStore } from './useSettingsStore';
 
 export { formatDuration, formatRelative, formatAge } from '@kindred-log/shared';
@@ -24,9 +25,10 @@ export function formatTimeShort(epochMs: number, clock: '12h' | '24h' = '24h'): 
 export function formatDayLabel(epochMs: number, now = Date.now()): string {
   const d = new Date(epochMs);
   const today = new Date(now);
-  const yesterday = new Date(now - 86_400_000);
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  const day = startOfDay(epochMs);
+  if (day === startOfDay(now)) return 'Today';
+  // Calendar day before, not 24 h before (DST days are 23/25 h).
+  if (day === addDays(startOfDay(now), -1)) return 'Yesterday';
   return d.toLocaleDateString([], {
     weekday: 'short',
     day: 'numeric',
