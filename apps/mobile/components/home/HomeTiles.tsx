@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Activity, Baby, CalendarClock, ChevronRight, Droplets, History, Milk, Moon, Pill, Plus } from 'lucide-react-native';
+import { AngleRight, Baby, BottleWater, CalendarDays, ChildReaching, ClockRotateLeft, Moon, Pills, Plus, PoopDroplet } from '../icons';
 import {
   activeSleep,
   describeDiaper,
@@ -169,10 +169,11 @@ function useTileContent(logs: LogEntry[], child: Child, now: number): Record<Hom
   return { sleep, feed, diaper };
 }
 
+// The old quick-dock tints (20 % fill, 30 % border); a running timer gets stronger.
 const STYLE: Record<HomeTile, { box: string; boxActive: string; label: string; icon: () => string; Icon: typeof Moon }> = {
-  sleep: { box: 'bg-violet/10 border-violet/40', boxActive: 'bg-violet/20 border-violet-strong/60', label: 'text-violet-soft', icon: () => colors.violetStrong, Icon: Moon },
-  feed: { box: 'bg-cyan/10 border-cyan/40', boxActive: 'bg-cyan/20 border-cyan-soft/60', label: 'text-cyan-soft', icon: () => colors.cyanSoft, Icon: Baby },
-  diaper: { box: 'bg-amber/10 border-amber/40', boxActive: 'bg-amber/20 border-amber-strong/60', label: 'text-amber-strong', icon: () => colors.amberStrong, Icon: Droplets },
+  sleep: { box: 'bg-violet/20 border-violet/30', boxActive: 'bg-violet/30 border-violet-strong/60', label: 'text-violet-soft', icon: () => colors.violetStrong, Icon: Moon },
+  feed: { box: 'bg-cyan/20 border-cyan/30', boxActive: 'bg-cyan/30 border-cyan-soft/60', label: 'text-cyan-soft', icon: () => colors.cyanSoft, Icon: Baby },
+  diaper: { box: 'bg-amber/20 border-amber/30', boxActive: 'bg-amber/30 border-amber-strong/60', label: 'text-amber-strong', icon: () => colors.amberStrong, Icon: PoopDroplet },
 };
 
 function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: TileContent; large?: boolean; onLongPress: () => void }) {
@@ -227,7 +228,7 @@ function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
     <View className="bg-surface border border-line rounded-2xl">
       {meds.map((m) => (
         <View key={m.name} className="flex-row items-center px-3.5 py-3 border-b border-line">
-          <Pill color={colors.blueSoft} size={16} />
+          <Pills color={colors.blueSoft} size={16} />
           <Text className="flex-1 text-ink text-sm ml-2.5" numberOfLines={1}>{m.name}</Text>
           <Text className={`text-xs ${m.dueAt <= now ? 'text-red-soft' : 'text-blue-pale'}`}>
             {m.dueAt <= now ? `Overdue by ${formatDuration(now - m.dueAt)}` : `Due at ${formatTime(m.dueAt)}`}
@@ -235,15 +236,15 @@ function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
         </View>
       ))}
       <Pressable onPress={() => router.push('/schedule')} className="flex-row items-center px-3.5 py-3 border-b border-line">
-        <CalendarClock color={colors.violetSoft} size={16} />
+        <CalendarDays color={colors.violetSoft} size={16} />
         <Text className="flex-1 text-ink text-sm ml-2.5">Sleep schedule</Text>
-        <ChevronRight color={colors.inkGhost} size={16} />
+        <AngleRight color={colors.inkGhost} size={16} />
       </Pressable>
       <Pressable onPress={() => router.push('/history')} className="flex-row items-center px-3.5 py-3">
-        <History color={colors.inkSoft} size={16} />
+        <ClockRotateLeft color={colors.inkSoft} size={16} />
         <Text className="flex-1 text-ink text-sm ml-2.5">Today's log</Text>
         <Text className="text-ink-muted text-xs mr-1">{today === 1 ? '1 entry' : `${today} entries`}</Text>
-        <ChevronRight color={colors.inkGhost} size={16} />
+        <AngleRight color={colors.inkGhost} size={16} />
       </Pressable>
     </View>
   );
@@ -253,9 +254,9 @@ function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
 function Shortcuts() {
   const open = useSheetStore((s) => s.open);
   const items = [
-    { label: 'Pump', Icon: Milk, color: () => colors.fuchsiaSoft, box: 'bg-fuchsia/10 border-fuchsia/40', onPress: () => open({ kind: 'log', type: 'pumping' }) },
-    { label: 'Meds', Icon: Pill, color: () => colors.blueSoft, box: 'bg-blue/10 border-blue/40', onPress: () => open({ kind: 'log', type: 'medication' }) },
-    { label: 'Tummy', Icon: Activity, color: () => colors.tealSoft, box: 'bg-teal/10 border-teal/40', onPress: () => open({ kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } }) },
+    { label: 'Pump', Icon: BottleWater, color: () => colors.fuchsiaSoft, box: 'bg-fuchsia/10 border-fuchsia/40', onPress: () => open({ kind: 'log', type: 'pumping' }) },
+    { label: 'Meds', Icon: Pills, color: () => colors.blueSoft, box: 'bg-blue/10 border-blue/40', onPress: () => open({ kind: 'log', type: 'medication' }) },
+    { label: 'Tummy', Icon: ChildReaching, color: () => colors.tealSoft, box: 'bg-teal/10 border-teal/40', onPress: () => open({ kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } }) },
   ];
   return (
     <View className="flex-row gap-2">

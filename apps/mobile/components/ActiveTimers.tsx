@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Square } from 'lucide-react-native';
+import { Stop } from './icons';
 import { activeTimers, formatDuration } from '@kindred-log/shared';
 import { useLogStore } from '../store/useLogStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -44,7 +44,7 @@ export default function ActiveTimers() {
               }}
               className="bg-raised rounded-full p-2"
             >
-              <Square color={colors.ink} size={14} fill={colors.ink} />
+              <Stop color={colors.ink} size={14} />
             </Pressable>
           </Pressable>
         );

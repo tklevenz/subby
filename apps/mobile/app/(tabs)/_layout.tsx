@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ChartLine, History, House, Settings } from 'lucide-react-native';
+import { ChartLine, ClockRotateLeft, Gear, House } from '../../components/icons';
 import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
@@ -14,9 +14,9 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }} />
-      <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: ({ color, size }) => <History color={color} size={size} /> }} />
+      <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: ({ color, size }) => <ClockRotateLeft color={color} size={size} /> }} />
       <Tabs.Screen name="trends" options={{ title: 'Trends', tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size} /> }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Settings color={color} size={size} /> }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Gear color={color} size={size} /> }} />
     </Tabs>
   );
 }

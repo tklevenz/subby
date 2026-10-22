@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Check, Droplets } from 'lucide-react-native';
+import { Check, Droplet, Poop, PoopDroplet, type IconProps } from '../icons';
 import type { DIAPER_COLORS, LogEntry } from '@kindred-log/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSheetStore } from '../../store/useSheetStore';
@@ -13,10 +13,16 @@ import { colors } from '../../theme/colors';
 type Condition = 'wet' | 'dirty' | 'both';
 type DiaperColor = (typeof DIAPER_COLORS)[number];
 
-const KINDS: { condition: Condition; label: string; className: string; icon: () => string }[] = [
-  { condition: 'wet', label: 'Wet', className: 'bg-amber/20 border-amber/30', icon: () => colors.amberStrong },
-  { condition: 'dirty', label: 'Dirty', className: 'bg-lime/20 border-lime/30', icon: () => colors.limeStrong },
-  { condition: 'both', label: 'Both', className: 'bg-orange/20 border-orange/30', icon: () => colors.orangeStrong },
+// Wet is blue, dirty brown; both is neutral and lets its two colored icons say it.
+const KINDS: { condition: Condition; label: string; className: string; Icon: (p: IconProps) => React.ReactNode }[] = [
+  { condition: 'wet', label: 'Wet', className: 'bg-blue/20 border-blue/40', Icon: (p) => <Droplet {...p} color={colors.blueSoft} /> },
+  { condition: 'dirty', label: 'Dirty', className: 'bg-brown/30 border-brown-strong/50', Icon: (p) => <Poop {...p} color={colors.brownStrong} /> },
+  {
+    condition: 'both',
+    label: 'Both',
+    className: 'bg-raised border-line-strong',
+    Icon: (p) => <PoopDroplet {...p} color={colors.brownStrong} dropColor={colors.blueSoft} />,
+  },
 ];
 // Most common first.
 const COLOR_ORDER: DiaperColor[] = ['yellow', 'brown', 'green', 'orange', 'black', 'red', 'white', 'gray'];
@@ -60,7 +66,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
               onPress={() => log(k.condition)}
               className={`flex-1 h-24 rounded-2xl border items-center justify-center ${k.className}`}
             >
-              <Droplets color={k.icon()} size={26} />
+              <k.Icon size={28} />
               <Text className="text-ink text-base font-semibold mt-2">{k.label}</Text>
             </Pressable>
           ))}

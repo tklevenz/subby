@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import { Camera, ImagePlus, Plus, X } from 'lucide-react-native';
+import { Camera, ImageIcon, Plus, Xmark } from '../icons';
 import { recentTags } from '@kindred-log/shared';
 import { pickPhoto } from '../../features/photos';
 import { useLogStore } from '../../store/useLogStore';
@@ -95,7 +95,7 @@ export function TagsField({ value, onChange }: { value: string[] | undefined; on
         {tags.map((t) => (
           <Pressable key={t} onPress={() => set(tags.filter((x) => x !== t))} className="flex-row items-center px-3 py-1.5 rounded-full bg-violet/30 border border-violet-strong/60">
             <Text className="text-violet-faint mr-1">{t}</Text>
-            <X color={colors.violetPale} size={12} />
+            <Xmark color={colors.violetPale} size={12} />
           </Pressable>
         ))}
         {suggestions.map((t) => (
@@ -123,7 +123,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
       <View>
         <Image source={{ uri: value }} className="w-full h-48 rounded-xl" resizeMode="cover" />
         <Pressable onPress={() => onChange(undefined)} className="absolute top-2 right-2 bg-scrim/60 rounded-full p-1.5">
-          <X color={colors.ink} size={16} />
+          <Xmark color={colors.ink} size={16} />
         </Pressable>
       </View>
     );
@@ -131,7 +131,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
   return (
     <View className="flex-row gap-2">
       <Pressable onPress={() => pick(false)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
-        <ImagePlus color={colors.inkSoft} size={18} />
+        <ImageIcon color={colors.inkSoft} size={18} />
         <Text className="text-ink-soft ml-2">Library</Text>
       </Pressable>
       <Pressable onPress={() => pick(true)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Minus, Pause, Plus } from 'lucide-react-native';
+import { Minus, Pause, Plus } from '../icons';
 import {
   formatVolume,
   isRunning,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { AngleRight } from './icons';
 import type { LogEntry } from '@kindred-log/shared';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime } from '../store/timeHelpers';
@@ -28,7 +28,7 @@ export default function LogRow({ entry }: { entry: LogEntry }) {
           ) : null}
         </View>
         <Text className="text-xs text-ink-faint">{formatTime(entry.startedAt)}</Text>
-        <ChevronRight color={colors.inkGhost} size={14} />
+        <AngleRight color={colors.inkGhost} size={14} />
       </Pressable>
     </View>
   );

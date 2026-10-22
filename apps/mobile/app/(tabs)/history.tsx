@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { AngleLeft, AngleRight } from '../../components/icons';
 import { addDays, dailyStats, dayRange, formatHoursMinutes, formatVolume, startOfDay, type DayStats } from '@kindred-log/shared';
 import LogTimeline from '../../components/LogTimeline';
 import DayTimeline from '../../components/charts/DayTimeline';
@@ -77,12 +77,12 @@ function Calendar({
   return (
     <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
       <View className="flex-row items-center justify-between my-2">
-        <NavButton icon={<ChevronLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -span))} />
+        <NavButton icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -span))} />
         <Pressable onPress={() => setAnchor(today)} disabled={anchor === today}>
           <Text className="text-ink font-semibold text-base">{title}</Text>
         </Pressable>
         <NavButton
-          icon={<ChevronRight color={anchor >= today ? colors.lineStrong : colors.inkSoft} size={20} />}
+          icon={<AngleRight color={anchor >= today ? colors.lineStrong : colors.inkSoft} size={20} />}
           disabled={anchor >= today}
           onPress={() => setAnchor(Math.min(addDays(anchor, span), today))}
         />

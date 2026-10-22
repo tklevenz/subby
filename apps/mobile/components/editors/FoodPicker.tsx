@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
-import { Plus, TriangleAlert } from 'lucide-react-native';
+import { Plus, TriangleExclamation } from '../icons';
 import { flaggedFoods, recentFoods, type PayloadOf } from '@kindred-log/shared';
 import { HAS_FOODS, useLogQuery } from '../../store/queries';
 import { Chip, FieldLabel, TextField } from '../ui';
@@ -46,7 +46,7 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
 
       <View className="flex-row items-center justify-between mt-4">
         <View className="flex-row items-center">
-          <TriangleAlert color={colors.amberStrong} size={16} />
+          <TriangleExclamation color={colors.amberStrong} size={16} />
           <Text className="text-ink-soft ml-2">Possible allergen / first try</Text>
         </View>
         <Switch value={value.allergen ?? false} onValueChange={(allergen) => onChange({ allergen: allergen || undefined })} />

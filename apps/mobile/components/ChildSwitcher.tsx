@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, Modal } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Check, ChevronDown, ChevronRight, Plus } from 'lucide-react-native';
+import { AngleDown, AngleRight, Check, Plus } from './icons';
 import { formatAge } from '@kindred-log/shared';
 import { useCanAddChild, useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -32,7 +32,7 @@ export default function ChildSwitcher() {
         {active ? (
           <Text className="text-sm text-ink-muted ml-2">{formatAge(active.birthDate, Date.now())}</Text>
         ) : null}
-        <ChevronDown color={colors.inkFaint} size={18} style={{ marginLeft: 4 }} />
+        <AngleDown color={colors.inkFaint} size={18} style={{ marginLeft: 4 }} />
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -58,7 +58,7 @@ export default function ChildSwitcher() {
                   className="flex-row items-center px-4 py-3"
                 >
                   <Text className="text-ink-muted text-xs mr-0.5">Profile</Text>
-                  <ChevronRight color={colors.inkFaint} size={14} />
+                  <AngleRight color={colors.inkFaint} size={14} />
                 </Pressable>
               </View>
             ))}

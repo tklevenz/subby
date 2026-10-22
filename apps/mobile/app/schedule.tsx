@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { Moon, Sun, SunMedium } from 'lucide-react-native';
+import { CloudSun, Moon, Sun } from '../components/icons';
 import {
   addDays,
   formatHoursMinutes,
@@ -83,7 +83,7 @@ function ItemRow({ item, now, formatTime }: { item: ScheduleItem; now: number; f
     item.kind === 'wake'
       ? [<Sun key="i" color={colors.amberSoft} size={16} />, 'Wake up', formatTime(item.at)]
       : item.kind === 'nap'
-        ? [<SunMedium key="i" color={colors.violetSoft} size={16} />, `Nap ${item.index + 1}`, `${formatTime(item.start)} – ${formatTime(item.end)}`]
+        ? [<CloudSun key="i" color={colors.violetSoft} size={16} />, `Nap ${item.index + 1}`, `${formatTime(item.start)} – ${formatTime(item.end)}`]
         : [<Moon key="i" color={colors.violetDeep} size={16} />, 'Bedtime', formatTime(item.at)];
   return (
     <View className={`flex-row items-center py-3 border-b border-line ${past ? 'opacity-40' : ''}`}>

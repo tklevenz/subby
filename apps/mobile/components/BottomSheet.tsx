@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X } from 'lucide-react-native';
+import { Xmark } from './icons';
 import { colors } from '../theme/colors';
 
 /** Slide-up modal sheet with drag handle, title row and scrollable body. */
@@ -60,7 +60,7 @@ export default function BottomSheet({
               <Text className="text-lg font-bold text-ink ml-2">{title}</Text>
             </View>
             <Pressable onPress={dismiss} hitSlop={10}>
-              <X color={colors.inkMuted} size={22} />
+              <Xmark color={colors.inkMuted} size={22} />
             </Pressable>
           </View>
 

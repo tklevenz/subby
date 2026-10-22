@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight } from 'lucide-react-native';
+import { AngleRight } from '../../components/icons';
 import {
   addDays,
   averageStats,
@@ -43,7 +43,7 @@ export default function TrendsScreen() {
   const stats = useMemo(() => (logs ? dailyStats(logs, days, now) : null), [logs, days, now]);
   // Today is still in progress: drawn faded and left out of the averages.
   const avg = useMemo(() => (stats ? averageStats(stats.slice(0, -1)) : null), [stats]);
-  const chevron = <ChevronRight color={colors.inkGhost} size={16} />;
+  const chevron = <AngleRight color={colors.inkGhost} size={16} />;
 
   const bars = (values: (s: DayStats) => number[]): Bar[] =>
     (stats ?? []).map((s) => ({

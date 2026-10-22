@@ -97,6 +97,9 @@ module.exports = {
     pinkStrong: "#f472b6",
     pink: "#ec4899",
     pinkDeep: "#db2777",
+    // Dirty diapers (Tailwind amber 700 / 600): base for tints, Strong for the icon
+    brown: "#b45309",
+    brownStrong: "#d97706",
     // Child avatars without a photo: fill and initial
     avatar1Bg: "#4c1d95",
     avatar1Ink: "#ddd6fe",

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Modal, Platform, Pressable, Text, View } from 'react-native';
-import { Camera, ImagePlus, Trash2 } from 'lucide-react-native';
+import { Camera, ImageIcon, TrashCan } from './icons';
 import { pickPhoto } from '../features/photos';
 import { colors } from '../theme/colors';
 
@@ -43,9 +43,9 @@ export default function PhotoMenu({
 
   const items = [
     { label: 'Take photo', icon: <Camera color={colors.inkSoft} size={18} />, onPress: () => pick('camera') },
-    { label: 'Choose from library', icon: <ImagePlus color={colors.inkSoft} size={18} />, onPress: () => pick('library') },
+    { label: 'Choose from library', icon: <ImageIcon color={colors.inkSoft} size={18} />, onPress: () => pick('library') },
     ...(hasPhoto
-      ? [{ label: 'Remove photo', icon: <Trash2 color={colors.redStrong} size={18} />, onPress: () => after(() => onChange(null)), danger: true }]
+      ? [{ label: 'Remove photo', icon: <TrashCan color={colors.redStrong} size={18} />, onPress: () => after(() => onChange(null)), danger: true }]
       : []),
   ];
 

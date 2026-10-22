@@ -1,5 +1,5 @@
 import React from 'react';
-import { Baby, Droplets, Plus } from 'lucide-react-native';
+import { Baby, Plus, PoopDroplet } from '../icons';
 import { useSheetStore, type SheetRequest } from '../../store/useSheetStore';
 import BottomSheet from '../BottomSheet';
 import { TYPE_META } from '../logTypes';
@@ -16,7 +16,7 @@ function header(sheet: SheetRequest): { title: string; icon: React.ReactNode } {
     case 'add':
       return { title: 'Log something', icon: <Plus color={colors.violetSoft} size={20} /> };
     case 'diaper':
-      return { title: 'Diaper', icon: <Droplets color={colors.amberStrong} size={20} /> };
+      return { title: 'Diaper', icon: <PoopDroplet color={colors.amberStrong} size={20} /> };
     case 'log': {
       const { label, Icon, color } = TYPE_META[sheet.type];
       return { title: `Log ${label.toLowerCase()}`, icon: <Icon color={color} size={20} /> };

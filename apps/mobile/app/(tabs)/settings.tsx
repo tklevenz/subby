@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, Plus } from 'lucide-react-native';
+import { AngleRight, Plus } from '../../components/icons';
 import { activeReminderCount, formatAge } from '@kindred-log/shared';
 import { remindersAvailable, setRemindersEnabled } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
@@ -56,7 +56,7 @@ export default function SettingsScreen() {
   const reminders = useSettingsStore((s) => s.reminders);
   const reminderCount = activeReminderCount(reminders);
   const setSetting = useSettingsStore((s) => s.set);
-  const chevron = <ChevronRight color={colors.inkGhost} size={16} />;
+  const chevron = <AngleRight color={colors.inkGhost} size={16} />;
 
   return (
     <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
@@ -133,6 +133,8 @@ export default function SettingsScreen() {
 
       <View className="mt-10 items-center">
         <Text className="text-ink-ghost text-xs">Kindred Log · data stays on this device</Text>
+        {/* Required by the Font Awesome Free license (CC BY 4.0). */}
+        <Text className="text-ink-ghost text-xs mt-1">Icons by Font Awesome (CC BY 4.0)</Text>
       </View>
     </ScrollView>
   );

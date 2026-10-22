@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Baby, Camera, ChevronLeft, ChevronRight, Flag, Ruler, Sparkles } from 'lucide-react-native';
+import { AngleLeft, AngleRight, Baby, CakeCandles, Camera, Flag, RulerVertical } from '../../../components/icons';
 import {
   childStory,
   formatAgeLong,
@@ -129,7 +129,7 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
 
       <View style={{ top: insets.top + 8 }} className="absolute left-4 right-4 flex-row justify-between">
         <Pressable onPress={() => router.back()} accessibilityLabel="Back" hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
-          <ChevronLeft color={colors.ink} size={22} />
+          <AngleLeft color={colors.ink} size={22} />
         </Pressable>
         <View className="flex-row gap-2">
           {showPhoto ? (
@@ -213,9 +213,9 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
 
 const STORY_STYLE: Record<StoryItem['kind'], { box: string; Icon: typeof Flag; color: () => string }> = {
   milestone: { box: 'bg-orange/10 border-orange/40', Icon: Flag, color: () => colors.orangeSoft },
-  growth: { box: 'bg-green/10 border-green/40', Icon: Ruler, color: () => colors.greenSoft },
+  growth: { box: 'bg-green/10 border-green/40', Icon: RulerVertical, color: () => colors.greenSoft },
   solids: { box: 'bg-cyan/10 border-cyan/40', Icon: Baby, color: () => colors.cyanSoft },
-  birth: { box: 'bg-violet/10 border-violet/40', Icon: Sparkles, color: () => colors.violetSoft },
+  birth: { box: 'bg-violet/10 border-violet/40', Icon: CakeCandles, color: () => colors.violetSoft },
 };
 
 function StoryRow({ item, child, last }: { item: StoryItem; child: Child; last: boolean }) {
@@ -238,7 +238,7 @@ function StoryRow({ item, child, last }: { item: StoryItem; child: Child; last: 
       </View>
       {item.logId ? (
         <View className="pt-1.5">
-          <ChevronRight color={colors.inkGhost} size={14} />
+          <AngleRight color={colors.inkGhost} size={14} />
         </View>
       ) : null}
     </Pressable>
