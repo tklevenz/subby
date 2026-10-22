@@ -109,6 +109,34 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **UX rule:** 2-tap maximum for common logs (sleep: 1 tap on its tile; diaper: tile + type; feed: tile + sheet).
 - **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.
 
+### `apps/server` (`@kindred-log/server`, Kindred Sync; **AGPL-3.0**, everything else is MIT)
+- **What it is:** a zero-knowledge sync relay. NestJS (Fastify) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
+  - The server stores only ids, public keys, signatures, versions and ciphertext. Never add a column that holds readable user data.
+  - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
+- **Endpoints (`/v1`):**
+  - `info`.
+  - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed.
+  - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
+  - `keys`: `GET`, `grant`, and `rotate`. A rotation must be sealed to exactly the current members plus the recovery key.
+  - `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
+  - `sync/push` and `sync/pull`:
+    - Last writer wins via `serverAccepts`, and a per-family `seq`.
+    - New data must use the current epoch.
+    - Records must be written as the calling device.
+  - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
+- **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, and grant. They can't sync or rotate.
+- **Code conventions:**
+  - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
+  - `lockFamily(tx, id)` serializes writes per family.
+- **Single-instance assumptions:** auth challenges and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
+- **Modes:** `MODE=self|hosted`. `Entitlements.canSync` is the hook for the hosted subscription (a stub for now).
+- **Commands** (in `apps/server`):
+  - `pnpm db:up`: dev Postgres on port **54329** via `docker-compose.dev.yml`.
+  - `pnpm serve:dev`: needs `.env`, copied from `.env.example`. Deliberately not named `dev`, so the root `pnpm run dev` still only starts the app.
+  - `pnpm build`: esbuild bundles the shared package; npm dependencies stay external.
+  - Schema changes: edit `src/db/schema.ts`, then run `pnpm db:generate`. Migrations run at startup.
+- **Tests:** `test/e2e.test.ts` runs the real server on a throwaway database. `test/client.ts` is a full simulated app (pairing, sync, removal + rotation, recovery) and the reference for the mobile sync engine. The tests are skipped, with a warning, when the dev Postgres isn't running.
+
 ### Native builds (local, no EAS)
 - `expo-dev-client` is installed, so `pnpm run dev` / `expo start` now targets the **Kindred Log dev build**. Use `pnpm --filter @kindred-log/mobile dev:go` (or press `s`) for Expo Go.
 - `android/` and `ios/` are generated (Continuous Native Generation) and gitignored. Never edit them: change `app.json` or a config plugin instead.
@@ -141,4 +169,5 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Child profile pages with photos.
 - 2026-10-22: Home C / profile D redesign, theme-ready palette, Font Awesome icons.
 - 2026-10-22: **Phase 6 started: SQLCipher encryption** (local dev build, no EAS).
-- **Next in Phase 6:** Android widget; then iOS (Xcode build): widgets, Live Activities, Siri shortcuts.
+- 2026-10-22: **PROJECT.md Phase 2 (E2EE sync) started**: shared crypto/protocol (M1) and the sync server (M2) done. Phase 1.6 widgets etc. postponed.
+- **Next:** M3, the mobile sync engine (see the plan file).

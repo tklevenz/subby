@@ -1,0 +1,14 @@
+# Development database only. Port 54329 so it never clashes with a local Postgres.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: kindred
+      POSTGRES_PASSWORD: kindred
+      POSTGRES_DB: kindred
+    ports:
+      - "54329:5432"
+    volumes:
+      - kindred-dev-db:/var/lib/postgresql/data
+volumes:
+  kindred-dev-db:
