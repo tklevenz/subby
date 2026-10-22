@@ -26,7 +26,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "expo-status-bar",
       "expo-secure-store",
       "@react-native-community/datetimepicker",

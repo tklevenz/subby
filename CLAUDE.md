@@ -13,7 +13,7 @@
   - Color props in JS (icons, charts, navigation) use `colors.<role>` from `theme/colors`, read at render time (no module-level copies; `TYPE_META.color` is a getter). No hex literals except data colors (diaper swatches).
   - `theme/palette.test.ts` fails on raw palette classes or hex literals in `app/`, `components/`, `features/`.
   - Adding a theme later: add a map next to `dark` with the same keys (the test checks), switch the CSS variables (NativeWind `vars()` or a `.dark:root`/class block) and swap `colors`.
-- **State & Local Persistence:** Zustand (in-memory UI state) backed by `expo-sqlite` via `drizzle-orm/expo-sqlite` (unencrypted in Expo Go), with Drizzle migrations (see §3 DB).
+- **State & Local Persistence:** Zustand (in-memory UI state) backed by `expo-sqlite` via `drizzle-orm/expo-sqlite` (SQLCipher-encrypted in native builds, plain in Expo Go), with Drizzle migrations (see §3 DB).
 - **Runtime Environment:** Node.js v24.9.0 on macOS (Apple Silicon)[cite: 4]
 
 ## 3. Repository & File Structure
@@ -45,6 +45,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **DB:**
   - `db/schema.ts` (Drizzle): tables `children`, `logs` (generic, JSON `payload`, `ended_at`, `import_ref` unique), `settings` (kv), `reminders`.
   - `db/client.ts`: `initDatabase()` runs migrations at startup and upgrades pre-migration v0 databases via `db/legacy.ts`.
+  - **Encryption:** `app.json` sets `expo-sqlite` `useSQLCipher`. `openAppDatabase()` opens `kindred.db` with a random 256-bit raw key from `expo-secure-store` (`kl.dbKey`, `AFTER_FIRST_UNLOCK`). The startup decision is the pure `planOpen` in `db/encryption.ts` (tested):
+    - The pre-encryption plain `kindred-log.db` is copied in once with `sqlcipher_export`, then deleted. Every step is safe to re-run after a crash.
+    - An encrypted file whose key is missing (e.g. Android restore) is moved aside as `kindred.unreadable-<ts>.db`, never deleted.
+    - Expo Go has no SQLCipher (`PRAGMA cipher_version` is empty) and keeps using plain `kindred-log.db`.
+    - Never log or export the key. Inspect a device database with `sqlcipher`, not `sqlite3`.
   - **Schema changes:** edit `db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`. Commit the generated `db/migrations/*`, and never edit an applied migration.
 - **Stores (Zustand, write-through to SQLite):**
   - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`, `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
@@ -120,4 +125,6 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Deleted or replaced note photos are removed from disk.
   - Reminders got a master switch and new kinds.
   - Child profile pages with photos.
-- **Next: Phase 6** (needs an EAS dev build, leaving Expo Go): SQLCipher encryption, widgets, Live Activities, Siri shortcuts.
+- 2026-10-22: Home C / profile D redesign, theme-ready palette, Font Awesome icons.
+- 2026-10-22: **Phase 6 started: SQLCipher encryption** (local dev build, no EAS).
+- **Next in Phase 6:** Android widget; then iOS (Xcode build): widgets, Live Activities, Siri shortcuts.
