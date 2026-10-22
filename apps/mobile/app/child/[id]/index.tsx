@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { AngleLeft, AngleRight, Baby, CakeCandles, Camera, Flag, RulerVertical } from '../../../components/icons';
 import {
   childStory,
@@ -112,6 +113,8 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
   const { bg, fg } = avatarColors(child.id);
   const showPhoto = child.photoUri && failed !== child.photoUri;
   const height = Math.round(Math.min(width, 420) * 0.92);
+  // The name sits on the photo now; a soft shadow keeps it readable on light photos.
+  const textOnPhoto = { textShadowColor: colors.ground, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 };
 
   return (
     <View style={{ height, backgroundColor: bg }} className="overflow-hidden">
@@ -143,10 +146,21 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
         </View>
       </View>
 
-      <View className="absolute left-0 right-0 bottom-0 px-5 pt-4 pb-4 bg-ground/70 flex-row items-end justify-between">
+      {/* Fades the bottom of the photo into the page; a flat translucent band let busy photos streak through behind the text. */}
+      <Svg style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} width="100%" height={120}>
+        <Defs>
+          <LinearGradient id="coverFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.ground} stopOpacity={0} />
+            <Stop offset="0.75" stopColor={colors.ground} stopOpacity={0.3} />
+            <Stop offset="1" stopColor={colors.ground} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#coverFade)" />
+      </Svg>
+      <View className="absolute left-0 right-0 bottom-0 px-5 pt-4 pb-4 flex-row items-end justify-between">
         <View className="flex-1">
-          <Text className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1}>{child.name}</Text>
-          <Text className="text-violet-pale text-[15px] mt-0.5">
+          <Text style={textOnPhoto} className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1}>{child.name}</Text>
+          <Text style={textOnPhoto} className="text-violet-pale text-[15px] mt-0.5">
             {formatAgeLong(child.birthDate, Date.now())} · born {fmtDate(isoToMs(child.birthDate), { day: 'numeric', month: 'short' })}
           </Text>
         </View>

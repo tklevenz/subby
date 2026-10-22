@@ -27,12 +27,14 @@ export default function ChildSwitcher() {
   return (
     <>
       <Pressable onPress={() => setOpen(true)} className="flex-row items-center mb-4" hitSlop={8}>
-        {active ? <ChildAvatar child={active} size={34} /> : null}
-        <Text className="text-xl font-bold text-ink ml-2.5">{active?.name ?? 'Kindred Log'}</Text>
-        {active ? (
-          <Text className="text-sm text-ink-muted ml-2">{formatAge(active.birthDate, Date.now())}</Text>
-        ) : null}
-        <AngleDown color={colors.inkFaint} size={18} style={{ marginLeft: 4 }} />
+        {active ? <ChildAvatar child={active} size={40} /> : null}
+        <View className="ml-3">
+          <View className="flex-row items-center">
+            <Text className="text-xl font-bold text-ink">{active?.name ?? 'Kindred Log'}</Text>
+            <AngleDown color={colors.inkFaint} size={16} style={{ marginLeft: 4 }} />
+          </View>
+          {active ? <Text className="text-[13px] text-ink-muted">{formatAge(active.birthDate, Date.now())}</Text> : null}
+        </View>
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
