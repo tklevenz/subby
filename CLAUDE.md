@@ -24,6 +24,20 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - `src/schemas/log.schema.ts`: `LogEntry` + discriminated `LogPayload` union (feed, diaper, sleep, pumping, growth, temperature, medication, potty, activity, milestone, note). Canonical units only: ml, g, cm, °C, seconds, epoch ms.
 - **`endedAt` rule:** for `TIMED_LOG_TYPES` (sleep, feed, pumping, activity), `endedAt` is always set once the entry is complete (= `startedAt` for instant ones like a bottle), and `null` means a running timer. For other types it's always `null`.
 - `src/schemas/child.schema.ts`: `Child`.
+- `src/crypto/` (import from `@kindred-log/shared/crypto`): end-to-end encryption for sync, shared by the app and the server.
+  - Built on the audited `@noble/*` and `@scure/bip39` libraries. Never hand-roll primitives, and never use `Math.random` for keys.
+  - React Native must call `setRandomSource` with `expo-crypto` at startup.
+  - Contents:
+    - `aead` (XChaCha20-Poly1305).
+    - `keys`: device identity (Ed25519 sign + X25519 box) and sealed boxes.
+    - `recovery`: 24 words to an identity. Its test vector must never change, or existing recovery keys stop working.
+    - `pairing`: the 6-digit code.
+    - `deviceLog`: the signed, hash-chained family membership. Every client verifies it.
+    - `files`: chunked photo encryption.
+- `src/sync/` (`@kindred-log/shared/sync`):
+  - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD; tombstones carry no data.
+  - `merge`: last-writer-wins with a device-id tie-break, the same rule on server and client.
+  - Plan: `~/.claude/plans/let-s-analyze-the-current-precious-scroll.md` (Phase 2).
 - `src/domain/`: pure, RN-free helpers. Put new business logic here and test it with vitest (`src/__tests__`).
   - `units`, `time`, `summary`, `validate` (`isCompletePayload` gates Save).
   - `feedTimer`: breastfeeding L/R timer state lives in the feed payload (`timerSide`, `timerSideSince`); `toggleSide`/`pauseFeed`.
