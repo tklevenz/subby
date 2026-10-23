@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import {
   RECOVERY_SIGNER,
   appendEntry,
+  decryptFile,
+  encryptFile,
   fromBase64,
   newIdentity,
   newSymmetricKey,
@@ -134,9 +136,31 @@ export class TestClient {
 
   // --- sync ---------------------------------------------------------------------------------------------
 
-  seal(kind: RecordKind, id: string, body: unknown, opts: { deleted?: boolean; updatedAt?: number } = {}): SyncRecord {
+  seal(kind: RecordKind, id: string, body: unknown, opts: { deleted?: boolean; updatedAt?: number; blobs?: string[] } = {}): SyncRecord {
     const meta = { id, kind, updatedAt: opts.updatedAt ?? Date.now(), deviceId: this.deviceId, deleted: opts.deleted ?? false };
-    return sealRecord(this.familyKeys.get(this.currentEpoch)!, this.currentEpoch, meta, body);
+    const record = sealRecord(this.familyKeys.get(this.currentEpoch)!, this.currentEpoch, meta, body);
+    return opts.blobs ? { ...record, blobs: opts.blobs } : record;
+  }
+
+  // --- blobs (photos) -----------------------------------------------------------------------------------
+
+  /** Encrypts a file with a fresh key, uploads it and returns the reference that goes inside a record. */
+  async uploadFile(data: Uint8Array) {
+    const id = randomUUID();
+    const key = newSymmetricKey();
+    const res = await fetch(`${this.server}/v1/blobs/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${this.token}` },
+      body: encryptFile(key, data) as Uint8Array<ArrayBuffer>,
+    });
+    if (!res.ok) throw new HttpError(res.status, res.statusText);
+    return { id, key: toBase64(key) };
+  }
+
+  async downloadFile(ref: { id: string; key: string }) {
+    const res = await fetch(`${this.server}/v1/blobs/${ref.id}`, { headers: { authorization: `Bearer ${this.token}` } });
+    if (!res.ok) throw new HttpError(res.status, res.statusText);
+    return decryptFile(fromBase64(ref.key), new Uint8Array(await res.arrayBuffer()));
   }
 
   push(records: SyncRecord[]) {

@@ -12,7 +12,8 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
+import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
+import { downloadPhotos, queueUnsyncedPhotos, uploadPhotos } from './photos';
 
 const PUSH_BATCH = 500;
 
@@ -145,13 +146,15 @@ async function runOnce() {
     const api = sessionFor(settings);
     await refreshMembers(api, settings);
     const keys = await refreshKeys(api);
+    await queueUnsyncedPhotos();
     const { stale } = await pushAll(api, settings, keys);
     // A stale push means the server has a newer version we may have skipped: read everything again.
     const applied = await pullAll(api, settings, keys, stale ? 0 : settings.lastSeq);
+    const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: 'Downloading photos', done } }));
     // Phones set up before names existed (or whose name record was lost) name themselves once.
     if (!syncSettings()?.names?.[settings.deviceId]) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
-    if (applied) await reloadStores();
+    if (applied || photos) await reloadStores();
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount() });
   } catch (e) {
     const removed = isRemoved(e);
@@ -204,12 +207,14 @@ type Keys = Awaited<ReturnType<typeof refreshKeys>>;
 
 async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }: Keys) {
   const key = keys.get(epoch)!;
-  const meta = (id: string, kind: 'child' | 'log', row: { updatedAt: number; isDeleted: boolean }) => ({
+  const meta = (id: string, kind: 'child' | 'log', row: Child | LogEntry) => ({
     id,
     kind,
     updatedAt: row.updatedAt,
     deviceId: settings.deviceId,
     deleted: row.isDeleted,
+    // Lets the server delete photos no version uses any more.
+    blobs: row.isDeleted ? [] : blobIdsOf(row),
   });
   let stale = false;
   let done = 0;
@@ -222,6 +227,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }
       : [];
     if (!children.length && !logs.length) return { stale };
 
+    await uploadPhotos(api, children, logs);
     const records: SyncRecord[] = [
       ...children.map((c) => sealRecord(key, epoch, meta(c.id, 'child', c), childToBody(c))),
       ...logs.map((l) => sealRecord(key, epoch, meta(l.id, 'log', l), logToBody(l))),
@@ -293,8 +299,10 @@ function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>,
       if (r.kind === 'child') {
         const row = r.deleted ? childTombstone(r.id, r.updatedAt, 'synced') : bodyToChild(r.id, body as ChildBody, r, local as Child | undefined);
         tx.insert(schema.childrenTable).values(row).onConflictDoUpdate({ target: schema.childrenTable.id, set: row }).run();
+        // This phone's copy of a photo the new version no longer uses (replaced, removed or deleted).
+        const oldPhoto = (local as Child | undefined)?.photoUri;
+        if (oldPhoto && oldPhoto !== row.photoUri) photos.push(oldPhoto);
         if (r.deleted) {
-          photos.push((local as Child | undefined)?.photoUri);
           for (const note of tx.select().from(schema.logsTable).where(and(eq(schema.logsTable.childId, r.id), eq(schema.logsTable.logType, 'note'))).all()) {
             photos.push(note.payload.type === 'note' ? note.payload.photoUri : undefined);
           }
@@ -314,6 +322,9 @@ function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>,
       } else {
         const row = bodyToLog(r.id, body as LogBody, r, local as LogEntry | undefined);
         tx.insert(schema.logsTable).values(row).onConflictDoUpdate({ target: schema.logsTable.id, set: row }).run();
+        const old = local as LogEntry | undefined;
+        const oldPhoto = old?.payload.type === 'note' ? old.payload.photoUri : undefined;
+        if (oldPhoto && oldPhoto !== (row.payload.type === 'note' ? row.payload.photoUri : undefined)) photos.push(oldPhoto);
       }
     }
   });

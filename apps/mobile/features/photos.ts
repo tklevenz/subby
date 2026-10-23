@@ -28,6 +28,23 @@ export async function pickPhoto(source: 'camera' | 'library', square = false): P
   return !res.canceled && res.assets[0] ? persistPhoto(res.assets[0].uri) : null;
 }
 
+/** A photo's bytes (for encrypting and uploading it); null when the file is gone. */
+export async function readPhotoBytes(uri: string): Promise<Uint8Array | null> {
+  const file = new File(uri);
+  return file.exists ? file.bytes() : null;
+}
+
+/** Saves a downloaded photo into the app's photos dir and returns its uri. */
+export function savePhotoBytes(name: string, data: Uint8Array): string {
+  const dir = photosDir();
+  dir.create({ idempotent: true, intermediates: true });
+  const file = new File(dir, name);
+  if (file.exists) file.delete();
+  file.create();
+  file.write(data);
+  return file.uri;
+}
+
 /** Delete a photo we own (inside the app's photos dir); anything else is left alone. */
 export function deletePhoto(uri: string | null | undefined) {
   if (!uri || !uri.startsWith(photosDir().uri)) return;

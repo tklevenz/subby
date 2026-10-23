@@ -19,6 +19,12 @@ export type SyncRecord = {
   deleted: boolean;
   /** base64url(nonce || ciphertext); null for tombstones, so deleted data is gone from the server too. */
   data: string | null;
+  /**
+   * Encrypted files (photos) this version uses, by random blob id. Only a hint for the server's cleanup:
+   * blobs a record stops listing are deleted. Left out, the record's blobs stay as they were. Not part of
+   * the AAD; the reference that matters (id + key) is inside the ciphertext.
+   */
+  blobs?: string[];
 };
 
 export type RecordMeta = Omit<SyncRecord, 'data' | 'epoch'>;

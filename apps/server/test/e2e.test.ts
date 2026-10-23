@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newRecoveryWords, toBase64 } from '@kindred-log/shared/crypto';
 import { createApp } from '../src/app';
+import { BlobsService } from '../src/blobs/blobs';
 import { HttpError, TestClient } from './client';
 
 /**
@@ -12,6 +16,7 @@ import { HttpError, TestClient } from './client';
  */
 const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://kindred:kindred@localhost:54329/kindred';
 const dbName = `kl_test_${randomUUID().replace(/-/g, '')}`;
+const blobDir = mkdtempSync(join(tmpdir(), 'kl-blobs-'));
 const admin = postgres(ADMIN_URL, { max: 1, onnotice: () => {}, connect_timeout: 3 });
 const reachable = await admin`select 1`.then(
   () => true,
@@ -50,6 +55,7 @@ describe.skipIf(!reachable)('sync server', () => {
       port: 0,
       mode: 'self',
       migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
+      blobs: { kind: 'disk', dir: blobDir },
     });
     await app.listen({ port: 0, host: '127.0.0.1' });
     url = await app.getUrl();
@@ -61,6 +67,7 @@ describe.skipIf(!reachable)('sync server', () => {
     await db?.end();
     await admin.unsafe(`drop database if exists ${dbName} with (force)`);
     await admin.end();
+    rmSync(blobDir, { recursive: true, force: true });
   });
 
   /** A family with two paired phones, as most tests need. */
@@ -244,5 +251,96 @@ describe.skipIf(!reachable)('sync server', () => {
     await a.push([a.seal('child', randomUUID(), { name: 'Zebediah Plaintextson', notes: 'allergic to peanuts' })]);
     const dump = JSON.stringify(await db`select * from records`) + JSON.stringify(await db`select * from device_log`);
     expect(dump).not.toMatch(/Zebediah|Plaintextson|peanuts/);
+  });
+
+  describe('photos', () => {
+    const photo = (text: string) => new TextEncoder().encode(`JPEG ${text} `.repeat(30_000)); // ~300 KB, several chunks
+    const exists = (c: TestClient, id: string) =>
+      c.downloadFile({ id, key: 'x' }).then(
+        () => true,
+        (e: unknown) => !(e instanceof HttpError && e.status === 404),
+      );
+
+    it('syncs an encrypted photo to the other phone', async () => {
+      const { a, b } = await pairedFamily();
+      const ref = await a.uploadFile(photo('baby'));
+      const id = randomUUID();
+      await a.push([a.seal('child', id, { name: 'Ada', photoBlob: ref }, { blobs: [ref.id] })]);
+      const [pulled] = (await b.pull()).filter((p) => p.record.id === id);
+      const got = await b.downloadFile((pulled!.body as { photoBlob: { id: string; key: string } }).photoBlob);
+      expect(new TextDecoder().decode(got.subarray(0, 9))).toBe('JPEG baby');
+      expect(got.length).toBe(photo('baby').length);
+    });
+
+    it('stores only ciphertext', async () => {
+      const { a } = await pairedFamily();
+      const ref = await a.uploadFile(photo('secretface'));
+      const files = readdirSync(blobDir, { recursive: true, withFileTypes: true }).filter((f) => f.isFile() && f.name === ref.id);
+      expect(files).toHaveLength(1);
+      expect(readFileSync(join(files[0]!.parentPath, files[0]!.name)).toString('latin1')).not.toMatch(/secretface|JPEG/);
+    });
+
+    it("deletes a record's old photo when it changes and all of them when it's deleted", async () => {
+      const { a } = await pairedFamily();
+      const id = randomUUID();
+      const first = await a.uploadFile(photo('one'));
+      await a.push([a.seal('child', id, { photoBlob: first }, { blobs: [first.id], updatedAt: 1 })]);
+      // An edit that leaves the list out keeps the photo (older apps don't send it).
+      await a.push([a.seal('child', id, { photoBlob: first, name: 'edited' }, { updatedAt: 2 })]);
+      expect(await exists(a, first.id)).toBe(true);
+
+      const second = await a.uploadFile(photo('two'));
+      await a.push([a.seal('child', id, { photoBlob: second }, { blobs: [second.id], updatedAt: 3 })]);
+      expect(await exists(a, first.id)).toBe(false);
+      expect(await exists(a, second.id)).toBe(true);
+
+      await a.push([a.seal('child', id, null, { deleted: true, updatedAt: 4 })]);
+      expect(await exists(a, second.id)).toBe(false);
+      const [{ n }] = await db`select count(*)::int as n from blobs where id in (${first.id}, ${second.id})`;
+      expect(n).toBe(0);
+    });
+
+    it('a stale push does not touch the photos of the newer version', async () => {
+      const { a, b } = await pairedFamily();
+      const id = randomUUID();
+      const kept = await a.uploadFile(photo('kept'));
+      await a.push([a.seal('child', id, { photoBlob: kept }, { blobs: [kept.id], updatedAt: 10 })]);
+      const res = await b.push([b.seal('child', id, {}, { blobs: [], updatedAt: 5 })]);
+      expect(res.stale).toEqual([id]);
+      expect(await exists(a, kept.id)).toBe(true);
+    });
+
+    it('sweeps uploads that no record lists', async () => {
+      const { a } = await pairedFamily();
+      const orphan = await a.uploadFile(photo('orphan'));
+      const linked = await a.uploadFile(photo('linked'));
+      await a.push([a.seal('log', randomUUID(), { photoBlob: linked }, { blobs: [linked.id] })]);
+      const sweeper = app.get(BlobsService);
+      await sweeper.sweep(Date.now());
+      expect(await exists(a, orphan.id)).toBe(true); // still within the grace period
+      await sweeper.sweep(Date.now() + 25 * 60 * 60 * 1000);
+      expect(await exists(a, orphan.id)).toBe(false);
+      expect(await exists(a, linked.id)).toBe(true);
+    });
+
+    it("other families and removed phones can't download", async () => {
+      const { a, b } = await pairedFamily();
+      const ref = await a.uploadFile(photo('private'));
+      const stranger = new TestClient(url);
+      await stranger.createFamily();
+      await expectStatus(stranger.downloadFile(ref), 404);
+      await a.removeDevice(b.deviceId);
+      await expectStatus(b.downloadFile(ref), 401);
+    });
+
+    it('rejects ids that are taken, empty bodies and missing auth', async () => {
+      const { a } = await pairedFamily();
+      const ref = await a.uploadFile(photo('x'));
+      const put = (id: string, body: Uint8Array<ArrayBuffer>, token = a.token) =>
+        fetch(`${url}/v1/blobs/${id}`, { method: 'PUT', headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` }, body });
+      expect((await put(ref.id, new Uint8Array([1]))).status).toBe(409);
+      expect((await put(randomUUID(), new Uint8Array())).status).toBe(400);
+      expect((await put(randomUUID(), new Uint8Array([1]), '')).status).toBe(401);
+    });
   });
 });

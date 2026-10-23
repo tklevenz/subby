@@ -62,6 +62,22 @@ export const invites = pgTable('invites', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
 
+/**
+ * Encrypted files (photos), stored in the blob store under `id`. `recordId` is the record that lists the
+ * blob (null until one does; unlinked blobs are swept after a day). Size is kept for quotas.
+ */
+export const blobs = pgTable(
+  'blobs',
+  {
+    id: uuid('id').primaryKey(),
+    familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+    recordId: uuid('record_id'),
+    size: integer('size').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  },
+  (t) => [index('blobs_family_record_idx').on(t.familyId, t.recordId)],
+);
+
 /** Encrypted records; the newest version per id (last writer wins), tombstones without data. */
 export const records = pgTable(
   'records',

@@ -109,6 +109,12 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore. It installs `expo-crypto` as the shared crypto's random source on import.
   - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
   - `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
+  - **Photos** (`photos.ts`): a photo syncs as an encrypted blob with its own key; the reference `photoBlob: {id, key}` sits in the encrypted record (`children.photo_blob`, note `payload.photoBlob`), and `photoUri` stays this device's file.
+    - Stores clear `photoBlob` whenever `photoUri` changes; `uploadPhotos` (before each push) uploads rows with a file but no reference, without bumping their version.
+    - `downloadPhotos` (after each pull) fetches references without a local file into `photos/<blobId>.jpg`; a pulled version pointing at another blob drops (and deletes) the local copy.
+    - `queueUnsyncedPhotos` re-queues photos from before photo sync, as an edit.
+    - Each record lists its blob ids (`SyncRecord.blobs`, not in the AAD) so the server can delete unused photos.
+    - Blob up/download uses `expo/fetch` (raw bytes).
   - `engine.ts`:
     - `setUpSync` creates the family; `turnOffSync` leaves the family (a self `remove` in the device log, best effort) and forgets this phone's keys.
     - Every run verifies the device log (`refreshMembers`): `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
@@ -136,6 +142,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
   - `keys`: `GET`, `grant`, and `rotate`. A rotation must be sealed to exactly the current members plus the recovery key.
   - `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
+  - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. `Entitlements.canStore` is the hosted quota hook.
   - `sync/push` and `sync/pull`:
     - Last writer wins via `serverAccepts`, and a per-family `seq`.
     - New data must use the current epoch.
@@ -190,4 +197,5 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-23: **M3 mobile sync engine done**: verified on an emulator against the dev server (setup, auto-upload, delete tombstones; crypto runs on Hermes). Pulling from a second device gets its first device test in M4.
 - 2026-10-23: **M4 pairing done**: verified with the Pixel (real data) and an emulator: QR invite (pasted), matching codes, replace-on-join downloading ~10.5k records in ~20 s, live sync both ways, rename, removal with key rotation (epoch 2 sealed only to the Pixel; the removed phone sees a "removed" screen).
 - 2026-10-23: **M5 recovery key done**: verified on the emulator: create (with the two-word check), wipe the app, recover from onboarding → Join → Use a recovery key, then remove the lost phone (the new epoch is sealed to the recovered phone and the recovery key).
-- **Next:** M6, encrypted photo sync (see the plan file).
+- 2026-10-23: **M6 photo sync done**: server e2e covers upload/download, replacement and tombstone cleanup, the sweep and access control; the S3 store was checked against an S3 mock. On the emulator: a child photo uploads encrypted (only ciphertext on disk), comes back after wipe + recovery, and removing it deletes it on the server.
+- **Next:** M7, background sync and push (see the plan file).

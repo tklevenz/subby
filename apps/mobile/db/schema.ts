@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { LogPayload } from '@kindred-log/shared';
+import type { LogPayload, PhotoBlob } from '@kindred-log/shared';
 import { LOG_TYPES } from '@kindred-log/shared';
 
 // Sync-relevant columns shared by every synced table (UUIDv7 ids, LWW updatedAt, soft delete).
@@ -20,6 +20,8 @@ export const childrenTable = sqliteTable(
     dueDate: text('due_date'),
     sex: text('sex', { enum: ['female', 'male', 'other'] }),
     photoUri: text('photo_uri'),
+    // The synced photo (blob id + key); photoUri is this device's copy of it.
+    photoBlob: text('photo_blob', { mode: 'json' }).$type<PhotoBlob>(),
     ...syncColumns,
   },
   (table) => [uniqueIndex('children_import_ref_idx').on(table.importRef)],

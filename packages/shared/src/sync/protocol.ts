@@ -99,6 +99,14 @@ export const InviteStatusSchema = z.object({ claimKey: b64 });
 
 export const MAX_RECORD_DATA = 256 * 1024;
 export const MAX_PUSH = 500;
+export const MAX_RECORD_BLOBS = 4;
+
+// --- blobs (encrypted files: PUT/GET/DELETE /v1/blobs/:id, application/octet-stream) -------------------
+
+/** Largest encrypted file the server accepts. Photos are picked at 0.7 quality, a few MB at most. */
+export const MAX_BLOB_BYTES = 20 * 1024 * 1024;
+/** Uploads no record has listed after this long are deleted (an abandoned or rejected upload). */
+export const UNLINKED_BLOB_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const SyncRecordSchema = z.object({
   id: uuid,
@@ -108,6 +116,7 @@ export const SyncRecordSchema = z.object({
   deviceId: uuid,
   deleted: z.boolean(),
   data: b64.max(Math.ceil((MAX_RECORD_DATA * 4) / 3)).nullable(),
+  blobs: z.array(uuid).max(MAX_RECORD_BLOBS).optional(),
 });
 
 /** POST /v1/sync/push */

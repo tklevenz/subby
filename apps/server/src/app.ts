@@ -16,6 +16,9 @@ import { InvitesController, InvitesService } from './invites/invites';
 import { SyncController, SyncService } from './sync/sync';
 import { Entitlements } from './sync/entitlements';
 import { LiveBus, LiveGateway } from './live/live';
+import { BlobsController, BlobsService } from './blobs/blobs';
+import { BLOB_STORE, openBlobStore } from './blobs/store';
+import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -35,10 +38,12 @@ class AppModule {
   static with(config: Config, db: unknown): DynamicModule {
     return {
       module: AppModule,
-      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController],
+      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: DB, useValue: db },
+        { provide: BLOB_STORE, useValue: openBlobStore(config.blobs) },
+        BlobsService,
         AuthService,
         DeviceGuard,
         DeviceOrRecoveryGuard,
@@ -63,6 +68,11 @@ export async function createApp(config: Config) {
     new FastifyAdapter({ bodyLimit: 16 * 1024 * 1024 }),
     { logger: ['error', 'warn'] },
   );
+  // Encrypted files arrive as raw bytes.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_BLOB_BYTES + 1 }, (_req, body, done) => done(null, body));
   app.useWebSocketAdapter(new WsAdapter(app));
   app.enableShutdownHooks();
   const originalClose = app.close.bind(app);

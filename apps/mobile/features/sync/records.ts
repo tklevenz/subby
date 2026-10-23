@@ -1,10 +1,11 @@
-import type { Child, LogEntry, LogPayload } from '@kindred-log/shared';
+import type { Child, LogEntry, LogPayload, PhotoBlob } from '@kindred-log/shared';
 
 /**
  * What a child or log entry looks like inside its encrypted sync record. Device-local fields stay out:
- * photo file paths (photos sync separately) and Baby Buddy import refs (per-device import bookkeeping).
+ * photo file paths (the photo itself syncs as an encrypted blob, referenced by `photoBlob`) and Baby Buddy
+ * import refs (per-device import bookkeeping).
  */
-export type ChildBody = Pick<Child, 'name' | 'birthDate' | 'birthTime' | 'dueDate' | 'sex'>;
+export type ChildBody = Pick<Child, 'name' | 'birthDate' | 'birthTime' | 'dueDate' | 'sex'> & { photoBlob: PhotoBlob | null };
 export type LogBody = Pick<LogEntry, 'childId' | 'logType' | 'startedAt' | 'endedAt' | 'createdBy' | 'payload'>;
 
 export const childToBody = (c: Child): ChildBody => ({
@@ -13,7 +14,22 @@ export const childToBody = (c: Child): ChildBody => ({
   birthTime: c.birthTime,
   dueDate: c.dueDate,
   sex: c.sex,
+  photoBlob: c.photoBlob ?? null,
 });
+
+const noteBlob = (p: LogPayload) => (p.type === 'note' ? p.photoBlob : undefined);
+
+/** The blob ids a row's record lists, so the server can delete photos nothing uses any more. */
+export const blobIdsOf = (row: Child | LogEntry): string[] => {
+  const blob = 'logType' in row ? noteBlob(row.payload) : row.photoBlob;
+  return blob ? [blob.id] : [];
+};
+
+/** A row whose photo still has to be uploaded: a local file, no synced reference yet. */
+export const needsPhotoUpload = (row: Child | LogEntry): boolean =>
+  'logType' in row
+    ? row.payload.type === 'note' && Boolean(row.payload.photoUri) && !row.payload.photoBlob
+    : Boolean(row.photoUri) && !row.photoBlob;
 
 export function logToBody(l: LogEntry): LogBody {
   const { photoUri: _, ...payload } = l.payload as LogPayload & { photoUri?: string };
@@ -22,12 +38,18 @@ export function logToBody(l: LogEntry): LogBody {
 
 type Version = { updatedAt: number };
 
-/** A pulled child as a local row, keeping this device's photo and import ref for the same id. */
+/** This device's copy of a photo stays only while the record still points at the same blob. */
+const keepLocalPhoto = (localUri: string | null | undefined, localBlob: PhotoBlob | null | undefined, blob: PhotoBlob | null | undefined) =>
+  localUri && blob && localBlob?.id === blob.id ? localUri : null;
+
+/** A pulled child as a local row, keeping this device's photo copy and import ref for the same id. */
 export function bodyToChild(id: string, body: ChildBody, v: Version, local: Child | undefined): Child {
+  const photoBlob = body.photoBlob ?? null;
   return {
     ...body,
     id,
-    photoUri: local?.photoUri ?? null,
+    photoBlob,
+    photoUri: keepLocalPhoto(local?.photoUri, local?.photoBlob, photoBlob),
     importRef: local?.importRef ?? null,
     updatedAt: v.updatedAt,
     isDeleted: false,
@@ -36,8 +58,13 @@ export function bodyToChild(id: string, body: ChildBody, v: Version, local: Chil
 }
 
 export function bodyToLog(id: string, body: LogBody, v: Version, local: LogEntry | undefined): LogEntry {
-  const localPhoto = local?.payload.type === 'note' ? local.payload.photoUri : undefined;
-  const payload = (body.payload.type === 'note' && localPhoto ? { ...body.payload, photoUri: localPhoto } : body.payload) as LogPayload;
+  let payload = body.payload;
+  if (payload.type === 'note') {
+    const { photoUri: _, ...note } = payload;
+    const localNote = local?.payload.type === 'note' ? local.payload : undefined;
+    const photoUri = keepLocalPhoto(localNote?.photoUri, localNote?.photoBlob, note.photoBlob);
+    payload = photoUri ? { ...note, photoUri } : note;
+  }
   return {
     ...body,
     payload,
@@ -58,6 +85,7 @@ export const childTombstone = (id: string, updatedAt: number, syncStatus: 'pendi
   dueDate: null,
   sex: null,
   photoUri: null,
+  photoBlob: null,
   importRef: null,
   updatedAt,
   isDeleted: true,

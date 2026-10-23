@@ -21,6 +21,8 @@ apps/mobile/android/
 *.db
 *.db-journal
 *.db-wal
+# Sync server's encrypted photo store (BLOB_DIR default)
+apps/server/data/
 .env
 .env.*
 !.env.example

@@ -13,4 +13,10 @@ export class Entitlements {
     if (this.config.mode === 'self') return true;
     return true;
   }
+
+  /** Whether a family may store another encrypted file of `bytes` (hosted storage quotas go here). */
+  async canStore(_familyId: string, _bytes: number): Promise<boolean> {
+    if (this.config.mode === 'self') return true;
+    return true;
+  }
 }

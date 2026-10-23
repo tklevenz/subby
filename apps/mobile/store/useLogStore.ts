@@ -139,6 +139,11 @@ export const useLogStore = create<LogState>((set, get) => ({
       updatedAt: Date.now(),
       syncStatus: 'pending',
     };
+    // A new or removed photo: drop the synced reference so the next sync uploads the new one (or none).
+    if (photoOf(current.payload) !== photoOf(updated.payload) && updated.payload.type === 'note') {
+      const { photoBlob: _, ...payload } = updated.payload;
+      updated.payload = payload;
+    }
 
     await db
       .update(schema.logsTable)

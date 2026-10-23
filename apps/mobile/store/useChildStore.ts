@@ -104,14 +104,17 @@ export const useChildStore = create<ChildState>((set, get) => ({
   updateChild: async (id, patch) => {
     const now = Date.now();
     const before = get().children.find((c) => c.id === id);
+    const photoChanged = patch.photoUri !== undefined && before?.photoUri !== patch.photoUri;
     // A replaced or removed photo is no longer referenced anywhere.
-    if (patch.photoUri !== undefined && before?.photoUri && before.photoUri !== patch.photoUri) deletePhoto(before.photoUri);
+    if (photoChanged && before?.photoUri) deletePhoto(before.photoUri);
+    // A new photo is uploaded on the next sync; dropping the old reference is what triggers that.
+    const change = photoChanged ? { ...patch, photoBlob: null } : patch;
     await db
       .update(schema.childrenTable)
-      .set({ ...patch, updatedAt: now, syncStatus: 'pending' })
+      .set({ ...change, updatedAt: now, syncStatus: 'pending' })
       .where(eq(schema.childrenTable.id, id));
     set((state) => ({
-      children: state.children.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: now } : c)),
+      children: state.children.map((c) => (c.id === id ? { ...c, ...change, updatedAt: now } : c)),
     }));
   },
 
@@ -131,7 +134,7 @@ export const useChildStore = create<ChildState>((set, get) => ({
       tx.delete(schema.remindersTable).where(eq(schema.remindersTable.childId, id)).run();
       // Scrub personal data; importRef is cleared so a later re-import starts fresh.
       tx.update(schema.childrenTable)
-        .set({ name: '', birthDate: '', birthTime: null, dueDate: null, sex: null, photoUri: null, importRef: null, isDeleted: true, updatedAt: now, syncStatus: 'pending' })
+        .set({ name: '', birthDate: '', birthTime: null, dueDate: null, sex: null, photoUri: null, photoBlob: null, importRef: null, isDeleted: true, updatedAt: now, syncStatus: 'pending' })
         .where(eq(schema.childrenTable.id, id))
         .run();
     });

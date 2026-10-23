@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PhotoBlobSchema } from './child.schema';
 
 // All quantities are stored in canonical units (ml, g, cm, °C, seconds, epoch ms)
 // and converted for display only (see domain/units.ts).
@@ -105,6 +106,7 @@ export const NotePayloadSchema = z.object({
   type: z.literal('note'),
   text: z.string().min(1),
   photoUri: z.string().optional(),
+  photoBlob: PhotoBlobSchema.optional(),
   ...base,
 });
 
