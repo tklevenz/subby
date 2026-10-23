@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { eq } from 'drizzle-orm';
 import { DEFAULT_REMINDERS, type ReminderSettings, type UnitSystem } from '@kindred-log/shared';
 import { db, schema } from '../db/client';
 
@@ -25,6 +26,10 @@ export type SyncSettings = {
   /** Last server sequence number pulled. */
   lastSeq: number;
   lastSyncedAt: number | null;
+  /** Display names of the family's phones by device id (synced encrypted as `device` records). */
+  names?: Record<string, string>;
+  /** Devices this phone has already seen in the family, to point out new ones. */
+  knownDevices?: string[];
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';
@@ -59,10 +64,17 @@ export const useSettingsStore = create<SettingsState>((setState) => ({
   },
 
   set: async (key, value) => {
-    await db
-      .insert(schema.settingsTable)
-      .values({ key, value })
-      .onConflictDoUpdate({ target: schema.settingsTable.key, set: { value } });
+    // Memory first: a read-modify-write that starts before this write finishes (e.g. two quick saveSync
+    // calls) must already see the new value, or it writes the old one back.
     setState({ [key]: value } as Partial<Settings>);
+    if (value === null) {
+      // The column is NOT NULL: a cleared setting is a missing row, which hydrates back to its default.
+      await db.delete(schema.settingsTable).where(eq(schema.settingsTable.key, key));
+    } else {
+      await db
+        .insert(schema.settingsTable)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: schema.settingsTable.key, set: { value } });
+    }
   },
 }));

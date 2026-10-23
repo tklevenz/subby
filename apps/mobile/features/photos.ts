@@ -38,3 +38,13 @@ export function deletePhoto(uri: string | null | undefined) {
     // A missing file shouldn't block deleting the data that referenced it.
   }
 }
+
+/** Delete every photo this app stored (used when a phone replaces its data with a family's). */
+export function deleteAllPhotos() {
+  try {
+    const dir = photosDir();
+    if (dir.exists) dir.delete();
+  } catch {
+    // Leftover files are harmless; the rows that referenced them are gone.
+  }
+}

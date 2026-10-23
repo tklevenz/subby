@@ -30,7 +30,10 @@ export default function Onboarding() {
           // The protected route guard swaps to the tabs once a child exists.
         }}
       />
-      <Text className="text-ink-faint text-center mt-8">Coming from Baby Buddy?</Text>
+      <Text className="text-ink-faint text-center mt-8">Another phone in your family already uses Kindred Log?</Text>
+      <Button label="Join a family" variant="ghost" onPress={() => router.push('/sync/join')} />
+
+      <Text className="text-ink-faint text-center mt-6">Coming from Baby Buddy?</Text>
       <Button label="Import from Baby Buddy" variant="ghost" onPress={() => router.push('/import/babybuddy')} />
     </ScrollView>
   );

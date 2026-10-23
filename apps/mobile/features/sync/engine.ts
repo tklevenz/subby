@@ -1,8 +1,9 @@
 import { create } from 'zustand';
+import * as Device from 'expo-device';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogEntry } from '@kindred-log/shared';
-import { appendEntry, fromBase64, newSymmetricKey, openSealed, seal, toBase64 } from '@kindred-log/shared/crypto';
+import { appendEntry, fromBase64, newSymmetricKey, openSealed, seal, toBase64, verifyDeviceLog } from '@kindred-log/shared/crypto';
 import { clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
@@ -22,20 +23,26 @@ type SyncStatus = {
   pending: number;
   /** During a long first upload or download. */
   progress: { label: string; done: number } | null;
+  /** The family's phones, from the verified device log. */
+  members: { id: string; isMe: boolean }[];
+  /** Phones that joined since this phone last looked (shown once as a heads-up). */
+  newDevices: string[];
+  /** Another phone removed this one from the family: it can only turn sync off. */
+  removed: boolean;
 };
 
-export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null }));
+export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false }));
 
 let session: SyncSession | null = null;
-function sessionFor(s: SyncSettings) {
+export function sessionFor(s: SyncSettings) {
   if (!session || session.server !== s.server || session.deviceId !== s.deviceId) {
     session = new SyncSession(s.server, s.deviceId, deviceIdentity());
   }
   return session;
 }
 
-const syncSettings = () => useSettingsStore.getState().sync;
-const saveSync = (patch: Partial<SyncSettings>) => {
+export const syncSettings = () => useSettingsStore.getState().sync;
+export const saveSync = (patch: Partial<SyncSettings>) => {
   const current = syncSettings();
   return current ? useSettingsStore.getState().set('sync', { ...current, ...patch }) : Promise.resolve();
 };
@@ -49,7 +56,7 @@ export async function pendingCount(): Promise<number> {
 // --- setup / leave ----------------------------------------------------------------------------------------
 
 /** Creates a new family on the server with this phone as its first device, then uploads everything. */
-export async function setUpSync(serverInput: string) {
+export async function setUpSync(serverInput: string, deviceName: string) {
   const server = normalizeServerUrl(serverInput);
   await checkServer(server);
 
@@ -65,17 +72,29 @@ export async function setUpSync(serverInput: string) {
   // Everything on this phone goes up, including deletions made before sync existed.
   await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
   await db.update(schema.logsTable).set({ syncStatus: 'pending' });
-  await useSettingsStore.getState().set('sync', { server, familyId, deviceId, lastSeq: 0, lastSyncedAt: null });
+  await useSettingsStore.getState().set('sync', { server, familyId, deviceId, lastSeq: 0, lastSyncedAt: null, knownDevices: [deviceId] });
+  await pushDeviceName(deviceName);
   requestSync(0);
 }
 
 /** Stops syncing on this phone. Local data stays; this phone's keys are forgotten. */
 export async function turnOffSync() {
+  const settings = syncSettings();
+  // Leave the family properly when the server is reachable; offline, the other phones can remove this one.
+  if (settings) await leaveFamily(settings).catch(() => {});
   closeLive();
   session = null;
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
-  useSyncStore.setState({ phase: 'off', error: null, progress: null });
+  useSyncStore.setState({ phase: 'off', error: null, progress: null, members: [], newDevices: [], removed: false });
+}
+
+async function leaveFamily(settings: SyncSettings) {
+  const api = sessionFor(settings);
+  const { entries, state } = await refreshMembers(api, settings);
+  const me = { id: settings.deviceId, keys: deviceIdentity() };
+  const entry = appendEntry(state, entries.length, me, { type: 'remove', deviceId: settings.deviceId }, Date.now());
+  await api.request('POST', '/v1/families/me/log', { entry });
 }
 
 // --- one sync run -----------------------------------------------------------------------------------------
@@ -122,27 +141,49 @@ async function runOnce() {
   useSyncStore.setState({ phase: 'syncing', error: null });
   try {
     const api = sessionFor(settings);
+    await refreshMembers(api, settings);
     const keys = await refreshKeys(api);
     const { stale } = await pushAll(api, settings, keys);
     // A stale push means the server has a newer version we may have skipped: read everything again.
     const applied = await pullAll(api, settings, keys, stale ? 0 : settings.lastSeq);
+    // Phones set up before names existed (or whose name record was lost) name themselves once.
+    if (!syncSettings()?.names?.[settings.deviceId]) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied) await reloadStores();
-    useSyncStore.setState({ phase: 'idle', error: null, progress: null, pending: await pendingCount() });
+    useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount() });
   } catch (e) {
-    const message =
-      e instanceof SyncHttpError && e.status === 401
-        ? 'This phone is no longer part of the family'
-        : e instanceof Error
-          ? e.message
-          : String(e);
-    useSyncStore.setState({ phase: 'error', error: message, progress: null, pending: await pendingCount() });
+    const removed = isRemoved(e);
+    const message = removed ? 'This phone was removed from the family' : e instanceof Error ? e.message : String(e);
+    useSyncStore.setState({ phase: 'error', error: message, removed, progress: null, pending: await pendingCount() });
     throw e;
   }
 }
 
+/** A removed device can't log in any more (its sessions and membership are gone). */
+export const isRemoved = (e: unknown) =>
+  e instanceof SyncHttpError && (e.status === 401 || (e.status === 404 && /unknown device/i.test(e.message)));
+
+/**
+ * Verifies the signed device log (a server can't add phones on its own) and publishes the members.
+ * Phones that weren't there last time are flagged once, so a parent notices a phone they didn't add.
+ */
+export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
+  const { entries } = await api.log();
+  const state = verifyDeviceLog(entries);
+  if (!state.members.has(settings.deviceId)) throw new SyncHttpError(401, 'Removed');
+  const ids = [...state.members.keys()];
+  const known = new Set(settings.knownDevices ?? [settings.deviceId]);
+  const added = ids.filter((id) => !known.has(id));
+  if (added.length || ids.length !== known.size) await saveSync({ knownDevices: ids });
+  useSyncStore.setState((s) => ({
+    members: ids.map((id) => ({ id, isMe: id === settings.deviceId })),
+    newDevices: added.length ? [...s.newDevices, ...added] : s.newDevices,
+  }));
+  return { entries, state };
+}
+
 /** Opens any family keys sealed to this device that it doesn't have yet (new epochs after a removal). */
-async function refreshKeys(api: SyncSession) {
+export async function refreshKeys(api: SyncSession) {
   const keys = loadFamilyKeys();
   const res = await api.keys();
   let changed = false;
@@ -222,7 +263,8 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys }: Keys,
 /** Applies one page in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
   // Decrypt first: a record we can't open fails the run before anything is written.
-  const opened = records.map((r) => ({ record: r, body: openRecord<ChildBody | LogBody>(keys, r) }));
+  const opened = records.map((r) => ({ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }));
+  applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
   const photos: (string | null | undefined)[] = [];
   let changed = false;
 
@@ -237,7 +279,7 @@ function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>,
     );
 
     for (const { record: r, body } of opened) {
-      if (r.kind === 'device') continue; // device names: handled with pairing
+      if (r.kind === 'device') continue; // names, applied above
       const local: Child | LogEntry | undefined = r.kind === 'child' ? localChildren.get(r.id) : localLogs.get(r.id);
       // Our own upload coming back: already applied.
       if (local && r.deviceId === ownDeviceId && local.updatedAt === r.updatedAt) continue;
@@ -275,6 +317,34 @@ function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>,
 
   for (const uri of photos) deletePhoto(uri ?? undefined);
   return changed;
+}
+
+/** A sensible default name for this phone in the family's list, e.g. "Pixel 10". */
+export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? 'Phone';
+
+/** A phone's display name, as its encrypted `device` record (id = that phone's device id). */
+export type DeviceBody = { name: string };
+
+function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]) {
+  if (!records.length) return;
+  const names = { ...syncSettings()?.names };
+  for (const { record, body } of records) {
+    if (record.deleted) delete names[record.id];
+    else names[record.id] = (body as DeviceBody).name;
+  }
+  saveSync({ names });
+}
+
+/** Publishes a phone's name to the family (this phone's at setup, join and rename). */
+export async function pushDeviceName(name: string, deviceId?: string) {
+  const settings = syncSettings();
+  if (!settings) return;
+  const api = sessionFor(settings);
+  const { keys, epoch } = await refreshKeys(api);
+  const id = deviceId ?? settings.deviceId;
+  const meta = { id, kind: 'device' as const, updatedAt: Date.now(), deviceId: settings.deviceId, deleted: false };
+  await api.push([sealRecord(keys.get(epoch)!, epoch, meta, { name } satisfies DeviceBody)]);
+  await saveSync({ names: { ...settings.names, [id]: name } });
 }
 
 async function reloadStores() {

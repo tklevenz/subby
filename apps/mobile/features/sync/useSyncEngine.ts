@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
+import { router } from 'expo-router';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -28,6 +29,19 @@ export function useSyncEngine(ready: boolean) {
         if (!!s.sync !== !!prev.sync) (s.sync ? start() : closeLive());
       }),
     ];
+    // A phone this one didn't add showed up: say so once, after the sync that brought its name.
+    unsubs.push(
+      useSyncStore.subscribe((s) => {
+        if (s.phase !== 'idle' || !s.newDevices.length) return;
+        const names = useSettingsStore.getState().sync?.names ?? {};
+        const list = s.newDevices.map((id) => names[id] ?? 'a new phone').join(', ');
+        useSyncStore.setState({ newDevices: [] });
+        Alert.alert('New phone in your family', `${list} can now see and add entries. If nobody in your family added it, remove it.`, [
+          { text: 'OK' },
+          { text: 'Review phones', onPress: () => router.push('/sync') },
+        ]);
+      }),
+    );
     const appState = AppState.addEventListener('change', (state) => (state === 'active' ? start() : closeLive()));
     return () => {
       unsubs.forEach((u) => u());

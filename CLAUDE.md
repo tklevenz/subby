@@ -52,7 +52,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 
 ### `apps/mobile`
 - **Config:**
-  - `app.json`: plugins `expo-router`, `expo-sqlite`, `expo-secure-store`, datetimepicker.
+  - `app.json`: plugins `expo-router`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), datetimepicker.
   - `babel.config.js`: `babel-preset-expo` with `jsxImportSource: 'nativewind'`, `nativewind/babel`, and `inline-import` for `.sql`.
   - `metro.config.js`: `withNativeWind(... './global.css')`, plus `sql` in `sourceExts`.
   - pnpm note: `react-native-css-interop` must stay a direct dependency or Metro can't resolve the NativeWind JSX runtime.
@@ -69,7 +69,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`, `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
   - Note photos are deleted from disk when their entry is deleted or the photo is replaced (`features/photos.ts`).
   - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads on every `revision`. Use these for anything beyond the store's 30-day window: History day/week, Trends, Growth, Solids, Export, and all-time lookups such as allergens in `FoodPicker` and milestones done. `HAS_FOODS` filters feeds that have foods.
-  - `useChildStore` (`deleteChild` hard-deletes the child's logs, reminders and photos and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub), `useActiveChild`.
+  - `useChildStore` (`deleteChild` hard-deletes the child's logs, reminders and photos and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub; `set` updates memory before the DB write, so back-to-back read-modify-writes like `saveSync` don't lose each other's changes, and `null` deletes the row because `value` is NOT NULL), `useActiveChild`.
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
   - `app/(tabs)/`:
@@ -110,12 +110,15 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
   - `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
   - `engine.ts`:
-    - `setUpSync` creates the family; `turnOffSync` forgets this phone's keys.
+    - `setUpSync` creates the family; `turnOffSync` leaves the family (a self `remove` in the device log, best effort) and forgets this phone's keys.
+    - Every run verifies the device log (`refreshMembers`): `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
+    - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
     - Own echoes are skipped. A stale push re-pulls from 0.
     - The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
   - `useSyncEngine` (in `_layout`) triggers sync on start, on store changes (debounced), when the app comes to the foreground, and on live messages.
-  - Screen: `app/sync.tsx`, under Settings → Sync.
+  - `family.ts` (pairing): inviter `createInvite` → `inviteStatus` → `claimCode` (checks the claim's MAC) → `approveClaim` (signs the `add`, grants every epoch); joiner `claimInvite` → `joinStatus` → `finishJoin(join, 'merge' | 'replace')`. `removeDevice` signs a `remove`, rotates to a new epoch sealed to the remaining phones plus recovery, and tombstones the removed phone's name.
+  - Screens: `app/sync/index.tsx` (Settings → Sync: status, phones, rename, remove), `sync/add.tsx` (QR code, then compare the 6-digit code), `sync/join.tsx` (scan or paste, compare, then replace or merge local data; not route-guarded, so onboarding links to it). `components/QrCode.tsx` draws with `qrcode` + react-native-svg.
   - Every write already sets `syncStatus: 'pending'`. Keep it that way for anything new.
   - `deleteChild` now leaves scrubbed log tombstones (`{type}` payload) instead of hard-deleting, so deletes reach other phones.
 - **Utilities:** `store/timeHelpers.ts` (`useNow`, `useFormatTime`, `formatDayLabel`, ISO date helpers; re-exports the shared formatters).
@@ -184,4 +187,5 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-22: **Phase 6 started: SQLCipher encryption** (local dev build, no EAS).
 - 2026-10-22: **PROJECT.md Phase 2 (E2EE sync) started**: shared crypto/protocol (M1) and the sync server (M2) done. Phase 1.6 widgets etc. postponed.
 - 2026-10-23: **M3 mobile sync engine done**: verified on an emulator against the dev server (setup, auto-upload, delete tombstones; crypto runs on Hermes). Pulling from a second device gets its first device test in M4.
-- **Next:** M4, pairing a second phone by QR code (see the plan file).
+- 2026-10-23: **M4 pairing done**: verified with the Pixel (real data) and an emulator: QR invite (pasted), matching codes, replace-on-join downloading ~10.5k records in ~20 s, live sync both ways, rename, removal with key rotation (epoch 2 sealed only to the Pixel; the removed phone sees a "removed" screen).
+- **Next:** M5, the recovery key (see the plan file).

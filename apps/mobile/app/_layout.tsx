@@ -70,13 +70,15 @@ export default function RootLayout() {
           <Stack.Screen name="child/[id]/index" options={{ headerShown: false }} />
           <Stack.Screen name="child/[id]/edit" options={{ presentation: 'modal', headerShown: true, title: 'Edit' }} />
           <Stack.Screen name="reminders" options={{ headerShown: true, title: 'Reminders', headerBackTitle: 'Settings' }} />
-          <Stack.Screen name="sync" options={{ headerShown: true, title: 'Sync', headerBackTitle: 'Settings' }} />
+          <Stack.Screen name="sync/index" options={{ headerShown: true, title: 'Sync', headerBackTitle: 'Settings' }} />
+          <Stack.Screen name="sync/add" options={{ headerShown: true, title: 'Add a phone' }} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
-        {/* Reachable from onboarding too, so it isn't guarded. */}
+        {/* Reachable from onboarding too, so they aren't guarded. */}
         <Stack.Screen name="import/babybuddy" options={{ headerShown: true, title: 'Import' }} />
+        <Stack.Screen name="sync/join" options={{ headerShown: true, title: 'Join a family' }} />
       </Stack>
     </>
   );

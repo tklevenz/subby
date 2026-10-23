@@ -36,7 +36,15 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Kindred Log uses the camera to scan the code shown on another phone when you add it to your family.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

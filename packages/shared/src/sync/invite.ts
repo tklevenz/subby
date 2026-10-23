@@ -1,7 +1,7 @@
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { concatBytes, equalBytes, fromBase64, toBase64, utf8ToBytes } from '../crypto/bytes';
+import { bytesToJson, concatBytes, equalBytes, fromBase64, jsonToBytes, toBase64, utf8ToBytes } from '../crypto/bytes';
 import { randomBytes } from '../crypto/random';
 import { AUTH_CONTEXT } from './protocol';
 
@@ -41,11 +41,18 @@ export function checkClaimMac(secret: Uint8Array, claimant: { deviceId: string; 
   return equalBytes(expected, fromBase64(claimant.mac));
 }
 
-export const encodeInviteQr = (qr: InviteQr) => `kindred:${JSON.stringify(qr)}`;
+/** `kindred:` + base64url(JSON): URL-safe, so the same text works in a QR code or pasted by hand. */
+export const encodeInviteQr = (qr: InviteQr) => `kindred:${toBase64(jsonToBytes(qr))}`;
 
-export function decodeInviteQr(text: string): InviteQr {
+export function decodeInviteQr(input: string): InviteQr {
+  const text = input.trim();
   if (!text.startsWith('kindred:')) throw new Error('Not a Kindred Log code');
-  const qr = JSON.parse(text.slice('kindred:'.length)) as InviteQr;
+  let qr: InviteQr;
+  try {
+    qr = bytesToJson<InviteQr>(fromBase64(text.slice('kindred:'.length)));
+  } catch {
+    throw new Error('This code is damaged');
+  }
   if (qr.v !== 1 || !qr.s || !qr.i || !qr.k || !qr.d || !qr.p) throw new Error('Unsupported or damaged code');
   return qr;
 }
