@@ -6,6 +6,7 @@ import {
   newSymmetricKey,
   openSealed,
   pairingCode,
+  recoveryIdentity,
   seal,
   toBase64,
   verifyDeviceLog,
@@ -28,7 +29,7 @@ import { deleteAllPhotos } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { checkServer, SyncSession } from './api';
+import { checkServer, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { pushDeviceName, refreshKeys, refreshMembers, requestSync, saveSync, sessionFor, syncSettings } from './engine';
 
@@ -111,6 +112,60 @@ export async function removeDevice(deviceId: string) {
   requestSync(0);
 }
 
+// --- recovery key ----------------------------------------------------------------------------------------
+
+/**
+ * Makes `words` the family's recovery key (replacing any earlier one, whose words stop working) and seals
+ * every family key to it. Call only after the person has written the words down.
+ */
+export async function setRecoveryKey(words: string) {
+  const { settings, api, me } = member();
+  const recovery = recoveryIdentity(words);
+  const { entries, state } = await refreshMembers(api, settings);
+  const keys = { sign: recovery.sign.publicKey, box: recovery.box.publicKey };
+  const entry = appendEntry(state, entries.length, me, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys }, Date.now());
+  await api.request('POST', '/v1/families/me/log', { entry });
+  const { keys: familyKeys } = await refreshKeys(api);
+  const sealed = [...familyKeys].map(([epoch, key]) => ({ epoch, sealed: toBase64(seal(keys.box, key)) }));
+  await api.request('POST', '/v1/keys/grant', { recipient: RECOVERY_SIGNER, keys: sealed });
+  await refreshMembers(api, settings);
+}
+
+/**
+ * A phone with only the recovery words (every other phone lost): logs in as the recovery key, adds this
+ * phone to the family, hands it the family keys, then joins like a scanned invite.
+ */
+export async function recoverFamily(serverInput: string, words: string, local: 'merge' | 'replace', name: string) {
+  const server = normalizeServerUrl(serverInput);
+  await checkServer(server);
+  const recovery = recoveryIdentity(words);
+  const rec = new SyncSession(server, RECOVERY_SIGNER, recovery, true);
+  try {
+    await rec.login();
+  } catch (e) {
+    if (e instanceof SyncHttpError && e.status === 404) throw new Error("These words don't belong to a family on this server");
+    throw e;
+  }
+  const { entries } = await rec.log();
+  const state = verifyDeviceLog(entries);
+  if (!state.recovery || toBase64(state.recovery.signKey) !== toBase64(recovery.sign.publicKey)) {
+    throw new Error("The family's recovery key doesn't match these words");
+  }
+  const res = await rec.keys();
+  const familyKeys = res.keys.map((k) => ({ epoch: k.epoch, key: openSealed(recovery, fromBase64(k.sealed)) }));
+
+  const identity = deviceIdentity();
+  const deviceId = uuidv7();
+  const keys = { sign: identity.sign.publicKey, box: identity.box.publicKey };
+  const entry = appendEntry(state, entries.length, { id: RECOVERY_SIGNER, keys: recovery }, { type: 'add', deviceId, keys }, Date.now());
+  await rec.request('POST', '/v1/families/me/log', { entry });
+  await rec.request('POST', '/v1/keys/grant', {
+    recipient: deviceId,
+    keys: familyKeys.map((k) => ({ epoch: k.epoch, sealed: toBase64(seal(keys.box, k.key)) })),
+  });
+  await completeJoin(server, deviceId, () => {}, local, name);
+}
+
 // --- joining (the new phone) -----------------------------------------------------------------------------
 
 export type Join = { qr: InviteQr; deviceId: string; code: string };
@@ -162,14 +217,33 @@ export async function hasLocalData() {
  * Once approved: checks the device log (the inviting phone from the QR code must be in it, and so must
  * this one), takes the family keys, then either adds this phone's data to the family or replaces it.
  */
-export async function finishJoin(join: Join, local: 'merge' | 'replace', name: string) {
-  const session = new SyncSession(join.qr.s, join.deviceId, deviceIdentity());
+export function finishJoin(join: Join, local: 'merge' | 'replace', name: string) {
+  return completeJoin(
+    join.qr.s,
+    join.deviceId,
+    (state) => {
+      const inviter = state.members.get(join.qr.d);
+      if (!inviter || toBase64(inviter.signKey) !== join.qr.p) throw new Error("The family's phone list doesn't match the code. Try again.");
+    },
+    local,
+    name,
+  );
+}
+
+/** Logs in as the newly added phone, checks the device log, takes the keys and sets up local data. */
+async function completeJoin(
+  server: string,
+  deviceId: string,
+  check: (state: ReturnType<typeof verifyDeviceLog>) => void,
+  local: 'merge' | 'replace',
+  name: string,
+) {
+  const session = new SyncSession(server, deviceId, deviceIdentity());
   const { familyId } = await session.login();
   const { entries } = await session.log();
   const state = verifyDeviceLog(entries);
-  const inviter = state.members.get(join.qr.d);
-  if (!inviter || toBase64(inviter.signKey) !== join.qr.p) throw new Error("The family's phone list doesn't match the code. Try again.");
-  if (!state.members.has(join.deviceId)) throw new Error('This phone was not added to the family');
+  check(state);
+  if (!state.members.has(deviceId)) throw new Error('This phone was not added to the family');
 
   const res = await session.request<KeysResponse>('GET', '/v1/keys');
   const identity = deviceIdentity();
@@ -191,9 +265,9 @@ export async function finishJoin(join: Join, local: 'merge' | 'replace', name: s
   }
 
   await useSettingsStore.getState().set('sync', {
-    server: join.qr.s,
+    server,
     familyId,
-    deviceId: join.deviceId,
+    deviceId,
     lastSeq: 0,
     lastSyncedAt: null,
     knownDevices: [...state.members.keys()],

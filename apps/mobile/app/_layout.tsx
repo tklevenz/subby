@@ -72,6 +72,7 @@ export default function RootLayout() {
           <Stack.Screen name="reminders" options={{ headerShown: true, title: 'Reminders', headerBackTitle: 'Settings' }} />
           <Stack.Screen name="sync/index" options={{ headerShown: true, title: 'Sync', headerBackTitle: 'Settings' }} />
           <Stack.Screen name="sync/add" options={{ headerShown: true, title: 'Add a phone' }} />
+          <Stack.Screen name="sync/recovery" options={{ headerShown: true, title: 'Recovery key' }} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />
@@ -79,6 +80,7 @@ export default function RootLayout() {
         {/* Reachable from onboarding too, so they aren't guarded. */}
         <Stack.Screen name="import/babybuddy" options={{ headerShown: true, title: 'Import' }} />
         <Stack.Screen name="sync/join" options={{ headerShown: true, title: 'Join a family' }} />
+        <Stack.Screen name="sync/recover" options={{ headerShown: true, title: 'Recover' }} />
       </Stack>
     </>
   );

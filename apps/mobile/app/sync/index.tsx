@@ -122,8 +122,39 @@ function Status() {
       <Button label="Sync now" variant="ghost" onPress={() => syncNow().catch(() => {})} disabled={phase === 'syncing'} />
 
       <Phones />
+      <Recovery />
 
       <Button label="Turn off sync on this phone" variant="danger" onPress={confirmOff} />
+    </>
+  );
+}
+
+/** The recovery key: set or not, and a nudge when this phone is the only copy of the family's data. */
+function Recovery() {
+  const hasRecovery = useSyncStore((s) => s.hasRecovery);
+  const alone = useSyncStore((s) => s.members.length === 1);
+  const open = () => router.push('/sync/recovery');
+
+  return (
+    <>
+      <Text className="text-xs font-semibold text-ink-muted uppercase mt-8 mb-2 ml-1">Recovery key</Text>
+      {hasRecovery ? (
+        <>
+          <Card>
+            <Row label="Recovery key" value="Saved" onPress={open} />
+          </Card>
+          <Text className="text-ink-faint text-xs mt-2 ml-1">Lost the paper? Make new words; the old ones stop working.</Text>
+        </>
+      ) : (
+        <View className={`rounded-2xl px-4 py-4 border ${alone ? 'bg-violet/10 border-violet/40' : 'bg-surface border-line'}`}>
+          <Text className="text-ink text-[15px] leading-[22px]">
+            {alone
+              ? "Only this phone has your family's data. If it's lost, the data is gone, unless you have a recovery key."
+              : "If every phone in the family is lost, a recovery key is the only way to get the data back."}
+          </Text>
+          <Button label="Create a recovery key" variant={alone ? 'primary' : 'ghost'} onPress={open} />
+        </View>
+      )}
     </>
   );
 }

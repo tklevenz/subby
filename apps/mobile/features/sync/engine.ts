@@ -29,9 +29,11 @@ type SyncStatus = {
   newDevices: string[];
   /** Another phone removed this one from the family: it can only turn sync off. */
   removed: boolean;
+  /** Whether the family has a recovery key (from the verified device log). */
+  hasRecovery: boolean;
 };
 
-export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false }));
+export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false }));
 
 let session: SyncSession | null = null;
 export function sessionFor(s: SyncSettings) {
@@ -86,7 +88,7 @@ export async function turnOffSync() {
   session = null;
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
-  useSyncStore.setState({ phase: 'off', error: null, progress: null, members: [], newDevices: [], removed: false });
+  useSyncStore.setState({ phase: 'off', error: null, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false });
 }
 
 async function leaveFamily(settings: SyncSettings) {
@@ -177,6 +179,7 @@ export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
   if (added.length || ids.length !== known.size) await saveSync({ knownDevices: ids });
   useSyncStore.setState((s) => ({
     members: ids.map((id) => ({ id, isMe: id === settings.deviceId })),
+    hasRecovery: state.recovery !== null,
     newDevices: added.length ? [...s.newDevices, ...added] : s.newDevices,
   }));
   return { entries, state };

@@ -55,7 +55,8 @@ export const createFamily = (server: string, body: { familyId: string; entry: De
   call<{ familyId: string }>(server, 'POST', '/v1/families', body);
 
 /**
- * An authenticated session for one device. Logs in by signing a challenge, and logs in again once when
+ * An authenticated session for one device (or, with `asRecovery`, for the recovery key, which may only
+ * read the log and keys and enroll a phone). Logs in by signing a challenge, and logs in again once when
  * the token expired or was revoked.
  */
 export class SyncSession {
@@ -65,10 +66,12 @@ export class SyncSession {
     readonly server: string,
     readonly deviceId: string,
     private readonly identity: IdentityKeys,
+    private readonly asRecovery = false,
   ) {}
 
   async login(): Promise<VerifyResponse> {
-    const { challenge } = await call<ChallengeResponse>(this.server, 'POST', '/v1/auth/challenge', { deviceId: this.deviceId });
+    const who = this.asRecovery ? { recoverySignKey: toBase64(this.identity.sign.publicKey) } : { deviceId: this.deviceId };
+    const { challenge } = await call<ChallengeResponse>(this.server, 'POST', '/v1/auth/challenge', who);
     const res = await call<VerifyResponse>(this.server, 'POST', '/v1/auth/verify', {
       challenge,
       signature: toBase64(sign(this.identity, authMessage(challenge))),

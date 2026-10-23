@@ -148,6 +148,9 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
         <TextField value={pasted} onChangeText={setPasted} placeholder="kindred:…" autoCapitalize="none" autoCorrect={false} />
         <Button label="Use this code" variant="ghost" onPress={() => onCode(pasted)} disabled={!pasted.trim()} />
       </View>
+
+      <Text className="text-xs font-semibold text-ink-muted uppercase mt-10 mb-2 ml-1">No phone in the family left?</Text>
+      <Button label="Use a recovery key" variant="ghost" onPress={() => router.push('/sync/recover')} />
     </>
   );
 }
