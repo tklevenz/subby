@@ -83,8 +83,13 @@ export function planReminders(input: {
   settings: ReminderSettings;
   children: ReminderChild[];
   formatTime: (ms: number) => string;
+  /**
+   * Another phone may log a dose that this phone only learns about when the app opens (sync without push).
+   * Medication reminders then say to check first, so nobody gives a second dose by mistake.
+   */
+  checkBeforeDosing?: boolean;
 }): PlannedNotification[] {
-  const { now, settings, children, formatTime } = input;
+  const { now, settings, children, formatTime, checkBeforeDosing } = input;
   const out: PlannedNotification[] = [];
   if (!settings.enabled) return out;
   const add = (n: PlannedNotification) => {
@@ -147,7 +152,9 @@ export function planReminders(input: {
           id: `${REMINDER_ID_PREFIX}med:${c.id}:${m.name.trim().toLowerCase()}`,
           at: m.dueAt,
           title: `${m.name} due for ${c.name}`,
-          body: `Last dose at ${formatTime(m.lastAt)}.`,
+          body: checkBeforeDosing
+            ? `Last dose at ${formatTime(m.lastAt)}. Open the app first to check nobody else has given it.`
+            : `Last dose at ${formatTime(m.lastAt)}.`,
           childId: c.id,
         });
       }

@@ -85,6 +85,7 @@ export class FamiliesService {
       case 'remove':
         await tx.update(schema.devices).set({ active: false }).where(eq(schema.devices.id, entry.deviceId));
         await tx.delete(schema.sessions).where(eq(schema.sessions.deviceId, entry.deviceId));
+        await tx.delete(schema.pushTokens).where(eq(schema.pushTokens.deviceId, entry.deviceId));
         await tx
           .delete(schema.familyKeys)
           .where(and(eq(schema.familyKeys.familyId, familyId), eq(schema.familyKeys.recipient, entry.deviceId)));

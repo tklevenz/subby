@@ -78,6 +78,14 @@ export const blobs = pgTable(
   (t) => [index('blobs_family_record_idx').on(t.familyId, t.recordId)],
 );
 
+/** Hosted push: one Expo push token per device (removed with the device, or when the push service drops it). */
+export const pushTokens = pgTable('push_tokens', {
+  deviceId: uuid('device_id').primaryKey(),
+  familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  token: text('token').notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
+
 /** Encrypted records; the newest version per id (last writer wins), tombstones without data. */
 export const records = pgTable(
   'records',

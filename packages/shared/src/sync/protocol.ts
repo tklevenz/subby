@@ -127,6 +127,11 @@ export type PushResponse = { seq: number; accepted: string[]; stale: string[] };
 /** GET /v1/sync/pull?since=<seq>&limit=<n> */
 export type PullResponse = { records: (z.infer<typeof SyncRecordSchema> & { seq: number })[]; seq: number; more: boolean };
 
+// --- push (hosted) -------------------------------------------------------------------------------------
+
+/** PUT /v1/push/token: this phone's Expo push token. `GET /v1/info` says whether the server sends pushes. */
+export const RegisterPushSchema = z.object({ token: z.string().min(1).max(256) });
+
 // --- live (WebSocket /v1/live?token=) -----------------------------------------------------------------
 
 export type LiveMessage =

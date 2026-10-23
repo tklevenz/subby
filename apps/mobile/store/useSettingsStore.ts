@@ -30,6 +30,10 @@ export type SyncSettings = {
   names?: Record<string, string>;
   /** Devices this phone has already seen in the family, to point out new ones. */
   knownDevices?: string[];
+  /** Whether the server wakes this phone with push when others write (hosted Kindred Sync does). */
+  push?: boolean;
+  /** The Expo push token last registered with the server (re-registered when it changes). */
+  pushToken?: string;
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';

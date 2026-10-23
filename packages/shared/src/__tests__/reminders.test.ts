@@ -47,6 +47,13 @@ describe('planReminders', () => {
     expect(plan).toEqual([]);
   });
 
+  it('medication reminders say to check first when other phones sync without push', () => {
+    const med = (checkBeforeDosing?: boolean) =>
+      planReminders({ now, settings: all, children: [child], formatTime: fmt, checkBeforeDosing }).find((p) => p.id === 'kl:med:c1:ibuprofen')!.body;
+    expect(med()).toBe('Last dose at 10:00.');
+    expect(med(true)).toBe('Last dose at 10:00. Open the app first to check nobody else has given it.');
+  });
+
   it('the master switch pauses everything', () => {
     expect(planReminders({ now, settings: { ...all, enabled: false }, children: [child], formatTime: fmt })).toEqual([]);
   });

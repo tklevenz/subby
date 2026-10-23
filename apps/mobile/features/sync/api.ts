@@ -46,7 +46,7 @@ async function call<T>(server: string, method: string, path: string, body?: unkn
 
 /** Checks that a URL is a Kindred Sync server this app can talk to. */
 export async function checkServer(server: string) {
-  const info = await call<{ service?: string; protocol?: number; mode?: string }>(server, 'GET', '/v1/info');
+  const info = await call<{ service?: string; protocol?: number; mode?: string; push?: boolean }>(server, 'GET', '/v1/info');
   if (info.service !== 'kindred-sync') throw new Error('That address is not a Kindred Sync server');
   if (info.protocol !== 1) throw new Error('This server needs a newer version of the app');
   return info;

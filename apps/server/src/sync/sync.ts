@@ -9,6 +9,7 @@ import { lockFamily } from '../families/families.service';
 import { LiveBus } from '../live/live';
 import { Entitlements } from './entitlements';
 import { BlobsService } from '../blobs/blobs';
+import { PushService } from '../push/push';
 
 const PULL_LIMIT = 1000;
 
@@ -19,6 +20,7 @@ export class SyncService {
     @Inject(LiveBus) private readonly live: LiveBus,
     @Inject(Entitlements) private readonly entitlements: Entitlements,
     @Inject(BlobsService) private readonly blobs: BlobsService,
+    @Inject(PushService) private readonly pushes: PushService,
   ) {}
 
   /** Stores each record if it is newer than the server's copy; every accepted record gets the next seq. */
@@ -69,7 +71,10 @@ export class SyncService {
     });
 
     await this.blobs.deleteFiles(result.dropped);
-    if (result.accepted.length) this.live.publish(auth.familyId, { type: 'seq', seq: result.seq });
+    if (result.accepted.length) {
+      this.live.publish(auth.familyId, { type: 'seq', seq: result.seq });
+      this.pushes.changed(auth.familyId, auth.deviceId);
+    }
     return { seq: result.seq, accepted: result.accepted, stale: result.stale };
   }
 

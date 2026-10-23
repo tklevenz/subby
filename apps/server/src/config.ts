@@ -6,7 +6,18 @@ export type Config = {
   migrationsFolder: string;
   /** Where encrypted files (photos) go: a local folder, or S3-compatible object storage. */
   blobs: BlobStoreConfig;
+  /** Background "sync now" pings. On by default for hosted, off for self-hosted (no push credentials). */
+  push: { kind: 'none' } | { kind: 'expo'; url: string; accessToken?: string };
 };
+
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+function pushConfig(env: NodeJS.ProcessEnv, mode: Config['mode']): Config['push'] {
+  const kind = env.PUSH ?? (mode === 'hosted' ? 'expo' : 'none');
+  if (kind === 'none') return { kind };
+  if (kind !== 'expo') throw new Error(`PUSH must be "expo" or "none", got "${kind}"`);
+  return { kind, url: env.EXPO_PUSH_URL ?? EXPO_PUSH_URL, accessToken: env.EXPO_ACCESS_TOKEN };
+}
 
 export type BlobStoreConfig =
   | { kind: 'disk'; dir: string }
@@ -32,7 +43,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, migrationsFolder: string): Co
   const mode = env.MODE ?? 'self';
   if (mode !== 'self' && mode !== 'hosted') throw new Error(`MODE must be "self" or "hosted", got "${mode}"`);
   if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-  return { databaseUrl: env.DATABASE_URL, port: Number(env.PORT ?? 8787), mode, migrationsFolder, blobs: blobStoreConfig(env) };
+  return { databaseUrl: env.DATABASE_URL, port: Number(env.PORT ?? 8787), mode, migrationsFolder, blobs: blobStoreConfig(env), push: pushConfig(env, mode) };
 }
 
 export const CONFIG = Symbol('CONFIG');

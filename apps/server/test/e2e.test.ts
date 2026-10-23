@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newRecoveryWords, toBase64 } from '@kindred-log/shared/crypto';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
+import { PushService } from '../src/push/push';
 import { HttpError, TestClient } from './client';
 
 /**
@@ -46,7 +48,29 @@ describe.skipIf(!reachable)('sync server', () => {
   let url = '';
   let db: postgres.Sql;
 
+  /** A stand-in for the Expo push service: records messages; tokens containing "gone" are unregistered. */
+  const pushed: { to: string; data: unknown; title?: string; body?: string }[] = [];
+  let pushServer: Server;
+  let pushUrl = '';
+
   beforeAll(async () => {
+    pushServer = createServer((req, res) => {
+      let raw = '';
+      req.on('data', (c) => (raw += c));
+      req.on('end', () => {
+        const messages = JSON.parse(raw) as { to: string; data: unknown }[];
+        pushed.push(...messages);
+        res.setHeader('content-type', 'application/json');
+        res.end(
+          JSON.stringify({
+            data: messages.map((m) => (m.to.includes('gone') ? { status: 'error', details: { error: 'DeviceNotRegistered' } } : { status: 'ok', id: randomUUID() })),
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => pushServer.listen(0, '127.0.0.1', resolve));
+    const address = pushServer.address() as { port: number };
+    pushUrl = `http://127.0.0.1:${address.port}`;
     await admin.unsafe(`create database ${dbName}`);
     const dbUrl = ADMIN_URL.replace(/\/[^/]+$/, `/${dbName}`);
     db = postgres(dbUrl, { max: 1, onnotice: () => {} });
@@ -56,6 +80,7 @@ describe.skipIf(!reachable)('sync server', () => {
       mode: 'self',
       migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
       blobs: { kind: 'disk', dir: blobDir },
+      push: { kind: 'expo', url: `${pushUrl}/push/send` },
     });
     await app.listen({ port: 0, host: '127.0.0.1' });
     url = await app.getUrl();
@@ -63,6 +88,7 @@ describe.skipIf(!reachable)('sync server', () => {
   });
 
   afterAll(async () => {
+    pushServer?.close();
     await app?.close();
     await db?.end();
     await admin.unsafe(`drop database if exists ${dbName} with (force)`);
@@ -251,6 +277,51 @@ describe.skipIf(!reachable)('sync server', () => {
     await a.push([a.seal('child', randomUUID(), { name: 'Zebediah Plaintextson', notes: 'allergic to peanuts' })]);
     const dump = JSON.stringify(await db`select * from records`) + JSON.stringify(await db`select * from device_log`);
     expect(dump).not.toMatch(/Zebediah|Plaintextson|peanuts/);
+  });
+
+  describe('push', () => {
+    const register = (c: TestClient, token: string) => c.request('PUT', '/v1/push/token', { token });
+    const tokensOf = async (familyId: string) => (await db`select token from push_tokens where family_id = ${familyId}`).map((r) => r.token as string);
+
+    it('says whether it sends pushes', async () => {
+      expect(await new TestClient(url).request('GET', '/v1/info')).toMatchObject({ push: true });
+    });
+
+    it("wakes the family's other phones with a content-free ping after a write", async () => {
+      const { a, b } = await pairedFamily();
+      const tokenA = `ExponentPushToken[a-${randomUUID()}]`;
+      const tokenB = `ExponentPushToken[b-${randomUUID()}]`;
+      await register(a, tokenA);
+      await register(b, tokenB);
+      await a.push([a.seal('log', randomUUID(), { secret: 'Zebediah' })]);
+      await until(() => pushed.some((m) => m.to === tokenB), 5000);
+      const toB = pushed.filter((m) => m.to === tokenB);
+      expect(toB).toHaveLength(1);
+      expect(toB[0]).toMatchObject({ data: { kind: 'sync' } });
+      expect(toB[0]!.title).toBeUndefined();
+      expect(JSON.stringify(toB)).not.toMatch(/Zebediah/);
+      expect(pushed.some((m) => m.to === tokenA)).toBe(false); // the writer itself isn't woken
+    });
+
+    it('drops tokens the push service no longer knows, and those of removed phones', async () => {
+      const { a, b } = await pairedFamily();
+      await register(a, `ExponentPushToken[gone-${randomUUID()}]`);
+      await register(b, `ExponentPushToken[b-${randomUUID()}]`);
+      expect(await tokensOf(a.familyId)).toHaveLength(2);
+      await app.get(PushService).send(a.familyId, null);
+      expect(await tokensOf(a.familyId)).toHaveLength(1);
+      await a.removeDevice(b.deviceId);
+      expect(await tokensOf(a.familyId)).toHaveLength(0);
+    });
+
+    it('a phone can replace or remove its token', async () => {
+      const { a } = await pairedFamily();
+      await register(a, 'ExponentPushToken[one]');
+      await register(a, 'ExponentPushToken[two]');
+      expect(await tokensOf(a.familyId)).toEqual(['ExponentPushToken[two]']);
+      await a.request('DELETE', '/v1/push/token');
+      expect(await tokensOf(a.familyId)).toEqual([]);
+    });
   });
 
   describe('photos', () => {

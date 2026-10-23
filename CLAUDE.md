@@ -123,6 +123,10 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Own echoes are skipped. A stale push re-pulls from 0.
     - The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
   - `useSyncEngine` (in `_layout`) triggers sync on start, on store changes (debounced), when the app comes to the foreground, and on live messages.
+  - **Background** (`background.ts`, imported first by the entry `index.ts`, because headless launches render no screen): `backgroundSync` = `appReady()` (`features/startup.ts`, opens the DB once per runtime) + `syncNow` + `replanReminders`.
+    - Runs from an `expo-background-task` periodic task (everyone; at best every 15 min) and from an `expo-notifications` background task when a hosted server's "sync now" push arrives.
+    - `setUpBackgroundSync` (each foreground start) registers the tasks, stores whether the server pushes (`settings.sync.push`), and registers the Expo push token. The token needs an Expo project id (`extra.eas.projectId`); without one, registration is skipped.
+    - Without push and with other phones, medication reminders say to check the app first (`planReminders({ checkBeforeDosing })`).
   - `family.ts` (pairing): inviter `createInvite` → `inviteStatus` → `claimCode` (checks the claim's MAC) → `approveClaim` (signs the `add`, grants every epoch); joiner `claimInvite` → `joinStatus` → `finishJoin(join, 'merge' | 'replace')`. `removeDevice` signs a `remove`, rotates to a new epoch sealed to the remaining phones plus recovery, and tombstones the removed phone's name.
   - Recovery key (`family.ts`): `setRecoveryKey(words)` signs a `setRecovery` and grants every epoch to it (the server then drops the old recovery key's keys and sessions). `recoverFamily(server, words, local)` logs in as the recovery key (`SyncSession(..., asRecovery)`), checks the log's recovery key matches, signs this phone's `add`, grants it the keys, then finishes like a join (`completeJoin`).
   - Screens: `app/sync/index.tsx` (Settings → Sync: status, phones, rename, remove), `sync/add.tsx` (QR code, then compare the 6-digit code), `sync/join.tsx` (scan or paste, compare, then replace or merge local data; not route-guarded, so onboarding links to it), `sync/recovery.tsx` (show 24 words, type two back, only then register them; regenerating replaces the old words), `sync/recover.tsx` (server + words; linked from Join, not route-guarded). The Sync screen nudges a single-phone family without a recovery key (`useSyncStore.hasRecovery`). `components/QrCode.tsx` draws with `qrcode` + react-native-svg.
@@ -148,6 +152,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - New data must use the current epoch.
     - Records must be written as the calling device.
   - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
+  - `push/token` (PUT/DELETE): hosted only (`PUSH=expo`, the default for `MODE=hosted`; a self-hosted server ignores tokens). After accepted writes, `PushService` sends the family's other phones a data-only `{kind: 'sync'}` ping through the Expo push service (coalesced over 2 s). Tokens are dropped when the service says DeviceNotRegistered or when the device is removed. `/v1/info` reports `push`.
 - **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, and grant. They can't sync or rotate.
 - **Code conventions:**
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
@@ -166,6 +171,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - `android/` and `ios/` are generated (Continuous Native Generation) and gitignored. Never edit them: change `app.json` or a config plugin instead.
 - Build and install on a USB-connected phone or an emulator: `cd apps/mobile && pnpm android`. After native changes (new native package, `app.json` plugins), run `pnpm android:clean`.
 - Rebuild only for native changes; JS changes hot-reload as usual.
+- **Release builds** (`./gradlew assembleRelease`): Gradle runs the Expo CLI directly, without pnpm's `NODE_PATH`, so Babel resolves presets from `apps/mobile/node_modules`. That's why `babel-preset-expo` and `@babel/plugin-transform-react-jsx` (named by NativeWind's preset) are direct devDependencies; keep them.
+- **Background tasks don't run headless in dev-client builds** (the headless runtime can't load the bundle from Metro). Test them in a release build. Release builds block `http://`, so test against an https server, or temporarily allow cleartext in the generated manifest.
 - Toolchain (Android): JDK 17, Android SDK 36, build-tools 36.0.0, NDK 27.1.12297006 (Gradle fetches the NDK). `JAVA_HOME` and `ANDROID_HOME` must be set.
 
 ### Commands
@@ -198,4 +205,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-23: **M4 pairing done**: verified with the Pixel (real data) and an emulator: QR invite (pasted), matching codes, replace-on-join downloading ~10.5k records in ~20 s, live sync both ways, rename, removal with key rotation (epoch 2 sealed only to the Pixel; the removed phone sees a "removed" screen).
 - 2026-10-23: **M5 recovery key done**: verified on the emulator: create (with the two-word check), wipe the app, recover from onboarding → Join → Use a recovery key, then remove the lost phone (the new epoch is sealed to the recovered phone and the recovery key).
 - 2026-10-23: **M6 photo sync done**: server e2e covers upload/download, replacement and tombstone cleanup, the sweep and access control; the S3 store was checked against an S3 mock. On the emulator: a child photo uploads encrypted (only ciphertext on disk), comes back after wipe + recovery, and removing it deletes it on the server.
-- **Next:** M7, background sync and push (see the plan file).
+- 2026-10-23: **M7 background sync and push done**:
+  - Periodic background sync verified headless on the emulator with a release build: app process killed, WorkManager started it without UI, the task logged in, synced and re-queued itself.
+  - Push is covered by server e2e tests against a fake Expo push service. A real device push still needs an Expo project id plus FCM/APNs credentials (not set up).
+- **Next:** M8, open source and hosting readiness (see the plan file).

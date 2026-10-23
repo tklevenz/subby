@@ -18,7 +18,7 @@ import { fetchLogs } from '../../store/queries';
 import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
-import { useSettingsStore } from '../../store/useSettingsStore';
+import { useSettingsStore, type Settings } from '../../store/useSettingsStore';
 
 const CHANNEL = 'reminders';
 const DAY = 86_400_000;
@@ -110,7 +110,7 @@ async function reminderChild(id: string, name: string, now: number): Promise<Rem
 /** Replace our scheduled notifications with the current plan. */
 async function sync() {
   if (!Notifications) return;
-  const { reminders, clock } = useSettingsStore.getState();
+  const { reminders, clock, sync: syncSettings } = useSettingsStore.getState();
   const anyEnabled = activeReminderCount(reminders) > 0;
   const scheduled = (await Notifications.getAllScheduledNotificationsAsync()).filter((n) =>
     n.identifier.startsWith(REMINDER_ID_PREFIX),
@@ -124,6 +124,7 @@ async function sync() {
           settings: reminders,
           children: await Promise.all(useChildStore.getState().children.map((c) => reminderChild(c.id, c.name, now))),
           formatTime: (ms) => formatTimeShort(ms, clock),
+          checkBeforeDosing: sharedWithoutPush(syncSettings),
         })
       : [];
 
@@ -142,7 +143,17 @@ async function sync() {
   }
 }
 
+/** Other phones log too, but this one only hears about it when the app opens (no push on this server). */
+const sharedWithoutPush = (s: Settings['sync']) => Boolean(s && !s.push && (s.knownDevices?.length ?? 1) > 1);
+
 let running: Promise<void> = Promise.resolve();
+
+/** Re-plans now and resolves when done (background tasks, which may be stopped right after). */
+export function replanReminders(): Promise<void> {
+  clearTimeout(timer);
+  running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e));
+  return running;
+}
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 /** Debounced, serialized re-plan. Call after anything that could move a reminder. */
@@ -178,7 +189,11 @@ export function useReminderSync(ready: boolean) {
     const unsubs = [
       useLogStore.subscribe((s, prev) => s.revision !== prev.revision && scheduleReminderSync()),
       useChildStore.subscribe((s, prev) => s.children !== prev.children && scheduleReminderSync()),
-      useSettingsStore.subscribe((s, prev) => (s.reminders !== prev.reminders || s.clock !== prev.clock) && scheduleReminderSync(0)),
+      useSettingsStore.subscribe(
+        (s, prev) =>
+          (s.reminders !== prev.reminders || s.clock !== prev.clock || sharedWithoutPush(s.sync) !== sharedWithoutPush(prev.sync)) &&
+          scheduleReminderSync(0),
+      ),
     ];
     const appState = AppState.addEventListener('change', (state) => state === 'active' && scheduleReminderSync());
     const tap = Notifications.addNotificationResponseReceivedListener(async (res) => {

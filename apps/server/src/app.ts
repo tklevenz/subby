@@ -18,6 +18,7 @@ import { Entitlements } from './sync/entitlements';
 import { LiveBus, LiveGateway } from './live/live';
 import { BlobsController, BlobsService } from './blobs/blobs';
 import { BLOB_STORE, openBlobStore } from './blobs/store';
+import { PushController, PushService } from './push/push';
 import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
@@ -29,7 +30,7 @@ class InfoController {
 
   @Get('info')
   info() {
-    return { service: 'kindred-sync', protocol: PROTOCOL_VERSION, mode: this.config.mode };
+    return { service: 'kindred-sync', protocol: PROTOCOL_VERSION, mode: this.config.mode, push: this.config.push.kind !== 'none' };
   }
 }
 
@@ -38,12 +39,13 @@ class AppModule {
   static with(config: Config, db: unknown): DynamicModule {
     return {
       module: AppModule,
-      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController],
+      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController, PushController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: DB, useValue: db },
         { provide: BLOB_STORE, useValue: openBlobStore(config.blobs) },
         BlobsService,
+        PushService,
         AuthService,
         DeviceGuard,
         DeviceOrRecoveryGuard,

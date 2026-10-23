@@ -3,9 +3,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { initDatabase } from '../db/client';
+import { appReady } from '../features/startup';
 import { useChildStore } from '../store/useChildStore';
-import { useSettingsStore } from '../store/useSettingsStore';
 import { useLogStore } from '../store/useLogStore';
 import { useActiveChild } from '../store/useActiveChild';
 import { useReminderSync } from '../features/reminders/scheduler';
@@ -21,11 +20,9 @@ export default function RootLayout() {
   const loadLogs = useLogStore((s) => s.loadLogs);
 
   useEffect(() => {
-    (async () => {
-      await initDatabase();
-      await Promise.all([useSettingsStore.getState().hydrate(), useChildStore.getState().hydrate()]);
-      setReady(true);
-    })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+    appReady()
+      .then(() => setReady(true))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
   useReminderSync(ready);

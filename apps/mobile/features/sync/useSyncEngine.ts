@@ -5,6 +5,7 @@ import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { closeLive, openLive, pendingCount, requestSync, useSyncStore } from './engine';
+import { setUpBackgroundSync, stopBackgroundSync } from './background';
 
 /**
  * Keeps this phone in sync while the app runs: on start, on every local write (debounced), when the app
@@ -19,6 +20,7 @@ export function useSyncEngine(ready: boolean) {
       pendingCount().then((pending) => useSyncStore.setState({ pending }));
       requestSync(0);
       openLive();
+      setUpBackgroundSync().catch((e: unknown) => console.warn('Background sync setup failed', e));
     };
     start();
     const unsubs = [
@@ -26,7 +28,12 @@ export function useSyncEngine(ready: boolean) {
       useChildStore.subscribe((s, prev) => s.children !== prev.children && requestSync()),
       // Set up or turned off on the Sync screen.
       useSettingsStore.subscribe((s, prev) => {
-        if (!!s.sync !== !!prev.sync) (s.sync ? start() : closeLive());
+        if (!!s.sync === !!prev.sync) return;
+        if (s.sync) start();
+        else {
+          closeLive();
+          stopBackgroundSync().catch(() => {});
+        }
       }),
     ];
     // A phone this one didn't add showed up: say so once, after the sync that brought its name.
