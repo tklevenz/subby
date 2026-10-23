@@ -9,6 +9,7 @@ import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useCanAddChild, useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useSyncStore } from '../../features/sync/engine';
 import { Card, Row, Segmented } from '../../components/ui';
 import { colors } from '../../theme/colors';
 
@@ -57,6 +58,9 @@ export default function SettingsScreen() {
   const reminderCount = activeReminderCount(reminders);
   const setSetting = useSettingsStore((s) => s.set);
   const chevron = <AngleRight color={colors.inkGhost} size={16} />;
+  const sync = useSettingsStore((s) => s.sync);
+  const syncPhase = useSyncStore((s) => s.phase);
+  const syncLabel = !sync ? 'Off' : syncPhase === 'error' ? "Couldn't sync" : syncPhase === 'syncing' ? 'Syncing…' : 'On';
 
   return (
     <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
@@ -87,6 +91,11 @@ export default function SettingsScreen() {
           subtitleAccent
         />
       </ScrollView>
+
+      <SectionTitle>Sync</SectionTitle>
+      <Card>
+        <Row label="Sync between phones" value={syncLabel} onPress={() => router.push('/sync')} right={chevron} />
+      </Card>
 
       <SectionTitle>Notifications</SectionTitle>
       <Card>

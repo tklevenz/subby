@@ -186,3 +186,29 @@ describe('file encryption', () => {
 // Derived once from the zero-entropy words; must never change, or existing recovery keys stop working.
 const SIGN_VECTOR = '1d5cfc1df788fb56134d66d69577b102085e334f0c16c1903ac14ccd61bc11a8';
 const BOX_VECTOR = 'db681b557fa30bbc15ad52eea85575d4d062f1452fa4c36d4a6acc5cf304b821';
+
+describe('u64', () => {
+  it('encodes big-endian across the 32-bit boundary', async () => {
+    const { u64 } = await import('../crypto');
+    for (const n of [0, 1, 2 ** 32 - 1, 2 ** 32, 1_760_000_000_000, Number.MAX_SAFE_INTEGER]) {
+      const view = new DataView(u64(n).buffer);
+      expect(view.getBigUint64(0)).toBe(BigInt(n));
+    }
+  });
+});
+
+describe('utf8 fallback (no TextDecoder, as on Hermes)', () => {
+  it('decodes like TextDecoder', async () => {
+    const { bytesToUtf8, utf8ToBytes } = await import('../crypto');
+    const original = globalThis.TextDecoder;
+    const text = 'Sam · 120 ml · Brei 🥕 – ÄÖÜ ß 日本';
+    try {
+      // @ts-expect-error simulate an engine without TextDecoder
+      delete globalThis.TextDecoder;
+      expect(bytesToUtf8(utf8ToBytes(text))).toBe(text);
+      expect(() => bytesToUtf8(new Uint8Array([0xc3]))).toThrow();
+    } finally {
+      globalThis.TextDecoder = original;
+    }
+  });
+});

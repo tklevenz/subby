@@ -9,6 +9,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useLogStore } from '../store/useLogStore';
 import { useActiveChild } from '../store/useActiveChild';
 import { useReminderSync } from '../features/reminders/scheduler';
+import { useSyncEngine } from '../features/sync/useSyncEngine';
 import { colors } from '../theme/colors';
 
 
@@ -28,6 +29,7 @@ export default function RootLayout() {
   }, []);
 
   useReminderSync(ready);
+  useSyncEngine(ready);
 
   useEffect(() => {
     if (activeChild) loadLogs(activeChild.id);
@@ -68,6 +70,7 @@ export default function RootLayout() {
           <Stack.Screen name="child/[id]/index" options={{ headerShown: false }} />
           <Stack.Screen name="child/[id]/edit" options={{ presentation: 'modal', headerShown: true, title: 'Edit' }} />
           <Stack.Screen name="reminders" options={{ headerShown: true, title: 'Reminders', headerBackTitle: 'Settings' }} />
+          <Stack.Screen name="sync" options={{ headerShown: true, title: 'Sync', headerBackTitle: 'Settings' }} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />

@@ -105,6 +105,19 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `importer.ts`: `previewImport` (counts, children, unit detection) and `runImport` (one transaction per page, `onConflictDoNothing` on `import_ref`, so re-runs only add new records and never overwrite local edits).
   - The API key is never persisted. Only `settings.bbUrl` is remembered.
   - Opt-in tests that hit real data (kept outside the repo): `BB_DUMP=<all.json> pnpm --filter @kindred-log/shared test`, `BB_URL=… BB_TOKEN=… npx vitest run client` in `apps/mobile`.
+- **Sync (`features/sync/`, the client of `apps/server`):**
+  - `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore. It installs `expo-crypto` as the shared crypto's random source on import.
+  - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
+  - `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
+  - `engine.ts`:
+    - `setUpSync` creates the family; `turnOffSync` forgets this phone's keys.
+    - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
+    - Own echoes are skipped. A stale push re-pulls from 0.
+    - The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
+  - `useSyncEngine` (in `_layout`) triggers sync on start, on store changes (debounced), when the app comes to the foreground, and on live messages.
+  - Screen: `app/sync.tsx`, under Settings → Sync.
+  - Every write already sets `syncStatus: 'pending'`. Keep it that way for anything new.
+  - `deleteChild` now leaves scrubbed log tombstones (`{type}` payload) instead of hard-deleting, so deletes reach other phones.
 - **Utilities:** `store/timeHelpers.ts` (`useNow`, `useFormatTime`, `formatDayLabel`, ISO date helpers; re-exports the shared formatters).
 - **UX rule:** 2-tap maximum for common logs (sleep: 1 tap on its tile; diaper: tile + type; feed: tile + sheet).
 - **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.
@@ -170,4 +183,5 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-22: Home C / profile D redesign, theme-ready palette, Font Awesome icons.
 - 2026-10-22: **Phase 6 started: SQLCipher encryption** (local dev build, no EAS).
 - 2026-10-22: **PROJECT.md Phase 2 (E2EE sync) started**: shared crypto/protocol (M1) and the sync server (M2) done. Phase 1.6 widgets etc. postponed.
-- **Next:** M3, the mobile sync engine (see the plan file).
+- 2026-10-23: **M3 mobile sync engine done**: verified on an emulator against the dev server (setup, auto-upload, delete tombstones; crypto runs on Hermes). Pulling from a second device gets its first device test in M4.
+- **Next:** M4, pairing a second phone by QR code (see the plan file).

@@ -14,6 +14,17 @@ export type Settings = {
   bbUrl: string | null;
   /** Home tile pinned to the top, per child id (default sleep). Set by long-pressing a tile. */
   homeTop: Record<string, HomeTile>;
+  /** Device-local sync state; null until sync is set up. Keys live in the keychain (features/sync/keystore). */
+  sync: SyncSettings | null;
+};
+
+export type SyncSettings = {
+  server: string;
+  familyId: string;
+  deviceId: string;
+  /** Last server sequence number pulled. */
+  lastSeq: number;
+  lastSyncedAt: number | null;
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';
@@ -26,6 +37,7 @@ const DEFAULTS: Settings = {
   isPremium: false,
   bbUrl: null,
   homeTop: {},
+  sync: null,
 };
 
 interface SettingsState extends Settings {

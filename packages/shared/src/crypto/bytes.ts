@@ -35,15 +35,39 @@ export function fromBase64(text: string): Uint8Array {
   return out;
 }
 
-export const bytesToUtf8 = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
+/** UTF-8 decode. Hermes (React Native) has TextEncoder but not always TextDecoder, so there's a fallback. */
+export function bytesToUtf8(bytes: Uint8Array): string {
+  if (typeof TextDecoder !== 'undefined') return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  let out = '';
+  for (let i = 0; i < bytes.length; ) {
+    const b = bytes[i++];
+    let cp: number;
+    if (b < 0x80) cp = b;
+    else if (b >= 0xc2 && b < 0xe0) cp = ((b & 0x1f) << 6) | cont(bytes, i++);
+    else if (b >= 0xe0 && b < 0xf0) cp = ((b & 0x0f) << 12) | (cont(bytes, i++) << 6) | cont(bytes, i++);
+    else if (b >= 0xf0 && b < 0xf5) cp = ((b & 0x07) << 18) | (cont(bytes, i++) << 12) | (cont(bytes, i++) << 6) | cont(bytes, i++);
+    else throw new Error('Invalid UTF-8');
+    out += String.fromCodePoint(cp);
+  }
+  return out;
+}
+
+function cont(bytes: Uint8Array, i: number): number {
+  const b = bytes[i];
+  if (b === undefined || (b & 0xc0) !== 0x80) throw new Error('Invalid UTF-8');
+  return b & 0x3f;
+}
 export const jsonToBytes = (value: unknown) => utf8ToBytes(JSON.stringify(value));
 export const bytesToJson = <T>(bytes: Uint8Array): T => JSON.parse(bytesToUtf8(bytes)) as T;
 
 /** Big-endian u64 (safe-integer range), used in nonces and signed messages. */
 export function u64(n: number): Uint8Array {
   if (!Number.isSafeInteger(n) || n < 0) throw new Error('u64 out of range');
+  // High/low 32-bit halves instead of setBigUint64, which not every JS engine (Hermes) has.
   const out = new Uint8Array(8);
-  new DataView(out.buffer).setBigUint64(0, BigInt(n));
+  const view = new DataView(out.buffer);
+  view.setUint32(0, Math.floor(n / 2 ** 32));
+  view.setUint32(4, n >>> 0);
   return out;
 }
 

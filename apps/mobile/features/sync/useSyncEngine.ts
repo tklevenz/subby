@@ -1,0 +1,38 @@
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { useChildStore } from '../../store/useChildStore';
+import { useLogStore } from '../../store/useLogStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { closeLive, openLive, pendingCount, requestSync, useSyncStore } from './engine';
+
+/**
+ * Keeps this phone in sync while the app runs: on start, on every local write (debounced), when the app
+ * comes to the foreground, and on live notifications from the server while it's open.
+ */
+export function useSyncEngine(ready: boolean) {
+  useEffect(() => {
+    if (!ready) return;
+    const start = () => {
+      if (!useSettingsStore.getState().sync) return;
+      useSyncStore.setState((s) => (s.phase === 'off' ? { phase: 'idle' } : s));
+      pendingCount().then((pending) => useSyncStore.setState({ pending }));
+      requestSync(0);
+      openLive();
+    };
+    start();
+    const unsubs = [
+      useLogStore.subscribe((s, prev) => s.revision !== prev.revision && requestSync()),
+      useChildStore.subscribe((s, prev) => s.children !== prev.children && requestSync()),
+      // Set up or turned off on the Sync screen.
+      useSettingsStore.subscribe((s, prev) => {
+        if (!!s.sync !== !!prev.sync) (s.sync ? start() : closeLive());
+      }),
+    ];
+    const appState = AppState.addEventListener('change', (state) => (state === 'active' ? start() : closeLive()));
+    return () => {
+      unsubs.forEach((u) => u());
+      appState.remove();
+      closeLive();
+    };
+  }, [ready]);
+}

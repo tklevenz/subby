@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { and, asc, count, eq, min, notInArray } from 'drizzle-orm';
+import { and, asc, count, eq, min, notInArray, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogPayload, LogType } from '@kindred-log/shared';
 import { db, schema } from '../db/client';
@@ -15,9 +15,9 @@ interface ChildState {
   addChild: (input: ChildInput) => Promise<Child>;
   updateChild: (id: string, patch: Partial<ChildInput>) => Promise<void>;
   /**
-   * Permanently delete a child and everything logged for them. The child row stays as a
-   * scrubbed tombstone (so a future sync can propagate the delete); logs, reminders and
-   * photos are removed outright.
+   * Permanently delete a child and everything logged for them. The child and its logs stay as
+   * scrubbed tombstones (id and type only, so sync can delete them on other phones too);
+   * reminders and photos are removed outright.
    */
   deleteChild: (id: string) => Promise<void>;
 }
@@ -123,11 +123,15 @@ export const useChildStore = create<ChildState>((set, get) => ({
       .where(and(eq(schema.logsTable.childId, id), eq(schema.logsTable.logType, 'note')));
 
     db.transaction((tx) => {
-      tx.delete(schema.logsTable).where(eq(schema.logsTable.childId, id)).run();
+      const now = Date.now();
+      tx.update(schema.logsTable)
+        .set({ isDeleted: true, payload: sql`json_object('type', ${schema.logsTable.logType})`, importRef: null, updatedAt: now, syncStatus: 'pending' })
+        .where(eq(schema.logsTable.childId, id))
+        .run();
       tx.delete(schema.remindersTable).where(eq(schema.remindersTable.childId, id)).run();
       // Scrub personal data; importRef is cleared so a later re-import starts fresh.
       tx.update(schema.childrenTable)
-        .set({ name: '', birthDate: '', birthTime: null, dueDate: null, sex: null, photoUri: null, importRef: null, isDeleted: true, updatedAt: Date.now(), syncStatus: 'pending' })
+        .set({ name: '', birthDate: '', birthTime: null, dueDate: null, sex: null, photoUri: null, importRef: null, isDeleted: true, updatedAt: now, syncStatus: 'pending' })
         .where(eq(schema.childrenTable.id, id))
         .run();
     });
