@@ -164,6 +164,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `pnpm serve:dev`: needs `.env`, copied from `.env.example`. Deliberately not named `dev`, so the root `pnpm run dev` still only starts the app.
   - `pnpm build`: esbuild bundles the shared package; npm dependencies stay external.
   - Schema changes: edit `src/db/schema.ts`, then run `pnpm db:generate`. Migrations run at startup.
+- **Docker / self-hosting** (`apps/server/README.md`):
+  - `Dockerfile` builds from the repo root (`.dockerignore` keeps only the app's `package.json`).
+  - The runtime stage installs only the server's npm dependencies, pinned from `pnpm list`. Don't use `pnpm deploy`: drizzle-orm's optional peers, shared with the app in the lockfile, pull in React Native (over 1 GB).
+  - `docker-compose.yml` runs server + Postgres, with an optional `https` profile (Caddy, `DOMAIN`). Settings go in `docker.env.example` → `.env`.
+  - Verified locally: the full client flow against the container (pair, sync, photo, live).
 - **Tests:** `test/e2e.test.ts` runs the real server on a throwaway database. `test/client.ts` is a full simulated app (pairing, sync, removal + rotation, recovery) and the reference for the mobile sync engine. The tests are skipped, with a warning, when the dev Postgres isn't running.
 
 ### Native builds (local, no EAS)

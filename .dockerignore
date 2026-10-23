@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.expo
+.git
+**/.env
+**/.env.*
+!**/.env.example
+apps/server/data
+# The app isn't part of the server image; only its manifest is needed for the lockfile.
+apps/mobile/*
+!apps/mobile/package.json
