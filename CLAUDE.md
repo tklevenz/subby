@@ -45,6 +45,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `stats` (`dailyStats` per-day totals, splitting sleep across midnight; `averageStats` over tracked days; `sleepSegments`; `solidsReport`; DST-safe `addDays`/`dayRange`).
   - `growth`: WHO LMS z-scores/percentiles (0–24 months, from the birth date; corrected age for preterm babies was dropped on purpose, and `dueDate` is stored but unused), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
   - `prediction`: on-device nap prediction. Age norms (`ageNorms`), plus `sleepHabits` (the last 7 days; night sleep logged in pieces is merged into one night), `predictNextSleep` (put-down window plus `napMinutes`, the expected nap length) and `suggestedSchedule`. Heuristic, verified against the real Baby Buddy history.
+  - `timeline`: `dayTimeline` (History's Day: entries newest first, a sleep running into the day from the evening before, wake windows of a minute or more between sleeps, today's current one first).
   - `summary` also has `overlappingSleep` (a sleep may not overlap another; running ones last until stopped). The log sheet and the edit screen block overlaps via `apps/mobile/features/sleepOverlap.ts` (a week of sleeps from SQLite plus the loaded ones).
   - `reminders`: `planReminders` (pure) turns `ReminderSettings` + per-child state into the notifications to schedule (stable `kl:` ids).
   - `story`: `childStory` builds a child's story of firsts (milestones, measurements, first solid food, birth), newest first. No counts or completion: we don't gamify childcare.
@@ -78,7 +79,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - Tapping the sleep tile (start or wake up) offers Undo for 5 s; a running sleep has a Discard button (with a confirmation). Accidental taps on the big tile are easy.
       - Tapping a tile's time opens its entry (running, or the last one). The tile's action is a full-size `Pressable` underneath, with the content on top passing taps through (`pointerEvents`); buttons nested inside a `Pressable` don't reliably get their own taps on Android.
       - The header: the avatar opens the child's profile, the name switches child (`ChildSwitcher`).
-    - `history`: List, Day (24 h lanes) and Week (sleep pattern + totals) views.
+    - `history`: Day and Week. Day (`components/history/DayLog`) is the day as a timeline, newest first: times on a rail, sleeps as thick spans, the wake windows between sleeps (`dayTimeline` in shared), plus the day's totals; arrows move by day; tapping the date opens `datetime/CalendarSheet` (month grid, Monday first, a dot on days with entries, swipe or arrows between months; `monthGrid` in `datetime/parts.ts`), and "Back to today" returns. Week is the sleep pattern + totals; tapping a day opens it in Day.
     - `trends`: 7/14/30-day averages and charts.
     - `settings`: includes a `__DEV__`-only Premium stub toggle.
   - `app/schedule.tsx` (next sleep + suggested day; linked from Home's "Sleep schedule" row), `app/reminders.tsx`.
@@ -94,8 +95,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Settings shows children as an avatar strip linking to their profiles. App-wide settings stay in Settings.
   - `app/import/babybuddy.tsx`: import wizard (connect → review children/units → progress → summary). Not route-guarded, so onboarding can link to it.
 - **Components:**
-  - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `DayTimeline`, `WeekPattern`, `GrowthChart`.
-  - `ChildSwitcher` (avatar, switch child, open a profile), `ActiveTimers`, `LogTimeline` (day-grouped, History) / `LogRow` (tap to open; delete only from the entry screen).
+  - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `WeekPattern`, `GrowthChart`.
+  - `ChildSwitcher` (avatar, switch child, open a profile), `ActiveTimers`. Entries open from History or the Home tiles; delete only from the entry screen.
   - `ChildAvatar`: the photo, or the child's initial on a per-child color. `PhotoMenu`: take/choose/remove; it runs the picker only after its modal has dismissed (iOS).
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
   - `icons/`: all icons are Font Awesome 6 Free **solid**, drawn with `react-native-svg` (no icon font, no Lucide). `faPaths.ts` is generated from `@fortawesome/fontawesome-free/svgs/solid` (don't edit by hand); add an icon by adding its name there and a `make('<name>')` export in `index.tsx`. `PoopDroplet` (poop with a masked-out droplet) is the diaper icon. The CC BY 4.0 credit is at the bottom of Settings; keep it.

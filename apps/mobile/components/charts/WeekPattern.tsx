@@ -2,10 +2,15 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { addDays, formatHoursMinutes, sleepSegments, type DayStats, type LogEntry } from '@kindred-log/shared';
 import { TYPE_META } from '../logTypes';
-import { hourLabel } from './DayTimeline';
 import { colors } from '../../theme/colors';
 
 const ROW_H = 22;
+
+function hourLabel(h: number, clock: '12h' | '24h') {
+  if (clock === '24h') return String(h % 24).padStart(2, '0');
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh}${h % 24 < 12 ? 'a' : 'p'}`;
+}
 
 /**
  * Sleep pattern: one row per day across 24 h (like Baby Buddy / Huckleberry), sleep as

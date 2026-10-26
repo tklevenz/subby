@@ -1,29 +1,27 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AngleLeft, AngleRight } from '../../components/icons';
+import { AngleDown, AngleLeft, AngleRight } from '../../components/icons';
+import CalendarSheet from '../../components/datetime/CalendarSheet';
 import { addDays, dailyStats, dayRange, formatHoursMinutes, formatVolume, startOfDay, type DayStats } from '@kindred-log/shared';
-import LogTimeline from '../../components/LogTimeline';
-import DayTimeline from '../../components/charts/DayTimeline';
+import { DayLog, DayTotals } from '../../components/history/DayLog';
 import WeekPattern from '../../components/charts/WeekPattern';
 import { Segmented } from '../../components/ui';
 import { useLogQuery } from '../../store/queries';
-import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { formatDayLabel, useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
 
-type Mode = 'list' | 'day' | 'week';
+type Mode = 'day' | 'week';
 const MODES = [
-  { value: 'list', label: 'List' },
   { value: 'day', label: 'Day' },
   { value: 'week', label: 'Week' },
 ] as const;
 
+/** History: one day as a timeline (with wake windows), or a week of sleep patterns and totals. */
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
-  const loadOlder = useLogStore((s) => s.loadOlder);
-  const [mode, setMode] = useState<Mode>('list');
+  const [mode, setMode] = useState<Mode>('day');
   const [anchor, setAnchor] = useState(() => startOfDay(Date.now()));
 
   return (
@@ -32,19 +30,15 @@ export default function HistoryScreen() {
         <Text className="text-xl font-bold text-ink">History</Text>
         <Segmented options={MODES} value={mode} onChange={setMode} />
       </View>
-      {mode === 'list' ? (
-        <LogTimeline onEndReached={loadOlder} />
-      ) : (
-        <Calendar
-          mode={mode}
-          anchor={anchor}
-          setAnchor={setAnchor}
-          openDay={(day) => {
-            setAnchor(day);
-            setMode('day');
-          }}
-        />
-      )}
+      <Calendar
+        mode={mode}
+        anchor={anchor}
+        setAnchor={setAnchor}
+        openDay={(day) => {
+          setAnchor(day);
+          setMode('day');
+        }}
+      />
     </View>
   );
 }
@@ -66,21 +60,43 @@ function Calendar({
   const today = startOfDay(now);
   const span = mode === 'day' ? 1 : 7;
   const days = useMemo(() => dayRange(anchor, span), [anchor, span]);
-  const logs = useLogQuery({ from: days[0], to: addDays(anchor, 1) });
+  // A day also reads the two before it: last night's sleep and the sleep before the first wake window.
+  const logs = useLogQuery({ from: addDays(days[0]!, mode === 'day' ? -2 : 0), to: addDays(anchor, 1) });
   const stats = useMemo(() => (logs ? dailyStats(logs, days, now) : null), [logs, days, now]);
+  const [picking, setPicking] = useState(false);
 
-  const title =
-    mode === 'day'
-      ? formatDayLabel(anchor, now)
-      : `${new Date(days[0]).toLocaleDateString([], { day: 'numeric', month: 'short' })} – ${new Date(anchor).toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
+  const short = (ms: number) => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  const title = mode === 'day' ? formatDayLabel(anchor, now) : `${short(days[0]!)} – ${short(anchor)}`;
+  // Under "Today" or "Yesterday", the date itself.
+  const subtitle =
+    mode === 'day' && anchor >= addDays(today, -1)
+      ? new Date(anchor).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })
+      : null;
 
   return (
     <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
       <View className="flex-row items-center justify-between my-2">
         <NavButton icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -span))} />
-        <Pressable onPress={() => setAnchor(today)} disabled={anchor === today}>
-          <Text className="text-ink font-semibold text-base">{title}</Text>
-        </Pressable>
+        <View className="items-center">
+          {/* The date opens a month calendar to jump to any day. */}
+          <Pressable
+            onPress={() => setPicking(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`${title}, pick a day`}
+            className="flex-row items-center"
+          >
+            <Text className="text-ink font-semibold text-base">{title}</Text>
+            <AngleDown color={colors.inkFaint} size={12} style={{ marginLeft: 6 }} />
+          </Pressable>
+          {anchor === today ? (
+            subtitle ? <Text className="text-ink-muted text-xs">{subtitle}</Text> : null
+          ) : (
+            <Pressable onPress={() => setAnchor(today)} hitSlop={8}>
+              <Text className="text-violet-soft text-xs font-semibold">Back to today</Text>
+            </Pressable>
+          )}
+        </View>
         <NavButton
           icon={<AngleRight color={anchor >= today ? colors.lineStrong : colors.inkSoft} size={20} />}
           disabled={anchor >= today}
@@ -90,13 +106,10 @@ function Calendar({
 
       {!logs || !stats ? null : mode === 'day' ? (
         <>
-          <Totals stats={stats[0]} units={units} />
-          <View className="mt-4">
-            <DayTimeline logs={logs} day={anchor} now={now} clock={clock} />
+          <DayTotals stats={stats[0]!} units={units} />
+          <View className="mt-2.5">
+            <DayLog logs={logs} day={anchor} now={now} />
           </View>
-          {!stats[0].tracked && stats[0].sleepMs === 0 ? (
-            <Text className="text-ink-faint text-center mt-4">Nothing logged this day.</Text>
-          ) : null}
         </>
       ) : (
         <>
@@ -104,6 +117,16 @@ function Calendar({
           <WeekTable stats={stats} units={units} />
         </>
       )}
+      {picking ? (
+        <CalendarSheet
+          value={anchor}
+          onClose={() => setPicking(false)}
+          onPick={(day) => {
+            setPicking(false);
+            setAnchor(day);
+          }}
+        />
+      ) : null}
     </ScrollView>
   );
 }
@@ -113,25 +136,6 @@ function NavButton({ icon, onPress, disabled }: { icon: React.ReactNode; onPress
     <Pressable onPress={onPress} disabled={disabled} hitSlop={10} className="w-9 h-9 rounded-full bg-surface items-center justify-center">
       {icon}
     </Pressable>
-  );
-}
-
-function Totals({ stats, units }: { stats: DayStats; units: 'metric' | 'imperial' }) {
-  const items = [
-    { label: 'Sleep', value: formatHoursMinutes(stats.sleepMs), sub: stats.naps ? `${stats.naps} nap${stats.naps === 1 ? '' : 's'}` : undefined },
-    { label: 'Feeds', value: String(stats.feeds), sub: stats.bottleMl ? formatVolume(stats.bottleMl, units) : stats.breastSec ? formatHoursMinutes(stats.breastSec * 1000) : undefined },
-    { label: 'Diapers', value: String(stats.diapers), sub: stats.diapers ? `${stats.wet} wet · ${stats.dirty} dirty` : undefined },
-  ];
-  return (
-    <View className="flex-row gap-2">
-      {items.map((i) => (
-        <View key={i.label} className="flex-1 bg-surface border border-line rounded-xl p-3">
-          <Text className="text-ink-muted text-xs">{i.label}</Text>
-          <Text className="text-ink text-lg font-semibold">{i.value}</Text>
-          {i.sub ? <Text className="text-ink-faint text-[11px]" numberOfLines={1}>{i.sub}</Text> : null}
-        </View>
-      ))}
-    </View>
   );
 }
 

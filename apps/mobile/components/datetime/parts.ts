@@ -34,3 +34,15 @@ export const to12 = (hour: number) => ({ hour12: hour % 12 === 0 ? 12 : hour % 1
 export const from12 = (hour12: number, pm: boolean) => (hour12 % 12) + (pm ? 12 : 0);
 
 export const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+
+/**
+ * A month as calendar weeks starting on Monday: local midnights, null for the padding before the 1st and
+ * after the last day.
+ */
+export function monthGrid(year: number, month: number): (number | null)[][] {
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7; // Monday = 0
+  const cells: (number | null)[] = Array.from({ length: lead }, () => null);
+  for (let d = 1; d <= daysInMonth(year, month); d++) cells.push(new Date(year, month, d).getTime());
+  while (cells.length % 7) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, w) => cells.slice(w * 7, w * 7 + 7));
+}

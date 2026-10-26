@@ -14,3 +14,4 @@ export * from './domain/csv';
 export * from './domain/prediction';
 export * from './domain/reminders';
 export * from './domain/story';
+export * from './domain/timeline';

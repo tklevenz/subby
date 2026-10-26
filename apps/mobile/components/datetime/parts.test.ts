@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayOptions, daysInMonth, from12, joinTime, splitTime, to12 } from './parts';
+import { dayOptions, daysInMonth, from12, joinTime, monthGrid, splitTime, to12 } from './parts';
 
 const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m, d, h, min).getTime();
 
@@ -39,5 +39,15 @@ describe('date wheel parts', () => {
 
   it('knows month lengths', () => {
     expect([daysInMonth(2024, 1), daysInMonth(2026, 1), daysInMonth(2026, 3)]).toEqual([29, 28, 30]);
+  });
+
+  it('lays a month out in Monday-first weeks', () => {
+    const oct = monthGrid(2026, 9); // Oct 1, 2026 is a Thursday
+    expect(oct[0]!.slice(0, 3)).toEqual([null, null, null]);
+    expect(oct[0]![3]).toBe(at(2026, 9, 1));
+    expect(oct.every((w) => w.length === 7)).toBe(true);
+    expect(oct.flat().filter((d) => d !== null)).toHaveLength(31);
+    expect(oct.flat().filter((d) => d !== null).every((d) => new Date(d!).getHours() === 0)).toBe(true);
+    expect(monthGrid(2026, 1)[0]![6]).toBe(at(2026, 1, 1)); // Feb 1, 2026 is a Sunday
   });
 });
