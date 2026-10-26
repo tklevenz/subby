@@ -42,6 +42,8 @@ type TileContent = {
   onPress: () => void;
   /** A running timer started by mistake: delete it (asks first). */
   onDiscard?: () => void;
+  /** The entry the time refers to (running, or the last one); tapping the time opens it. */
+  entryId?: string;
 };
 
 /** A tap on a big tile can be taken back for a few seconds: the tile is easy to hit by accident. */
@@ -139,6 +141,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       lines: [],
       hint: 'Tap to wake up',
       active: true,
+      entryId: sleeping.id,
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const slept = formatHoursMinutes(Date.now() - sleeping.startedAt);
@@ -164,6 +167,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       value: wakeAt !== null ? formatHoursMinutes(now - wakeAt) : '–',
       lines: wakeAt !== null ? lines : ['No sleep logged yet'],
       hint: 'Tap to start sleep',
+      entryId: logs.find((l) => l.logType === 'sleep' && l.endedAt !== null)?.id,
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Daytime sleeps default to naps; editable afterwards.
@@ -185,6 +189,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       lines: [describeFeed(runningFeed.payload)],
       hint: 'Tap for sides',
       active: true,
+      entryId: runningFeed.id,
       onPress: () => open({ kind: 'feed', tab: 'breast' }),
     };
   } else if (lastFeed?.payload.type === 'feed') {
@@ -193,6 +198,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       value: s.value,
       lines: [s.first, ...(side ? [`Breast next: ${side === 'left' ? 'Left' : 'Right'}`] : [])],
       hint: 'Tap to log a feed',
+      entryId: lastFeed.id,
       onPress: () => open({ kind: 'feed' }),
     };
   } else {
@@ -205,7 +211,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   let diaper: TileContent;
   if (lastDiaper) {
     const s = since(lastDiaper.startedAt, describeDiaper(lastDiaper.payload));
-    diaper = { value: s.value, lines: [s.first, `${today} today`], hint: 'Tap to log a change', onPress: diaperPress };
+    diaper = { value: s.value, lines: [s.first, `${today} today`], hint: 'Tap to log a change', entryId: lastDiaper.id, onPress: diaperPress };
   } else {
     diaper = { value: '–', lines: ['No changes yet'], hint: 'Tap to log a change', onPress: diaperPress };
   }
@@ -222,44 +228,59 @@ const STYLE: Record<HomeTile, { box: string; boxActive: string; label: string; i
 
 function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: TileContent; large?: boolean; onLongPress: () => void }) {
   const s = STYLE[tile];
+  // The tile's action is a full-size button underneath; the content on top lets taps through to it, except for
+  // the time (opens its entry) and Discard. Buttons nested inside a button don't reliably get their own taps.
   return (
-    <Pressable
-      onPress={content.onPress}
-      onLongPress={onLongPress}
-      delayLongPress={400}
-      accessibilityRole="button"
-      accessibilityLabel={`${LABEL[tile]}: ${[content.eyebrow, content.value, ...content.lines].filter(Boolean).join(', ')}`}
-      accessibilityHint={`${content.hint}. Long-press to make this the top tile.`}
-      className={`flex-1 border justify-between ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}
-    >
-      <View className="flex-row items-center justify-between">
+    <View className={`flex-1 border justify-between ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}>
+      <Pressable
+        onPress={content.onPress}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        accessibilityRole="button"
+        accessibilityLabel={`${LABEL[tile]}: ${[content.eyebrow, content.value, ...content.lines].filter(Boolean).join(', ')}`}
+        accessibilityHint={`${content.hint}. Long-press to make this the top tile.`}
+        className="absolute inset-0 rounded-3xl"
+      />
+      <View pointerEvents="none" className="flex-row items-center justify-between">
         <View className="flex-row items-center">
           <s.Icon color={s.icon()} size={20} />
           <Text className={`text-sm font-semibold ml-2 ${s.label}`}>{LABEL[tile]}</Text>
         </View>
         {large ? <Text className="text-ink-muted text-xs">{content.hint}</Text> : null}
       </View>
-      <View>
-        {content.eyebrow ? (
-          <Text className={`text-[13px] font-medium ${tile === 'sleep' && !content.active ? 'text-amber-pale/80' : 'text-ink-muted'}`}>
-            {content.eyebrow}
-          </Text>
-        ) : null}
-        <Text
-          className={`text-ink font-bold ${large ? 'text-[44px] leading-[48px]' : 'text-[28px] leading-8'}`}
-          style={{ fontVariant: ['tabular-nums'] }}
-          numberOfLines={1}
-          adjustsFontSizeToFit
+      <View pointerEvents="box-none">
+        {/* The time opens its entry (the running or last one). */}
+        <Pressable
+          onPress={content.entryId ? () => router.push(`/entry/${content.entryId}`) : undefined}
+          // Nothing to open yet ("No feeds yet"): taps go through to the tile.
+          pointerEvents={content.entryId ? 'auto' : 'none'}
+          hitSlop={8}
+          accessibilityRole={content.entryId ? 'link' : undefined}
+          accessibilityLabel={content.entryId ? `Open this ${LABEL[tile].toLowerCase()} entry` : undefined}
+          className="self-start"
         >
-          {content.value}
-        </Text>
-        {content.lines.map((line) => (
-          <Text key={line} className="text-ink-muted text-xs mt-0.5" numberOfLines={large ? 2 : 1}>
-            {line}
+          {content.eyebrow ? (
+            <Text className={`text-[13px] font-medium ${tile === 'sleep' && !content.active ? 'text-amber-pale/80' : 'text-ink-muted'}`}>
+              {content.eyebrow}
+            </Text>
+          ) : null}
+          <Text
+            className={`text-ink font-bold ${large ? 'text-[44px] leading-[48px]' : 'text-[28px] leading-8'}`}
+            style={{ fontVariant: ['tabular-nums'] }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {content.value}
           </Text>
-        ))}
+        </Pressable>
+        <View pointerEvents="none">
+          {content.lines.map((line) => (
+            <Text key={line} className="text-ink-muted text-xs mt-0.5" numberOfLines={large ? 2 : 1}>
+              {line}
+            </Text>
+          ))}
+        </View>
       </View>
-      {/* Last, so it's on top of the text block and gets its own taps. */}
       {content.onDiscard ? (
         <Pressable
           onPress={content.onDiscard}
@@ -272,7 +293,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           <Text className="text-ink-muted text-xs ml-1.5">Discard</Text>
         </Pressable>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 

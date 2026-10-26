@@ -70,7 +70,8 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           <FieldLabel>Ended</FieldLabel>
           {running ? (
             <View className="flex-row items-center gap-3">
-              <Text className="text-violet-soft">Still running</Text>
+              {/* mt-4 matches the Button's own top margin, so both sit on one line. */}
+              <Text className="text-violet-soft mt-4">Still running</Text>
               <Button label="Stop now" variant="ghost" onPress={() => setEndedAt(Date.now())} />
             </View>
           ) : (

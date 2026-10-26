@@ -76,8 +76,9 @@ export default function LogSheet({
     onClose();
   };
 
+  // A timer from the chosen start time (now unless changed), e.g. for a nap that began a few minutes ago.
   const start = async () => {
-    await startTimer(payload);
+    await startTimer(payload, startedAt);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
   };
@@ -119,7 +120,7 @@ export default function LogSheet({
 
       <Button label="Save" onPress={save} disabled={!complete || invalidEnd} />
       {timed ? (
-        <Button label="Start timer now" variant="ghost" onPress={start} disabled={!complete} />
+        <Button label="Start timer" variant="ghost" onPress={start} disabled={!complete} />
       ) : null}
     </>
   );
