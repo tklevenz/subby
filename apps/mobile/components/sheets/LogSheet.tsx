@@ -3,14 +3,15 @@ import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@kindred-log/shared';
 import { useLogStore } from '../../store/useLogStore';
+import { useSleepOverlap } from '../../features/sleepOverlap';
 import DateTimeField from '../DateTimeField';
 import { PayloadEditor } from '../editors';
 import { TagsField } from '../editors/fields';
 import { defaultPayload } from '../logTypes';
 import { Button, FieldLabel, TextField } from '../ui';
 
-/** Types logged with a start and an end here (default length in minutes), and startable as a live timer. */
-const DURATION_TYPES: Partial<Record<LogType, number>> = { sleep: 60, pumping: 15, activity: 10 };
+/** Types logged with a start and an end here, or started as a live timer from the chosen start. */
+const TIMED: readonly LogType[] = ['sleep', 'pumping', 'activity'];
 
 /** Common fields shared by the log sheet and the edit screen. */
 export function CommonFields({ payload, onChange }: { payload: LogPayload; onChange: (p: Partial<LogPayload>) => void }) {
@@ -46,21 +47,23 @@ export default function LogSheet({
 }) {
   const addLog = useLogStore((s) => s.addLog);
   const startTimer = useLogStore((s) => s.startTimer);
-  const defaultDuration = DURATION_TYPES[type];
+  const timed = TIMED.includes(type);
   // Past breastfeed: default to having started 15 min ago so its end isn't in the future.
   const pastBreastfeed = type === 'feed' && initial !== undefined && 'method' in initial && initial.method === 'breast';
-  const startOffsetMin = defaultDuration ?? (pastBreastfeed ? 15 : 0);
+  const startOffsetMin = pastBreastfeed ? 15 : 0;
 
   const [payload, setPayload] = useState<LogPayload>(() => ({ ...defaultPayload(type), ...initial }) as LogPayload);
-  // Timed types default to "just finished": start = now − the usual length, end = now.
+  // Timed types start now with no end: "Start timer" runs from the start; logging a past one needs an end.
   const [startedAt, setStartedAt] = useState(() => Date.now() - startOffsetMin * 60_000);
-  // null: still going (saved as a running timer from the start time).
-  const [end, setEnd] = useState<number | null>(() => Date.now());
+  const [end, setEnd] = useState<number | null>(null);
 
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
   const complete = isCompletePayload(payload);
-  const timed = defaultDuration !== undefined;
   const invalidEnd = timed && end !== null && end <= startedAt;
+  // The same time can't be two sleeps: checked for what Save would log and for a timer from the start.
+  const isSleep = type === 'sleep';
+  const saveOverlap = useSleepOverlap(isSleep && end !== null, startedAt, end);
+  const timerOverlap = useSleepOverlap(isSleep, startedAt, null);
 
   const endedAt = (() => {
     if (timed) return end;
@@ -85,31 +88,27 @@ export default function LogSheet({
 
   return (
     <>
-      <FieldLabel>{timed ? 'Start' : startOffsetMin ? 'Started' : 'Time'}</FieldLabel>
+      <FieldLabel>{timed ? 'Start' : pastBreastfeed ? 'Started' : 'Time'}</FieldLabel>
       <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} title={timed ? 'Start time' : 'Time'} />
 
       {timed ? (
         <>
           <FieldLabel>End</FieldLabel>
           <View className="flex-row items-center gap-3">
+            <DateTimeField value={end} onChange={setEnd} maximumDate={new Date()} title="End time" placeholder="Set end time" />
             {end !== null ? (
-              <DateTimeField value={end} onChange={setEnd} maximumDate={new Date()} title="End time" />
-            ) : (
-              <Text className="text-violet-soft text-base py-3">Still going</Text>
-            )}
-            <Pressable
-              onPress={() => setEnd(end === null ? Date.now() : null)}
-              className="rounded-full border border-line-strong px-3 py-2"
-              hitSlop={6}
-            >
-              <Text className="text-ink-muted text-sm">{end === null ? 'Set end' : 'Still going'}</Text>
-            </Pressable>
+              <Pressable onPress={() => setEnd(null)} className="rounded-full border border-line-strong px-3 py-2" hitSlop={6}>
+                <Text className="text-ink-muted text-sm">Clear</Text>
+              </Pressable>
+            ) : null}
           </View>
           {invalidEnd ? (
             <Text className="text-red-strong mt-2">End must be after start.</Text>
+          ) : (end !== null ? saveOverlap : timerOverlap) ? (
+            <Text className="text-red-strong mt-2">{end !== null ? saveOverlap : timerOverlap}</Text>
           ) : (
             <Text className="text-ink-muted text-sm mt-2">
-              {end === null ? 'Saved as running, like a timer started then.' : formatHoursMinutes(end - startedAt)}
+              {end === null ? 'Set an end time to log a past one, or start a timer.' : formatHoursMinutes(end - startedAt)}
             </Text>
           )}
         </>
@@ -118,9 +117,9 @@ export default function LogSheet({
       <PayloadEditor payload={payload} onChange={patch} />
       <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={!complete || invalidEnd} />
+      <Button label="Save" onPress={save} disabled={!complete || (timed && (end === null || invalidEnd || saveOverlap !== null))} />
       {timed ? (
-        <Button label="Start timer" variant="ghost" onPress={start} disabled={!complete} />
+        <Button label="Start timer" variant="ghost" onPress={start} disabled={!complete || timerOverlap !== null} />
       ) : null}
     </>
   );

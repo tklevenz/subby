@@ -8,6 +8,7 @@ import { CommonFields } from '../../components/sheets/LogSheet';
 import { TYPE_META, activityLabel } from '../../components/logTypes';
 import { Button, FieldLabel } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
+import { useSleepOverlap } from '../../features/sleepOverlap';
 import { colors } from '../../theme/colors';
 
 /** Edit/backdate any log entry, including ones older than the loaded window. */
@@ -33,6 +34,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const timed = TIMED_LOG_TYPES.includes(entry.logType);
   const running = timed && endedAt === null;
   const invalid = endedAt !== null && endedAt < startedAt;
+  const overlap = useSleepOverlap(entry.logType === 'sleep', startedAt, endedAt, entry.id);
 
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
 
@@ -78,6 +80,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
             <DateTimeField value={endedAt!} onChange={setEndedAt} title="End time" />
           )}
           {invalid ? <Text className="text-red-strong mt-2">End must be after start.</Text> : null}
+          {!invalid && overlap ? <Text className="text-red-strong mt-2">{overlap}</Text> : null}
         </>
       ) : null}
 
@@ -85,7 +88,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
 
       <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={invalid || !isCompletePayload(payload)} />
+      <Button label="Save" onPress={save} disabled={invalid || overlap !== null || !isCompletePayload(payload)} />
       <Button label="Delete" variant="danger" onPress={confirmDelete} />
     </ScrollView>
   );

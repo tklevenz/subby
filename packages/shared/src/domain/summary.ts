@@ -26,6 +26,18 @@ export function activeSleep(logs: LogEntry[]): EntryOf<'sleep'> | undefined {
   return logs.find((l): l is EntryOf<'sleep'> => isType('sleep')(l) && l.endedAt === null);
 }
 
+/**
+ * A sleep overlapping [start, end) (end null: still going), so the same time isn't logged as two sleeps.
+ * Running sleeps last until stopped. `excludeId` skips the entry being edited. Touching ends don't overlap.
+ */
+export function overlappingSleep(logs: LogEntry[], start: number, end: number | null, excludeId?: string): EntryOf<'sleep'> | undefined {
+  const until = end ?? Infinity;
+  return logs.find(
+    (l): l is EntryOf<'sleep'> =>
+      isType('sleep')(l) && !l.isDeleted && l.id !== excludeId && l.startedAt < until && (l.endedAt ?? Infinity) > start,
+  );
+}
+
 /** When the current wake window started: end of the most recent finished sleep. */
 export function lastWakeAt(logs: LogEntry[]): number | null {
   const ended = logs.find((l) => l.logType === 'sleep' && l.endedAt !== null);

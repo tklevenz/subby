@@ -20,13 +20,16 @@ export default function DateTimeField({
   mode = 'datetime',
   maximumDate,
   title,
+  placeholder,
 }: {
-  value: number;
+  /** null: not set yet; the field shows `placeholder` and the wheels open at now. */
+  value: number | null;
   onChange: (ms: number) => void;
   mode?: 'datetime' | 'date';
   maximumDate?: Date;
   /** Sheet heading, e.g. "Start time". */
   title?: string;
+  placeholder?: string;
 }) {
   const formatTime = useFormatTime();
   const [open, setOpen] = useState(false);
@@ -34,16 +37,20 @@ export default function DateTimeField({
   return (
     <>
       <Pressable onPress={() => setOpen(true)} className="bg-raised border border-line-strong rounded-xl px-4 py-3 self-start">
-        <Text className="text-ink text-base">
-          {mode === 'date'
-            ? new Date(value).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
-            : `${formatDayLabel(value)} · ${formatTime(value)}`}
-        </Text>
+        {value === null ? (
+          <Text className="text-ink-muted text-base">{placeholder ?? 'Set time'}</Text>
+        ) : (
+          <Text className="text-ink text-base">
+            {mode === 'date'
+              ? new Date(value).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
+              : `${formatDayLabel(value)} · ${formatTime(value)}`}
+          </Text>
+        )}
       </Pressable>
       {open ? (
         <WheelSheet
           title={title ?? (mode === 'date' ? 'Date' : 'Time')}
-          value={value}
+          value={value ?? Math.min(Date.now(), maximumDate?.getTime() ?? Infinity)}
           mode={mode}
           max={maximumDate?.getTime()}
           onCancel={() => setOpen(false)}
