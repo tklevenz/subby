@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flaggedFoods, medicationsDue, recentFoods, recentMedications } from '../domain/recent';
+import { flaggedFoods, medicationsDue, recentFoods, recentMedications, recentShortcuts } from '../domain/recent';
 import { MILESTONES } from '../domain/milestones';
 import { desc, entry } from './fixtures';
 
@@ -26,5 +26,32 @@ describe('recent values', () => {
 
   it('has unique milestone keys', () => {
     expect(new Set(MILESTONES.map((m) => m.key)).size).toBe(MILESTONES.length);
+  });
+});
+
+describe('recentShortcuts', () => {
+  const at = (h: number) => h * H;
+  it('falls back to Pump, Meds, Tummy without history', () => {
+    expect(recentShortcuts([])).toEqual(['pumping', 'medication', 'tummy']);
+  });
+
+  it('puts the most recently logged categories first, skipping the big three and duplicates', () => {
+    const logs = [
+      entry({ type: 'growth', weightG: 9000 }, at(1)),
+      entry({ type: 'sleep' }, at(5), at(6)),
+      entry({ type: 'temperature', celsius: 37.2 }, at(4)),
+      entry({ type: 'growth', weightG: 9100 }, at(3)),
+      entry({ type: 'diaper', condition: 'wet' }, at(7)),
+    ];
+    expect(recentShortcuts(logs)).toEqual(['temperature', 'growth', 'pumping']);
+  });
+
+  it('tells tummy time apart from other activities', () => {
+    const logs = [
+      entry({ type: 'activity', kind: 'bath' }, at(3), at(3)),
+      entry({ type: 'activity', kind: 'tummy_time' }, at(2), at(2)),
+      entry({ type: 'note', text: 'hi' }, at(1)),
+    ];
+    expect(recentShortcuts(logs)).toEqual(['activity', 'tummy', 'note']);
   });
 });

@@ -8,6 +8,28 @@ import type { SyncSession } from './api';
 import { needsPhotoUpload } from './records';
 
 /**
+ * Photo references point at blobs on one server, for one family. A phone starting or joining another family
+ * (a new server, or setting sync up again) forgets them, so its photos upload to the new family. With
+ * `onlyLocal`, only rows whose photo file is on this phone are touched (they're the ones it can re-upload).
+ */
+export async function forgetPhotoUploads({ onlyLocal = false } = {}) {
+  await db
+    .update(schema.childrenTable)
+    .set({ photoBlob: null })
+    .where(onlyLocal ? isNotNull(schema.childrenTable.photoUri) : isNotNull(schema.childrenTable.photoBlob));
+  await db
+    .update(schema.logsTable)
+    .set({ payload: sql`json_remove(${schema.logsTable.payload}, '$.photoBlob')` })
+    .where(
+      and(
+        eq(schema.logsTable.logType, 'note'),
+        sql`json_extract(${schema.logsTable.payload}, '$.photoBlob') is not null`,
+        ...(onlyLocal ? [sql`json_extract(${schema.logsTable.payload}, '$.photoUri') is not null`] : []),
+      ),
+    );
+}
+
+/**
  * Photos that never went up: added before photo sync existed, on rows already synced. They are queued as an
  * edit (a newer version, or the server would ignore it as already known), so the next push uploads them.
  */

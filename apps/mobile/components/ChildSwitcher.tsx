@@ -10,7 +10,7 @@ import { useActiveChild } from '../store/useActiveChild';
 import ChildAvatar from './ChildAvatar';
 import { colors } from '../theme/colors';
 
-/** Header showing the active child; tap to switch child, open a profile or add a child. */
+/** Header showing the active child: the avatar opens their profile; the name switches child or adds one. */
 export default function ChildSwitcher() {
   const children = useChildStore((s) => s.children);
   const setSetting = useSettingsStore((s) => s.set);
@@ -26,16 +26,25 @@ export default function ChildSwitcher() {
 
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} className="flex-row items-center mb-4" hitSlop={8}>
-        {active ? <ChildAvatar child={active} size={40} /> : null}
-        <View className="ml-3">
+      <View className="flex-row items-center mb-4">
+        {active ? (
+          <Pressable
+            onPress={() => router.push(`/child/${active.id}`)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`${active.name}'s profile`}
+          >
+            <ChildAvatar child={active} size={40} />
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => setOpen(true)} hitSlop={8} className="ml-3" accessibilityRole="button" accessibilityLabel="Switch child">
           <View className="flex-row items-center">
             <Text className="text-xl font-bold text-ink">{active?.name ?? 'Kindred Log'}</Text>
             <AngleDown color={colors.inkFaint} size={16} style={{ marginLeft: 4 }} />
           </View>
           {active ? <Text className="text-[13px] text-ink-muted">{formatAge(active.birthDate, Date.now())}</Text> : null}
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable className="flex-1 bg-scrim/60 justify-center px-8" onPress={() => setOpen(false)}>

@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
-import { Baby, BottleWater, ChildReaching, Flag, Moon, PenToSquare, Pills, PoopDroplet, RulerVertical, TemperatureHalf, Toilet, type IconComponent } from './icons';
-import type { LogPayload, LogType } from '@kindred-log/shared';
+import { Baby, BottleWater, ChildReaching, Flag, Moon, PenToSquare, Pills, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent } from './icons';
+import { LOG_TYPES, type LogPayload, type LogType, type ShortcutKey } from '@kindred-log/shared';
+import type { SheetRequest } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
 
 export type LogTypeMeta = {
@@ -20,10 +21,32 @@ export const TYPE_META: Record<LogType, LogTypeMeta> = {
   temperature: { label: 'Temperature', Icon: TemperatureHalf, get color() { return colors.redSoft; }, bg: 'border-red/40 bg-red/10' },
   medication: { label: 'Medication', Icon: Pills, get color() { return colors.blueSoft; }, bg: 'border-blue/40 bg-blue/10' },
   potty: { label: 'Potty', Icon: Toilet, get color() { return colors.amberPale; }, bg: 'border-yellow/40 bg-yellow/10' },
-  activity: { label: 'Activity', Icon: ChildReaching, get color() { return colors.tealSoft; }, bg: 'border-teal/40 bg-teal/10' },
+  activity: { label: 'Activity', Icon: Shapes, get color() { return colors.tealSoft; }, bg: 'border-teal/40 bg-teal/10' },
   milestone: { label: 'Milestone', Icon: Flag, get color() { return colors.orangeSoft; }, bg: 'border-orange/40 bg-orange/10' },
   note: { label: 'Note', Icon: PenToSquare, get color() { return colors.inkSoft; }, bg: 'border-gray/40 bg-gray/10' },
 };
+
+/**
+ * The things you can log, as tiles (the "log something" grid, Home shortcuts): every log type, with tummy time,
+ * the activity logged most, as its own tile. "Activity" opens with Play, for the rest.
+ */
+export type LogTileKey = LogType | ShortcutKey;
+export type LogTile = LogTypeMeta & { key: LogTileKey; short: string; request: SheetRequest };
+
+export const LOG_TILE_KEYS: readonly LogTileKey[] = LOG_TYPES.flatMap((t): LogTileKey[] => (t === 'activity' ? ['tummy', t] : [t]));
+
+const SHORT: Partial<Record<LogTileKey, string>> = { pumping: 'Pump', medication: 'Meds', temperature: 'Temp', tummy: 'Tummy' };
+
+export function logTile(key: LogTileKey): LogTile {
+  if (key === 'tummy') {
+    const { color, bg } = TYPE_META.activity;
+    return { key, label: 'Tummy time', short: 'Tummy', Icon: ChildReaching, color, bg, request: { kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } } };
+  }
+  const meta = TYPE_META[key];
+  const request: SheetRequest =
+    key === 'feed' ? { kind: 'feed' } : key === 'activity' ? { kind: 'log', type: key, payload: { kind: 'play' } } : { kind: 'log', type: key };
+  return { key, label: meta.label, short: SHORT[key] ?? meta.label, Icon: meta.Icon, get color() { return meta.color; }, bg: meta.bg, request };
+}
 
 /** Starting payload for a new entry of each type. */
 export function defaultPayload(type: LogType): LogPayload {

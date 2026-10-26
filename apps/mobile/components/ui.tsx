@@ -79,7 +79,7 @@ export function Button({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
-      className={`${bg} rounded-xl py-3.5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
+      className={`${bg} rounded-xl py-3.5 px-5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
     >
       <Text className="text-ink font-semibold text-base">{label}</Text>
     </Pressable>

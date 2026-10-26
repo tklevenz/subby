@@ -163,7 +163,9 @@ export default function BabyBuddyImport() {
               </Text>
             </>
           ) : <Text className="text-ink-muted mt-4">Starting…</Text>}
-          <Button label="Cancel" variant="ghost" onPress={() => (cancelled.current = true)} />
+          <View className="w-full">
+            <Button label="Cancel" variant="ghost" onPress={() => (cancelled.current = true)} />
+          </View>
           <Text className="text-ink-faint text-xs mt-2 text-center">Already imported entries stay; run the import again to continue.</Text>
         </View>
       ) : null}

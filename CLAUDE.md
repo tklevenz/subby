@@ -177,6 +177,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - Build and install on a USB-connected phone or an emulator: `cd apps/mobile && pnpm android`. After native changes (new native package, `app.json` plugins), run `pnpm android:clean`.
 - Rebuild only for native changes; JS changes hot-reload as usual.
 - **Release builds** (`./gradlew assembleRelease`): Gradle runs the Expo CLI directly, without pnpm's `NODE_PATH`, so Babel resolves presets from `apps/mobile/node_modules`. That's why `babel-preset-expo` and `@babel/plugin-transform-react-jsx` (named by NativeWind's preset) are direct devDependencies; keep them.
+- **Standalone builds for a LAN server**: `app.config.js` adds `usesCleartextTraffic` (via `expo-build-properties`) only when `KINDRED_ALLOW_HTTP=1` is set during prebuild: `KINDRED_ALLOW_HTTP=1 npx expo prebuild --clean --platform android && (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)`. Release APKs are signed with the debug key, so they install over the dev build and keep the data. Never set the switch for a store build.
 - **Background tasks don't run headless in dev-client builds** (the headless runtime can't load the bundle from Metro). Test them in a release build. Release builds block `http://`, so test against an https server, or temporarily allow cleartext in the generated manifest.
 - Toolchain (Android): JDK 17, Android SDK 36, build-tools 36.0.0, NDK 27.1.12297006 (Gradle fetches the NDK). `JAVA_HOME` and `ANDROID_HOME` must be set.
 

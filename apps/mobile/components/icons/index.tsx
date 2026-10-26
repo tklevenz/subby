@@ -53,6 +53,7 @@ export const Pills = make('pills');
 export const Plus = make('plus');
 export const Poop = make('poop');
 export const RulerVertical = make('ruler-vertical');
+export const Shapes = make('shapes');
 export const Stop = make('stop');
 export const Sun = make('sun');
 export const TemperatureHalf = make('temperature-half');

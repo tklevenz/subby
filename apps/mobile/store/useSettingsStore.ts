@@ -32,6 +32,8 @@ export type SyncSettings = {
   knownDevices?: string[];
   /** Whether the server wakes this phone with push when others write (hosted Kindred Sync does). */
   push?: boolean;
+  /** The family this phone's photo references belong to; differs (or is missing) after moving to another family. */
+  photosFamily?: string;
   /** The Expo push token last registered with the server (re-registered when it changes). */
   pushToken?: string;
 };

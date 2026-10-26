@@ -13,7 +13,7 @@ import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStor
 import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
-import { downloadPhotos, queueUnsyncedPhotos, uploadPhotos } from './photos';
+import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
 
 const PUSH_BATCH = 500;
 
@@ -72,10 +72,13 @@ export async function setUpSync(serverInput: string, deviceName: string) {
   await createFamily(server, { familyId, entry, sealedKey: toBase64(seal(identity.box.publicKey, familyKey)) });
 
   saveFamilyKeys(new Map([[1, familyKey]]));
-  // Everything on this phone goes up, including deletions made before sync existed.
+  // Everything on this phone goes up, including deletions made before sync existed, and photos to this family.
   await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
   await db.update(schema.logsTable).set({ syncStatus: 'pending' });
-  await useSettingsStore.getState().set('sync', { server, familyId, deviceId, lastSeq: 0, lastSyncedAt: null, knownDevices: [deviceId] });
+  await forgetPhotoUploads();
+  await useSettingsStore
+    .getState()
+    .set('sync', { server, familyId, deviceId, lastSeq: 0, lastSyncedAt: null, knownDevices: [deviceId], photosFamily: familyId });
   await pushDeviceName(deviceName);
   requestSync(0);
 }
@@ -146,6 +149,11 @@ async function runOnce() {
     const api = sessionFor(settings);
     await refreshMembers(api, settings);
     const keys = await refreshKeys(api);
+    // A phone moved to another family before photo references were tracked: re-upload its own photos once.
+    if (settings.photosFamily !== settings.familyId) {
+      await forgetPhotoUploads({ onlyLocal: true });
+      await saveSync({ photosFamily: settings.familyId });
+    }
     await queueUnsyncedPhotos();
     const { stale } = await pushAll(api, settings, keys);
     // A stale push means the server has a newer version we may have skipped: read everything again.

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AngleRight, Baby, BottleWater, CalendarDays, ChildReaching, ClockRotateLeft, Moon, Pills, Plus, PoopDroplet } from '../icons';
+import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, Pills, Plus, PoopDroplet } from '../icons';
 import {
   activeSleep,
   describeDiaper,
@@ -15,6 +15,7 @@ import {
   lastWakeAt,
   medicationsDue,
   predictNextSleep,
+  recentShortcuts,
   startOfDay,
   suggestedNextSide,
   type Child,
@@ -23,6 +24,7 @@ import {
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';
+import { logTile } from '../logTypes';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
 
@@ -74,7 +76,7 @@ export default function HomeTiles({ child }: { child: Child }) {
         ))}
       </View>
       <UpNext logs={logs} now={now} />
-      <Shortcuts />
+      <Shortcuts logs={logs} />
     </View>
   );
 }
@@ -250,20 +252,18 @@ function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
   );
 }
 
-/** Second-tier log types, one tap away; More opens every type. */
-function Shortcuts() {
+/** The three categories (besides the big tiles) logged most recently, one tap away; More opens everything. */
+function Shortcuts({ logs }: { logs: LogEntry[] }) {
   const open = useSheetStore((s) => s.open);
-  const items = [
-    { label: 'Pump', Icon: BottleWater, color: () => colors.fuchsiaSoft, box: 'bg-fuchsia/10 border-fuchsia/40', onPress: () => open({ kind: 'log', type: 'pumping' }) },
-    { label: 'Meds', Icon: Pills, color: () => colors.blueSoft, box: 'bg-blue/10 border-blue/40', onPress: () => open({ kind: 'log', type: 'medication' }) },
-    { label: 'Tummy', Icon: ChildReaching, color: () => colors.tealSoft, box: 'bg-teal/10 border-teal/40', onPress: () => open({ kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } }) },
-  ];
+  const items = useMemo(() => recentShortcuts(logs).map(logTile), [logs]);
   return (
     <View className="flex-row gap-2">
-      {items.map(({ label, Icon, color, box, onPress }) => (
-        <Pressable key={label} onPress={onPress} className={`flex-1 h-12 rounded-xl border flex-row items-center justify-center ${box}`}>
-          <Icon color={color()} size={16} />
-          <Text className="text-ink text-[13px] font-medium ml-1.5">{label}</Text>
+      {items.map(({ key, short, Icon, color, bg, request }) => (
+        <Pressable key={key} onPress={() => open(request)} className={`flex-1 h-12 rounded-xl border flex-row items-center justify-center ${bg}`}>
+          <Icon color={color} size={16} />
+          <Text className="text-ink text-[13px] font-medium ml-1.5" numberOfLines={1}>
+            {short}
+          </Text>
         </Pressable>
       ))}
       <Pressable

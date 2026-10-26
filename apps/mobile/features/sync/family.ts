@@ -26,6 +26,7 @@ import {
 } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deleteAllPhotos } from '../photos';
+import { forgetPhotoUploads } from './photos';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -262,6 +263,8 @@ async function completeJoin(
   } else {
     await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
     await db.update(schema.logsTable).set({ syncStatus: 'pending' });
+    // This phone's photos belong to its old family (if any); they upload to this one.
+    await forgetPhotoUploads();
   }
 
   await useSettingsStore.getState().set('sync', {
@@ -271,6 +274,7 @@ async function completeJoin(
     lastSeq: 0,
     lastSyncedAt: null,
     knownDevices: [...state.members.keys()],
+    photosFamily: familyId,
   });
   await pushDeviceName(name);
   requestSync(0);

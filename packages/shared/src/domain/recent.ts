@@ -1,4 +1,4 @@
-import type { LogEntry, PayloadOf } from '../schemas/log.schema';
+import type { LogEntry, LogPayload, LogType, PayloadOf } from '../schemas/log.schema';
 
 /** Distinct values ordered by most recent use (logs sorted startedAt DESC). */
 function distinctRecent(values: Iterable<string>, limit: number): string[] {
@@ -60,4 +60,32 @@ export function medicationsDue(logs: LogEntry[]): MedicationDue[] {
     }
   }
   return out.sort((a, b) => a.dueAt - b.dueAt);
+}
+
+/** What a Home shortcut opens: a log type, or tummy time (an activity kind, but logged often enough to be its own). */
+export type ShortcutKey = Exclude<LogType, 'sleep' | 'feed' | 'diaper'> | 'tummy';
+
+/** Until there's history (or for the slots it doesn't fill). */
+export const DEFAULT_SHORTCUTS: readonly ShortcutKey[] = ['pumping', 'medication', 'tummy'];
+
+/** Sleep, feeds and diapers have their own big tiles on Home, so they're never shortcuts. */
+export function shortcutKey(p: LogPayload): ShortcutKey | null {
+  if (p.type === 'sleep' || p.type === 'feed' || p.type === 'diaper') return null;
+  if (p.type === 'activity' && p.kind === 'tummy_time') return 'tummy';
+  return p.type;
+}
+
+/** The `count` most recently logged shortcut categories, newest first, topped up with the defaults. */
+export function recentShortcuts(logs: Pick<LogEntry, 'startedAt' | 'payload'>[], count = 3): ShortcutKey[] {
+  const out: ShortcutKey[] = [];
+  for (const log of [...logs].sort((a, b) => b.startedAt - a.startedAt)) {
+    const key = shortcutKey(log.payload);
+    if (key && !out.includes(key)) out.push(key);
+    if (out.length === count) return out;
+  }
+  for (const key of DEFAULT_SHORTCUTS) {
+    if (out.length === count) break;
+    if (!out.includes(key)) out.push(key);
+  }
+  return out;
 }

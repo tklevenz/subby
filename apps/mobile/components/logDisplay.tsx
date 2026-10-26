@@ -12,6 +12,7 @@ import {
   type UnitSystem,
 } from '@kindred-log/shared';
 import { TYPE_META, activityLabel } from './logTypes';
+import { ChildReaching } from './icons';
 
 export { activityLabel };
 
@@ -30,7 +31,9 @@ export function logDisplay(
   formatTime: (ms: number) => string,
 ): LogDisplay {
   const p = entry.payload;
-  const { Icon, color, bg } = TYPE_META[p.type];
+  const { color, bg } = TYPE_META[p.type];
+  // Tummy time keeps its own icon (as on Home); other activities use the generic one.
+  const Icon = p.type === 'activity' && p.kind === 'tummy_time' ? ChildReaching : TYPE_META[p.type].Icon;
   const running = entry.endedAt === null;
   const span = entry.endedAt !== null && entry.endedAt > entry.startedAt
     ? `${formatTime(entry.startedAt)} → ${formatTime(entry.endedAt)}`
