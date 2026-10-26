@@ -49,6 +49,7 @@ export default function ChildForm({
       <FieldLabel>Birth date</FieldLabel>
       <DateTimeField
         mode="date"
+        title="Birth date"
         value={fromIsoDate(birthDate)}
         maximumDate={new Date()}
         onChange={(ms) => setBirthDate(toIsoDate(ms))}

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { isCompletePayload, type LogPayload, type LogType } from '@kindred-log/shared';
+import { formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@kindred-log/shared';
 import { useLogStore } from '../../store/useLogStore';
 import DateTimeField from '../DateTimeField';
 import { PayloadEditor } from '../editors';
-import { NumberField, TagsField } from '../editors/fields';
+import { TagsField } from '../editors/fields';
 import { defaultPayload } from '../logTypes';
 import { Button, FieldLabel, TextField } from '../ui';
 
-/** Types logged with a start + duration here, and startable as a live timer. */
+/** Types logged with a start and an end here (default length in minutes), and startable as a live timer. */
 const DURATION_TYPES: Partial<Record<LogType, number>> = { sleep: 60, pumping: 15, activity: 10 };
 
 /** Common fields shared by the log sheet and the edit screen. */
@@ -52,15 +52,18 @@ export default function LogSheet({
   const startOffsetMin = defaultDuration ?? (pastBreastfeed ? 15 : 0);
 
   const [payload, setPayload] = useState<LogPayload>(() => ({ ...defaultPayload(type), ...initial }) as LogPayload);
-  const [durationMin, setDurationMin] = useState<number | undefined>(defaultDuration);
-  // Duration types default to "just finished": start = now − duration.
+  // Timed types default to "just finished": start = now − the usual length, end = now.
   const [startedAt, setStartedAt] = useState(() => Date.now() - startOffsetMin * 60_000);
+  // null: still going (saved as a running timer from the start time).
+  const [end, setEnd] = useState<number | null>(() => Date.now());
 
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
   const complete = isCompletePayload(payload);
+  const timed = defaultDuration !== undefined;
+  const invalidEnd = timed && end !== null && end <= startedAt;
 
   const endedAt = (() => {
-    if (defaultDuration !== undefined) return startedAt + (durationMin ?? 0) * 60_000;
+    if (timed) return end;
     if (payload.type === 'feed') {
       return startedAt + ((payload.leftSeconds ?? 0) + (payload.rightSeconds ?? 0)) * 1000;
     }
@@ -81,21 +84,41 @@ export default function LogSheet({
 
   return (
     <>
-      <FieldLabel>{startOffsetMin ? 'Started' : 'Time'}</FieldLabel>
-      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} />
+      <FieldLabel>{timed ? 'Start' : startOffsetMin ? 'Started' : 'Time'}</FieldLabel>
+      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} title={timed ? 'Start time' : 'Time'} />
 
-      {defaultDuration !== undefined ? (
+      {timed ? (
         <>
-          <FieldLabel>Duration</FieldLabel>
-          <NumberField value={durationMin} onChange={setDurationMin} suffix="min" />
+          <FieldLabel>End</FieldLabel>
+          <View className="flex-row items-center gap-3">
+            {end !== null ? (
+              <DateTimeField value={end} onChange={setEnd} maximumDate={new Date()} title="End time" />
+            ) : (
+              <Text className="text-violet-soft text-base py-3">Still going</Text>
+            )}
+            <Pressable
+              onPress={() => setEnd(end === null ? Date.now() : null)}
+              className="rounded-full border border-line-strong px-3 py-2"
+              hitSlop={6}
+            >
+              <Text className="text-ink-muted text-sm">{end === null ? 'Set end' : 'Still going'}</Text>
+            </Pressable>
+          </View>
+          {invalidEnd ? (
+            <Text className="text-red-strong mt-2">End must be after start.</Text>
+          ) : (
+            <Text className="text-ink-muted text-sm mt-2">
+              {end === null ? 'Saved as running, like a timer started then.' : formatHoursMinutes(end - startedAt)}
+            </Text>
+          )}
         </>
       ) : null}
 
       <PayloadEditor payload={payload} onChange={patch} />
       <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={!complete || (defaultDuration !== undefined && !durationMin)} />
-      {defaultDuration !== undefined ? (
+      <Button label="Save" onPress={save} disabled={!complete || invalidEnd} />
+      {timed ? (
         <Button label="Start timer now" variant="ghost" onPress={start} disabled={!complete} />
       ) : null}
     </>

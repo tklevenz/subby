@@ -41,7 +41,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - `src/domain/`: pure, RN-free helpers. Put new business logic here and test it with vitest (`src/__tests__`).
   - `units`, `time`, `summary`, `validate` (`isCompletePayload` gates Save).
   - `feedTimer`: breastfeeding L/R timer state lives in the feed payload (`timerSide`, `timerSideSince`); `toggleSide`/`pauseFeed`.
-  - `recent` (food/tag/medication suggestions, `medicationsDue`), `milestones` (bundled checklist).
+  - `recent` (food/tag/medication suggestions, `medicationsDue`, `recentShortcuts` for Home: the 3 most recently logged categories besides the big tiles, tummy time separate, defaults Pump/Meds/Tummy), `milestones` (bundled checklist).
   - `stats` (`dailyStats` per-day totals, splitting sleep across midnight; `averageStats` over tracked days; `sleepSegments`; `solidsReport`; DST-safe `addDays`/`dayRange`).
   - `growth`: WHO LMS z-scores/percentiles (0–24 months, from the birth date; corrected age for preterm babies was dropped on purpose, and `dueDate` is stored but unused), `percentileCurves`. The tables in `domain/who/lms.ts` are generated from the CDC-hosted WHO CSVs; don't edit them by hand.
   - `prediction`: on-device nap prediction. Age norms (`ageNorms`), plus `sleepHabits` (the last 7 days; night sleep logged in pieces is merged into one night), `predictNextSleep` (put-down window plus `napMinutes`, the expected nap length) and `suggestedSchedule`. Heuristic, verified against the real Baby Buddy history.
@@ -52,7 +52,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 
 ### `apps/mobile`
 - **Config:**
-  - `app.json`: plugins `expo-router`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), datetimepicker.
+  - `app.json`: plugins `expo-router`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), `expo-notifications`, `expo-background-task`. No system date picker (see `DateTimeField`).
   - `babel.config.js`: `babel-preset-expo` with `jsxImportSource: 'nativewind'`, `nativewind/babel`, and `inline-import` for `.sql`.
   - `metro.config.js`: `withNativeWind(... './global.css')`, plus `sql` in `sourceExts`.
   - pnpm note: `react-native-css-interop` must stay a direct dependency or Metro can't resolve the NativeWind JSX runtime.
@@ -73,7 +73,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
   - `app/(tabs)/`:
-    - `index`: Home: `components/home/HomeTiles` shows Sleep, Feed and Diaper as big tiles. The pinned tile sits on top (sleep by default; long-press a tile to pin it; `settings.homeTop` per child) and the other two side by side. Below: medication due, links to the sleep schedule and today's log, and shortcuts (Pump, Meds, Tummy, More). Running pumping/activity timers show above the tiles via `ActiveTimers`.
+    - `index`: Home: `components/home/HomeTiles` shows Sleep, Feed and Diaper as big tiles. The pinned tile sits on top (sleep by default; long-press a tile to pin it; `settings.homeTop` per child) and the other two side by side. Below: medication due, links to the sleep schedule and today's log, and shortcuts (`recentShortcuts` → `logTile`, plus More). Running pumping/activity timers show above the tiles via `ActiveTimers`.
+      - Tapping the sleep tile (start or wake up) offers Undo for 5 s; a running sleep has a Discard button (with a confirmation). Accidental taps on the big tile are easy.
+      - The header: the avatar opens the child's profile, the name switches child (`ChildSwitcher`).
     - `history`: List, Day (24 h lanes) and Week (sleep pattern + totals) views.
     - `trends`: 7/14/30-day averages and charts.
     - `settings`: includes a `__DEV__`-only Premium stub toggle.
@@ -96,9 +98,12 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
   - `icons/`: all icons are Font Awesome 6 Free **solid**, drawn with `react-native-svg` (no icon font, no Lucide). `faPaths.ts` is generated from `@fortawesome/fontawesome-free/svgs/solid` (don't edit by hand); add an icon by adding its name there and a `make('<name>')` export in `index.tsx`. `PoopDroplet` (poop with a masked-out droplet) is the diaper icon. The CC BY 4.0 credit is at the bottom of Settings; keep it.
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
-  - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags), `AddLogSheet` (type grid), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes; Wet is blue, Dirty brown, Both neutral with both icons). Keep one Modal (iOS can't present while another dismisses).
+  - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags; sleep, pumping and activity take a start and an end, where an empty end ("Still going") saves a running timer), `AddLogSheet` (grid of `LOG_TILE_KEYS`: every type, with Tummy time as its own tile; `logTile` in `logTypes.tsx` is shared with the Home shortcuts), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes; Wet is blue, Dirty brown, Both neutral with both icons). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
-  - `DateTimeField`.
+  - `DateTimeField`: our own wheel sheet (`components/datetime/`: `WheelColumn`, tested `parts.ts`), the same on iOS and Android, replacing the system pickers.
+    - `datetime` mode: day ("Today", "Yesterday", "Sat, Oct 24"…, a year back or to the value), hour and minute, plus AM/PM on a 12-hour clock.
+    - `date` mode (birth date): day, month and year.
+    - A value past `maximumDate` saves as the maximum.
 - **Reminders (`features/reminders/scheduler.ts`):** expo-notifications, local only. `useReminderSync` (in `_layout`) re-plans on log/child/settings changes and app foreground, debounced and serialized. Reminder settings are device-local (`settings.reminders`), not the synced `reminders` table, which is still unused. Kinds: feed, diaper and pumping intervals, medication due, nap/bedtime, and forgotten timers. A master `enabled` switch also appears in Settings. Tapping a notification switches to that child; forgotten-timer reminders also open the entry. expo-notifications is `require`d lazily and skipped in Expo Go on Android (it crashes on import there); `remindersAvailable` is false in that case. Never import it statically.
 - **Baby Buddy import (`features/import/babybuddy/`):**
   - `client.ts`: read-only REST client (token auth, paging; rewrites `next` links to the user's base URL).

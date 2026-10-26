@@ -63,7 +63,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
       <Stack.Screen options={{ title }} />
 
       <FieldLabel>{timed ? 'Started' : 'Time'}</FieldLabel>
-      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} />
+      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} title="Start time" />
 
       {timed ? (
         <>
@@ -74,7 +74,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
               <Button label="Stop now" variant="ghost" onPress={() => setEndedAt(Date.now())} />
             </View>
           ) : (
-            <DateTimeField value={endedAt!} onChange={setEndedAt} />
+            <DateTimeField value={endedAt!} onChange={setEndedAt} title="End time" />
           )}
           {invalid ? <Text className="text-red-strong mt-2">End must be after start.</Text> : null}
         </>

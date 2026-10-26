@@ -128,7 +128,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
   return (
     <View>
       <FieldLabel>Time</FieldLabel>
-      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} />
+      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title="Time" />
       <FieldLabel>Milk</FieldLabel>
       <Segmented
         options={[{ value: 'breast_milk', label: 'Breast milk' }, { value: 'formula', label: 'Formula' }, { value: 'fortified', label: 'Fortified' }]}
@@ -172,7 +172,7 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
   return (
     <View>
       <FieldLabel>Time</FieldLabel>
-      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} />
+      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title="Time" />
       <FoodPicker value={solids} onChange={(p) => setSolids((s) => ({ ...s, ...p }))} />
       <Button
         label="Log solids"

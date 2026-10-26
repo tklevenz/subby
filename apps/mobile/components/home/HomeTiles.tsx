@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, Pills, Plus, PoopDroplet } from '../icons';
+import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, Pills, Plus, PoopDroplet, Xmark } from '../icons';
 import {
   activeSleep,
   describeDiaper,
@@ -40,7 +40,13 @@ type TileContent = {
   hint: string;
   active?: boolean;
   onPress: () => void;
+  /** A running timer started by mistake: delete it (asks first). */
+  onDiscard?: () => void;
 };
+
+/** A tap on a big tile can be taken back for a few seconds: the tile is easy to hit by accident. */
+type UndoOffer = { label: string; undo: () => void };
+const UNDO_MS = 5000;
 
 /**
  * Home: the pinned tile on top (sleep by default), the other two side by side below, then
@@ -52,7 +58,15 @@ export default function HomeTiles({ child }: { child: Child }) {
   const setSetting = useSettingsStore((s) => s.set);
   const now = useNow();
   const top = homeTop[child.id] ?? 'sleep';
-  const content = useTileContent(logs, child, now);
+  const [offer, setOffer] = useState<UndoOffer | null>(null);
+  const offerTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const offerUndo = (o: UndoOffer) => {
+    clearTimeout(offerTimer.current);
+    setOffer(o);
+    offerTimer.current = setTimeout(() => setOffer(null), UNDO_MS);
+  };
+  useEffect(() => () => clearTimeout(offerTimer.current), []);
+  const content = useTileContent(logs, child, now, offerUndo);
 
   const longPress = (tile: HomeTile) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -77,14 +91,34 @@ export default function HomeTiles({ child }: { child: Child }) {
       </View>
       <UpNext logs={logs} now={now} />
       <Shortcuts logs={logs} />
+      {offer ? (
+        <View className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5">
+          <Text className="flex-1 text-ink text-sm" numberOfLines={1}>
+            {offer.label}
+          </Text>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              clearTimeout(offerTimer.current);
+              setOffer(null);
+              offer.undo();
+            }}
+            className="px-4 py-2.5 rounded-lg"
+          >
+            <Text className="text-violet-soft text-sm font-semibold">Undo</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function useTileContent(logs: LogEntry[], child: Child, now: number): Record<HomeTile, TileContent> {
+function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: (o: UndoOffer) => void): Record<HomeTile, TileContent> {
   const formatTime = useFormatTime();
   const startTimer = useLogStore((s) => s.startTimer);
   const stopTimer = useLogStore((s) => s.stopTimer);
+  const updateLog = useLogStore((s) => s.updateLog);
+  const softDeleteLog = useLogStore((s) => s.softDeleteLog);
   const open = useSheetStore((s) => s.open);
   const minute = Math.floor(now / 60_000);
   const prediction = useMemo(() => predictNextSleep(logs, child, minute * 60_000), [logs, child, minute]);
@@ -105,10 +139,17 @@ function useTileContent(logs: LogEntry[], child: Child, now: number): Record<Hom
       lines: [],
       hint: 'Tap to wake up',
       active: true,
-      onPress: () => {
+      onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        stopTimer(sleeping.id);
+        const slept = formatHoursMinutes(Date.now() - sleeping.startedAt);
+        await stopTimer(sleeping.id);
+        offerUndo({ label: `Woke up after ${slept}`, undo: () => updateLog(sleeping.id, { endedAt: null }) });
       },
+      onDiscard: () =>
+        Alert.alert('Discard this sleep?', "It's deleted, as if it never started.", [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: () => softDeleteLog(sleeping.id) },
+        ]),
     };
   } else {
     const lines: string[] = [];
@@ -123,11 +164,12 @@ function useTileContent(logs: LogEntry[], child: Child, now: number): Record<Hom
       value: wakeAt !== null ? formatHoursMinutes(now - wakeAt) : '–',
       lines: wakeAt !== null ? lines : ['No sleep logged yet'],
       hint: 'Tap to start sleep',
-      onPress: () => {
+      onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Daytime sleeps default to naps; editable afterwards.
         const hour = new Date().getHours();
-        startTimer({ type: 'sleep', nap: hour >= 7 && hour < 19 });
+        const entry = await startTimer({ type: 'sleep', nap: hour >= 7 && hour < 19 });
+        offerUndo({ label: 'Sleep started', undo: () => softDeleteLog(entry.id) });
       },
     };
   }
@@ -217,6 +259,19 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           </Text>
         ))}
       </View>
+      {/* Last, so it's on top of the text block and gets its own taps. */}
+      {content.onDiscard ? (
+        <Pressable
+          onPress={content.onDiscard}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Discard this ${LABEL[tile].toLowerCase()}`}
+          className="absolute right-4 bottom-4 flex-row items-center rounded-full border border-line-strong bg-ground/40 px-3 py-1.5"
+        >
+          <Xmark color={colors.inkMuted} size={12} />
+          <Text className="text-ink-muted text-xs ml-1.5">Discard</Text>
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
