@@ -35,6 +35,9 @@ export default function Onboarding() {
 
       <Text className="text-ink-faint text-center mt-6">Coming from Baby Buddy?</Text>
       <Button label="Import from Baby Buddy" variant="ghost" onPress={() => router.push('/import/babybuddy')} />
+
+      <Text className="text-ink-faint text-center mt-6">Have a Kindred Log backup?</Text>
+      <Button label="Restore a backup" variant="ghost" onPress={() => router.push('/backup')} />
     </ScrollView>
   );
 }

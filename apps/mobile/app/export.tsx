@@ -3,13 +3,11 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { LOG_TYPES, logsToCsv, type LogType } from '@kindred-log/shared';
-import PremiumGate from '../components/PremiumGate';
 import { TYPE_META } from '../components/logTypes';
 import { Button, Chip, FieldLabel, Segmented } from '../components/ui';
 import { fetchLogs } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { countChildLogs } from '../store/useChildStore';
-import { useSettingsStore } from '../store/useSettingsStore';
 import { toIsoDate } from '../store/timeHelpers';
 
 const RANGES = [
@@ -21,7 +19,6 @@ const RANGES = [
 
 export default function ExportScreen() {
   const child = useActiveChild();
-  const isPremium = useSettingsStore((s) => s.isPremium);
   const [range, setRange] = useState<(typeof RANGES)[number]['value']>('all');
   const [counts, setCounts] = useState<Partial<Record<LogType, number>>>({});
   const [selected, setSelected] = useState<Set<LogType> | null>(null);
@@ -36,15 +33,6 @@ export default function ExportScreen() {
   }, [child?.id]);
 
   if (!child) return null;
-
-  if (!isPremium) {
-    return (
-      <PremiumGate
-        title="CSV export is a Premium feature"
-        description="Export every entry as a spreadsheet to share with your pediatrician or keep your own backup."
-      />
-    );
-  }
 
   const types = LOG_TYPES.filter((t) => counts[t]);
   const toggle = (t: LogType) =>

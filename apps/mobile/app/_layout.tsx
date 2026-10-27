@@ -76,6 +76,7 @@ export default function RootLayout() {
         </Stack.Protected>
         {/* Reachable from onboarding too, so they aren't guarded. */}
         <Stack.Screen name="import/babybuddy" options={{ headerShown: true, title: 'Import' }} />
+        <Stack.Screen name="backup" options={{ headerShown: true, title: 'Backup', headerBackTitle: 'Settings' }} />
         <Stack.Screen name="sync/join" options={{ headerShown: true, title: 'Join a family' }} />
         <Stack.Screen name="sync/recover" options={{ headerShown: true, title: 'Recover' }} />
       </Stack>

@@ -50,6 +50,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `reminders`: `planReminders` (pure) turns `ReminderSettings` + per-child state into the notifications to schedule (stable `kl:` ids).
   - `story`: `childStory` builds a child's story of firsts (milestones, measurements, first solid food, birth), newest first. No counts or completion: we don't gamify childcare.
   - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).
+  - `backup` (import from `@kindred-log/shared/domain/backup`, kept off the main index):
+    - The file is a zip (`fflate`) holding `backup.json` (children, entries and tombstones) plus `photos/<n>.<ext>`. Photo names are ours, never taken from row data. Device-local fields stay out: photo paths, `photoBlob`, sync status.
+    - An optional passphrase encrypts it: `KLBK` header with scrypt parameters and salt, then `encryptFile`. The parameters are read from the header and bounded.
+    - `readBackup` validates each row and skips (and counts) bad ones; payloads are checked for shape only.
+    - `planRestore` uses newest-edit-wins, like sync.
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
 
 ### `apps/mobile`
@@ -83,11 +88,17 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - `trends`: 7/14/30-day averages and charts.
     - `settings`: includes a `__DEV__`-only Premium stub toggle.
   - `app/schedule.tsx` (next sleep + suggested day; linked from Home's "Sleep schedule" row), `app/reminders.tsx`.
-  - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV, Premium-gated).
+  - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV).
+  - `app/backup.tsx` (Settings → Backup & restore; also linked from onboarding, not route-guarded), backed by `features/backup.ts`:
+    - Back up: everything on the phone into one file.
+      - Android saves straight to the public Downloads folder through the local native module `modules/kindred-downloads` (MediaStore, Android 10+, no permission; autolinked, so changing it needs a prebuild). Android's folder picker doesn't allow Downloads itself.
+      - iOS opens the share sheet, which has "Save to Files".
+      - The cache copy is deleted afterwards.
+    - Restore: pick a file with `File.pickFileAsync` (no document-picker package), preview, then merge in one transaction. Restored rows are `pending`, so they sync.
+    - An import ref already used by another row here is dropped from the restored row.
   - `app/entry/[id].tsx`: edit/backdate any entry.
   - `app/child/new.tsx`: add a child (modal). It shows `PremiumGate` instead once the free limit is reached.
   - **Premium gates** (`isPremium` stub; dev toggle in Settings):
-    - CSV export.
     - More than `FREE_CHILD_LIMIT` (1) children. This is checked by `useCanAddChild` in the UI and enforced again in `useChildStore.addChild`.
     - The Baby Buddy import defaults extra children to "Don't import" for free users.
   - `app/child/[id]/index.tsx`: the child's profile page (no stack header). Full-width photo cover with name and age, a growth chart (Weight/Length/Head, WHO band), and the story of firsts (`childStory`).

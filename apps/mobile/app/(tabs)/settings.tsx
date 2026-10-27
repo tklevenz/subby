@@ -113,7 +113,8 @@ export default function SettingsScreen() {
 
       <SectionTitle>Data</SectionTitle>
       <Card>
-        <Row label="Export CSV" value={isPremium ? undefined : 'Premium'} onPress={() => router.push('/export')} right={chevron} />
+        <Row label="Backup & restore" onPress={() => router.push('/backup')} right={chevron} />
+        <Row label="Export CSV" onPress={() => router.push('/export')} right={chevron} />
         <Row label="Import from Baby Buddy" onPress={() => router.push('/import/babybuddy')} right={chevron} />
       </Card>
 
