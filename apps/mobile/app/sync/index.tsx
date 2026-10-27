@@ -69,7 +69,9 @@ function SetUp() {
 
 function Status() {
   const sync = useSettingsStore((s) => s.sync)!;
-  const { phase, error, pending, progress, removed } = useSyncStore();
+  const { phase, error, pending: waiting, progress, removed, tooLarge } = useSyncStore();
+  // Entries too large to sync stay pending; they're reported on their own, not as "waiting".
+  const pending = Math.max(0, waiting - tooLarge);
   const formatTime = useFormatTime();
   useNow(30_000);
 
@@ -119,6 +121,12 @@ function Status() {
         <Row label="Server" value={sync.server.replace(/^https?:\/\//, '')} />
       </Card>
       {phase === 'error' && error ? <Text className="text-red-soft text-sm mt-3 ml-1">{error}</Text> : null}
+      {tooLarge ? (
+        <Text className="text-amber-soft text-sm mt-3 ml-1 leading-5">
+          {tooLarge === 1 ? '1 entry is' : `${tooLarge.toLocaleString()} entries are`} too large to sync (a very long note?) and stay
+          on this phone only. Shortening it lets it sync.
+        </Text>
+      ) : null}
       <Button label="Sync now" variant="ghost" onPress={() => syncNow().catch(() => {})} disabled={phase === 'syncing'} />
 
       <Phones />

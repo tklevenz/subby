@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newRecoveryWords, toBase64 } from '@kindred-log/shared/crypto';
+import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, toBase64 } from '@kindred-log/shared/crypto';
+import { openRecord } from '@kindred-log/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
@@ -195,6 +196,9 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(newer.accepted).toEqual([id]);
     const older = await a.push([a.seal('log', id, { v: 'older' }, { updatedAt: 1500 })]);
     expect(older.stale).toEqual([id]);
+    // The winning version comes back with the answer, so a phone needn't pull everything again.
+    expect(older.newer.map((r) => r.updatedAt)).toEqual([2000]);
+    expect(openRecord(a.familyKeys, older.newer[0])).toEqual({ v: 'new' });
     const pulled = await a.pull();
     expect(pulled.filter((p) => p.record.id === id).at(-1)!.body).toEqual({ v: 'new' });
   });
@@ -276,6 +280,55 @@ describe.skipIf(!reachable)('sync server', () => {
     // The server drops the epoch entry, hoping b goes back to the old key.
     await db`delete from device_log where family_id = ${a.familyId} and index = ${a.log.length - 1}`;
     await expect(b.refresh()).rejects.toThrow('older');
+  });
+
+  it('a phone approved without its keys gets them on the next sync of any other phone', async () => {
+    const a = new TestClient(url);
+    await a.createFamily();
+    const b = new TestClient(url);
+    const { qr, secret } = await a.invite();
+    await b.claim(qr);
+    const invite = await a.request<{ claimant: { deviceId: string; signKey: string; boxKey: string } }>('GET', `/v1/invites/${qr.i}`);
+    const c = invite.claimant;
+    // The approval stopped after the log entry: no grant.
+    await a.append({ type: 'add', deviceId: c.deviceId, keys: { sign: fromBase64(c.signKey), box: fromBase64(c.boxKey) } });
+    expect(await b.finishJoin(qr)).toBe(true);
+    expect(b.familyKeys.size).toBe(0);
+    await a.refresh();
+    expect(a.missing).toEqual([{ recipient: b.deviceId, epochs: [1] }]);
+    await a.heal();
+    await b.refresh();
+    expect(b.familyKeys.get(1)).toEqual(a.familyKeys.get(1));
+    expect(a.missing).toEqual([]);
+  });
+
+  it('a removal whose rotation failed is finished by the next sync', async () => {
+    const { a, b } = await pairedFamily();
+    await a.append({ type: 'remove', deviceId: b.deviceId }); // and then the app was killed
+    await a.refresh();
+    expect(a.state!.rotationDue).toBe(true);
+    await a.heal();
+    expect(a.currentEpoch).toBe(2);
+    expect(a.state!.rotationDue).toBe(false);
+  });
+
+  it('replacing the recovery key starts a new epoch, sealed to the new words only', async () => {
+    const { a, b } = await pairedFamily();
+    const oldWords = newRecoveryWords();
+    await a.setRecovery(oldWords);
+    const newWords = newRecoveryWords();
+    await a.setRecovery(newWords);
+    await a.heal();
+    expect(a.currentEpoch).toBe(2);
+    await b.refresh();
+    expect(b.familyKeys.get(2)).toEqual(a.familyKeys.get(2));
+    const [row] = await db`select count(*)::int as n from family_keys where family_id = ${a.familyId} and recipient = ${RECOVERY_SIGNER} and epoch = 2`;
+    expect(row.n).toBe(1);
+    // The new words still recover everything.
+    await a.push([a.seal('log', randomUUID(), { after: 'replace' })]);
+    const fresh = new TestClient(url);
+    await fresh.recover(newWords);
+    expect((await fresh.pull()).map((r) => r.body)).toContainEqual({ after: 'replace' });
   });
 
   it("a grant can't replace a key someone already has", async () => {

@@ -61,6 +61,8 @@ export class TestClient {
   currentEpoch = 1;
   lastSeq = 0;
   log: DeviceLogEntry[] = [];
+  /** From the last refresh: members that lack some epochs (see `heal`). */
+  missing: KeysResponse['missing'] = [];
   state: DeviceLogState | null = null;
 
   constructor(readonly server: string) {}
@@ -133,6 +135,26 @@ export class TestClient {
     this.state = state;
     this.log = entries;
     this.currentEpoch = state.epoch;
+    this.missing = keys.missing;
+  }
+
+  /**
+   * What every sync run does after refreshing: finish what another phone left half done. Grants epochs a member
+   * lacks (sealed to its key from the verified log, never one the server names), and starts the epoch the log
+   * says is owed (after a removal or a replaced recovery key).
+   */
+  async heal() {
+    for (const { recipient, epochs } of this.missing) {
+      const member = recipient === RECOVERY_SIGNER ? this.state!.recovery : this.state!.members.get(recipient);
+      const keys = epochs.filter((e) => this.familyKeys.has(e));
+      if (!member || !keys.length) continue;
+      await this.request('POST', '/v1/keys/grant', {
+        recipient,
+        keys: keys.map((epoch) => ({ epoch, sealed: toBase64(seal(member.boxKey, this.familyKeys.get(epoch)!)) })),
+      });
+    }
+    if (this.state!.rotationDue) await this.rotate();
+    await this.refresh();
   }
 
   async append(change: Parameters<typeof appendEntry>[3], signer = this.me) {

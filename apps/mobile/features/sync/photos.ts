@@ -1,9 +1,10 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogEntry, PhotoBlob } from '@kindred-log/shared';
-import { decryptFile, encryptFile, fromBase64, newSymmetricKey, toBase64 } from '@kindred-log/shared/crypto';
+import { decryptFile, encryptFile, encryptedFileSize, fromBase64, newSymmetricKey, toBase64 } from '@kindred-log/shared/crypto';
+import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
-import { deletePhoto, readPhotoBytes, savePhotoBytes } from '../photos';
+import { deletePhoto, photoSize, readPhotoBytes, savePhotoBytes } from '../photos';
 import type { SyncSession } from './api';
 import { needsPhotoUpload } from './records';
 
@@ -69,6 +70,7 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
   for (const child of children) {
     if (!needsPhotoUpload(child)) continue;
     const blob = await upload(api, child.photoUri!);
+    if (blob === TOO_LARGE) continue;
     // A missing file: forget it, so the entry syncs without a photo instead of retrying forever.
     const change = blob ? { photoBlob: blob } : { photoUri: null };
     Object.assign(child, change);
@@ -80,6 +82,7 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
   for (const log of logs) {
     if (!needsPhotoUpload(log) || log.payload.type !== 'note') continue;
     const blob = await upload(api, log.payload.photoUri!);
+    if (blob === TOO_LARGE) continue;
     const { photoUri: _, ...note } = log.payload;
     log.payload = blob ? { ...log.payload, photoBlob: blob } : note;
     await db
@@ -89,7 +92,18 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
   }
 }
 
-async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null> {
+const TOO_LARGE = 'tooLarge';
+
+/**
+ * Encrypts and uploads one photo. null when its file is gone (the row then drops the photo); TOO_LARGE when it
+ * exceeds the server's limit: it stays on this phone only and the entry syncs without it, so it can't block sync.
+ */
+async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null | typeof TOO_LARGE> {
+  const size = photoSize(uri);
+  if (size !== null && encryptedFileSize(size) > MAX_BLOB_BYTES) {
+    console.warn('[sync] a photo is too large to sync; it stays on this phone');
+    return TOO_LARGE;
+  }
   const data = await readPhotoBytes(uri);
   if (!data) return null;
   const key = newSymmetricKey();

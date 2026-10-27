@@ -21,7 +21,25 @@ export class KeysService {
       .select({ epoch: schema.familyKeys.epoch, recipient: schema.familyKeys.recipient, sealed: schema.familyKeys.sealed })
       .from(schema.familyKeys)
       .where(and(eq(schema.familyKeys.familyId, auth.familyId), eq(schema.familyKeys.recipient, auth.deviceId)));
-    return { currentEpoch: family.currentEpoch, keys };
+    return { currentEpoch: family.currentEpoch, keys, missing: auth.deviceId === RECOVERY ? [] : await this.missing(family) };
+  }
+
+  /** Members (and the recovery key) that lack some epochs, so a phone that has them can grant them. */
+  private async missing(family: { id: string; currentEpoch: number; recoverySignKey: string | null }) {
+    const members = await this.db
+      .select({ id: schema.devices.id })
+      .from(schema.devices)
+      .where(and(eq(schema.devices.familyId, family.id), eq(schema.devices.active, true)));
+    const recipients = [...members.map((m) => m.id), ...(family.recoverySignKey ? [RECOVERY] : [])];
+    const held = await this.db
+      .select({ recipient: schema.familyKeys.recipient, epoch: schema.familyKeys.epoch })
+      .from(schema.familyKeys)
+      .where(eq(schema.familyKeys.familyId, family.id));
+    const has = new Set(held.map((k) => `${k.recipient}/${k.epoch}`));
+    const epochs = Array.from({ length: family.currentEpoch }, (_, i) => i + 1);
+    return recipients
+      .map((recipient) => ({ recipient, epochs: epochs.filter((e) => !has.has(`${recipient}/${e}`)) }))
+      .filter((m) => m.epochs.length);
   }
 
   /** Hands existing epochs to a member that was just added, or to a newly set recovery key. */

@@ -28,6 +28,12 @@ export async function pickPhoto(source: 'camera' | 'library', square = false): P
   return !res.canceled && res.assets[0] ? persistPhoto(res.assets[0].uri) : null;
 }
 
+/** A photo's size in bytes; null when the file is gone. */
+export function photoSize(uri: string): number | null {
+  const file = new File(uri);
+  return file.exists ? file.size : null;
+}
+
 /** A photo's bytes (for encrypting and uploading it); null when the file is gone. */
 export async function readPhotoBytes(uri: string): Promise<Uint8Array | null> {
   const file = new File(uri);

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import * as Device from 'expo-device';
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogEntry } from '@kindred-log/shared';
 import {
+  RECOVERY_SIGNER,
   appendEntry,
   assertLogContinues,
   fromBase64,
@@ -12,9 +14,10 @@ import {
   seal,
   toBase64,
   verifyDeviceLog,
+  type DeviceLogEntry,
   type DeviceLogState,
 } from '@kindred-log/shared/crypto';
-import { clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
+import { MAX_RECORD_DATA, clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
@@ -42,9 +45,11 @@ type SyncStatus = {
   removed: boolean;
   /** Whether the family has a recovery key (from the verified device log). */
   hasRecovery: boolean;
+  /** Local changes too large for the server, left unsynced (a very long note). */
+  tooLarge: number;
 };
 
-export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false }));
+export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false, tooLarge: 0 }));
 
 let session: SyncSession | null = null;
 export function sessionFor(s: SyncSettings) {
@@ -167,23 +172,27 @@ async function runOnce() {
   useSyncStore.setState({ phase: 'syncing', error: null });
   try {
     const api = sessionFor(settings);
-    const { state } = await refreshMembers(api, settings);
-    const keys = await refreshKeys(api, state);
+    let { entries, state } = await refreshMembers(api, settings);
+    let keys = await refreshKeys(api, state);
+    // Finish what a phone left half done (a grant or a rotation), then work with the result.
+    if (await heal(api, settings, entries, state, keys)) {
+      ({ entries, state } = await refreshMembers(api, settings));
+      keys = await refreshKeys(api, state);
+    }
     // A phone moved to another family before photo references were tracked: re-upload its own photos once.
     if (settings.photosFamily !== settings.familyId) {
       await forgetPhotoUploads({ onlyLocal: true });
       await saveSync({ photosFamily: settings.familyId });
     }
     await queueUnsyncedPhotos();
-    const { stale } = await pushAll(api, settings, keys);
-    // A stale push means the server has a newer version we may have skipped: read everything again.
-    const applied = await pullAll(api, settings, keys, stale ? 0 : settings.lastSeq);
+    const pushed = await pushAll(api, settings, keys);
+    const applied = (await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq)) || pushed.applied;
     const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: 'Downloading photos', done } }));
     // Phones set up before names existed (or whose name record was lost) name themselves once.
     if (!syncSettings()?.names?.[settings.deviceId]) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
-    useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount() });
+    useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
   } catch (e) {
     const removed = isRemoved(e);
     const message = removed ? 'This phone was removed from the family' : e instanceof Error ? e.message : String(e);
@@ -235,10 +244,57 @@ export async function refreshKeys(api: SyncSession, state?: DeviceLogState) {
   }
   if (changed) saveFamilyKeys(keys);
   if (!keys.has(log.epoch)) throw new Error('Missing the current family key');
-  return { keys, epoch: log.epoch };
+  return { keys, epoch: log.epoch, missing: res.missing ?? [] };
 }
 
 type Keys = Awaited<ReturnType<typeof refreshKeys>>;
+
+/**
+ * Finishes what another phone (or this one) left half done: grants epochs a member lacks, sealed only to keys from
+ * the verified log, and starts the epoch the log says is owed (after a removal or a replaced recovery key).
+ * Returns whether it changed anything. A rotation another phone made first is fine.
+ */
+async function heal(api: SyncSession, settings: SyncSettings, entries: DeviceLogEntry[], state: DeviceLogState, { keys, missing }: Keys) {
+  let changed = false;
+  for (const { recipient, epochs } of missing) {
+    const member = recipient === RECOVERY_SIGNER ? state.recovery : state.members.get(recipient);
+    const held = epochs.filter((e) => keys.has(e));
+    if (!member || !held.length) continue;
+    await api.request('POST', '/v1/keys/grant', {
+      recipient,
+      keys: held.map((epoch) => ({ epoch, sealed: toBase64(seal(member.boxKey, keys.get(epoch)!)) })),
+    });
+    changed = true;
+  }
+  if (state.rotationDue) {
+    try {
+      await rotateKeys(api, settings, entries, state, keys);
+    } catch (e) {
+      // Another phone rotated at the same moment: its epoch counts.
+      if (!(e instanceof SyncHttpError && (e.status === 400 || e.status === 409))) throw e;
+    }
+    changed = true;
+  }
+  return changed;
+}
+
+/**
+ * Starts the next epoch: its signed log entry commits to a new key, sealed to every member and the recovery key,
+ * stored by the server in one step. Whoever had the old key (a removed phone, old recovery words) can't read on.
+ */
+export async function rotateKeys(api: SyncSession, settings: SyncSettings, entries: DeviceLogEntry[], state: DeviceLogState, keys: Map<number, Uint8Array>) {
+  const me = { id: settings.deviceId, keys: deviceIdentity() };
+  const epoch = state.epoch + 1;
+  const key = newSymmetricKey();
+  const entry = appendEntry(state, entries.length, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key } }, Date.now());
+  const sealed: Record<string, string> = {};
+  for (const [id, m] of state.members) sealed[id] = toBase64(seal(m.boxKey, key));
+  if (state.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(state.recovery.boxKey, key));
+  await api.request('POST', '/v1/keys/rotate', { entry, sealed });
+  keys.set(epoch, key);
+  saveFamilyKeys(keys);
+  return { epoch, key };
+}
 
 async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }: Keys) {
   const key = keys.get(epoch)!;
@@ -251,26 +307,37 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }
     // Lets the server delete photos no version uses any more.
     blobs: row.isDeleted ? [] : blobIdsOf(row),
   });
-  let stale = false;
+  let applied = false;
   let done = 0;
+  // Rows too large for the server (a huge note): left pending and skipped, so they can't block everything else.
+  const tooLarge = new Set<string>();
+  const notTooLarge = <T extends { id: SQLiteColumn }>(t: T) => (tooLarge.size ? [notInArray(t.id, [...tooLarge])] : []);
 
   for (;;) {
     // Children first, so a fresh device sees a child before its entries.
-    const children = await db.select().from(schema.childrenTable).where(eq(schema.childrenTable.syncStatus, 'pending')).limit(PUSH_BATCH);
+    const c = schema.childrenTable;
+    const l = schema.logsTable;
+    const children = await db.select().from(c).where(and(eq(c.syncStatus, 'pending'), ...notTooLarge(c))).limit(PUSH_BATCH);
     const logs = children.length < PUSH_BATCH
-      ? await db.select().from(schema.logsTable).where(eq(schema.logsTable.syncStatus, 'pending')).limit(PUSH_BATCH - children.length)
+      ? await db.select().from(l).where(and(eq(l.syncStatus, 'pending'), ...notTooLarge(l))).limit(PUSH_BATCH - children.length)
       : [];
-    if (!children.length && !logs.length) return { stale };
+    if (!children.length && !logs.length) return { applied, tooLarge: tooLarge.size };
 
     await uploadPhotos(api, children, logs);
-    const records: SyncRecord[] = [
-      ...children.map((c) => sealRecord(key, epoch, meta(c.id, 'child', c), childToBody(c))),
-      ...logs.map((l) => sealRecord(key, epoch, meta(l.id, 'log', l), logToBody(l))),
+    const sealed: SyncRecord[] = [
+      ...children.map((row) => sealRecord(key, epoch, meta(row.id, 'child', row), childToBody(row))),
+      ...logs.map((row) => sealRecord(key, epoch, meta(row.id, 'log', row), logToBody(row))),
     ];
+    const records = sealed.filter((r) => {
+      if ((r.data?.length ?? 0) <= MAX_RECORD_CHARS) return true;
+      console.warn(`[sync] ${r.kind} ${r.id} is too large to sync`);
+      tooLarge.add(r.id);
+      return false;
+    });
+    if (!records.length) continue;
     const res = await api.push(records);
-    if (res.stale.length) stale = true;
 
-    // Stale ones are marked synced too: the server's newer version replaces them on the pull.
+    // Stale ones are marked synced too: the server's newer version (sent back as `newer`) replaces them below.
     const settled = new Set([...res.accepted, ...res.stale]);
     const version = new Map([...children, ...logs].map((r) => [r.id, r.updatedAt]));
     db.transaction((tx) => {
@@ -281,10 +348,14 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }
         tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
       }
     });
+    if (res.newer?.length) applied = applyPage(res.newer, keys, settings.deviceId) || applied;
     done += records.length;
     useSyncStore.setState({ progress: { label: 'Uploading', done } });
   }
 }
+
+/** The server's limit on a record's ciphertext (base64url characters). */
+const MAX_RECORD_CHARS = Math.ceil((MAX_RECORD_DATA * 4) / 3);
 
 /** Pulls every page since `since` and applies it. Returns whether anything changed locally. */
 async function pullAll(api: SyncSession, settings: SyncSettings, { keys }: Keys, since: number) {

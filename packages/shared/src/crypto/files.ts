@@ -24,6 +24,10 @@ export function encryptFile(key: Uint8Array, data: Uint8Array): Uint8Array {
   return concatBytes(...parts);
 }
 
+/** The size of `encryptFile`'s output for `length` bytes of input. */
+export const encryptedFileSize = (length: number) =>
+  MAGIC.length + PREFIX_BYTES + length + TAG_BYTES * Math.max(1, Math.ceil(length / FILE_CHUNK));
+
 export function decryptFile(key: Uint8Array, box: Uint8Array): Uint8Array {
   const header = MAGIC.length + PREFIX_BYTES;
   if (box.length < header + TAG_BYTES || !MAGIC.every((b, i) => box[i] === b)) throw new Error('Not an encrypted file');

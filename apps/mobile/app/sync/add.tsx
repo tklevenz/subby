@@ -15,7 +15,8 @@ type Step =
   | { kind: 'confirm'; invite: Invite; claimant: Claimant; code: string }
   | { kind: 'approving' }
   | { kind: 'done' }
-  | { kind: 'error'; message: string };
+  /** `retry`: the approval failed partway; trying again finishes it for the same phone (a new code would orphan it). */
+  | { kind: 'error'; message: string; retry?: Claimant };
 
 const POLL_MS = 2000;
 
@@ -63,7 +64,7 @@ export default function AddPhoneScreen() {
       await approveClaim(claimant);
       setStep({ kind: 'done' });
     } catch (e) {
-      setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e), retry: claimant });
     }
   };
 
@@ -126,7 +127,11 @@ export default function AddPhoneScreen() {
         <>
           <Text className="text-ink text-xl font-bold mt-4">Something went wrong</Text>
           <Text className="text-red-soft text-sm mt-2">{step.message}</Text>
-          <Button label="Try again" onPress={start} />
+          {step.retry ? (
+            <Button label="Try adding it again" onPress={() => approve(step.retry!)} />
+          ) : (
+            <Button label="Try again" onPress={start} />
+          )}
         </>
       ) : null}
     </ScrollView>

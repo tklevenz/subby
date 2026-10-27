@@ -44,6 +44,11 @@ export type DeviceLogState = {
   /** The current key epoch (the latest one the log started) and every epoch's key commitment. */
   epoch: number;
   keyHashes: Map<number, string>;
+  /**
+   * A new epoch is owed: a device was removed, or the recovery key was replaced or cleared, since the last one.
+   * Whoever holds the old key (the removed phone, the old words) must not read what comes next.
+   */
+  rotationDue: boolean;
   /** Hash of the last entry: the `prev` of the next one. */
   head: string;
 };
@@ -109,6 +114,7 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
   let recovery: Member | null = null;
   let epoch = 0;
   const keyHashes = new Map<number, string>();
+  let rotationDue = false;
   let head = '';
 
   entries.forEach((e, i) => {
@@ -138,6 +144,7 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
       if (!e.keyHash || fromBase64(e.keyHash).length !== 32) fail('missing key commitment');
       epoch = e.epoch!;
       keyHashes.set(epoch, e.keyHash!);
+      rotationDue = false;
     } else if (e.epoch !== null || e.keyHash !== null) {
       fail('only create and epoch entries carry a key');
     }
@@ -154,9 +161,11 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
       case 'remove':
         if (!members.delete(e.deviceId)) fail('device is not a member');
         removed.add(e.deviceId);
+        rotationDue = true;
         break;
       case 'setRecovery':
         if (e.deviceId !== RECOVERY_SIGNER) fail('setRecovery must target the recovery key');
+        if (recovery) rotationDue = true;
         recovery = e.signKey || e.boxKey ? keysOf(e) : null;
         break;
       default:
@@ -166,7 +175,7 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
   });
 
   if (!entries.length) throw new Error('Device log is empty');
-  return { members, recovery, epoch, keyHashes, head };
+  return { members, recovery, epoch, keyHashes, rotationDue, head };
 }
 
 /** Builds the next entry on top of a verified state. */

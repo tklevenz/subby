@@ -68,8 +68,13 @@ export async function createApp(config: Config) {
   const { db, close } = await openDb(config.databaseUrl, config.migrationsFolder);
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.with(config, db),
-    // Records are small, but a first upload of a long history comes in 500-record batches.
-    new FastifyAdapter({ bodyLimit: 16 * 1024 * 1024 }),
+    new FastifyAdapter({
+      // Records are small, but a first upload of a long history comes in 500-record batches.
+      bodyLimit: 16 * 1024 * 1024,
+      // On shutdown, cut every connection, not only idle ones: one that opened but hasn't sent a request yet
+      // would otherwise hold the restart for the 60 s header timeout. Sync requests are safe to retry.
+      forceCloseConnections: true,
+    }),
     { logger: ['error', 'warn'] },
   );
   // Encrypted files arrive as raw bytes.

@@ -67,7 +67,13 @@ export class SyncService {
       }
       if (seq !== family.seq) await tx.update(schema.families).set({ seq }).where(eq(schema.families.id, auth.familyId));
       const dropped = await this.blobs.link(tx, auth.familyId, accepted);
-      return { seq, accepted: accepted.map((r) => r.id), stale, dropped };
+      // The versions that beat this push, so the phone can apply them without pulling everything again.
+      const newer = stale.length
+        ? (await tx.select().from(schema.records).where(and(eq(schema.records.familyId, auth.familyId), inArray(schema.records.id, stale)))).map(
+            ({ familyId: _, ...r }) => r,
+          )
+        : [];
+      return { seq, accepted: accepted.map((r) => r.id), stale, newer, dropped };
     });
 
     await this.blobs.deleteFiles(result.dropped);
@@ -75,7 +81,7 @@ export class SyncService {
       this.live.publish(auth.familyId, { type: 'seq', seq: result.seq });
       this.pushes.changed(auth.familyId, auth.deviceId);
     }
-    return { seq: result.seq, accepted: result.accepted, stale: result.stale };
+    return { seq: result.seq, accepted: result.accepted, stale: result.stale, newer: result.newer };
   }
 
   async pull(auth: AuthContext, since: number, limit: number): Promise<PullResponse> {

@@ -3,7 +3,6 @@ import {
   RECOVERY_SIGNER,
   appendEntry,
   fromBase64,
-  newSymmetricKey,
   openFamilyKey,
   pairingCode,
   recoveryIdentity,
@@ -32,7 +31,7 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { checkServer, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { pushDeviceName, refreshKeys, refreshMembers, requestSync, saveSync, sessionFor, syncSettings } from './engine';
+import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys, saveSync, sessionFor, syncSettings } from './engine';
 
 export { defaultDeviceName } from './engine';
 
@@ -70,13 +69,18 @@ export function claimCode(invite: Invite, claimant: NonNullable<InviteResponse['
   return pairingCode(member().me.keys.sign.publicKey, fromBase64(claimant.signKey), invite.secret);
 }
 
-/** After the codes matched: signs the new phone into the device log and hands it every family key. */
+/**
+ * After the codes matched: signs the new phone into the device log and hands it every family key. Safe to retry:
+ * a phone already added only gets its keys (and any phone's next sync grants keys still missing).
+ */
 export async function approveClaim(claimant: NonNullable<InviteResponse['claimant']>) {
   const { settings, api, me } = member();
   const { entries, state } = await refreshMembers(api, settings);
   const keys = { sign: fromBase64(claimant.signKey), box: fromBase64(claimant.boxKey) };
-  const entry = appendEntry(state, entries.length, me, { type: 'add', deviceId: claimant.deviceId, keys }, Date.now());
-  await api.request('POST', '/v1/families/me/log', { entry });
+  if (!state.members.has(claimant.deviceId)) {
+    const entry = appendEntry(state, entries.length, me, { type: 'add', deviceId: claimant.deviceId, keys }, Date.now());
+    await api.request('POST', '/v1/families/me/log', { entry });
+  }
   const sealed = [...loadFamilyKeys()].map(([epoch, key]) => ({ epoch, sealed: toBase64(seal(keys.box, key)) }));
   await api.request('POST', '/v1/keys/grant', { recipient: claimant.deviceId, keys: sealed });
   await saveSync({ knownDevices: [...(settings.knownDevices ?? []), claimant.deviceId] });
@@ -94,17 +98,8 @@ export async function removeDevice(deviceId: string) {
   const entry = appendEntry(state, entries.length, me, { type: 'remove', deviceId }, Date.now());
   await api.request('POST', '/v1/families/me/log', { entry });
   const after = verifyDeviceLog([...entries, entry]);
-
-  // The new epoch's log entry commits to the key; the server stores it together with the sealed copies.
-  const epoch = after.epoch + 1;
-  const key = newSymmetricKey();
-  const epochEntry = appendEntry(after, entries.length + 1, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key } }, Date.now());
-  const sealed: Record<string, string> = {};
-  for (const [id, m] of after.members) sealed[id] = toBase64(seal(m.boxKey, key));
-  if (after.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(after.recovery.boxKey, key));
-  await api.request('POST', '/v1/keys/rotate', { entry: epochEntry, sealed });
-  keys.set(epoch, key);
-  saveFamilyKeys(keys);
+  // If this stops here (no connection, app closed), the log says a rotation is owed and the next sync does it.
+  const { epoch, key } = await rotateKeys(api, settings, [...entries, entry], after, keys);
   // Its name goes too (a tombstone, so the server drops the ciphertext and other phones forget it).
   await api.push([sealRecord(key, epoch, { id: deviceId, kind: 'device', updatedAt: Date.now(), deviceId: me.id, deleted: true }, null)]);
 
@@ -126,12 +121,18 @@ export async function setRecoveryKey(words: string) {
   const recovery = recoveryIdentity(words);
   const { entries, state } = await refreshMembers(api, settings);
   const keys = { sign: recovery.sign.publicKey, box: recovery.box.publicKey };
-  const entry = appendEntry(state, entries.length, me, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys }, Date.now());
-  await api.request('POST', '/v1/families/me/log', { entry });
+  // A retry with the same words after a failed grant doesn't log them twice.
+  const alreadySet = state.recovery && toBase64(state.recovery.signKey) === toBase64(keys.sign);
+  if (!alreadySet) {
+    const entry = appendEntry(state, entries.length, me, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys }, Date.now());
+    await api.request('POST', '/v1/families/me/log', { entry });
+  }
   const { keys: familyKeys } = await refreshKeys(api);
   const sealed = [...familyKeys].map(([epoch, key]) => ({ epoch, sealed: toBase64(seal(keys.box, key)) }));
   await api.request('POST', '/v1/keys/grant', { recipient: RECOVERY_SIGNER, keys: sealed });
   await refreshMembers(api, settings);
+  // Replacing earlier words owes a new epoch (the old words must not read on); the sync run starts it.
+  requestSync(0);
 }
 
 /**
@@ -248,11 +249,16 @@ async function completeJoin(
   check(state);
   if (!state.members.has(deviceId)) throw new Error('This phone was not added to the family');
 
-  const res = await session.request<KeysResponse>('GET', '/v1/keys');
   const identity = deviceIdentity();
-  // Each key must match the family's commitment in the log; the server can't slip in its own.
-  const keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(identity, state, k.epoch, fromBase64(k.sealed))]));
-  if (!keys.has(state.epoch)) throw new Error("This phone didn't get the family key. Try again.");
+  // Each key must match the family's commitment in the log; the server can't slip in its own. If the inviting
+  // phone's grant failed, its next sync grants them, so wait a little before giving up.
+  let keys = new Map<number, Uint8Array>();
+  for (let attempt = 0; attempt < 10 && !keys.has(state.epoch); attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 2000));
+    const res = await session.request<KeysResponse>('GET', '/v1/keys');
+    keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(identity, state, k.epoch, fromBase64(k.sealed))]));
+  }
+  if (!keys.has(state.epoch)) throw new Error("This phone didn't get the family key yet. Open Sync on the other phone, then try again.");
   saveFamilyKeys(keys);
 
   if (local === 'replace') {

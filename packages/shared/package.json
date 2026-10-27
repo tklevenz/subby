@@ -20,7 +20,7 @@
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/bip39": "^2.4.0",
-    "fflate": "0.8.2",
+    "fflate": "0.8.3",
     "zod": "^3.24.0"
   },
   "devDependencies": {

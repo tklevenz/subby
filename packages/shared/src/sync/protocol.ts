@@ -60,7 +60,15 @@ export type SealedKey = { epoch: number; recipient: string; sealed: string };
  * GET /v1/keys: every epoch sealed for the caller. `currentEpoch` is only a hint: phones take the current epoch
  * from the verified device log and check each key against its commitment there (`openFamilyKey`).
  */
-export type KeysResponse = { currentEpoch: number; keys: SealedKey[] };
+export type KeysResponse = {
+  currentEpoch: number;
+  keys: SealedKey[];
+  /**
+   * Members (device ids, or 'recovery') lacking some epochs, e.g. after an approval whose grant failed. Any phone
+   * holding those keys grants them, sealed only to public keys from the verified log. Empty for the recovery key.
+   */
+  missing: { recipient: string; epochs: number[] }[];
+};
 
 /** POST /v1/keys/grant: give a new member (or the recovery key) all existing epochs. */
 export const GrantKeysSchema = z.object({
@@ -129,8 +137,8 @@ export const SyncRecordSchema = z.object({
 
 /** POST /v1/sync/push */
 export const PushSchema = z.object({ records: z.array(SyncRecordSchema).min(1).max(MAX_PUSH) });
-/** `stale`: the server has a newer version; pull to get it. */
-export type PushResponse = { seq: number; accepted: string[]; stale: string[] };
+/** `stale`: the server has a newer version of these; `newer` carries those versions, so no full re-pull is needed. */
+export type PushResponse = { seq: number; accepted: string[]; stale: string[]; newer: PullResponse['records'] };
 
 /** GET /v1/sync/pull?since=<seq>&limit=<n> */
 export type PullResponse = { records: (z.infer<typeof SyncRecordSchema> & { seq: number })[]; seq: number; more: boolean };

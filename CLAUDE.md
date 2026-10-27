@@ -37,6 +37,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - Sealed boxes are anonymous, so the server could seal a key of its own. Phones therefore open keys only with `openFamilyKey`, which checks the commitment, and take the current epoch from the log (`state.epoch`), never from the server.
       - `assertLogContinues` rejects a log older than the one a phone already saw (`settings.sync.logSeen`), because a server could otherwise serve a prefix that hides a removal or a newer epoch.
       - Only devices start epochs, one at a time; the recovery key can only `add`.
+      - `state.rotationDue`: a removal, or a replaced or cleared recovery key, owes a new epoch.
     - `files`: chunked photo encryption.
 - `src/sync/` (`@kindred-log/shared/sync`):
   - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD; tombstones carry no data.
@@ -145,7 +146,13 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
     - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
-    - Own echoes are skipped. A stale push re-pulls from 0.
+    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`) and applies them; there's no re-pull from 0.
+    - **Self-healing** (`heal`, every run):
+      - Grants epochs that `GET /v1/keys` lists as `missing` for a member or the recovery key, sealed only to public keys from the verified log.
+      - Rotates when `rotationDue` (`rotateKeys`, also used by `removeDevice`). A concurrent rotation by another phone (400) is fine.
+      - So an approval, recovery-key setup or removal that stopped halfway is finished by the next sync. `approveClaim` and `setRecoveryKey` are also safe to retry, and `completeJoin` waits up to ~20 s for keys.
+    - Rows whose sealed data exceeds `MAX_RECORD_DATA` stay pending and are skipped (`useSyncStore.tooLarge`, shown on the Sync screen).
+    - Photos over `MAX_BLOB_BYTES` stay on the phone only (`encryptedFileSize`), so neither can block sync.
     - The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
   - `useSyncEngine` (in `_layout`) triggers sync on start, on store changes (debounced), when the app comes to the foreground, and on live messages.
   - **Background** (`background.ts`, imported first by the entry `index.ts`, because headless launches render no screen): `backgroundSync` = `appReady()` (`features/startup.ts`, opens the DB once per runtime) + `syncNow` + `replanReminders`.
@@ -162,7 +169,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.
 
 ### `apps/server` (`@kindred-log/server`, Kindred Sync; **AGPL-3.0**, everything else is MIT)
-- **What it is:** a zero-knowledge sync relay. NestJS (Fastify) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
+- **What it is:** a zero-knowledge sync relay. NestJS 12 (Fastify 5; the Fastify adapter pins its fastify version, so keep the direct `fastify` dependency equal to it) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
   - The server stores only ids, public keys, signatures, versions and ciphertext. Never add a column that holds readable user data.
   - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
 - **Endpoints (`/v1`):**
@@ -186,6 +193,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `lockFamily(tx, id)` serializes writes per family.
 - **Single-instance assumptions:** auth challenges and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
 - **Housekeeping** (`common/housekeeping.ts`, hourly): deletes expired sessions and invites more than a day past expiry.
+- **Shutdown:** Fastify runs with `forceCloseConnections: true`, and `LiveGateway` terminates its sockets on destroy. Otherwise a connection that never sent a request (or a closing WebSocket) holds a restart for up to the 60 s header timeout; that was the flaky e2e teardown.
 - **Query parameters:** numbers are parsed with `queryInt` (whole numbers only, otherwise 400).
 - **Modes:** `MODE=self|hosted`. `Entitlements.canSync` is the hook for the hosted subscription (a stub for now).
 - **Commands** (in `apps/server`):

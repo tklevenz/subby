@@ -194,6 +194,20 @@ describe('device log', () => {
     );
   });
 
+  it('owes a rotation after a removal or a replaced recovery key, until the next epoch', () => {
+    const recoveryKeys = (words = newRecoveryWords()) => keysOf(recoveryIdentity(words));
+    let log = push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) });
+    expect(verifyDeviceLog(log).rotationDue).toBe(false);
+    log = push(log, phoneA, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys: recoveryKeys() });
+    expect(verifyDeviceLog(log).rotationDue).toBe(false); // a first recovery key gets the keys anyway
+    log = push(log, phoneA, { type: 'remove', deviceId: phoneB.id });
+    expect(verifyDeviceLog(log).rotationDue).toBe(true);
+    log = push(log, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 2, key: newSymmetricKey() } });
+    expect(verifyDeviceLog(log).rotationDue).toBe(false);
+    log = push(log, phoneA, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys: recoveryKeys() });
+    expect(verifyDeviceLog(log).rotationDue).toBe(true); // the old words must not read what comes next
+  });
+
   it('notices a log rolled back to an older version', () => {
     const log = push(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) }), phoneA, { type: 'remove', deviceId: phoneB.id });
     const seen = { length: log.length, head: verifyDeviceLog(log).head };
@@ -251,6 +265,16 @@ describe('utf8 fallback (no TextDecoder, as on Hermes)', () => {
       expect(() => bytesToUtf8(new Uint8Array([0xc3]))).toThrow();
     } finally {
       globalThis.TextDecoder = original;
+    }
+  });
+});
+
+describe('encryptedFileSize', () => {
+  it('matches encryptFile for every chunk boundary', async () => {
+    const { encryptedFileSize } = await import('../crypto');
+    const key = newSymmetricKey();
+    for (const size of [0, 1, FILE_CHUNK - 1, FILE_CHUNK, FILE_CHUNK + 1, FILE_CHUNK * 3]) {
+      expect(encryptFile(key, new Uint8Array(size)).length).toBe(encryptedFileSize(size));
     }
   });
 });

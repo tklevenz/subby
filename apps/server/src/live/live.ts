@@ -66,8 +66,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     this.bus.remove(socket);
   }
 
+  // Shutting down: drop every socket now (apps reconnect). Otherwise the HTTP server waits for upgraded sockets,
+  // and ws keeps a closing one for up to 30 s, so a restart would hang until Docker kills the process.
   onModuleDestroy() {
     clearInterval(this.heartbeat);
+    for (const socket of this.all) socket.terminate();
+    this.all.clear();
   }
 
   // Drops sockets that stopped answering (phones switching networks rarely close cleanly).
