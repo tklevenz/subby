@@ -132,8 +132,8 @@ export const LOG_TYPES = [
 export const LogTypeSchema = z.enum(LOG_TYPES);
 
 export const LogEntrySchema = z.object({
-  id: z.string().uuid(),          // UUIDv7
-  childId: z.string().uuid(),     // UUIDv7
+  id: z.uuid(),          // UUIDv7
+  childId: z.uuid(),     // UUIDv7
   logType: LogTypeSchema,
   startedAt: z.number().int(),    // Unix timestamp (ms) - when the event occurred / began
   // TIMED_LOG_TYPES: always set once complete (= startedAt for instant ones like a bottle), null = running timer.

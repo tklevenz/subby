@@ -171,7 +171,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 ### `apps/server` (`@kindred-log/server`, Kindred Sync; **AGPL-3.0**, everything else is MIT)
 - **What it is:** a zero-knowledge sync relay. NestJS 12 (Fastify 5; the Fastify adapter pins its fastify version, so keep the direct `fastify` dependency equal to it) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
   - The server stores only ids, public keys, signatures, versions and ciphertext. Never add a column that holds readable user data.
-  - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
+  - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod 4: use `z.uuid()` and `.loose()`, not the deprecated `z.string().uuid()` and `.passthrough()`). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
 - **Endpoints (`/v1`):**
   - `info`.
   - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed.

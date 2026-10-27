@@ -98,10 +98,10 @@ const BackupChildSchema = ChildSchema.omit({ photoUri: true, photoBlob: true, sy
 // The payload is checked for its shape only (an object of the entry's type): a backup must restore what the
 // app stored, even values a stricter schema would reject. Photo fields are device-local and dropped.
 const BackupLogSchema = LogEntrySchema.omit({ syncStatus: true, isDeleted: true, payload: true })
-  .extend({ payload: z.object({ type: LogTypeSchema }).passthrough(), photo: photoRef })
+  .extend({ payload: z.object({ type: LogTypeSchema }).loose(), photo: photoRef })
   .refine((l) => l.payload.type === l.logType, 'payload type differs from logType');
 
-const TombstoneSchema = z.object({ kind: z.enum(['child', 'log']), id: z.string().uuid(), updatedAt: z.number().int() });
+const TombstoneSchema = z.object({ kind: z.enum(['child', 'log']), id: z.uuid(), updatedAt: z.number().int() });
 
 const ManifestSchema = z.object({
   format: z.literal(BACKUP_FORMAT),
@@ -132,7 +132,7 @@ export function readBackup(zip: Uint8Array): BackupContents {
   if (manifest.data.version > BACKUP_VERSION) throw new BackupError('This backup was made by a newer version of the app. Update the app first.');
 
   let invalid = 0;
-  const valid = <T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, rows: unknown[]): T[] =>
+  const valid = <S extends z.ZodType>(schema: S, rows: unknown[]): z.output<S>[] =>
     rows.flatMap((r) => {
       const res = schema.safeParse(r);
       if (res.success) return [res.data];

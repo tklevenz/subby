@@ -4,13 +4,13 @@ import { z } from 'zod';
  * A photo as synced: the encrypted file's id on the sync server and the key it was encrypted with
  * (base64url). Lives inside the encrypted record; `photoUri` is this device's local copy.
  */
-export const PhotoBlobSchema = z.object({ id: z.string().uuid(), key: z.string() });
+export const PhotoBlobSchema = z.object({ id: z.uuid(), key: z.string() });
 export type PhotoBlob = z.infer<typeof PhotoBlobSchema>;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
 export const ChildSchema = z.object({
-  id: z.string().uuid(),          // UUIDv7
+  id: z.uuid(),          // UUIDv7
   name: z.string().min(1),
   birthDate: isoDate,
   birthTime: z.string().regex(/^\d{2}:\d{2}$/).nullable(),

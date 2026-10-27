@@ -7,7 +7,7 @@ import { RECORD_KINDS } from './envelope';
  */
 
 const b64 = z.string().regex(/^[A-Za-z0-9_-]*$/, 'Expected base64url');
-const uuid = z.string().uuid();
+const uuid = z.uuid();
 /** Who a sealed family key is for: a device id, or the recovery key. */
 export const recipient = z.union([uuid, z.literal('recovery')]);
 

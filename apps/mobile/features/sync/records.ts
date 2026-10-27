@@ -16,7 +16,7 @@ export type LogBody = Pick<LogEntry, 'childId' | 'logType' | 'startedAt' | 'ende
 const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
   child: ChildSchema.pick({ name: true, birthDate: true, birthTime: true, dueDate: true, sex: true }).extend({ photoBlob: PhotoBlobSchema.nullable() }),
   log: LogEntrySchema.pick({ childId: true, logType: true, startedAt: true, endedAt: true, createdBy: true })
-    .extend({ payload: z.object({ type: LogTypeSchema, photoBlob: PhotoBlobSchema.optional() }).passthrough() })
+    .extend({ payload: z.object({ type: LogTypeSchema, photoBlob: PhotoBlobSchema.optional() }).loose() })
     .refine((l) => l.payload.type === l.logType),
   device: z.object({ name: z.string().min(1).max(100) }),
 };
