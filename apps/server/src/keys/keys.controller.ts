@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Inject, Post, UseGuards } from '@nestjs/common';
 import { GrantKeysSchema, RotateKeysSchema } from '@kindred-log/shared/sync';
+import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
 import { parse } from '../common/validate';
 import { Auth, DeviceGuard, DeviceOrRecoveryGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
@@ -28,7 +29,7 @@ export class KeysController {
   @HttpCode(200)
   @UseGuards(DeviceGuard)
   rotate(@Auth() auth: AuthContext, @Body() body: unknown) {
-    const { epoch, sealed } = parse(RotateKeysSchema, body);
-    return this.keys.rotate(auth, epoch, sealed);
+    const { entry, sealed } = parse(RotateKeysSchema, body);
+    return this.keys.rotate(auth, entry as DeviceLogEntry, sealed);
   }
 }

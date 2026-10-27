@@ -3,7 +3,17 @@ import * as Device from 'expo-device';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogEntry } from '@kindred-log/shared';
-import { appendEntry, fromBase64, newSymmetricKey, openSealed, seal, toBase64, verifyDeviceLog } from '@kindred-log/shared/crypto';
+import {
+  appendEntry,
+  assertLogContinues,
+  fromBase64,
+  newSymmetricKey,
+  openFamilyKey,
+  seal,
+  toBase64,
+  verifyDeviceLog,
+  type DeviceLogState,
+} from '@kindred-log/shared/crypto';
 import { clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
@@ -12,7 +22,7 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
+import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, isValidBody, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
 
 const PUSH_BATCH = 500;
@@ -67,8 +77,9 @@ export async function setUpSync(serverInput: string, deviceName: string) {
   const deviceId = uuidv7();
   const familyId = uuidv7();
   const keys = { sign: identity.sign.publicKey, box: identity.box.publicKey };
-  const entry = appendEntry(null, 0, { id: deviceId, keys: identity }, { type: 'create', deviceId, keys }, Date.now());
   const familyKey = newSymmetricKey();
+  // The create entry commits to the first family key, so every phone can check the key it's given.
+  const entry = appendEntry(null, 0, { id: deviceId, keys: identity }, { type: 'create', deviceId, keys, familyKey: { epoch: 1, key: familyKey } }, Date.now());
   await createFamily(server, { familyId, entry, sealedKey: toBase64(seal(identity.box.publicKey, familyKey)) });
 
   saveFamilyKeys(new Map([[1, familyKey]]));
@@ -78,7 +89,16 @@ export async function setUpSync(serverInput: string, deviceName: string) {
   await forgetPhotoUploads();
   await useSettingsStore
     .getState()
-    .set('sync', { server, familyId, deviceId, lastSeq: 0, lastSyncedAt: null, knownDevices: [deviceId], photosFamily: familyId });
+    .set('sync', {
+      server,
+      familyId,
+      deviceId,
+      lastSeq: 0,
+      lastSyncedAt: null,
+      knownDevices: [deviceId],
+      photosFamily: familyId,
+      logSeen: { length: 1, head: verifyDeviceLog([entry]).head },
+    });
   await pushDeviceName(deviceName);
   requestSync(0);
 }
@@ -147,8 +167,8 @@ async function runOnce() {
   useSyncStore.setState({ phase: 'syncing', error: null });
   try {
     const api = sessionFor(settings);
-    await refreshMembers(api, settings);
-    const keys = await refreshKeys(api);
+    const { state } = await refreshMembers(api, settings);
+    const keys = await refreshKeys(api, state);
     // A phone moved to another family before photo references were tracked: re-upload its own photos once.
     if (settings.photosFamily !== settings.familyId) {
       await forgetPhotoUploads({ onlyLocal: true });
@@ -177,12 +197,15 @@ export const isRemoved = (e: unknown) =>
   e instanceof SyncHttpError && (e.status === 401 || (e.status === 404 && /unknown device/i.test(e.message)));
 
 /**
- * Verifies the signed device log (a server can't add phones on its own) and publishes the members.
- * Phones that weren't there last time are flagged once, so a parent notices a phone they didn't add.
+ * Verifies the signed device log (a server can't add phones on its own, nor serve an older log than this phone
+ * saw) and publishes the members. Phones that weren't there last time are flagged once, so a parent notices a
+ * phone they didn't add.
  */
 export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
   const { entries } = await api.log();
+  assertLogContinues(entries, syncSettings()?.logSeen ?? settings.logSeen);
   const state = verifyDeviceLog(entries);
+  if (syncSettings()?.logSeen?.length !== entries.length) await saveSync({ logSeen: { length: entries.length, head: state.head } });
   if (!state.members.has(settings.deviceId)) throw new SyncHttpError(401, 'Removed');
   const ids = [...state.members.keys()];
   const known = new Set(settings.knownDevices ?? [settings.deviceId]);
@@ -196,19 +219,23 @@ export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
   return { entries, state };
 }
 
-/** Opens any family keys sealed to this device that it doesn't have yet (new epochs after a removal). */
-export async function refreshKeys(api: SyncSession) {
+/**
+ * Opens any family keys sealed to this device that it doesn't have yet (new epochs after a removal), each checked
+ * against its commitment in the verified device log. The current epoch is the log's, never the server's word.
+ */
+export async function refreshKeys(api: SyncSession, state?: DeviceLogState) {
+  const log = state ?? (await refreshMembers(api, syncSettings()!)).state;
   const keys = loadFamilyKeys();
   const res = await api.keys();
   let changed = false;
   for (const k of res.keys) {
     if (keys.has(k.epoch)) continue;
-    keys.set(k.epoch, openSealed(deviceIdentity(), fromBase64(k.sealed)));
+    keys.set(k.epoch, openFamilyKey(deviceIdentity(), log, k.epoch, fromBase64(k.sealed)));
     changed = true;
   }
   if (changed) saveFamilyKeys(keys);
-  if (!keys.has(res.currentEpoch)) throw new Error('Missing the current family key');
-  return { keys, epoch: res.currentEpoch };
+  if (!keys.has(log.epoch)) throw new Error('Missing the current family key');
+  return { keys, epoch: log.epoch };
 }
 
 type Keys = Awaited<ReturnType<typeof refreshKeys>>;
@@ -279,8 +306,15 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys }: Keys,
 
 /** Applies one page in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
-  // Decrypt first: a record we can't open fails the run before anything is written.
-  const opened = records.map((r) => ({ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }));
+  // Decrypt first: a record we can't open fails the run before anything is written. One that opens but is
+  // malformed (a buggy or hostile phone) is skipped rather than written.
+  const opened = records
+    .map((r) => ({ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }))
+    .filter(({ record, body }) => {
+      if (record.deleted || isValidBody(record.kind, body)) return true;
+      console.warn(`[sync] skipped malformed ${record.kind} record ${record.id}`);
+      return false;
+    });
   applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
   const photos: (string | null | undefined)[] = [];
   let changed = false;

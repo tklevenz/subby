@@ -1,5 +1,5 @@
 import { Body, ConflictException, Controller, Get, HttpCode, Inject, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { fromBase64 } from '@kindred-log/shared/crypto';
 import { ClaimInviteSchema, CreateInviteSchema, InviteStatusSchema, type InviteResponse } from '@kindred-log/shared/sync';
 import { DB, schema, type Db } from '../db/db';
@@ -35,9 +35,14 @@ export class InvitesService {
 
   async claim(id: string, claim: { claimKey: string; deviceId: string; signKey: string; boxKey: string; mac: string }) {
     const invite = await this.checked(id, claim.claimKey);
-    if (invite.status !== 'open' || invite.expiresAt < new Date()) throw new ConflictException('This code was already used or has expired');
     const { claimKey: _, ...claimant } = claim;
-    await this.db.update(schema.invites).set({ status: 'claimed', claimant }).where(eq(schema.invites.id, id));
+    // Conditional, so two phones claiming the same code at once can't both succeed.
+    const [won] = await this.db
+      .update(schema.invites)
+      .set({ status: 'claimed', claimant })
+      .where(and(eq(schema.invites.id, id), eq(schema.invites.status, 'open'), gt(schema.invites.expiresAt, new Date())))
+      .returning({ id: schema.invites.id });
+    if (!won) throw new ConflictException('This code was already used or has expired');
     this.live.publish(invite.familyId, { type: 'invite', inviteId: id, status: 'claimed' });
     return this.response({ ...invite, status: 'claimed', claimant });
   }

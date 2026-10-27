@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { eq, and, desc, gte, isNull, or, inArray } from 'drizzle-orm';
+import { eq, and, desc, gte, isNull, or, inArray, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
@@ -173,7 +173,8 @@ export const useLogStore = create<LogState>((set, get) => ({
     const now = Date.now();
     await db
       .update(schema.logsTable)
-      .set({ isDeleted: true, updatedAt: now, syncStatus: 'pending' })
+      // Only the id and type stay behind (for sync); nothing personal is kept in a deleted entry.
+      .set({ isDeleted: true, payload: sql`json_object('type', ${schema.logsTable.logType})`, updatedAt: now, syncStatus: 'pending' })
       .where(eq(schema.logsTable.id, id));
     if (current) deletePhoto(photoOf(current.payload));
 

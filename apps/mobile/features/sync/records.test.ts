@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Child, LogEntry } from '@kindred-log/shared';
-import { blobIdsOf, bodyToChild, bodyToLog, childToBody, logToBody, needsPhotoUpload } from './records';
+import { blobIdsOf, bodyToChild, bodyToLog, childToBody, isValidBody, logToBody, needsPhotoUpload } from './records';
 
 const blobA = { id: '0190a000-0000-7000-8000-0000000000aa', key: 'a-key' };
 const blobB = { id: '0190a000-0000-7000-8000-0000000000bb', key: 'b-key' };
@@ -69,5 +69,23 @@ describe('sync record bodies', () => {
   it('builds new rows for records this device has never seen', () => {
     expect(bodyToChild(child.id, childToBody(child), { updatedAt: 2000 }, undefined)).toMatchObject({ photoUri: null, photoBlob: blobA, importRef: null });
     expect(bodyToLog(note.id, logToBody(note), { updatedAt: 2000 }, undefined).payload).toEqual({ type: 'note', text: 'First smile', photoBlob: blobB });
+  });
+});
+
+describe('isValidBody', () => {
+  it('accepts what this app writes', () => {
+    expect(isValidBody('child', childToBody(child))).toBe(true);
+    expect(isValidBody('log', logToBody(note))).toBe(true);
+    expect(isValidBody('device', { name: 'Pixel 10' })).toBe(true);
+  });
+
+  it('rejects malformed bodies, including photo ids that aren\'t UUIDs', () => {
+    expect(isValidBody('child', { ...childToBody(child), birthDate: 'soon' })).toBe(false);
+    expect(isValidBody('child', { ...childToBody(child), photoBlob: { id: '../../SQLite/kindred.db', key: 'x' } })).toBe(false);
+    expect(isValidBody('log', { ...logToBody(note), logType: 'sleep' })).toBe(false);
+    expect(isValidBody('log', { ...logToBody(note), payload: { ...note.payload, photoBlob: { id: 'nope', key: 'x' } } })).toBe(false);
+    expect(isValidBody('log', { ...logToBody(note), startedAt: 'yesterday' })).toBe(false);
+    expect(isValidBody('device', { name: '' })).toBe(false);
+    expect(isValidBody('log', null)).toBe(false);
   });
 });

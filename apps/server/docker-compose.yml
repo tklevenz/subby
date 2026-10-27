@@ -38,7 +38,9 @@ services:
     volumes:
       - blobs:/data
     ports:
-      - "${HTTP_PORT:-8787}:8787"
+      # With the https profile, set HTTP_BIND=127.0.0.1 so plain HTTP isn't reachable from outside (Caddy talks
+      # to the server over the compose network, not this port).
+      - "${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-8787}:8787"
     depends_on:
       db:
         condition: service_healthy

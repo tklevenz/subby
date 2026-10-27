@@ -49,15 +49,11 @@ export class FamiliesService {
   /** Appends one entry after verifying the whole chain with it, then applies its effect. */
   async append(auth: AuthContext, entry: DeviceLogEntry) {
     if (entry.signer !== auth.deviceId) throw new ForbiddenException('Entries must be signed by the caller');
+    // An epoch comes with its sealed keys (POST /v1/keys/rotate), so nobody is left without the new key.
+    if (entry.type === 'epoch' || entry.type === 'create') throw new BadRequestException(`"${entry.type}" entries can't be appended here`);
     const result = await this.db.transaction(async (tx) => {
       await lockFamily(tx, auth.familyId);
-      const rows = await tx
-        .select({ entry: schema.deviceLog.entry })
-        .from(schema.deviceLog)
-        .where(eq(schema.deviceLog.familyId, auth.familyId))
-        .orderBy(asc(schema.deviceLog.index));
-      verified([...rows.map((r) => r.entry), entry]);
-      await tx.insert(schema.deviceLog).values({ familyId: auth.familyId, index: entry.index, entry });
+      await appendVerified(tx, auth.familyId, entry);
       await this.apply(tx, auth.familyId, entry);
       return { index: entry.index };
     });
@@ -100,6 +96,18 @@ export class FamiliesService {
         break;
     }
   }
+}
+
+/** Inside a locked transaction: verifies the whole chain with `entry` appended, then stores it. */
+export async function appendVerified(tx: Tx, familyId: string, entry: DeviceLogEntry) {
+  const rows = await tx
+    .select({ entry: schema.deviceLog.entry })
+    .from(schema.deviceLog)
+    .where(eq(schema.deviceLog.familyId, familyId))
+    .orderBy(asc(schema.deviceLog.index));
+  const state = verified([...rows.map((r) => r.entry), entry]);
+  await tx.insert(schema.deviceLog).values({ familyId, index: entry.index, entry });
+  return state;
 }
 
 /** Serializes writes per family (log appends, key rotation, sync seq). */

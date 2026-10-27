@@ -14,10 +14,12 @@ export const recipient = z.union([uuid, z.literal('recovery')]);
 export const DeviceLogEntrySchema = z.object({
   index: z.number().int().nonnegative(),
   prev: z.string(),
-  type: z.enum(['create', 'add', 'remove', 'setRecovery']),
+  type: z.enum(['create', 'add', 'remove', 'setRecovery', 'epoch']),
   deviceId: recipient,
   signKey: b64.nullable(),
   boxKey: b64.nullable(),
+  epoch: z.number().int().positive().nullable(),
+  keyHash: b64.nullable(),
   signer: recipient,
   at: z.number().int(),
   sig: b64,
@@ -25,7 +27,7 @@ export const DeviceLogEntrySchema = z.object({
 
 // --- families -----------------------------------------------------------------------------------------
 
-/** POST /v1/families: the first device creates the family with its signed `create` entry and epoch-1 key. */
+/** POST /v1/families: the first device creates the family with its signed `create` entry (committing to the epoch-1 key) and that key sealed to itself. */
 export const CreateFamilySchema = z.object({
   familyId: uuid,
   entry: DeviceLogEntrySchema,
@@ -33,7 +35,7 @@ export const CreateFamilySchema = z.object({
   sealedKey: b64,
 });
 
-/** POST /v1/families/me/log */
+/** POST /v1/families/me/log: adds, removes and recovery changes. Epochs go through /v1/keys/rotate. */
 export const AppendLogSchema = z.object({ entry: DeviceLogEntrySchema });
 
 // --- auth ---------------------------------------------------------------------------------------------
@@ -54,7 +56,10 @@ export const AUTH_CONTEXT = 'kindred/auth/v1';
 // --- keys ---------------------------------------------------------------------------------------------
 
 export type SealedKey = { epoch: number; recipient: string; sealed: string };
-/** GET /v1/keys: every epoch sealed for the caller. */
+/**
+ * GET /v1/keys: every epoch sealed for the caller. `currentEpoch` is only a hint: phones take the current epoch
+ * from the verified device log and check each key against its commitment there (`openFamilyKey`).
+ */
 export type KeysResponse = { currentEpoch: number; keys: SealedKey[] };
 
 /** POST /v1/keys/grant: give a new member (or the recovery key) all existing epochs. */
@@ -63,9 +68,12 @@ export const GrantKeysSchema = z.object({
   keys: z.array(z.object({ epoch: z.number().int().positive(), sealed: b64 })).min(1),
 });
 
-/** POST /v1/keys/rotate: a new epoch, sealed to every current member (and the recovery key, if set). */
+/**
+ * POST /v1/keys/rotate: a new epoch in one step: the signed `epoch` log entry (committing to the key) and the key
+ * sealed to every current member (and the recovery key, if set).
+ */
 export const RotateKeysSchema = z.object({
-  epoch: z.number().int().positive(),
+  entry: DeviceLogEntrySchema,
   sealed: z.record(recipient, b64),
 });
 

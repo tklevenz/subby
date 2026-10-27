@@ -19,6 +19,7 @@ import { LiveBus, LiveGateway } from './live/live';
 import { BlobsController, BlobsService } from './blobs/blobs';
 import { BLOB_STORE, openBlobStore } from './blobs/store';
 import { PushController, PushService } from './push/push';
+import { Housekeeping } from './common/housekeeping';
 import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
@@ -56,6 +57,7 @@ class AppModule {
         Entitlements,
         LiveBus,
         LiveGateway,
+        Housekeeping,
       ],
     };
   }

@@ -2,12 +2,13 @@ import { randomUUID } from 'node:crypto';
 import {
   RECOVERY_SIGNER,
   appendEntry,
+  assertLogContinues,
   decryptFile,
   encryptFile,
   fromBase64,
   newIdentity,
   newSymmetricKey,
-  openSealed,
+  openFamilyKey,
   pairingCode,
   recoveryIdentity,
   seal,
@@ -87,8 +88,14 @@ export class TestClient {
 
   async createFamily() {
     this.familyId = randomUUID();
-    const entry = appendEntry(null, 0, this.me, { type: 'create', deviceId: this.deviceId, keys: this.keysOf(this.identity) }, Date.now());
     const key = newSymmetricKey();
+    const entry = appendEntry(
+      null,
+      0,
+      this.me,
+      { type: 'create', deviceId: this.deviceId, keys: this.keysOf(this.identity), familyKey: { epoch: 1, key } },
+      Date.now(),
+    );
     await this.request('POST', '/v1/families', {
       familyId: this.familyId,
       entry,
@@ -111,14 +118,21 @@ export class TestClient {
     return res;
   }
 
-  /** Re-reads and verifies the device log, then opens every family key sealed for this device. */
+  /**
+   * Re-reads and verifies the device log (it must continue the one seen before), then opens the family keys
+   * sealed for this device, each checked against the log's commitment. The current epoch comes from the log.
+   */
   async refresh(identity = this.identity) {
     const { entries } = await this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
-    this.state = verifyDeviceLog(entries);
-    this.log = entries;
+    assertLogContinues(entries, this.log.length ? { length: this.log.length, head: this.state!.head } : null);
+    const state = verifyDeviceLog(entries);
     const keys = await this.request<KeysResponse>('GET', '/v1/keys');
-    this.currentEpoch = keys.currentEpoch;
-    for (const k of keys.keys) this.familyKeys.set(k.epoch, openSealed(identity, fromBase64(k.sealed)));
+    for (const k of keys.keys) {
+      if (!this.familyKeys.has(k.epoch)) this.familyKeys.set(k.epoch, openFamilyKey(identity, state, k.epoch, fromBase64(k.sealed)));
+    }
+    this.state = state;
+    this.log = entries;
+    this.currentEpoch = state.epoch;
   }
 
   async append(change: Parameters<typeof appendEntry>[3], signer = this.me) {
@@ -239,12 +253,20 @@ export class TestClient {
   /** Removes a device and starts a new key epoch sealed to everyone left. */
   async removeDevice(deviceId: string) {
     await this.append({ type: 'remove', deviceId });
+    await this.rotate();
+  }
+
+  /** Starts the next epoch: its log entry commits to the new key, which is sealed to every member left. */
+  async rotate() {
     const key = newSymmetricKey();
-    const epoch = this.currentEpoch + 1;
+    const epoch = this.state!.epoch + 1;
+    const entry = appendEntry(this.state, this.log.length, this.me, { type: 'epoch', deviceId: this.deviceId, familyKey: { epoch, key } }, Date.now());
     const sealed: Record<string, string> = {};
     for (const [id, member] of this.state!.members) sealed[id] = toBase64(seal(member.boxKey, key));
     if (this.state!.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(this.state!.recovery.boxKey, key));
-    await this.request('POST', '/v1/keys/rotate', { epoch, sealed });
+    await this.request('POST', '/v1/keys/rotate', { entry, sealed });
+    this.log = [...this.log, entry];
+    this.state = verifyDeviceLog(this.log);
     this.familyKeys.set(epoch, key);
     this.currentEpoch = epoch;
   }

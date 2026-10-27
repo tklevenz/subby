@@ -1,4 +1,6 @@
-import type { Child, LogEntry, LogPayload, PhotoBlob } from '@kindred-log/shared';
+import { z } from 'zod';
+import { ChildSchema, LogEntrySchema, LogTypeSchema, PhotoBlobSchema, type Child, type LogEntry, type LogPayload, type PhotoBlob } from '@kindred-log/shared';
+import type { RecordKind } from '@kindred-log/shared/sync';
 
 /**
  * What a child or log entry looks like inside its encrypted sync record. Device-local fields stay out:
@@ -7,6 +9,20 @@ import type { Child, LogEntry, LogPayload, PhotoBlob } from '@kindred-log/shared
  */
 export type ChildBody = Pick<Child, 'name' | 'birthDate' | 'birthTime' | 'dueDate' | 'sex'> & { photoBlob: PhotoBlob | null };
 export type LogBody = Pick<LogEntry, 'childId' | 'logType' | 'startedAt' | 'endedAt' | 'createdBy' | 'payload'>;
+
+// What a pulled record's body must look like before it touches the database. Payloads are checked for their
+// shape only (an object of the entry's type, photo reference well-formed), so values another phone stored
+// are never dropped for being unusual.
+const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
+  child: ChildSchema.pick({ name: true, birthDate: true, birthTime: true, dueDate: true, sex: true }).extend({ photoBlob: PhotoBlobSchema.nullable() }),
+  log: LogEntrySchema.pick({ childId: true, logType: true, startedAt: true, endedAt: true, createdBy: true })
+    .extend({ payload: z.object({ type: LogTypeSchema, photoBlob: PhotoBlobSchema.optional() }).passthrough() })
+    .refine((l) => l.payload.type === l.logType),
+  device: z.object({ name: z.string().min(1).max(100) }),
+};
+
+/** Whether a decrypted body from another phone is well-formed for its kind. */
+export const isValidBody = (kind: RecordKind, body: unknown) => BODY_SCHEMAS[kind].safeParse(body).success;
 
 export const childToBody = (c: Child): ChildBody => ({
   name: c.name,

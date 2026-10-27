@@ -32,7 +32,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - `keys`: device identity (Ed25519 sign + X25519 box) and sealed boxes.
     - `recovery`: 24 words to an identity. Its test vector must never change, or existing recovery keys stop working.
     - `pairing`: the 6-digit code.
-    - `deviceLog`: the signed, hash-chained family membership. Every client verifies it.
+    - `deviceLog`: the signed, hash-chained family membership (`kindred/devicelog/v2`). Every client verifies it.
+      - It also records every family key epoch. `create` (epoch 1) and `epoch` entries carry `keyHash = epochKeyHash(epoch, key)`, a commitment to the key.
+      - Sealed boxes are anonymous, so the server could seal a key of its own. Phones therefore open keys only with `openFamilyKey`, which checks the commitment, and take the current epoch from the log (`state.epoch`), never from the server.
+      - `assertLogContinues` rejects a log older than the one a phone already saw (`settings.sync.logSeen`), because a server could otherwise serve a prefix that hides a removal or a newer epoch.
+      - Only devices start epochs, one at a time; the recovery key can only `add`.
     - `files`: chunked photo encryption.
 - `src/sync/` (`@kindred-log/shared/sync`):
   - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD; tombstones carry no data.
@@ -73,7 +77,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Never log or export the key. Inspect a device database with `sqlcipher`, not `sqlite3`.
   - **Schema changes:** edit `db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`. Commit the generated `db/migrations/*`, and never edit an applied migration.
 - **Stores (Zustand, write-through to SQLite):**
-  - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog`, `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
+  - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog` (keeps only id and type: the payload becomes `{type}`), `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
   - Note photos are deleted from disk when their entry is deleted or the photo is replaced (`features/photos.ts`).
   - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads on every `revision`. Use these for anything beyond the store's 30-day window: History day/week, Trends, Growth, Solids, Export, and all-time lookups such as allergens in `FoodPicker` and milestones done. `HAS_FOODS` filters feeds that have foods.
   - `useChildStore` (`deleteChild` hard-deletes the child's logs, reminders and photos and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub; `set` updates memory before the DB write, so back-to-back read-modify-writes like `saveSync` don't lose each other's changes, and `null` deletes the row because `value` is NOT NULL), `useActiveChild`.
@@ -128,15 +132,17 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore. It installs `expo-crypto` as the shared crypto's random source on import.
   - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
   - `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
+    - `isValidBody` checks every pulled body before `applyPage` writes it; malformed records are skipped.
+    - Payloads are checked for shape only, so unusual values from another phone still sync. All rows of the real Baby Buddy history pass.
   - **Photos** (`photos.ts`): a photo syncs as an encrypted blob with its own key; the reference `photoBlob: {id, key}` sits in the encrypted record (`children.photo_blob`, note `payload.photoBlob`), and `photoUri` stays this device's file.
     - Stores clear `photoBlob` whenever `photoUri` changes; `uploadPhotos` (before each push) uploads rows with a file but no reference, without bumping their version.
-    - `downloadPhotos` (after each pull) fetches references without a local file into `photos/<blobId>.jpg`; a pulled version pointing at another blob drops (and deletes) the local copy.
+    - `downloadPhotos` (after each pull) fetches references without a local file into `photos/<blobId>.jpg` (only UUID ids; the id comes from another phone's record); a pulled version pointing at another blob drops (and deletes) the local copy.
     - `queueUnsyncedPhotos` re-queues photos from before photo sync, as an edit.
     - Each record lists its blob ids (`SyncRecord.blobs`, not in the AAD) so the server can delete unused photos.
     - Blob up/download uses `expo/fetch` (raw bytes).
   - `engine.ts`:
     - `setUpSync` creates the family; `turnOffSync` leaves the family (a self `remove` in the device log, best effort) and forgets this phone's keys.
-    - Every run verifies the device log (`refreshMembers`): `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
+    - Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
     - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
     - Own echoes are skipped. A stale push re-pulls from 0.
@@ -146,7 +152,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Runs from an `expo-background-task` periodic task (everyone; at best every 15 min) and from an `expo-notifications` background task when a hosted server's "sync now" push arrives.
     - `setUpBackgroundSync` (each foreground start) registers the tasks, stores whether the server pushes (`settings.sync.push`), and registers the Expo push token. The token needs an Expo project id (`extra.eas.projectId`); without one, registration is skipped.
     - Without push and with other phones, medication reminders say to check the app first (`planReminders({ checkBeforeDosing })`).
-  - `family.ts` (pairing): inviter `createInvite` → `inviteStatus` → `claimCode` (checks the claim's MAC) → `approveClaim` (signs the `add`, grants every epoch); joiner `claimInvite` → `joinStatus` → `finishJoin(join, 'merge' | 'replace')`. `removeDevice` signs a `remove`, rotates to a new epoch sealed to the remaining phones plus recovery, and tombstones the removed phone's name.
+  - `family.ts` (pairing): inviter `createInvite` → `inviteStatus` → `claimCode` (checks the claim's MAC) → `approveClaim` (signs the `add`, grants every epoch); joiner `claimInvite` → `joinStatus` → `finishJoin(join, 'merge' | 'replace')`. `removeDevice` signs a `remove`, then rotates: one `keys/rotate` request with the signed `epoch` entry and the key sealed to the remaining phones plus recovery. It also tombstones the removed phone's name.
   - Recovery key (`family.ts`): `setRecoveryKey(words)` signs a `setRecovery` and grants every epoch to it (the server then drops the old recovery key's keys and sessions). `recoverFamily(server, words, local)` logs in as the recovery key (`SyncSession(..., asRecovery)`), checks the log's recovery key matches, signs this phone's `add`, grants it the keys, then finishes like a join (`completeJoin`).
   - Screens: `app/sync/index.tsx` (Settings → Sync: status, phones, rename, remove), `sync/add.tsx` (QR code, then compare the 6-digit code), `sync/join.tsx` (scan or paste, compare, then replace or merge local data; not route-guarded, so onboarding links to it), `sync/recovery.tsx` (show 24 words, type two back, only then register them; regenerating replaces the old words), `sync/recover.tsx` (server + words; linked from Join, not route-guarded). The Sync screen nudges a single-phone family without a recovery key (`useSyncStore.hasRecovery`). `components/QrCode.tsx` draws with `qrcode` + react-native-svg.
   - Every write already sets `syncStatus: 'pending'`. Keep it that way for anything new.
@@ -163,7 +169,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `info`.
   - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed.
   - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
-  - `keys`: `GET`, `grant`, and `rotate`. A rotation must be sealed to exactly the current members plus the recovery key.
+  - `keys`: `GET`, `grant`, and `rotate`.
+    - A rotation is the signed `epoch` log entry plus the key sealed to exactly the current members plus the recovery key, stored in one transaction. `families/me/log` refuses `epoch` entries.
+    - Grants never overwrite an existing sealed key.
   - `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
   - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. `Entitlements.canStore` is the hosted quota hook.
   - `sync/push` and `sync/pull`:
@@ -177,6 +185,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
   - `lockFamily(tx, id)` serializes writes per family.
 - **Single-instance assumptions:** auth challenges and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
+- **Housekeeping** (`common/housekeeping.ts`, hourly): deletes expired sessions and invites more than a day past expiry.
+- **Query parameters:** numbers are parsed with `queryInt` (whole numbers only, otherwise 400).
 - **Modes:** `MODE=self|hosted`. `Entitlements.canSync` is the hook for the hosted subscription (a stub for now).
 - **Commands** (in `apps/server`):
   - `pnpm db:up`: dev Postgres on port **54329** via `docker-compose.dev.yml`.
@@ -187,6 +197,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `Dockerfile` builds from the repo root (`.dockerignore` keeps only the app's `package.json`).
   - The runtime stage installs only the server's npm dependencies, pinned from `pnpm list`. Don't use `pnpm deploy`: drizzle-orm's optional peers, shared with the app in the lockfile, pull in React Native (over 1 GB).
   - `docker-compose.yml` runs server + Postgres, with an optional `https` profile (Caddy, `DOMAIN`). Settings go in `docker.env.example` → `.env`.
+    - With HTTPS, set `HTTP_BIND=127.0.0.1` so plain HTTP isn't reachable around Caddy.
+    - The dev Postgres binds to 127.0.0.1 only.
+    - Android Auto Backup only includes shared preferences (minus SecureStore), via expo-secure-store's rules. Photos and the database are never in Google backup; keep it that way if backup rules change.
   - Verified locally: the full client flow against the container (pair, sync, photo, live).
 - **Tests:** `test/e2e.test.ts` runs the real server on a throwaway database. `test/client.ts` is a full simulated app (pairing, sync, removal + rotation, recovery) and the reference for the mobile sync engine. The tests are skipped, with a warning, when the dev Postgres isn't running.
 

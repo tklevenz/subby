@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_REMINDERS, type ReminderSettings, type UnitSystem } from '@kindred-log/shared';
+import type { LogSeen } from '@kindred-log/shared/crypto';
 import { db, schema } from '../db/client';
 
 export type Settings = {
@@ -36,6 +37,8 @@ export type SyncSettings = {
   photosFamily?: string;
   /** The Expo push token last registered with the server (re-registered when it changes). */
   pushToken?: string;
+  /** How far this phone has verified the device log, so a server can't serve an older one (`assertLogContinues`). */
+  logSeen?: LogSeen;
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';

@@ -4,7 +4,7 @@ import {
   appendEntry,
   fromBase64,
   newSymmetricKey,
-  openSealed,
+  openFamilyKey,
   pairingCode,
   recoveryIdentity,
   seal,
@@ -90,17 +90,19 @@ export async function approveClaim(claimant: NonNullable<InviteResponse['claiman
 export async function removeDevice(deviceId: string) {
   const { settings, api, me } = member();
   const { entries, state } = await refreshMembers(api, settings);
+  const { keys } = await refreshKeys(api, state);
   const entry = appendEntry(state, entries.length, me, { type: 'remove', deviceId }, Date.now());
   await api.request('POST', '/v1/families/me/log', { entry });
   const after = verifyDeviceLog([...entries, entry]);
 
-  const { keys, epoch: current } = await refreshKeys(api);
-  const epoch = current + 1;
+  // The new epoch's log entry commits to the key; the server stores it together with the sealed copies.
+  const epoch = after.epoch + 1;
   const key = newSymmetricKey();
+  const epochEntry = appendEntry(after, entries.length + 1, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key } }, Date.now());
   const sealed: Record<string, string> = {};
   for (const [id, m] of after.members) sealed[id] = toBase64(seal(m.boxKey, key));
   if (after.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(after.recovery.boxKey, key));
-  await api.request('POST', '/v1/keys/rotate', { epoch, sealed });
+  await api.request('POST', '/v1/keys/rotate', { entry: epochEntry, sealed });
   keys.set(epoch, key);
   saveFamilyKeys(keys);
   // Its name goes too (a tombstone, so the server drops the ciphertext and other phones forget it).
@@ -153,7 +155,7 @@ export async function recoverFamily(serverInput: string, words: string, local: '
     throw new Error("The family's recovery key doesn't match these words");
   }
   const res = await rec.keys();
-  const familyKeys = res.keys.map((k) => ({ epoch: k.epoch, key: openSealed(recovery, fromBase64(k.sealed)) }));
+  const familyKeys = res.keys.map((k) => ({ epoch: k.epoch, key: openFamilyKey(recovery, state, k.epoch, fromBase64(k.sealed)) }));
 
   const identity = deviceIdentity();
   const deviceId = uuidv7();
@@ -248,7 +250,10 @@ async function completeJoin(
 
   const res = await session.request<KeysResponse>('GET', '/v1/keys');
   const identity = deviceIdentity();
-  saveFamilyKeys(new Map(res.keys.map((k) => [k.epoch, openSealed(identity, fromBase64(k.sealed))])));
+  // Each key must match the family's commitment in the log; the server can't slip in its own.
+  const keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(identity, state, k.epoch, fromBase64(k.sealed))]));
+  if (!keys.has(state.epoch)) throw new Error("This phone didn't get the family key. Try again.");
+  saveFamilyKeys(keys);
 
   if (local === 'replace') {
     db.transaction((tx) => {
@@ -275,6 +280,7 @@ async function completeJoin(
     lastSyncedAt: null,
     knownDevices: [...state.members.keys()],
     photosFamily: familyId,
+    logSeen: { length: entries.length, head: state.head },
   });
   await pushDeviceName(name);
   requestSync(0);

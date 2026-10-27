@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Post, Query, UseGuards } from '@nestjs/common';
 import { AppendLogSchema, CreateFamilySchema } from '@kindred-log/shared/sync';
 import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
-import { parse } from '../common/validate';
+import { parse, queryInt } from '../common/validate';
 import { Auth, DeviceOrRecoveryGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { FamiliesService } from './families.service';
@@ -20,7 +20,7 @@ export class FamiliesController {
   @Get('me/log')
   @UseGuards(DeviceOrRecoveryGuard)
   log(@Auth() auth: AuthContext, @Query('since') since?: string) {
-    return this.families.log(auth.familyId, Number(since ?? 0) || 0);
+    return this.families.log(auth.familyId, queryInt(since, 0));
   }
 
   /** Devices append adds, removes and recovery changes; the recovery key can only add (checked by the log rules). */

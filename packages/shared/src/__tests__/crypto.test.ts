@@ -3,6 +3,7 @@ import {
   FILE_CHUNK,
   RECOVERY_SIGNER,
   appendEntry,
+  assertLogContinues,
   bytesToHex,
   decrypt,
   decryptFile,
@@ -13,6 +14,7 @@ import {
   newIdentity,
   newRecoveryWords,
   newSymmetricKey,
+  openFamilyKey,
   openSealed,
   pairingCode,
   recoveryIdentity,
@@ -120,7 +122,8 @@ describe('device log', () => {
 
   const phoneA = device();
   const phoneB = device();
-  const created = push([], phoneA, { type: 'create', deviceId: phoneA.id, keys: keysOf(phoneA.keys) });
+  const key1 = newSymmetricKey();
+  const created = push([], phoneA, { type: 'create', deviceId: phoneA.id, keys: keysOf(phoneA.keys), familyKey: { epoch: 1, key: key1 } });
 
   it('tracks adds and removes', () => {
     let log = push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) });
@@ -163,6 +166,45 @@ describe('device log', () => {
     expect(() => verifyDeviceLog(push(withRecovery, recovery, { type: 'remove', deviceId: phoneA.id }))).toThrow(
       'can only add',
     );
+    const key2 = { epoch: 2, key: newSymmetricKey() };
+    expect(() => verifyDeviceLog(push(withRecovery, recovery, { type: 'epoch', deviceId: RECOVERY_SIGNER, familyKey: key2 }))).toThrow('can only add');
+  });
+
+  it('commits to every family key, so a server-made key is refused', () => {
+    expect(() => verifyDeviceLog(push([], phoneA, { type: 'create', deviceId: phoneA.id, keys: keysOf(phoneA.keys) }))).toThrow('must start epoch 1');
+
+    const key2 = newSymmetricKey();
+    const log = push(created, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 2, key: key2 } });
+    const state = verifyDeviceLog(log);
+    expect(state.epoch).toBe(2);
+    expect(openFamilyKey(phoneA.keys, state, 2, seal(phoneA.keys.box.publicKey, key2))).toEqual(key2);
+    expect(openFamilyKey(phoneA.keys, state, 1, seal(phoneA.keys.box.publicKey, key1))).toEqual(key1);
+
+    // The server knows phone A's public box key and seals its own key as epoch 2, or epoch 1's as 2, or a future epoch.
+    const sealedTo = (k: Uint8Array) => seal(phoneA.keys.box.publicKey, k);
+    expect(() => openFamilyKey(phoneA.keys, state, 2, sealedTo(newSymmetricKey()))).toThrow('not the one the family made');
+    expect(() => openFamilyKey(phoneA.keys, state, 2, sealedTo(key1))).toThrow('not the one the family made');
+    expect(() => openFamilyKey(phoneA.keys, state, 3, sealedTo(newSymmetricKey()))).toThrow('no key for epoch 3');
+
+    // Epochs go up one at a time, are started by a member device, and carry a key only where they should.
+    expect(() => verifyDeviceLog(push(created, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 3, key: key2 } }))).toThrow('must start epoch 2');
+    expect(() => verifyDeviceLog(push(created, phoneB, { type: 'epoch', deviceId: phoneB.id, familyKey: { epoch: 2, key: key2 } }))).toThrow('not a member');
+    expect(() => verifyDeviceLog(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys), familyKey: { epoch: 2, key: key2 } }))).toThrow(
+      'only create and epoch',
+    );
+  });
+
+  it('notices a log rolled back to an older version', () => {
+    const log = push(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) }), phoneA, { type: 'remove', deviceId: phoneB.id });
+    const seen = { length: log.length, head: verifyDeviceLog(log).head };
+    expect(() => assertLogContinues(log, seen)).not.toThrow();
+    expect(() => assertLogContinues(push(log, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 2, key: key1 } }), seen)).not.toThrow();
+    expect(() => assertLogContinues(log.slice(0, 2), seen)).toThrow('older');
+    // A different history of the same length (the server can't sign one, but a forked log must not pass either).
+    const phoneC = device();
+    const other = push(push(created, phoneA, { type: 'add', deviceId: phoneC.id, keys: keysOf(phoneC.keys) }), phoneA, { type: 'remove', deviceId: phoneC.id });
+    expect(() => assertLogContinues(other, seen)).toThrow('older');
+    expect(() => assertLogContinues(log, null)).not.toThrow();
   });
 });
 

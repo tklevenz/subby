@@ -10,6 +10,7 @@ import { newRecoveryWords, toBase64 } from '@kindred-log/shared/crypto';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
+import { Housekeeping } from '../src/common/housekeeping';
 import { HttpError, TestClient } from './client';
 
 /**
@@ -159,6 +160,31 @@ describe.skipIf(!reachable)('sync server', () => {
     await expectStatus(new TestClient(url).claim({ ...qr, k: toBase64(new Uint8Array(32)) }), 404);
     await new TestClient(url).claim(qr);
     await expectStatus(new TestClient(url).claim(qr), 409);
+
+    // Two phones claiming at the same moment: exactly one wins.
+    const second = await a.invite();
+    const results = await Promise.allSettled(Array.from({ length: 5 }, () => new TestClient(url).claim(second.qr)));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  });
+
+  it('rejects malformed paging parameters', async () => {
+    const a = new TestClient(url);
+    await a.createFamily();
+    for (const q of ['since=-1', 'since=abc', 'limit=-1', 'limit=0.5', 'since=1e3']) await expectStatus(a.request('GET', `/v1/sync/pull?${q}`), 400);
+    await expectStatus(a.request('GET', '/v1/families/me/log?since=-2'), 400);
+    expect(await a.request('GET', '/v1/sync/pull?since=0&limit=0')).toMatchObject({ records: [] });
+  });
+
+  it('cleans up expired sessions and old invites', async () => {
+    const a = new TestClient(url);
+    await a.createFamily();
+    await a.invite();
+    const day = 24 * 3_600_000;
+    // Sessions last a week; invites ten minutes plus a day's grace.
+    const { sessions, invites } = await app.get(Housekeeping).run(Date.now() + 8 * day);
+    expect(sessions).toBeGreaterThan(0);
+    expect(invites).toBeGreaterThan(0);
+    await expectStatus(a.request('GET', '/v1/sync/pull'), 401);
   });
 
   it('keeps the newest version and reports stale pushes', async () => {
@@ -213,8 +239,52 @@ describe.skipIf(!reachable)('sync server', () => {
     await a.push([a.seal('log', randomUUID(), { after: 'removal' })]);
     const [row] = await db`select epoch from records where family_id = ${a.familyId} order by seq desc limit 1`;
     expect(row.epoch).toBe(2);
-    // The server refuses a rotation that leaves out or adds anyone.
-    await expectStatus(a.request('POST', '/v1/keys/rotate', { epoch: 3, sealed: {} }), 400);
+    // The server refuses a rotation that leaves out or adds anyone, and epochs without their keys.
+    const { appendEntry, newSymmetricKey } = await import('@kindred-log/shared/crypto');
+    const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, {
+      type: 'epoch',
+      deviceId: a.deviceId,
+      familyKey: { epoch: 3, key: newSymmetricKey() },
+    }, Date.now());
+    await expectStatus(a.request('POST', '/v1/keys/rotate', { entry, sealed: {} }), 400);
+    await expectStatus(a.request('POST', '/v1/families/me/log', { entry }), 400);
+  });
+
+  it("phones refuse family keys the server made up or swapped", async () => {
+    const { a, b } = await pairedFamily();
+    const { newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const fake = () => toBase64(seal(b.identity.box.publicKey, newSymmetricKey()));
+
+    // A new epoch, but the server hands b its own key instead of the one a sealed.
+    await a.rotate();
+    await db`update family_keys set sealed = ${fake()} where family_id = ${a.familyId} and recipient = ${b.deviceId} and epoch = 2`;
+    await expect(b.refresh()).rejects.toThrow('not the one the family made');
+
+    // An epoch no device ever started.
+    const c = (await pairedFamily()).b;
+    await db`update families set current_epoch = 2 where id = ${c.familyId}`;
+    await db`insert into family_keys (family_id, epoch, recipient, sealed) values (${c.familyId}, 2, ${c.deviceId}, ${toBase64(seal(c.identity.box.publicKey, newSymmetricKey()))})`;
+    await expect(c.refresh()).rejects.toThrow('no key for epoch 2');
+    expect(c.currentEpoch).toBe(1);
+  });
+
+  it('phones notice a device log rolled back to an older version', async () => {
+    const { a, b } = await pairedFamily();
+    await a.rotate();
+    await b.refresh();
+    expect(b.currentEpoch).toBe(2);
+    // The server drops the epoch entry, hoping b goes back to the old key.
+    await db`delete from device_log where family_id = ${a.familyId} and index = ${a.log.length - 1}`;
+    await expect(b.refresh()).rejects.toThrow('older');
+  });
+
+  it("a grant can't replace a key someone already has", async () => {
+    const { a, b } = await pairedFamily();
+    const [before] = await db`select sealed from family_keys where family_id = ${a.familyId} and recipient = ${b.deviceId} and epoch = 1`;
+    const { newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    await a.request('POST', '/v1/keys/grant', { recipient: b.deviceId, keys: [{ epoch: 1, sealed: toBase64(seal(b.identity.box.publicKey, newSymmetricKey())) }] });
+    const [after] = await db`select sealed from family_keys where family_id = ${a.familyId} and recipient = ${b.deviceId} and epoch = 1`;
+    expect(after.sealed).toBe(before.sealed);
   });
 
   it('rejects device log entries that are forged or out of order', async () => {
@@ -249,7 +319,7 @@ describe.skipIf(!reachable)('sync server', () => {
     const id = recoveryIdentity(words);
     await rec.login(id, { recoverySignKey: toBase64(id.sign.publicKey) });
     await expectStatus(rec.request('GET', '/v1/sync/pull'), 403);
-    await expectStatus(rec.request('POST', '/v1/keys/rotate', { epoch: 2, sealed: {} }), 403);
+    await expectStatus(rec.request('POST', '/v1/keys/rotate', { entry: fresh.log[0], sealed: {} }), 403);
   });
 
   it('rotations include the recovery key, so recovery still works afterwards', async () => {

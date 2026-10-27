@@ -20,7 +20,8 @@ cp docker.env.example .env
 ### With HTTPS (recommended)
 
 Release builds of the app only talk to `https://` servers. Point a domain (or subdomain) at the machine, open
-ports 80 and 443, set `DOMAIN=sync.example.com` in `.env`, then:
+ports 80 and 443, set `DOMAIN=sync.example.com` and `HTTP_BIND=127.0.0.1` in `.env` (the second keeps plain HTTP off
+the network, so nothing can reach the server around the certificate), then:
 
 ```sh
 docker compose --profile https up -d --build
@@ -35,7 +36,7 @@ Caddy gets and renews a Let's Encrypt certificate automatically. In the app: Set
 docker compose up -d --build
 ```
 
-The server listens on port 8787 (`HTTP_PORT` changes it). Development builds of the app accept `http://`
+The server listens on port 8787 on every interface (`HTTP_PORT` changes the port, `HTTP_BIND` the address). Development builds of the app accept `http://`
 addresses; release builds don't. Don't expose plain HTTP to the internet: the data is encrypted, but login
 tokens are not.
 

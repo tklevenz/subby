@@ -145,7 +145,11 @@ export async function downloadPhotos(api: SyncSession, onProgress: (done: number
   return done;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function download(api: SyncSession, blob: PhotoBlob): Promise<string | null> {
+  // The id comes from another phone's record and becomes a file name: only ever a UUID, never a path.
+  if (!UUID.test(blob.id)) return null;
   const data = await api.getBlob(blob.id);
   if (!data) return null; // replaced or deleted on the server since; the next pull brings the newer version
   return savePhotoBytes(`${blob.id}.jpg`, decryptFile(fromBase64(blob.key), data));

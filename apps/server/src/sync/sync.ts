@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCod
 import { and, asc, eq, gt, inArray } from 'drizzle-orm';
 import { PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@kindred-log/shared/sync';
 import { DB, schema, type Db } from '../db/db';
-import { parse } from '../common/validate';
+import { parse, queryInt } from '../common/validate';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { lockFamily } from '../families/families.service';
@@ -103,7 +103,6 @@ export class SyncController {
 
   @Get('pull')
   pull(@Auth() auth: AuthContext, @Query('since') since?: string, @Query('limit') limit?: string) {
-    const n = Math.min(Number(limit) || PULL_LIMIT, PULL_LIMIT);
-    return this.sync.pull(auth, Math.max(0, Number(since) || 0), n);
+    return this.sync.pull(auth, queryInt(since, 0), Math.min(Math.max(1, queryInt(limit, PULL_LIMIT)), PULL_LIMIT));
   }
 }

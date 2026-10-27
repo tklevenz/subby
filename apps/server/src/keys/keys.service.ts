@@ -1,9 +1,10 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
 import { and, eq } from 'drizzle-orm';
 import type { KeysResponse } from '@kindred-log/shared/sync';
 import { DB, schema, type Db, type Tx } from '../db/db';
 import { RECOVERY, type AuthContext } from '../auth/auth.service';
-import { lockFamily } from '../families/families.service';
+import { appendVerified, lockFamily } from '../families/families.service';
 import { LiveBus } from '../live/live';
 
 @Injectable()
@@ -33,23 +34,24 @@ export class KeysService {
         await tx
           .insert(schema.familyKeys)
           .values({ familyId: auth.familyId, epoch: k.epoch, recipient, sealed: k.sealed })
-          .onConflictDoUpdate({
-            target: [schema.familyKeys.familyId, schema.familyKeys.epoch, schema.familyKeys.recipient],
-            set: { sealed: k.sealed },
-          });
+          // Never replaces a key someone already has (a retried grant is fine; overwriting would only break things).
+          .onConflictDoNothing();
       }
     });
     return { ok: true };
   }
 
   /**
-   * Starts the next epoch after a removal. It must be sealed to exactly the current members (and the
-   * recovery key, if set), so nobody is silently left out or added.
+   * Starts the next epoch after a removal: the signed `epoch` log entry (committing to the key) and the key
+   * sealed to exactly the current members (and the recovery key, if set), so nobody is silently left out or added.
    */
-  async rotate(auth: AuthContext, epoch: number, sealed: Record<string, string>) {
+  async rotate(auth: AuthContext, entry: DeviceLogEntry, sealed: Record<string, string>) {
+    if (entry.type !== 'epoch' || entry.signer !== auth.deviceId) throw new ForbiddenException('Epochs must be started by the caller');
+    const epoch = entry.epoch!;
     await this.db.transaction(async (tx) => {
       const family = await lockFamily(tx, auth.familyId);
       if (epoch !== family.currentEpoch + 1) throw new BadRequestException(`Next epoch is ${family.currentEpoch + 1}`);
+      await appendVerified(tx, auth.familyId, entry);
       const members = await tx
         .select({ id: schema.devices.id })
         .from(schema.devices)
@@ -63,6 +65,7 @@ export class KeysService {
       await tx.insert(schema.familyKeys).values(given.map((recipient) => ({ familyId: auth.familyId, epoch, recipient, sealed: sealed[recipient] })));
       await tx.update(schema.families).set({ currentEpoch: epoch }).where(eq(schema.families.id, auth.familyId));
     });
+    this.live.publish(auth.familyId, { type: 'log', index: entry.index });
     this.live.publish(auth.familyId, { type: 'keys', epoch });
     return { currentEpoch: epoch };
   }

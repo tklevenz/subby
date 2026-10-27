@@ -9,3 +9,10 @@ export function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infe
   }
   return result.data;
 }
+
+/** A non-negative integer query parameter; `fallback` when missing, 400 when it's anything else. */
+export function queryInt(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === '') return fallback;
+  if (!/^\d{1,15}$/.test(value)) throw new BadRequestException(`Expected a whole number, got "${value}"`);
+  return Number(value);
+}
