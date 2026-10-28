@@ -78,17 +78,25 @@ export default function ScheduleScreen() {
 
 function ItemRow({ item, now, formatTime }: { item: ScheduleItem; now: number; formatTime: (ms: number) => string }) {
   const end = item.kind === 'nap' ? item.end : item.at;
-  const past = end < now;
+  // Predictions that have passed fade; what was logged stays.
+  const past = !item.logged && end < now;
   const [icon, label, time] =
     item.kind === 'wake'
       ? [<Sun key="i" color={colors.amberSoft} size={16} />, 'Wake up', formatTime(item.at)]
       : item.kind === 'nap'
-        ? [<CloudSun key="i" color={colors.violetSoft} size={16} />, `Nap ${item.index + 1}`, `${formatTime(item.start)} – ${formatTime(item.end)}`]
+        ? [
+            <CloudSun key="i" color={colors.violetSoft} size={16} />,
+            `Nap ${item.index + 1}`,
+            item.running ? `since ${formatTime(item.start)}` : `${formatTime(item.start)} – ${formatTime(item.end)}`,
+          ]
         : [<Moon key="i" color={colors.violetDeep} size={16} />, 'Bedtime', formatTime(item.at)];
   return (
     <View className={`flex-row items-center py-3 border-b border-line ${past ? 'opacity-40' : ''}`}>
       {icon}
-      <Text className="flex-1 text-ink ml-3">{label}</Text>
+      <View className="flex-1 ml-3">
+        <Text className="text-ink">{label}</Text>
+        {item.logged ? <Text className="text-ink-faint text-xs">{item.kind === 'nap' && item.running ? 'Napping now' : 'Logged'}</Text> : null}
+      </View>
       <Text className="text-ink-soft">{time}</Text>
     </View>
   );

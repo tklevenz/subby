@@ -17,11 +17,15 @@ export function dayRange(lastDay: number, count: number): number[] {
 const overlap = (start: number, end: number, from: number, to: number) =>
   Math.max(0, Math.min(end, to) - Math.max(start, from));
 
-/** Explicit nap flag, else daytime sleeps (07–19h start) count as naps, like the quick dock. */
-export function isNap(l: LogEntry & { payload: PayloadOf<'sleep'> }): boolean {
-  if (l.payload.nap !== undefined) return l.payload.nap;
-  const hour = new Date(l.startedAt).getHours();
+/** A sleep starting at `t` is a nap by default: it starts during the day (07–19h). */
+export function isNapTime(t: number): boolean {
+  const hour = new Date(t).getHours();
   return hour >= 7 && hour < 19;
+}
+
+/** Explicit nap flag, else daytime sleeps count as naps (`isNapTime`). */
+export function isNap(l: LogEntry & { payload: PayloadOf<'sleep'> }): boolean {
+  return l.payload.nap ?? isNapTime(l.startedAt);
 }
 
 export type DayStats = {

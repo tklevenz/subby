@@ -254,13 +254,14 @@ export function predictNextSleep(
 }
 
 export type ScheduleItem =
-  | { kind: 'wake'; at: number }
-  | { kind: 'nap'; start: number; end: number; index: number }
-  | { kind: 'bedtime'; at: number };
+  | { kind: 'wake'; at: number; logged?: true }
+  /** `running`: a nap still going; `end` is when it would usually end (or now). */
+  | { kind: 'nap'; start: number; end: number; index: number; logged?: true; running?: true }
+  | { kind: 'bedtime'; at: number; logged?: true };
 
 /**
- * A suggested day: morning wake-up, naps and bedtime. Uses today's actual wake-up when
- * logged, else the usual one (or 07:00).
+ * A suggested day: morning wake-up, naps and bedtime. Uses what today already logged (the wake-up, naps so far,
+ * bedtime once it started) and predicts the rest from there; without a logged wake-up, the usual one (or 07:00).
  */
 export function suggestedSchedule(
   logs: LogEntry[],
@@ -276,21 +277,41 @@ export function suggestedSchedule(
   const nightEnd = completedSleeps(logs)
     .filter((l) => !isNap(l) && l.endedAt! >= today && l.endedAt! < today + 14 * H)
     .at(-1)?.endedAt;
-  const wake = nightEnd != null && (nightEnd - today) / MIN >= usualWake - 90 ? nightEnd : atClock(today, usualWake);
+  const wakeLogged = nightEnd != null && (nightEnd - today) / MIN >= usualWake - 90;
+  const wake = wakeLogged ? nightEnd : atClock(today, usualWake);
+  const napLength = (i: number) => (habits.napLengths.get(i) ?? norms.napLength) * MIN;
+  const usualBedtime = habits.bedtimeClock !== null ? atClock(today, habits.bedtimeClock) : null;
 
-  const items: ScheduleItem[] = [{ kind: 'wake', at: wake }];
-  const napsPerDay = habits.napsPerDay ?? norms.naps;
+  const items: ScheduleItem[] = [{ kind: 'wake', at: wake, ...(wakeLogged ? { logged: true as const } : {}) }];
   let t = wake;
-  for (let i = 0; i < napsPerDay; i++) {
-    const start = t + blend(habits.napWindows.get(i), norms).center * MIN;
-    const end = start + (habits.napLengths.get(i) ?? norms.napLength) * MIN;
-    items.push({ kind: 'nap', start, end, index: i });
+  let index = 0;
+  // What today logged since the wake-up: naps, and bedtime once the night started.
+  const logged = logs.filter((l): l is SleepEntry => isSleep(l) && l.startedAt >= wake && l.startedAt <= now).sort((a, b) => a.startedAt - b.startedAt);
+  for (const s of logged) {
+    if (!isNap(s)) {
+      items.push({ kind: 'bedtime', at: s.startedAt, logged: true });
+      return { items, basis: basis(habits), norms };
+    }
+    const running = s.endedAt === null;
+    const end = running ? Math.max(now, s.startedAt + napLength(index)) : s.endedAt!;
+    items.push({ kind: 'nap', start: s.startedAt, end, index, logged: true, ...(running ? { running: true as const } : {}) });
+    t = end;
+    index++;
+  }
+
+  // The rest of the day, from the last wake-up. A nap that would run into the usual bedtime is left out.
+  const napsPerDay = habits.napsPerDay ?? norms.naps;
+  for (; index < napsPerDay; index++) {
+    const start = t + blend(habits.napWindows.get(index), norms).center * MIN;
+    if (usualBedtime !== null && start > usualBedtime - 90 * MIN) break;
+    const end = start + napLength(index);
+    items.push({ kind: 'nap', start, end, index });
     t = end;
   }
   const byWindow = t + blend(habits.bedtimeWindow, norms).center * MIN;
-  const usual = habits.bedtimeClock !== null ? atClock(today, habits.bedtimeClock) : null;
-  items.push({ kind: 'bedtime', at: usual !== null && usual - t >= norms.wakeMin * 0.75 * MIN ? usual : byWindow });
-
-  const personal = habits.napWindows.size > 0 || habits.bedtimeClock !== null || habits.napsPerDay !== null;
-  return { items, basis: personal ? 'personal' : 'age', norms };
+  items.push({ kind: 'bedtime', at: usualBedtime !== null && usualBedtime - t >= norms.wakeMin * 0.75 * MIN ? usualBedtime : byWindow });
+  return { items, basis: basis(habits), norms };
 }
+
+const basis = (habits: SleepHabits): 'age' | 'personal' =>
+  habits.napWindows.size > 0 || habits.bedtimeClock !== null || habits.napsPerDay !== null ? 'personal' : 'age';

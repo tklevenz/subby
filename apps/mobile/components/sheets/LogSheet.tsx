@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@kindred-log/shared';
+import { formatHoursMinutes, isCompletePayload, isNapTime, type LogPayload, type LogType } from '@kindred-log/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import DateTimeField from '../DateTimeField';
@@ -52,12 +52,24 @@ export default function LogSheet({
   const pastBreastfeed = type === 'feed' && initial !== undefined && 'method' in initial && initial.method === 'breast';
   const startOffsetMin = pastBreastfeed ? 15 : 0;
 
-  const [payload, setPayload] = useState<LogPayload>(() => ({ ...defaultPayload(type), ...initial }) as LogPayload);
   // Timed types start now with no end: "Start timer" runs from the start; logging a past one needs an end.
-  const [startedAt, setStartedAt] = useState(() => Date.now() - startOffsetMin * 60_000);
+  const [startedAt, setStart] = useState(() => Date.now() - startOffsetMin * 60_000);
   const [end, setEnd] = useState<number | null>(null);
+  // A sleep is a nap if it starts during the day, following the start time until the toggle is used.
+  const [napChosen, setNapChosen] = useState(initial !== undefined && 'nap' in initial);
+  const [payload, setPayload] = useState<LogPayload>(() => {
+    const p = { ...defaultPayload(type), ...initial } as LogPayload;
+    return p.type === 'sleep' && !napChosen ? { ...p, nap: isNapTime(startedAt) } : p;
+  });
 
-  const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
+  const patch = (p: Partial<LogPayload>) => {
+    if ('nap' in p) setNapChosen(true);
+    setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
+  };
+  const setStartedAt = (t: number) => {
+    setStart(t);
+    if (type === 'sleep' && !napChosen) setPayload((cur) => ({ ...cur, nap: isNapTime(t) }) as LogPayload);
+  };
   const complete = isCompletePayload(payload);
   const invalidEnd = timed && end !== null && end <= startedAt;
   // The same time can't be two sleeps: checked for what Save would log and for a timer from the start.

@@ -89,8 +89,36 @@ describe('suggestedSchedule', () => {
     const { items, basis } = suggestedSchedule(week(7), child, at(0, 8));
     expect(basis).toBe('personal');
     expect(items.map((i) => i.kind)).toEqual(['wake', 'nap', 'nap', 'bedtime']);
-    expect(items[0]).toEqual({ kind: 'wake', at: at(0, 7) });
+    expect(items[0]).toEqual({ kind: 'wake', at: at(0, 7), logged: true });
     expect(items[3]).toEqual({ kind: 'bedtime', at: at(0, 19, 30) });
+  });
+
+  it("uses today's logged naps and predicts the rest from the last one", () => {
+    // Nap 1 ran late and short: 11:00–11:30, instead of 09:30–10:30.
+    const logs = [...week(7), entry({ type: 'sleep', nap: true }, at(0, 11), at(0, 11, 30))];
+    const { items } = suggestedSchedule(logs, child, at(0, 12));
+    expect(items[1]).toEqual({ kind: 'nap', start: at(0, 11), end: at(0, 11, 30), index: 0, logged: true });
+    // Nap 2's usual window (180 min) blended with the age norm (157.5 min): 173.25 min after 11:30.
+    expect(items[2]).toMatchObject({ kind: 'nap', index: 1, start: at(0, 11, 30) + 173.25 * MIN });
+    expect(items[2]).not.toHaveProperty('logged');
+    expect(items.at(-1)).toEqual({ kind: 'bedtime', at: at(0, 19, 30) });
+  });
+
+  it('shows a running nap until its usual length, and a started night as bedtime', () => {
+    const running = [...week(7), entry({ type: 'sleep', nap: true }, at(0, 9, 30), null)];
+    expect(suggestedSchedule(running, child, at(0, 9, 45)).items[1]).toEqual({
+      kind: 'nap', start: at(0, 9, 30), end: at(0, 10, 30), index: 0, logged: true, running: true,
+    });
+    const night = [...week(7), entry({ type: 'sleep', nap: true }, at(0, 9, 30), at(0, 10, 30)), entry({ type: 'sleep', nap: false }, at(0, 18, 45), null)];
+    const { items } = suggestedSchedule(night, child, at(0, 19));
+    expect(items.map((i) => i.kind)).toEqual(['wake', 'nap', 'bedtime']);
+    expect(items[2]).toEqual({ kind: 'bedtime', at: at(0, 18, 45), logged: true });
+  });
+
+  it('leaves out a nap that would run into bedtime', () => {
+    // One late nap until 16:30: nap 2 would start ~19:20, past the usual bedtime minus 90 min.
+    const logs = [...week(7), entry({ type: 'sleep', nap: true }, at(0, 15), at(0, 16, 30))];
+    expect(suggestedSchedule(logs, child, at(0, 17)).items.map((i) => i.kind)).toEqual(['wake', 'nap', 'bedtime']);
   });
 
   it('starts from the usual wake-up while still asleep after a night waking', () => {
