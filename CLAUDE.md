@@ -98,7 +98,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - Tapping the sleep tile (start or wake up) offers Undo for 5 s; a running sleep has a Discard button (with a confirmation). Accidental taps on the big tile are easy.
       - Tapping a tile's time or the lines under it opens its entry (running, or the last one). The tile's action is a full-size `Pressable` underneath, with the content on top passing taps through (`pointerEvents`); buttons nested inside a `Pressable` don't reliably get their own taps on Android.
       - The header: the avatar opens the child's profile, the name switches child (`ChildSwitcher`).
-    - `history`: Day and Week. Day (`components/history/DayLog`) is the day as a timeline, newest first: times on a rail, sleeps as thick spans, the wake windows between sleeps (`dayTimeline` in shared), plus the day's totals; arrows move by day; tapping the date opens `datetime/CalendarSheet` (month grid, Monday first, a dot on days with entries, swipe or arrows between months; `monthGrid` in `datetime/parts.ts`), and "Back to today" returns. Week is the sleep pattern + totals; tapping a day opens it in Day.
+    - `history`: one day (`components/history/DayLog`): the day as a timeline, newest first: times on a rail, sleeps as thick spans, the wake windows between sleeps (`dayTimeline` in shared), plus the day's totals; arrows move by day; tapping the date opens `datetime/CalendarSheet` (month grid, Monday first, a dot on days with entries, swipe or arrows between months; `monthGrid` in `datetime/parts.ts`), and "Back to today" returns. (The Week view was dropped: Trends has the same totals.)
     - `trends`: 7/14/30-day averages and charts.
     - `settings`: includes a `__DEV__`-only Premium stub toggle.
   - `app/schedule.tsx` (next sleep + suggested day; linked from Home's "Sleep schedule" row), `app/reminders.tsx`.
@@ -120,7 +120,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Settings shows children as an avatar strip linking to their profiles. App-wide settings stay in Settings.
   - `app/import/babybuddy.tsx`: import wizard (connect → review children/units → progress → summary). Not route-guarded, so onboarding can link to it.
 - **Components:**
-  - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `WeekPattern`, `GrowthChart`.
+  - `charts/`: hand-rolled with `react-native-svg` and Views (no chart library): `BarChart` (stacked), `GrowthChart`.
   - `ChildSwitcher` (avatar, switch child, open a profile), `ActiveTimers`. Entries open from History or the Home tiles; delete only from the entry screen.
   - `ChildAvatar`: the photo, or the child's initial on a per-child color. `PhotoMenu`: take/choose/remove; it runs the picker only after its modal has dismissed (iOS).
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
