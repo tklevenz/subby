@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AngleRight, Plus } from '../../components/icons';
 import { activeReminderCount, formatAge } from '@kindred-log/shared';
@@ -12,6 +13,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/engine';
 import { Card, Row, Segmented } from '../../components/ui';
 import { colors } from '../../theme/colors';
+import { SubMono, Wordmark } from '../../components/brand/Sub';
 
 /** Card in the children strip. Same slots for every card, so they line up. */
 function ChildCard({
@@ -142,7 +144,15 @@ export default function SettingsScreen() {
       ) : null}
 
       <View className="mt-10 items-center">
-        <Text className="text-ink-ghost text-xs">Subby · data stays on this device</Text>
+        <View className="flex-row items-center">
+          <SubMono width={26} color={colors.subYellow} />
+          <Wordmark size={18} className="ml-1.5">
+            subby
+          </Wordmark>
+        </View>
+        <Text className="text-ink-ghost text-xs mt-1">
+          Data stays on this device{Constants.expoConfig?.version ? ` · ${Constants.expoConfig.version}` : ''}
+        </Text>
         {/* Required by the Font Awesome Free license (CC BY 4.0). */}
         <Text className="text-ink-ghost text-xs mt-1">Icons by Font Awesome (CC BY 4.0)</Text>
       </View>

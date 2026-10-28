@@ -14,10 +14,11 @@ import {
   seal,
   toBase64,
   verifyDeviceLog,
+  withinEpoch,
   type DeviceLogEntry,
   type DeviceLogState,
 } from '@kindred-log/shared/crypto';
-import { MAX_RECORD_DATA, clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
+import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
@@ -244,7 +245,7 @@ export async function refreshKeys(api: SyncSession, state?: DeviceLogState) {
   }
   if (changed) saveFamilyKeys(keys);
   if (!keys.has(log.epoch)) throw new Error('Missing the current family key');
-  return { keys, epoch: log.epoch, missing: res.missing ?? [] };
+  return { keys, epoch: log.epoch, missing: res.missing ?? [], closedAt: log.closedAt };
 }
 
 type Keys = Awaited<ReturnType<typeof refreshKeys>>;
@@ -281,22 +282,35 @@ async function heal(api: SyncSession, settings: SyncSettings, entries: DeviceLog
 /**
  * Starts the next epoch: its signed log entry commits to a new key, sealed to every member and the recovery key,
  * stored by the server in one step. Whoever had the old key (a removed phone, old recovery words) can't read on.
+ * The entry also closes the old epochs at the seq this phone has pulled to (`closedSeq`), so nothing written with
+ * an old key later counts. The server takes it only at the family's latest seq: pull first, again if another
+ * phone pushed in between.
  */
 export async function rotateKeys(api: SyncSession, settings: SyncSettings, entries: DeviceLogEntry[], state: DeviceLogState, keys: Map<number, Uint8Array>) {
   const me = { id: settings.deviceId, keys: deviceIdentity() };
   const epoch = state.epoch + 1;
   const key = newSymmetricKey();
-  const entry = appendEntry(state, entries.length, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key } }, Date.now());
   const sealed: Record<string, string> = {};
   for (const [id, m] of state.members) sealed[id] = toBase64(seal(m.boxKey, key));
   if (state.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(state.recovery.boxKey, key));
-  await api.request('POST', '/v1/keys/rotate', { entry, sealed });
+  const current: Keys = { keys, epoch: state.epoch, missing: [], closedAt: state.closedAt };
+  for (let attempt = 1; ; attempt++) {
+    if (await pullAll(api, settings, current, syncSettings()?.lastSeq ?? 0)) await reloadStores();
+    const closedSeq = syncSettings()?.lastSeq ?? 0;
+    const entry = appendEntry(state, entries.length, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key }, closedSeq }, Date.now());
+    try {
+      await api.request('POST', '/v1/keys/rotate', { entry, sealed });
+      break;
+    } catch (e) {
+      if (!(e instanceof SyncHttpError && e.status === 409) || attempt === 3) throw e;
+    }
+  }
   keys.set(epoch, key);
   saveFamilyKeys(keys);
   return { epoch, key };
 }
 
-async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }: Keys) {
+async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, closedAt }: Keys) {
   const key = keys.get(epoch)!;
   const meta = (id: string, kind: 'child' | 'log', row: Child | LogEntry) => ({
     id,
@@ -348,7 +362,9 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }
         tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
       }
     });
-    if (res.newer?.length) applied = applyPage(res.newer, keys, settings.deviceId) || applied;
+    // Only current-epoch versions: an older one that won would come with the regular pull, checked there.
+    const newer = (res.newer ?? []).filter((r) => r.epoch === epoch && withinEpoch({ closedAt }, r.epoch, r.seq));
+    if (newer.length) applied = applyPage(newer, keys, settings.deviceId) || applied;
     done += records.length;
     useSyncStore.setState({ progress: { label: 'Uploading', done } });
   }
@@ -357,15 +373,24 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch }
 /** The server's limit on a record's ciphertext (base64url characters). */
 const MAX_RECORD_CHARS = Math.ceil((MAX_RECORD_DATA * 4) / 3);
 
-/** Pulls every page since `since` and applies it. Returns whether anything changed locally. */
-async function pullAll(api: SyncSession, settings: SyncSettings, { keys }: Keys, since: number) {
+/**
+ * Pulls every page since `since` and applies it. Returns whether anything changed locally. Records that can't be
+ * genuine are skipped: a seq outside the page asked for, or one of an old epoch past the seq the log closed it at
+ * (written with a key a removed phone still has, and stored by a server that shouldn't have).
+ */
+async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedAt }: Keys, since: number) {
   let seq = since;
   let applied = false;
   let done = 0;
   for (;;) {
     const page = await api.pull(seq);
+    const genuine = page.records.filter((r) => {
+      if (r.seq > seq && r.seq <= page.seq && withinEpoch({ closedAt }, r.epoch, r.seq)) return true;
+      console.warn(`[sync] refused ${r.kind} record ${r.id}: seq ${r.seq} isn't valid for epoch ${r.epoch}`);
+      return false;
+    });
     if (page.records.length) {
-      applied = applyPage(page.records, keys, settings.deviceId) || applied;
+      applied = applyPage(genuine, keys, settings.deviceId) || applied;
       done += page.records.length;
       if (since === 0 || page.more) useSyncStore.setState({ progress: { label: 'Downloading', done } });
     }
@@ -378,9 +403,17 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys }: Keys,
 /** Applies one page in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
   // Decrypt first: a record we can't open fails the run before anything is written. One that opens but is
-  // malformed (a buggy or hostile phone) is skipped rather than written.
+  // malformed (a buggy or hostile phone), or a tombstone nobody sealed (an older app's, or a server's), is skipped.
   const opened = records
-    .map((r) => ({ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }))
+    .flatMap((r) => {
+      try {
+        return [{ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }];
+      } catch (e) {
+        if (!(e instanceof UnsealedRecordError)) throw e;
+        console.warn(`[sync] skipped unsealed ${r.kind} record ${r.id}`);
+        return [];
+      }
+    })
     .filter(({ record, body }) => {
       if (record.deleted || isValidBody(record.kind, body)) return true;
       console.warn(`[sync] skipped malformed ${record.kind} record ${record.id}`);

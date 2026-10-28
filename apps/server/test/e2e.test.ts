@@ -203,14 +203,72 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(pulled.filter((p) => p.record.id === id).at(-1)!.body).toEqual({ v: 'new' });
   });
 
-  it('deletes data on the server: tombstones carry nothing', async () => {
+  it('deletes data on the server: tombstones carry only a sealed empty body', async () => {
     const a = new TestClient(url);
     await a.createFamily();
     const id = randomUUID();
     await a.push([a.seal('log', id, { secret: 'note text' })]);
     await a.push([a.seal('log', id, null, { deleted: true })]);
     const [row] = await db`select data, deleted from records where id = ${id}`;
-    expect(row).toEqual({ data: null, deleted: true });
+    expect(row.deleted).toBe(true);
+    expect(fromBase64(row.data).length).toBeLessThan(64);
+  });
+
+  it("the server can't delete on its own: unsealed tombstones are refused", async () => {
+    const { a, b } = await pairedFamily();
+    const id = randomUUID();
+    await a.push([a.seal('log', id, { keep: 'me' }, { updatedAt: 1000 })]);
+    expect((await b.pull()).map((p) => p.record.id)).toContain(id);
+    // The server turns it into a newer tombstone without data (it has no key to seal one).
+    await db`update records set deleted = true, data = null, updated_at = 2000, seq = seq + 100 where id = ${id}`;
+    await db`update families set seq = seq + 100 where id = ${a.familyId}`;
+    expect(await b.pull()).toEqual([]);
+    expect(b.rejected).toContain(id);
+    // Older apps still push tombstones without data; the server takes them, phones ignore them.
+    const legacy = { ...a.seal('log', randomUUID(), null, { deleted: true }), data: null };
+    expect((await a.push([legacy])).accepted).toEqual([legacy.id]);
+  });
+
+  it("a removed phone can't write under its old key, even with the server's help", async () => {
+    const { a, b } = await pairedFamily();
+    await a.push([a.seal('log', randomUUID(), { before: 'removal' })]);
+    const oldKey = b.seal('log', randomUUID(), { forged: true });
+    await a.removeDevice(b.deviceId);
+    const closed = a.state!.closedAt.get(1)!;
+    expect(closed).toBe(a.lastSeq);
+
+    // The server refuses it (b is out)...
+    await expectStatus(b.push([oldKey]), 401);
+    // ...but a hostile server stores it anyway, after the seq the log closed epoch 1 at.
+    await db`insert into records (family_id, id, kind, epoch, updated_at, device_id, deleted, data, seq)
+      values (${a.familyId}, ${oldKey.id}, 'log', 1, ${oldKey.updatedAt}, ${oldKey.deviceId}, false, ${oldKey.data}, ${closed + 5})`;
+    await db`update families set seq = ${closed + 5} where id = ${a.familyId}`;
+    expect((await a.pull()).map((p) => p.record.id)).not.toContain(oldKey.id);
+    expect(a.rejected).toContain(oldKey.id);
+  });
+
+  it('a rotation closes the old epochs only at the latest seq', async () => {
+    const { a, b } = await pairedFamily();
+    await a.pull();
+    // Another phone pushes after a pulled: an entry claiming a's seq would hide b's record, so the server refuses it.
+    await b.push([b.seal('log', randomUUID(), { late: true })]);
+    const { appendEntry, newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const key = newSymmetricKey();
+    const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, {
+      type: 'epoch',
+      deviceId: a.deviceId,
+      familyKey: { epoch: 2, key },
+      closedSeq: a.lastSeq,
+    }, Date.now());
+    const sealed = Object.fromEntries([...a.state!.members].map(([id, m]) => [id, toBase64(seal(m.boxKey, key))]));
+    await expectStatus(a.request('POST', '/v1/keys/rotate', { entry, sealed }), 409);
+    // rotate() pulls first, so it closes at the latest seq and b's record stays valid.
+    await a.rotate();
+    expect(a.state!.closedAt.get(1)).toBe(a.lastSeq);
+    await b.refresh();
+    b.lastSeq = 0;
+    expect((await b.pull()).some((p) => (p.body as { late?: boolean } | null)?.late)).toBe(true);
+    expect(b.rejected).toEqual([]);
   });
 
   it('pages through long histories', async () => {
@@ -219,7 +277,7 @@ describe.skipIf(!reachable)('sync server', () => {
     const records = Array.from({ length: 450 }, (_, i) => a.seal('log', randomUUID(), { i }));
     await a.push(records);
     const b = new TestClient(url);
-    Object.assign(b, { deviceId: a.deviceId, identity: a.identity, token: a.token, familyKeys: a.familyKeys });
+    Object.assign(b, { deviceId: a.deviceId, identity: a.identity, token: a.token, familyKeys: a.familyKeys, state: a.state });
     expect(await b.pull()).toHaveLength(450);
   });
 

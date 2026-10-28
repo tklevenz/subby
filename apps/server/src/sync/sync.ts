@@ -28,13 +28,14 @@ export class SyncService {
     if (!(await this.entitlements.canSync(auth.familyId))) throw new ForbiddenException('Sync is not active for this family');
     for (const r of records) {
       if (r.deviceId !== auth.deviceId) throw new ForbiddenException('Records must be written as the calling device');
-      if (r.deleted !== (r.data === null)) throw new BadRequestException(`Record ${r.id}: tombstones and only tombstones have no data`);
+      // Tombstones carry a sealed empty body (older apps sent none); everything else needs its data.
+      if (!r.deleted && r.data === null) throw new BadRequestException(`Record ${r.id} has no data`);
     }
 
     const result = await this.db.transaction(async (tx) => {
       const family = await lockFamily(tx, auth.familyId);
-      // New data must use the current key, so a rotation actually locks removed devices out of new writes.
-      const old = records.find((r) => !r.deleted && r.epoch !== family.currentEpoch);
+      // New data (deletions too) must use the current key, so a rotation actually locks removed devices out of new writes.
+      const old = records.find((r) => r.epoch !== family.currentEpoch);
       if (old) throw new BadRequestException(`Record ${old.id} uses epoch ${old.epoch}; current is ${family.currentEpoch}`);
 
       const ids = [...new Set(records.map((r) => r.id))];

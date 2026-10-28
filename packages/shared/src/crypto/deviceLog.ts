@@ -31,6 +31,12 @@ export type DeviceLogEntry = {
    */
   epoch: number | null;
   keyHash: string | null;
+  /**
+   * For `epoch` entries: the sync seq the signing phone had pulled up to, which the server confirms is the
+   * family's latest. Records of the epochs before end there, so later ones (a removed phone writing with a
+   * key it still has) are refused. Left out of older entries, which then close nothing.
+   */
+  closedSeq?: number | null;
   /** deviceId of the signer, or `RECOVERY_SIGNER`. */
   signer: string;
   at: number;
@@ -44,6 +50,8 @@ export type DeviceLogState = {
   /** The current key epoch (the latest one the log started) and every epoch's key commitment. */
   epoch: number;
   keyHashes: Map<number, string>;
+  /** Epoch → the last sync seq its records may have, for epochs a later `epoch` entry closed. */
+  closedAt: Map<number, number>;
   /**
    * A new epoch is owed: a device was removed, or the recovery key was replaced or cleared, since the last one.
    * Whoever holds the old key (the removed phone, the old words) must not read what comes next.
@@ -55,11 +63,13 @@ export type DeviceLogState = {
 
 type Unsigned = Omit<DeviceLogEntry, 'sig'>;
 
-// Fixed key order, so every platform signs and hashes the same bytes.
+// Fixed key order, so every platform signs and hashes the same bytes. `closedSeq` is appended only when set,
+// so entries from before it existed keep their signatures.
 const canonical = (e: Unsigned) =>
   utf8ToBytes(
     JSON.stringify([
       'kindred/devicelog/v2', e.index, e.prev, e.type, e.deviceId, e.signKey, e.boxKey, e.epoch, e.keyHash, e.signer, e.at,
+      ...(typeof e.closedSeq === 'number' ? [e.closedSeq] : []),
     ]),
   );
 
@@ -68,6 +78,15 @@ export const entryHash = (e: DeviceLogEntry) => bytesToHex(sha256(concatBytes(ca
 /** Commitment to a family key, published in the signed log. Reveals nothing about the 256-bit random key. */
 export const epochKeyHash = (epoch: number, key: Uint8Array) =>
   toBase64(sha256(concatBytes(utf8ToBytes('kindred/epoch/v1'), u64(epoch), key)));
+
+/**
+ * Whether a record of `epoch` at sync `seq` can be genuine: an epoch's records end where the log closed it.
+ * Anything later was written with an old key after the rotation (by a removed phone, served by a server).
+ */
+export const withinEpoch = (state: Pick<DeviceLogState, 'closedAt'>, epoch: number, seq: number) => {
+  const closed = state.closedAt.get(epoch);
+  return closed === undefined || seq <= closed;
+};
 
 /**
  * Opens a family key sealed to this phone and checks it against the log's commitment for that epoch.
@@ -114,6 +133,8 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
   let recovery: Member | null = null;
   let epoch = 0;
   const keyHashes = new Map<number, string>();
+  const closedAt = new Map<number, number>();
+  let lastClosed = 0;
   let rotationDue = false;
   let head = '';
 
@@ -148,6 +169,13 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
     } else if (e.epoch !== null || e.keyHash !== null) {
       fail('only create and epoch entries carry a key');
     }
+    if (e.closedSeq != null) {
+      if (e.type !== 'epoch') fail('only epoch entries close an epoch');
+      if (!Number.isSafeInteger(e.closedSeq) || e.closedSeq < lastClosed) fail('closedSeq must not go back');
+      // Closes every epoch before the new one that isn't closed yet.
+      for (let old = 1; old < e.epoch!; old++) if (!closedAt.has(old)) closedAt.set(old, e.closedSeq);
+      lastClosed = e.closedSeq;
+    }
 
     switch (e.type) {
       case 'epoch':
@@ -175,7 +203,7 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
   });
 
   if (!entries.length) throw new Error('Device log is empty');
-  return { members, recovery, epoch, keyHashes, rotationDue, head };
+  return { members, recovery, epoch, keyHashes, closedAt, rotationDue, head };
 }
 
 /** Builds the next entry on top of a verified state. */
@@ -189,6 +217,8 @@ export function appendEntry(
     keys?: { sign: Uint8Array; box: Uint8Array } | null;
     /** For create and epoch: the new family key (only its commitment goes into the log). */
     familyKey?: { epoch: number; key: Uint8Array };
+    /** For epoch: see `DeviceLogEntry.closedSeq`. */
+    closedSeq?: number;
   },
   at: number,
 ): DeviceLogEntry {
@@ -201,6 +231,7 @@ export function appendEntry(
     boxKey: change.keys ? toBase64(change.keys.box) : null,
     epoch: change.familyKey?.epoch ?? null,
     keyHash: change.familyKey ? epochKeyHash(change.familyKey.epoch, change.familyKey.key) : null,
+    ...(change.closedSeq !== undefined ? { closedSeq: change.closedSeq } : {}),
     signer: signer.id,
     at,
   });

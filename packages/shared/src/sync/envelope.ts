@@ -17,7 +17,11 @@ export type SyncRecord = {
   updatedAt: number;
   deviceId: string;
   deleted: boolean;
-  /** base64url(nonce || ciphertext); null for tombstones, so deleted data is gone from the server too. */
+  /**
+   * base64url(nonce || ciphertext). A tombstone's is an empty body: nothing of the deleted data stays on the
+   * server, but the deletion is still sealed with the family key, so a server can't delete on its own.
+   * Older apps sent tombstones without data; those are ignored.
+   */
   data: string | null;
   /**
    * Encrypted files (photos) this version uses, by random blob id. Only a hint for the server's cleanup:
@@ -38,16 +42,21 @@ const aad = (m: RecordMeta, epoch: number) =>
   utf8ToBytes(JSON.stringify(['kindred/record/v1', m.id, m.kind, epoch, m.updatedAt, m.deviceId, m.deleted]));
 
 export function sealRecord(key: Uint8Array, epoch: number, meta: RecordMeta, body: unknown): SyncRecord {
-  if (meta.deleted) return { ...meta, epoch, data: null };
-  return { ...meta, epoch, data: toBase64(encrypt(key, jsonToBytes(body), aad(meta, epoch))) };
+  return { ...meta, epoch, data: toBase64(encrypt(key, jsonToBytes(meta.deleted ? null : body), aad(meta, epoch))) };
 }
 
-/** The decrypted body, or null for a tombstone. Throws if the key for its epoch is missing or the data was altered. */
+/** A record that can't be genuine (an unsealed tombstone): skip it rather than apply it. */
+export class UnsealedRecordError extends Error {}
+
+/**
+ * The decrypted body, or null for a tombstone. Throws if the key for its epoch is missing or the data was
+ * altered, and `UnsealedRecordError` for a record without data.
+ */
 export function openRecord<T>(keys: FamilyKeys, record: SyncRecord): T | null {
-  if (record.deleted) return null;
-  if (record.data === null) throw new Error(`Record ${record.id} has no data`);
+  if (record.data === null) throw new UnsealedRecordError(`Record ${record.id} has no data`);
   const key = keys.get(record.epoch);
   if (!key) throw new Error(`No family key for epoch ${record.epoch}`);
-  const { data, epoch, ...meta } = record;
-  return bytesToJson<T>(decrypt(key, fromBase64(data), aad(meta, epoch)));
+  const { data, epoch, blobs: _, ...meta } = record;
+  const body = bytesToJson<T>(decrypt(key, fromBase64(data), aad(meta, epoch)));
+  return record.deleted ? null : body;
 }

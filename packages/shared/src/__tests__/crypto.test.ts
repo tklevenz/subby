@@ -22,6 +22,7 @@ import {
   toBase64,
   utf8ToBytes,
   verifyDeviceLog,
+  withinEpoch,
   type DeviceLogEntry,
   type IdentityKeys,
 } from '../crypto';
@@ -206,6 +207,34 @@ describe('device log', () => {
     expect(verifyDeviceLog(log).rotationDue).toBe(false);
     log = push(log, phoneA, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys: recoveryKeys() });
     expect(verifyDeviceLog(log).rotationDue).toBe(true); // the old words must not read what comes next
+  });
+
+  it('closes old epochs at a signed seq, so later records under an old key are refused', () => {
+    let log = push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) });
+    log = push(log, phoneA, { type: 'remove', deviceId: phoneB.id });
+    log = push(log, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 2, key: newSymmetricKey() }, closedSeq: 40 });
+    const state = verifyDeviceLog(log);
+    expect(state.closedAt.get(1)).toBe(40);
+    expect(withinEpoch(state, 1, 40)).toBe(true);
+    // Phone B still has epoch 1's key; anything it writes after the rotation lands past seq 40.
+    expect(withinEpoch(state, 1, 41)).toBe(false);
+    expect(withinEpoch(state, 2, 1000)).toBe(true);
+
+    // The seq is signed: a server changing it breaks the signature. It never goes back, and only epochs close.
+    const tampered = log.map((e, i) => (i === log.length - 1 ? { ...e, closedSeq: 4000 } : e));
+    expect(() => verifyDeviceLog(tampered)).toThrow('bad signature');
+    const stripped = log.map((e, i) => (i === log.length - 1 ? { ...e, closedSeq: undefined } : e));
+    expect(() => verifyDeviceLog(stripped)).toThrow('bad signature');
+    expect(() => verifyDeviceLog(push(log, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 3, key: newSymmetricKey() }, closedSeq: 39 }))).toThrow(
+      'must not go back',
+    );
+    expect(() => verifyDeviceLog(push(log, phoneA, { type: 'remove', deviceId: phoneA.id, closedSeq: 50 }))).toThrow('only epoch entries');
+
+    // An epoch started without one (an older app) closes nothing; the next one closes both.
+    let legacy = push(created, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 2, key: newSymmetricKey() } });
+    expect(verifyDeviceLog(legacy).closedAt.size).toBe(0);
+    legacy = push(legacy, phoneA, { type: 'epoch', deviceId: phoneA.id, familyKey: { epoch: 3, key: newSymmetricKey() }, closedSeq: 7 });
+    expect([...verifyDeviceLog(legacy).closedAt]).toEqual([[1, 7], [2, 7]]);
   });
 
   it('notices a log rolled back to an older version', () => {

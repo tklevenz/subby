@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { newSymmetricKey } from '../crypto';
-import { clientApplies, compareVersions, openRecord, sealRecord, serverAccepts, type RecordMeta } from '../sync';
+import { fromBase64, newSymmetricKey } from '../crypto';
+import { UnsealedRecordError, clientApplies, compareVersions, openRecord, sealRecord, serverAccepts, type RecordMeta } from '../sync';
 
 describe('records', () => {
   const key = newSymmetricKey();
@@ -14,10 +14,14 @@ describe('records', () => {
     expect(openRecord(keys, rec)).toEqual(body);
   });
 
-  it('tombstones carry no data', () => {
+  it('tombstones keep no content but are sealed', () => {
     const rec = sealRecord(key, 1, { ...meta, deleted: true }, body);
-    expect(rec.data).toBeNull();
     expect(openRecord(keys, rec)).toBeNull();
+    // Only an empty body: nothing of the deleted entry stays on the server.
+    expect(fromBase64(rec.data!).length).toBeLessThan(64);
+    // A server can't delete on its own: a tombstone without data, or turning a live record into one, fails.
+    expect(() => openRecord(keys, { ...rec, data: null })).toThrow(UnsealedRecordError);
+    expect(() => openRecord(keys, { ...sealRecord(key, 1, meta, body), deleted: true })).toThrow();
   });
 
   it('binds the data to its metadata', () => {

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
 import { and, eq } from 'drizzle-orm';
 import type { KeysResponse } from '@kindred-log/shared/sync';
@@ -69,6 +69,11 @@ export class KeysService {
     await this.db.transaction(async (tx) => {
       const family = await lockFamily(tx, auth.familyId);
       if (epoch !== family.currentEpoch + 1) throw new BadRequestException(`Next epoch is ${family.currentEpoch + 1}`);
+      // The entry closes the old epochs at this seq: the phone must have pulled everything, so no genuine record
+      // lies beyond it. (Older apps send none.)
+      if (entry.closedSeq != null && entry.closedSeq !== family.seq) {
+        throw new ConflictException(`Pull first: the family is at seq ${family.seq}`);
+      }
       await appendVerified(tx, auth.familyId, entry);
       const members = await tx
         .select({ id: schema.devices.id })

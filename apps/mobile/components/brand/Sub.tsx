@@ -1,5 +1,6 @@
 import React from 'react';
-import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
+import { Platform, Text, type TextProps } from 'react-native';
+import Svg, { Circle, Defs, G, Mask, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { colors } from '../../theme/colors';
 
 /** The sub's box in the app icon's 100-unit coordinates (assets/brand/icon.svg). */
@@ -54,5 +55,52 @@ export function RestingSub({ width }: { width: number }) {
         z
       </SvgText>
     </Svg>
+  );
+}
+
+/** The app icon: the sub on its navy tile, with bubbles. */
+export function SubTile({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Rect width={100} height={100} rx={22} fill={colors.subNavy} />
+      <Circle cx={76} cy={22} r={3} fill={colors.subBubble} opacity={0.55} />
+      <Circle cx={83} cy={14} r={2} fill={colors.subBubble} opacity={0.45} />
+      <Circle cx={71} cy={12} r={1.6} fill={colors.subBubble} opacity={0.4} />
+      <SubParts />
+    </Svg>
+  );
+}
+
+/** The sub in one color, portholes and moon cut out (like the notification icon). */
+export function SubMono({ width, color }: { width: number; color: string }) {
+  const { x, y, w, h } = SUB_VIEWBOX;
+  return (
+    <Svg width={width} height={(width * h) / w} viewBox={`${x} ${y} ${w} ${h}`}>
+      <Defs>
+        <Mask id="subMono" maskUnits="userSpaceOnUse" x={0} y={0} width={100} height={100}>
+          <Path d="M54 40 V20 H62" fill="none" stroke="white" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />
+          <Rect x={40} y={30} width={20} height={14} rx={5} fill="white" />
+          <Path d="M18 48 L8 40 L8 70 L18 62 Z" fill="white" />
+          <Rect x={14} y={40} width={74} height={36} rx={18} fill="white" />
+          <Circle cx={32} cy={58} r={3.4} fill="black" />
+          <Circle cx={58} cy={58} r={10} fill="black" />
+          <Circle cx={57} cy={58} r={6} fill="white" />
+          <Circle cx={60.2} cy={55.4} r={5} fill="black" />
+        </Mask>
+      </Defs>
+      <Rect x={0} y={0} width={100} height={100} fill={color} mask="url(#subMono)" />
+    </Svg>
+  );
+}
+
+// Fredoka SemiBold, embedded by the expo-font plugin (app.json). Android names it by file, iOS by PostScript name.
+const WORDMARK_FONT = Platform.select({ ios: 'Fredoka-SemiBold', default: 'Fredoka_600SemiBold' });
+
+/** "Subby" in the brand's typeface. */
+export function Wordmark({ size, style, children = 'Subby', ...rest }: { size: number } & TextProps & { children?: string }) {
+  return (
+    <Text {...rest} style={[{ fontFamily: WORDMARK_FONT, fontSize: size, lineHeight: size * 1.15, color: colors.subYellow }, style]}>
+      {children}
+    </Text>
   );
 }

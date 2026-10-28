@@ -42,9 +42,12 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - `assertLogContinues` rejects a log older than the one a phone already saw (`settings.sync.logSeen`), because a server could otherwise serve a prefix that hides a removal or a newer epoch.
       - Only devices start epochs, one at a time; the recovery key can only `add`.
       - `state.rotationDue`: a removal, or a replaced or cleared recovery key, owes a new epoch.
+      - `epoch` entries carry `closedSeq`: the sync seq the rotating phone had pulled to (the server checks it's the family's latest). Records of older epochs end there (`state.closedAt`, `withinEpoch`), so a removed phone writing with a key it still has, stored by a hostile server, is refused. Signed only when set, so older entries keep their signatures; an epoch without one closes nothing.
+      - A phone that joins later can't tell such records from genuine history (the seq isn't signed per record); phones that were in sync can.
     - `files`: chunked photo encryption.
 - `src/sync/` (`@kindred-log/shared/sync`):
-  - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD; tombstones carry no data.
+  - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD.
+    - Tombstones carry a sealed empty body: no content stays on the server, but a server can't delete on its own. `openRecord` throws `UnsealedRecordError` for one without data (older apps sent those); phones skip them.
   - `merge`: last-writer-wins with a device-id tie-break, the same rule on server and client.
   - Plan: `~/.claude/plans/let-s-analyze-the-current-precious-scroll.md` (Phase 2).
 - `src/domain/`: pure, RN-free helpers. Put new business logic here and test it with vitest (`src/__tests__`).
@@ -125,7 +128,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
   - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags; sleep, pumping and activity: the start defaults to now and the end is empty; Save needs an end (a past one), "Start timer" runs from the chosen start), `AddLogSheet` (grid of `LOG_TILE_KEYS`: every type, with Tummy time as its own tile; `logTile` in `logTypes.tsx` is shared with the Home shortcuts), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes; Wet is blue, Dirty brown, Both neutral with both icons). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
-  - `brand/`: the moon sub from the app icon (`Sub`, `RestingSub`; colors `sub*` and `seaFloor` in the palette), drawn with react-native-svg and animated with Reanimated. They stand still with reduced motion. Use these, not `ActivityIndicator`:
+  - `brand/`: the moon sub from the app icon (`Sub`, `RestingSub`, `SubTile` (onboarding), `SubMono` (one color, portholes cut out: Settings footer, Growth image), `Wordmark` (Fredoka SemiBold, embedded by the `expo-font` plugin from `@expo-google-fonts/fredoka`; Android names it by file, iOS by PostScript name); colors `sub*` and `seaFloor` in the palette), drawn with react-native-svg and animated with Reanimated. They stand still with reduced motion. Use these, not `ActivityIndicator`:
     - `SubLoader` (bobbing, bubbles): general waits without a known total.
     - `PeriscopeLoader`: waiting on the other phone (creating a code, adding, joining).
     - `SubProgress`: a known 0–1 progress (backup, restore, Baby Buddy import).
@@ -159,7 +162,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
     - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
-    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`) and applies them; there's no re-pull from 0.
+    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`) and applies them (current epoch only; older ones come through the pull); there's no re-pull from 0.
+    - Pulled records are refused (skipped, not written) if their seq is outside the page asked for, or `withinEpoch` says the log closed their epoch before them. Unsealed tombstones are skipped too.
+    - `rotateKeys` pulls everything first and signs `closedSeq` = this phone's `lastSeq`; on 409 (another phone pushed in between) it pulls and retries, up to three times.
     - **Self-healing** (`heal`, every run):
       - Grants epochs that `GET /v1/keys` lists as `missing` for a member or the recovery key, sealed only to public keys from the verified log.
       - Rotates when `rotationDue` (`rotateKeys`, also used by `removeDevice`). A concurrent rotation by another phone (400) is fine.
@@ -191,12 +196,14 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
   - `keys`: `GET`, `grant`, and `rotate`.
     - A rotation is the signed `epoch` log entry plus the key sealed to exactly the current members plus the recovery key, stored in one transaction. `families/me/log` refuses `epoch` entries.
+    - Its `closedSeq` must equal the family's seq, otherwise 409 ("Pull first"); entries from older apps without one are taken.
     - Grants never overwrite an existing sealed key.
   - `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
   - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. `Entitlements.canStore` is the hosted quota hook.
   - `sync/push` and `sync/pull`:
     - Last writer wins via `serverAccepts`, and a per-family `seq`.
-    - New data must use the current epoch.
+    - New data must use the current epoch, deletions too.
+    - Tombstones may carry a sealed body or (older apps) none; anything else needs data.
     - Records must be written as the calling device.
   - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
   - `push/token` (PUT/DELETE): hosted only (`PUSH=expo`, the default for `MODE=hosted`; a self-hosted server ignores tokens). After accepted writes, `PushService` sends the family's other phones a data-only `{kind: 'sync'}` ping through the Expo push service (coalesced over 2 s). Tokens are dropped when the service says DeviceNotRegistered or when the device is removed. `/v1/info` reports `push`.

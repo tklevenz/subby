@@ -20,6 +20,7 @@ export const DeviceLogEntrySchema = z.object({
   boxKey: b64.nullable(),
   epoch: z.number().int().positive().nullable(),
   keyHash: b64.nullable(),
+  closedSeq: z.number().int().nonnegative().nullable().optional(),
   signer: recipient,
   at: z.number().int(),
   sig: b64,

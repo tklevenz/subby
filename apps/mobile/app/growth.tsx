@@ -18,6 +18,8 @@ import { Button, Segmented } from '../components/ui';
 import { useLogQuery } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { SubMono } from '../components/brand/Sub';
+import { colors } from '../theme/colors';
 
 const MEASURES = [
   { value: 'weightKg', label: 'Weight' },
@@ -80,7 +82,11 @@ export default function GrowthScreen() {
           {sex ? ` · WHO ${sex === 'female' ? 'girls' : 'boys'} 3rd–97th percentile` : ''}
         </Text>
         <GrowthChart measure={measure} sex={sex} points={points} units={units} />
-        <Text className="text-ink-ghost text-[10px] mt-2">Source: WHO Child Growth Standards · Subby</Text>
+        <View className="flex-row items-center mt-2">
+          <Text className="text-ink-ghost text-[10px]">Source: WHO Child Growth Standards · </Text>
+          <SubMono width={14} color={colors.inkFaint} />
+          <Text className="text-ink-faint text-[10px] ml-1">Subby</Text>
+        </View>
       </View>
 
       {points.length === 0 && logs ? (

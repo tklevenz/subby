@@ -15,6 +15,7 @@ import {
   sign,
   toBase64,
   verifyDeviceLog,
+  withinEpoch,
   type DeviceLogEntry,
   type DeviceLogState,
   type IdentityKeys,
@@ -26,6 +27,7 @@ import {
   claimKeyOf,
   claimMac,
   newInviteSecret,
+  UnsealedRecordError,
   openRecord,
   sealRecord,
   type InviteQr,
@@ -203,12 +205,30 @@ export class TestClient {
     return this.request<PushResponse>('POST', '/v1/sync/push', { records });
   }
 
-  /** Pulls every page since the last seq and decrypts it. */
+  /** Ids of pulled records refused as not genuine (see `pull`). */
+  rejected: string[] = [];
+
+  /**
+   * Pulls every page since the last seq and decrypts it. Refuses (and lists in `rejected`) what can't be genuine:
+   * a seq outside the page, a record of an old epoch past the seq the log closed it at, an unsealed tombstone.
+   */
   async pull() {
     const out: { record: SyncRecord; body: unknown }[] = [];
     for (;;) {
-      const page = await this.request<PullResponse>('GET', `/v1/sync/pull?since=${this.lastSeq}&limit=200`);
-      for (const { seq: _, ...record } of page.records) out.push({ record, body: openRecord(this.familyKeys, record) });
+      const since = this.lastSeq;
+      const page = await this.request<PullResponse>('GET', `/v1/sync/pull?since=${since}&limit=200`);
+      for (const { seq, ...record } of page.records) {
+        if (seq <= since || seq > page.seq || !withinEpoch(this.state!, record.epoch, seq)) {
+          this.rejected.push(record.id);
+          continue;
+        }
+        try {
+          out.push({ record, body: openRecord(this.familyKeys, record) });
+        } catch (e) {
+          if (!(e instanceof UnsealedRecordError)) throw e;
+          this.rejected.push(record.id);
+        }
+      }
       this.lastSeq = page.seq;
       if (!page.more) return out;
     }
@@ -278,15 +298,28 @@ export class TestClient {
     await this.rotate();
   }
 
-  /** Starts the next epoch: its log entry commits to the new key, which is sealed to every member left. */
+  /**
+   * Starts the next epoch: its log entry commits to the new key, which is sealed to every member left, and closes
+   * the old epochs at the seq this client has pulled to. The server takes it only if that's the family's latest,
+   * so this pulls first (and again if another phone pushed in between).
+   */
   async rotate() {
     const key = newSymmetricKey();
     const epoch = this.state!.epoch + 1;
-    const entry = appendEntry(this.state, this.log.length, this.me, { type: 'epoch', deviceId: this.deviceId, familyKey: { epoch, key } }, Date.now());
     const sealed: Record<string, string> = {};
     for (const [id, member] of this.state!.members) sealed[id] = toBase64(seal(member.boxKey, key));
     if (this.state!.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(this.state!.recovery.boxKey, key));
-    await this.request('POST', '/v1/keys/rotate', { entry, sealed });
+    let entry: DeviceLogEntry;
+    for (let attempt = 1; ; attempt++) {
+      await this.pull();
+      entry = appendEntry(this.state, this.log.length, this.me, { type: 'epoch', deviceId: this.deviceId, familyKey: { epoch, key }, closedSeq: this.lastSeq }, Date.now());
+      try {
+        await this.request('POST', '/v1/keys/rotate', { entry, sealed });
+        break;
+      } catch (e) {
+        if (!(e instanceof HttpError && e.status === 409) || attempt === 3) throw e;
+      }
+    }
     this.log = [...this.log, entry];
     this.state = verifyDeviceLog(this.log);
     this.familyKeys.set(epoch, key);

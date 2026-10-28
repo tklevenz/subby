@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChildForm from '../components/ChildForm';
 import { Button } from '../components/ui';
+import { SubTile } from '../components/brand/Sub';
 import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 
@@ -18,7 +19,8 @@ export default function Onboarding() {
       contentContainerStyle={{ paddingTop: insets.top + 32, paddingHorizontal: 20, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-3xl font-bold text-ink">Welcome to Subby</Text>
+      <SubTile size={64} />
+      <Text className="text-3xl font-bold text-ink mt-4">Welcome to Subby</Text>
       <Text className="text-ink-muted mt-2 leading-6">
         Private, offline baby tracking. Everything stays on this device. Let's start with your little one.
       </Text>
