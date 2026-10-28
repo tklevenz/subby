@@ -1,7 +1,8 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { appReady } from '../features/startup';
 import { useChildStore } from '../store/useChildStore';
@@ -11,6 +12,9 @@ import { useReminderSync } from '../features/reminders/scheduler';
 import { useSyncEngine } from '../features/sync/useSyncEngine';
 import { colors } from '../theme/colors';
 
+// The native splash (the sub on navy) stays up until the database is open, so there's no spinner in between.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.setOptions({ fade: true, duration: 250 });
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -22,7 +26,8 @@ export default function RootLayout() {
   useEffect(() => {
     appReady()
       .then(() => setReady(true))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => SplashScreen.hideAsync().catch(() => {}));
   }, []);
 
   useReminderSync(ready);
@@ -36,11 +41,7 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.ground }} className="justify-center items-center px-8">
         <StatusBar style="light" />
-        {error ? (
-          <Text className="text-red-strong text-center">Failed to open database: {error}</Text>
-        ) : (
-          <ActivityIndicator size="large" color={colors.violetStrong} />
-        )}
+        {error ? <Text className="text-red-strong text-center">Failed to open database: {error}</Text> : null}
       </View>
     );
   }

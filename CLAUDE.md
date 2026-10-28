@@ -3,6 +3,10 @@
 ## 1. Project Overview
 `kindred-log` is a local-first, offline-capable baby/child activity tracking mobile application (logging feeds, diapers, and sleep/wake windows) built within a `pnpm` monorepo (`~/src/kindred-log`)[cite: 4].
 
+**Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo and package name. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; Home stays brand-free.
+- User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme and the `kindred-sync` server id.
+- The package id `com.kindred.log` also stays for now: a new id is a different app (fresh install). Decide once, before the first store release.
+
 ## 2. Tech Stack & Environment
 - **Monorepo / Package Manager:** `pnpm` workspaces (Turborepo / `pnpm run dev` task runner)[cite: 4]
 - **Mobile Framework:** Expo SDK 57 (recently upgraded from an earlier SDK to match the latest Expo Go client)[cite: 4]
@@ -64,7 +68,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 
 ### `apps/mobile`
 - **Config:**
-  - `app.json`: plugins `expo-router`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), `expo-notifications`, `expo-background-task`. No system date picker (see `DateTimeField`).
+  - `app.json`: name Subby; icons and splash from `assets/` (see below); plugins `expo-router`, `expo-splash-screen`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), `expo-notifications`, `expo-background-task`. No system date picker (see `DateTimeField`).
+  - **Brand assets:** `assets/brand/*.svg` are the sources; the PNGs in `assets/` are rendered from them at their declared size (we used `@resvg/resvg-js`, outside the repo). Re-render after editing an SVG, then prebuild. `icon` (full bleed, iOS rounds it), `adaptive-icon` + `adaptive-icon-monochrome` (Android, framed inside the safe zone), `splash-icon` (same framing, so Android 12+'s round mask doesn't clip it), `notification-icon` (white, tinted `#FFC93C`), `tile` (rounded, for in-app use).
+  - The native splash stays up until the database is open (`SplashScreen.preventAutoHideAsync` in `_layout`, hidden after `appReady()`), so there's no spinner at start.
   - `babel.config.js`: `babel-preset-expo` with `jsxImportSource: 'nativewind'`, `nativewind/babel`, and `inline-import` for `.sql`.
   - `metro.config.js`: `withNativeWind(... './global.css')`, plus `sql` in `sourceExts`.
   - pnpm note: `react-native-css-interop` must stay a direct dependency or Metro can't resolve the NativeWind JSX runtime.

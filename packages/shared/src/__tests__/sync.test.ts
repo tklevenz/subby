@@ -68,6 +68,6 @@ describe('invite code', () => {
     expect(text).toMatch(/^kindred:[A-Za-z0-9_-]+$/);
     expect(decodeInviteQr(`  ${text}\n`)).toEqual(qr);
     expect(() => decodeInviteQr('kindred:!!!')).toThrow('damaged');
-    expect(() => decodeInviteQr('https://example.com')).toThrow('Not a Kindred');
+    expect(() => decodeInviteQr('https://example.com')).toThrow('Not a Subby code');
   });
 });

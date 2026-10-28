@@ -80,7 +80,7 @@ export default function GrowthScreen() {
           {sex ? ` · WHO ${sex === 'female' ? 'girls' : 'boys'} 3rd–97th percentile` : ''}
         </Text>
         <GrowthChart measure={measure} sex={sex} points={points} units={units} />
-        <Text className="text-ink-ghost text-[10px] mt-2">Source: WHO Child Growth Standards · Kindred Log</Text>
+        <Text className="text-ink-ghost text-[10px] mt-2">Source: WHO Child Growth Standards · Subby</Text>
       </View>
 
       {points.length === 0 && logs ? (

@@ -46,7 +46,7 @@ export const encodeInviteQr = (qr: InviteQr) => `kindred:${toBase64(jsonToBytes(
 
 export function decodeInviteQr(input: string): InviteQr {
   const text = input.trim();
-  if (!text.startsWith('kindred:')) throw new Error('Not a Kindred Log code');
+  if (!text.startsWith('kindred:')) throw new Error('Not a Subby code');
   let qr: InviteQr;
   try {
     qr = bytesToJson<InviteQr>(fromBase64(text.slice('kindred:'.length)));

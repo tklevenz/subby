@@ -39,7 +39,7 @@ export default function ChildSwitcher() {
         ) : null}
         <Pressable onPress={() => setOpen(true)} hitSlop={8} className="ml-3" accessibilityRole="button" accessibilityLabel="Switch child">
           <View className="flex-row items-center">
-            <Text className="text-xl font-bold text-ink">{active?.name ?? 'Kindred Log'}</Text>
+            <Text className="text-xl font-bold text-ink">{active?.name ?? 'Subby'}</Text>
             <AngleDown color={colors.inkFaint} size={16} style={{ marginLeft: 4 }} />
           </View>
           {active ? <Text className="text-[13px] text-ink-muted">{formatAge(active.birthDate, Date.now())}</Text> : null}

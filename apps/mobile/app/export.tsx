@@ -47,7 +47,7 @@ export default function ExportScreen() {
     if (!selected?.size) return;
     setBusy(true);
     const slug = child.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'child';
-    const file = new File(Paths.cache, `kindred-log-${slug}-${toIsoDate(Date.now())}.csv`);
+    const file = new File(Paths.cache, `subby-${slug}-${toIsoDate(Date.now())}.csv`);
     try {
       const from = range === 'all' ? undefined : Date.now() - Number(range) * 86_400_000;
       const logs = await fetchLogs(child.id, { from, types: [...selected] });

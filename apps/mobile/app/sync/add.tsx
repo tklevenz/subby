@@ -83,7 +83,7 @@ export default function AddPhoneScreen() {
         <>
           <Text className="text-ink text-xl font-bold">Scan this on the other phone</Text>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
-            On the new phone, open Kindred Log and choose "Join a family" (or Settings → Sync → Join), then scan this code.
+            On the new phone, open Subby and choose "Join a family" (or Settings → Sync → Join), then scan this code.
           </Text>
           <View className="items-center mt-6">
             <View className="rounded-2xl overflow-hidden">

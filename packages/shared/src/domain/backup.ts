@@ -12,6 +12,7 @@ import { LogEntrySchema, LogTypeSchema, type LogEntry, type LogPayload } from '.
  * something deleted later) plus the photos, in one zip. Optionally encrypted with a passphrase.
  * Device-local fields stay out: photo paths (the photos themselves are in the zip), sync references and status.
  */
+// Internal: keeps the old name (Kindred Log) so existing backups still restore. Never change it.
 export const BACKUP_FORMAT = 'kindred-log-backup';
 export const BACKUP_VERSION = 1;
 const MANIFEST = 'backup.json';
@@ -118,9 +119,9 @@ export function readBackup(zip: Uint8Array): BackupContents {
   try {
     files = unzipSync(zip);
   } catch {
-    throw new BackupError('This file is damaged or not a Kindred Log backup');
+    throw new BackupError('This file is damaged or not a Subby backup');
   }
-  if (!files[MANIFEST]) throw new BackupError('This file is not a Kindred Log backup');
+  if (!files[MANIFEST]) throw new BackupError('This file is not a Subby backup');
   let raw: unknown;
   try {
     raw = bytesToJson(files[MANIFEST]);
@@ -128,7 +129,7 @@ export function readBackup(zip: Uint8Array): BackupContents {
     throw new BackupError('This backup is damaged');
   }
   const manifest = ManifestSchema.safeParse(raw);
-  if (!manifest.success) throw new BackupError('This file is not a Kindred Log backup');
+  if (!manifest.success) throw new BackupError('This file is not a Subby backup');
   if (manifest.data.version > BACKUP_VERSION) throw new BackupError('This backup was made by a newer version of the app. Update the app first.');
 
   let invalid = 0;

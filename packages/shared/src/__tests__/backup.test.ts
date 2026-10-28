@@ -67,7 +67,7 @@ describe('backup', () => {
     expect(res.backup.logs).toHaveLength(2);
 
     expect(() => readBackup(strToU8('hello'))).toThrow(BackupError);
-    expect(() => readBackup(zipSync({ 'other.txt': strToU8('x') }))).toThrow(/not a Kindred Log backup/);
+    expect(() => readBackup(zipSync({ 'other.txt': strToU8('x') }))).toThrow(/not a Subby backup/);
     const newer = zipSync({ 'backup.json': strToU8(JSON.stringify({ ...manifest, version: 99 })) });
     expect(() => readBackup(newer)).toThrow(/newer version/);
   });

@@ -1,10 +1,11 @@
 {
   "expo": {
-    "name": "Kindred Log",
+    "name": "Subby",
     "slug": "kindred-log",
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "kindred-log",
+    "icon": "./assets/icon.png",
     "platforms": [
       "ios",
       "android"
@@ -17,7 +18,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#020617"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#0E1B3D"
       },
       "package": "com.kindred.log"
     },
@@ -26,6 +29,15 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#0E1B3D"
+        }
+      ],
       [
         "expo-sqlite",
         {
@@ -38,13 +50,15 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
+          "color": "#FFC93C",
           "enableBackgroundRemoteNotifications": true
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Kindred Log uses the camera to scan the code shown on another phone when you add it to your family.",
+          "cameraPermission": "Subby uses the camera to scan the code shown on another phone when you add it to your family.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }

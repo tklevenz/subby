@@ -142,7 +142,7 @@ export default function SettingsScreen() {
       ) : null}
 
       <View className="mt-10 items-center">
-        <Text className="text-ink-ghost text-xs">Kindred Log · data stays on this device</Text>
+        <Text className="text-ink-ghost text-xs">Subby · data stays on this device</Text>
         {/* Required by the Font Awesome Free license (CC BY 4.0). */}
         <Text className="text-ink-ghost text-xs mt-1">Icons by Font Awesome (CC BY 4.0)</Text>
       </View>

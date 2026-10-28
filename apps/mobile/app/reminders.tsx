@@ -76,7 +76,7 @@ export default function RemindersScreen() {
       ) : allowed === false ? (
         <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
           <Text className="text-amber-pale text-sm leading-5">
-            Notifications are turned off for Kindred Log.{' '}
+            Notifications are turned off for Subby.{' '}
             <Text className="underline" onPress={() => Linking.openSettings()}>Open Settings</Text> to allow them.
           </Text>
         </View>

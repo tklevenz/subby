@@ -34,7 +34,7 @@ export const savesToDownloads = downloads !== null;
  */
 export async function saveBackup(passphrase: string | null, onProgress?: (p: number) => void) {
   const { bytes, ...counts } = await buildBackup(passphrase, onProgress);
-  const name = `kindred-log-backup-${toIsoDate(Date.now())}.${passphrase ? 'kindred' : 'zip'}`;
+  const name = `subby-backup-${toIsoDate(Date.now())}.${passphrase ? 'subby' : 'zip'}`;
   const mimeType = passphrase ? 'application/octet-stream' : 'application/zip';
   const file = new File(Paths.cache, name);
   try {

@@ -58,7 +58,7 @@ function SetUp() {
         autoCorrect={false}
         keyboardType="url"
       />
-      <Text className="text-ink-faint text-xs mt-2 ml-1">Hosted Kindred Sync is coming. For now, use a server you run yourself.</Text>
+      <Text className="text-ink-faint text-xs mt-2 ml-1">Hosted Subby Sync is coming. For now, use a server you run yourself.</Text>
 
       {error ? <Text className="text-red-soft text-sm mt-4">{error}</Text> : null}
       <Button label={busy ? 'Setting up…' : 'Set up sync'} onPress={start} disabled={busy || !server.trim()} />
