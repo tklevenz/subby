@@ -42,7 +42,7 @@ type TileContent = {
   onPress: () => void;
   /** A running timer started by mistake: delete it (asks first). */
   onDiscard?: () => void;
-  /** The entry the time refers to (running, or the last one); tapping the time opens it. */
+  /** The entry the time refers to (running, or the last one); tapping the time or its lines opens it. */
   entryId?: string;
 };
 
@@ -136,9 +136,8 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   let sleep: TileContent;
   if (sleeping) {
     sleep = {
-      eyebrow: `${sleeping.payload.nap ? 'Napping' : 'Asleep'} since ${formatTime(sleeping.startedAt)}`,
       value: formatDuration(now - sleeping.startedAt),
-      lines: [],
+      lines: [`${sleeping.payload.nap ? 'napping' : 'asleep'} · since ${formatTime(sleeping.startedAt)}`],
       hint: 'Tap to wake up',
       active: true,
       entryId: sleeping.id,
@@ -163,9 +162,8 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       lines.push(`Bedtime around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
     }
     sleep = {
-      eyebrow: wakeAt !== null ? 'Awake for' : undefined,
       value: wakeAt !== null ? formatHoursMinutes(now - wakeAt) : '–',
-      lines: wakeAt !== null ? lines : ['No sleep logged yet'],
+      lines: wakeAt !== null ? [`awake · since ${formatTime(wakeAt)}`, ...lines] : ['No sleep logged yet'],
       hint: 'Tap to start sleep',
       entryId: logs.find((l) => l.logType === 'sleep' && l.endedAt !== null)?.id,
       onPress: async () => {
@@ -229,7 +227,7 @@ const STYLE: Record<HomeTile, { box: string; boxActive: string; label: string; i
 function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: TileContent; large?: boolean; onLongPress: () => void }) {
   const s = STYLE[tile];
   // The tile's action is a full-size button underneath; the content on top lets taps through to it, except for
-  // the time (opens its entry) and Discard. Buttons nested inside a button don't reliably get their own taps.
+  // the time and its lines (open the entry) and Discard. Buttons nested inside a button don't reliably get their own taps.
   return (
     <View className={`flex-1 border justify-between ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}>
       <Pressable
@@ -249,7 +247,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
         {large ? <Text className="text-ink-muted text-xs">{content.hint}</Text> : null}
       </View>
       <View pointerEvents="box-none">
-        {/* The time opens its entry (the running or last one). */}
+        {/* The time and the lines below it open its entry (the running or last one). */}
         <Pressable
           onPress={content.entryId ? () => router.push(`/entry/${content.entryId}`) : undefined}
           // Nothing to open yet ("No feeds yet"): taps go through to the tile.
@@ -260,7 +258,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           className="self-start"
         >
           {content.eyebrow ? (
-            <Text className={`text-[13px] font-medium ${tile === 'sleep' && !content.active ? 'text-amber-pale/80' : 'text-ink-muted'}`}>
+            <Text className="text-[13px] font-medium text-ink-muted">
               {content.eyebrow}
             </Text>
           ) : null}
@@ -272,14 +270,12 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           >
             {content.value}
           </Text>
-        </Pressable>
-        <View pointerEvents="none">
           {content.lines.map((line) => (
             <Text key={line} className="text-ink-muted text-xs mt-0.5" numberOfLines={large ? 2 : 1}>
               {line}
             </Text>
           ))}
-        </View>
+        </Pressable>
       </View>
       {content.onDiscard ? (
         <Pressable
