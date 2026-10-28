@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import type { InviteResponse } from '@kindred-log/shared/sync';
 import { approveClaim, claimCode, createInvite, inviteStatus, type Invite } from '../../features/sync/family';
 import QrCode from '../../components/QrCode';
 import { Button } from '../../components/ui';
 import { useNow } from '../../store/timeHelpers';
-import { colors } from '../../theme/colors';
+import { PeriscopeLoader } from '../../components/brand/loaders';
 
 type Claimant = NonNullable<InviteResponse['claimant']>;
 type Step =
@@ -74,7 +74,7 @@ export default function AddPhoneScreen() {
     <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       {step.kind === 'loading' || step.kind === 'approving' ? (
         <View className="items-center mt-24">
-          <ActivityIndicator size="large" color={colors.violetStrong} />
+          <PeriscopeLoader />
           <Text className="text-ink-muted mt-4">{step.kind === 'approving' ? 'Adding the phone…' : 'Creating a code…'}</Text>
         </View>
       ) : null}

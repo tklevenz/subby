@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { BackupContents, RestorePlan } from '@kindred-log/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
 import { Button, FieldLabel, TextField } from '../components/ui';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
-import { colors } from '../theme/colors';
+import { SubLoader, SubProgress } from '../components/brand/loaders';
 
 const MIN_PASSPHRASE = 8;
 
@@ -250,7 +250,7 @@ function Line({ label, value }: { label: string; value: number }) {
 function Busy({ label, progress }: { label: string; progress: number }) {
   return (
     <View className="items-center mt-24">
-      <ActivityIndicator size="large" color={colors.violetStrong} />
+      {progress > 0 && progress < 1 ? <SubProgress progress={progress} /> : <SubLoader />}
       <Text className="text-ink-muted mt-4">{progress > 0 && progress < 1 ? `${label} ${Math.round(progress * 100)}%` : label}</Text>
     </View>
   );

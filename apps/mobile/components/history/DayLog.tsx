@@ -17,6 +17,7 @@ import { logDisplay } from '../logDisplay';
 import { TYPE_META } from '../logTypes';
 import { Moon } from '../icons';
 import { colors } from '../../theme/colors';
+import { EmptyState } from '../brand/EmptyState';
 
 /** The day's sleep, feeds and diapers as plain figures in one row. */
 export function DayTotals({ stats, units }: { stats: DayStats; units: UnitSystem }) {
@@ -58,7 +59,7 @@ export function DayTotals({ stats, units }: { stats: DayStats; units: UnitSystem
  */
 export function DayLog({ logs, day, now }: { logs: LogEntry[]; day: number; now: number }) {
   const items = dayTimeline(logs, day, now);
-  if (!items.length) return <Text className="text-ink-faint text-center mt-10">Nothing logged on this day.</Text>;
+  if (!items.length) return <EmptyState title="All quiet down here" text="Nothing logged on this day." />;
   return (
     <View>
       {items.map((item) =>

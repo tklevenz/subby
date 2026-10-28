@@ -100,6 +100,14 @@ module.exports = {
     // Dirty diapers (Tailwind amber 700 / 600): base for tints, Strong for the icon
     brown: "#b45309",
     brownStrong: "#d97706",
+    // Subby, the moon submarine (brand mark, loaders, empty states)
+    subYellow: "#ffc93c",
+    subAmber: "#e8a317",
+    subGlass: "#1e2a5a",
+    subMoon: "#fff1b8",
+    subBubble: "#7dd3fc",
+    subNavy: "#0e1b3d",
+    seaFloor: "#0b3b47",
     // Child avatars without a photo: fill and initial
     avatar1Bg: "#4c1d95",
     avatar1Ink: "#ddd6fe",

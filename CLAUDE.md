@@ -125,6 +125,13 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
   - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags; sleep, pumping and activity: the start defaults to now and the end is empty; Save needs an end (a past one), "Start timer" runs from the chosen start), `AddLogSheet` (grid of `LOG_TILE_KEYS`: every type, with Tummy time as its own tile; `logTile` in `logTypes.tsx` is shared with the Home shortcuts), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes; Wet is blue, Dirty brown, Both neutral with both icons). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
+  - `brand/`: the moon sub from the app icon (`Sub`, `RestingSub`; colors `sub*` and `seaFloor` in the palette), drawn with react-native-svg and animated with Reanimated. They stand still with reduced motion. Use these, not `ActivityIndicator`:
+    - `SubLoader` (bobbing, bubbles): general waits without a known total.
+    - `PeriscopeLoader`: waiting on the other phone (creating a code, adding, joining).
+    - `SubProgress`: a known 0–1 progress (backup, restore, Baby Buddy import).
+    - `SubSpinner`: small inline waits (buttons, rows, loading an entry).
+    - `SyncPing`: two sonar rings once, when the Sync screen is up to date (new `key` per sync).
+    - `EmptyState`: the sub asleep on the sea floor (History day, Trends, Export).
   - `DateTimeField`: our own wheel sheet (`components/datetime/`: `WheelColumn`, tested `parts.ts`), the same on iOS and Android, replacing the system pickers.
     - `datetime` mode: day ("Today", "Yesterday", "Sat, Oct 24"…, a year back or to the value), hour and minute, plus AM/PM on a 12-hour clock.
     - `date` mode (birth date): day, month and year.

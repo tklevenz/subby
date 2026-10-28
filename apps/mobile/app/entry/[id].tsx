@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { TIMED_LOG_TYPES, isCompletePayload, pauseFeed, type LogEntry, type LogPayload } from '@kindred-log/shared';
 import DateTimeField from '../../components/DateTimeField';
@@ -9,7 +9,7 @@ import { TYPE_META, activityLabel } from '../../components/logTypes';
 import { Button, FieldLabel } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
-import { colors } from '../../theme/colors';
+import { SubSpinner } from '../../components/brand/loaders';
 
 /** Edit/backdate any log entry, including ones older than the loaded window. */
 export default function EntryScreen() {
@@ -20,7 +20,7 @@ export default function EntryScreen() {
     useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
   }, [id]);
 
-  if (entry === undefined) return <ActivityIndicator className="mt-10" color={colors.violetStrong} />;
+  if (entry === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
   return entry ? <EntryForm entry={entry} /> : <Stack.Screen options={{ title: 'Entry not found' }} />;
 }
 

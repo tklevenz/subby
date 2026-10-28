@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -20,7 +20,7 @@ import { previewImport, runImport, type ImportPreview, type ImportProgress, type
 import { canAddChild, useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { colors } from '../../theme/colors';
+import { SubLoader, SubProgress, SubSpinner } from '../../components/brand/loaders';
 
 const LABELS: Record<BBEndpoint, string> = {
   feedings: 'Feedings', changes: 'Diaper changes', sleep: 'Sleep', 'tummy-times': 'Tummy time',
@@ -112,7 +112,7 @@ export default function BabyBuddyImport() {
             <Text className="text-amber-soft text-xs mt-2">This address isn't encrypted (http). Your key and data travel in plain text.</Text>
           ) : null}
           {error ? <Text className="text-red-strong mt-3">{error}</Text> : null}
-          {busy ? <ActivityIndicator className="mt-4" color={colors.violetStrong} /> : (
+          {busy ? <View className="items-center mt-4"><SubSpinner size={36} /></View> : (
             <Button label="Connect" onPress={connect} disabled={!url.trim() || !token.trim()} />
           )}
         </View>
@@ -150,19 +150,23 @@ export default function BabyBuddyImport() {
 
       {step.kind === 'running' ? (
         <View className="items-center mt-8">
-          <ActivityIndicator size="large" color={colors.violetStrong} />
           {step.progress ? (
             <>
               <Text className="text-ink text-base mt-4">{LABELS[step.progress.endpoint]}</Text>
               <Text className="text-ink-muted mt-1">{step.progress.done} / {step.progress.total}</Text>
-              <View className="w-full h-2 bg-raised rounded-full mt-3 overflow-hidden">
-                <View className="h-2 bg-violet" style={{ width: `${Math.round((step.progress.done / Math.max(1, step.progress.total)) * 100)}%` }} />
+              <View className="w-full mt-3">
+                <SubProgress progress={step.progress.done / Math.max(1, step.progress.total)} />
               </View>
               <Text className="text-ink-faint text-xs mt-2">
                 Step {BB_ENDPOINTS.indexOf(step.progress.endpoint) + 1} of {BB_ENDPOINTS.length}
               </Text>
             </>
-          ) : <Text className="text-ink-muted mt-4">Starting…</Text>}
+          ) : (
+            <>
+              <SubLoader />
+              <Text className="text-ink-muted mt-4">Starting…</Text>
+            </>
+          )}
           <View className="w-full">
             <Button label="Cancel" variant="ghost" onPress={() => (cancelled.current = true)} />
           </View>

@@ -9,6 +9,7 @@ import { fetchLogs } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { countChildLogs } from '../store/useChildStore';
 import { toIsoDate } from '../store/timeHelpers';
+import { EmptyState } from '../components/brand/EmptyState';
 
 const RANGES = [
   { value: 'all', label: 'All time' },
@@ -85,7 +86,7 @@ export default function ExportScreen() {
           <Chip key={t} label={`${TYPE_META[t].label} · ${counts[t]!.toLocaleString()}`} selected={selected?.has(t) ?? false} onPress={() => toggle(t)} />
         ))}
       </View>
-      {types.length === 0 ? <Text className="text-ink-faint mt-2">Nothing logged yet.</Text> : null}
+      {types.length === 0 ? <EmptyState small text="Nothing logged yet." /> : null}
 
       <Button label={busy ? 'Exporting…' : 'Export CSV'} disabled={busy || !selected?.size} onPress={exportCsv} />
       <Text className="text-ink-ghost text-xs mt-3 leading-5">

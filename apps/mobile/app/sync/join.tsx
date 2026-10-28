@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimInvite, defaultDeviceName, finishJoin, hasLocalData, joinStatus, type Join } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField } from '../../components/ui';
-import { colors } from '../../theme/colors';
+import { PeriscopeLoader, SubLoader } from '../../components/brand/loaders';
 
 type Step =
   | { kind: 'scan' }
@@ -78,9 +78,9 @@ export default function JoinScreen() {
           <Text className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-10">
             {step.join.code.slice(0, 3)} {step.join.code.slice(3)}
           </Text>
-          <View className="flex-row items-center justify-center mt-10">
-            <ActivityIndicator color={colors.violetStrong} />
-            <Text className="text-ink-muted ml-3">Waiting for the other phone…</Text>
+          <View className="items-center mt-10">
+            <PeriscopeLoader width={72} />
+            <Text className="text-ink-muted mt-3">Waiting for the other phone…</Text>
           </View>
         </>
       ) : null}
@@ -159,7 +159,7 @@ function Busy({ label }: { label: string }) {
   const progress = useSyncStore((s) => s.progress);
   return (
     <View className="items-center mt-24">
-      <ActivityIndicator size="large" color={colors.violetStrong} />
+      <SubLoader />
       <Text className="text-ink-muted mt-4">{progress ? `${progress.label} · ${progress.done.toLocaleString()}` : label}</Text>
     </View>
   );

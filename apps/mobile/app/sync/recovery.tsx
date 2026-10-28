@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { newRecoveryWords, normalizeRecoveryWords } from '@kindred-log/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
 import { useSyncStore } from '../../features/sync/engine';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Button, FieldLabel, TextField } from '../../components/ui';
-import { colors } from '../../theme/colors';
+import { SubLoader } from '../../components/brand/loaders';
 
 type Step = { kind: 'intro' } | { kind: 'words'; words: string[] } | { kind: 'check'; words: string[] } | { kind: 'saving' } | { kind: 'done' };
 
@@ -72,7 +72,7 @@ export default function RecoveryKeyScreen() {
 
       {step.kind === 'saving' ? (
         <View className="items-center mt-24">
-          <ActivityIndicator size="large" color={colors.violetStrong} />
+          <SubLoader />
           <Text className="text-ink-muted mt-4">Saving the recovery key…</Text>
         </View>
       ) : null}

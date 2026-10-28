@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { isValidRecoveryWords, normalizeRecoveryWords } from '@kindred-log/shared/crypto';
 import { defaultDeviceName, hasLocalData, recoverFamily } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField } from '../../components/ui';
-import { colors } from '../../theme/colors';
+import { SubLoader } from '../../components/brand/loaders';
 
 type Step = { kind: 'enter' } | { kind: 'choose' } | { kind: 'working' } | { kind: 'error'; message: string };
 
@@ -104,7 +104,7 @@ function Busy() {
   const progress = useSyncStore((s) => s.progress);
   return (
     <View className="items-center mt-24">
-      <ActivityIndicator size="large" color={colors.violetStrong} />
+      <SubLoader />
       <Text className="text-ink-muted mt-4">{progress ? `${progress.label} · ${progress.done.toLocaleString()}` : 'Recovering…'}</Text>
     </View>
   );

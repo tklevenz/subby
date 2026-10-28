@@ -21,6 +21,7 @@ import { useLogQuery } from '../../store/queries';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
+import { EmptyState } from '../../components/brand/EmptyState';
 
 const RANGES = [
   { value: '7', label: '7 days' },
@@ -62,7 +63,7 @@ export default function TrendsScreen() {
 
       {stats && avg ? (
         avg.days === 0 && !stats[stats.length - 1].tracked ? (
-          <Text className="text-ink-faint mt-6">Nothing logged in this period yet.</Text>
+          <EmptyState small text="Nothing logged in this period yet." />
         ) : (
           <>
             {any('sleepMs') ? (

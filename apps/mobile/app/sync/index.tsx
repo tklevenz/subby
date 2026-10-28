@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -7,7 +7,7 @@ import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { pushDeviceName, setUpSync, syncNow, turnOffSync, useSyncStore } from '../../features/sync/engine';
 import { defaultDeviceName, removeDevice } from '../../features/sync/family';
 import { Button, Card, FieldLabel, Row, TextField } from '../../components/ui';
-import { colors } from '../../theme/colors';
+import { SubSpinner, SyncPing } from '../../components/brand/loaders';
 
 /** Sync between phones: set up or join, status, the family's phones, turning it off. */
 export default function SyncScreen() {
@@ -115,7 +115,9 @@ function Status() {
         <Row
           label="Status"
           value={state}
-          right={phase === 'syncing' ? <ActivityIndicator size="small" color={colors.violetStrong} /> : undefined}
+          right={
+            phase === 'syncing' ? <SubSpinner size={24} /> : phase !== 'error' && !pending && sync.lastSyncedAt ? <SyncPing key={sync.lastSyncedAt} /> : undefined
+          }
         />
         <Row label="Last synced" value={sync.lastSyncedAt ? formatTime(sync.lastSyncedAt) : 'Not yet'} />
         <Row label="Server" value={sync.server.replace(/^https?:\/\//, '')} />
