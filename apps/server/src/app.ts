@@ -24,7 +24,7 @@ import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
 
-/** GET /v1/info: lets the app check that a custom server URL really is a Kindred Sync server. */
+/** GET /v1/info: lets the app check that a custom server URL really is a Subby Sync server. */
 @Controller('v1')
 class InfoController {
   constructor(@Inject(CONFIG) private readonly config: Config) {}

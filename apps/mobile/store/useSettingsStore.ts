@@ -31,7 +31,7 @@ export type SyncSettings = {
   names?: Record<string, string>;
   /** Devices this phone has already seen in the family, to point out new ones. */
   knownDevices?: string[];
-  /** Whether the server wakes this phone with push when others write (hosted Kindred Sync does). */
+  /** Whether the server wakes this phone with push when others write (hosted Subby Sync does). */
   push?: boolean;
   /** The family this phone's photo references belong to; differs (or is missing) after moving to another family. */
   photosFamily?: string;

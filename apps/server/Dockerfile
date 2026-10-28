@@ -1,4 +1,4 @@
-# Kindred Sync server. Build from the repository root (the server bundles the shared workspace package):
+# Subby Sync server. Build from the repository root (the server bundles the shared workspace package):
 #   docker build -f apps/server/Dockerfile -t kindred-sync .
 
 FROM node:24-bookworm-slim AS build

@@ -1,7 +1,7 @@
 export type Config = {
   databaseUrl: string;
   port: number;
-  /** `self`: self-hosted, no limits, no push. `hosted`: the official Kindred Sync service. */
+  /** `self`: self-hosted, no limits, no push. `hosted`: the official Subby Sync service. */
   mode: 'self' | 'hosted';
   migrationsFolder: string;
   /** Where encrypted files (photos) go: a local folder, or S3-compatible object storage. */

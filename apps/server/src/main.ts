@@ -6,4 +6,4 @@ import { loadConfig } from './config';
 const config = loadConfig(process.env, fileURLToPath(new URL('../drizzle', import.meta.url)));
 const app = await createApp(config);
 await app.listen({ port: config.port, host: '0.0.0.0' });
-console.log(`Kindred Sync (${config.mode}) listening on :${config.port}`);
+console.log(`Subby Sync (${config.mode}) listening on :${config.port}`);

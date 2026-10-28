@@ -1,6 +1,6 @@
 // Every UI color, by role. Single source for Tailwind (as CSS variables, see tailwind.config.js)
 // and for colors passed in JS (icons, charts, navigation): import { colors } from theme/colors.
-// A theme is one of these maps; Kindred Log launches with dark only. Values are Tailwind v3 colors.
+// A theme is one of these maps; Subby launches with dark only. Values are Tailwind v3 colors.
 // CommonJS so tailwind.config.js can require it.
 module.exports = {
   dark: {

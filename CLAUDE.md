@@ -4,7 +4,7 @@
 `kindred-log` is a local-first, offline-capable baby/child activity tracking mobile application (logging feeds, diapers, and sleep/wake windows) built within a `pnpm` monorepo (`~/src/kindred-log`)[cite: 4].
 
 **Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo and package name. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; Home stays brand-free.
-- User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme and the `kindred-sync` server id.
+- User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme, and on the server (Subby Sync) the `kindred-sync` service id and Docker image and the `kindred` Postgres user and database.
 - The package id `com.kindred.log` also stays for now: a new id is a different app (fresh install). Decide once, before the first store release.
 
 ## 2. Tech Stack & Environment
@@ -186,7 +186,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **UX rule:** 2-tap maximum for common logs (sleep: 1 tap on its tile; diaper: tile + type; feed: tile + sheet).
 - **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.
 
-### `apps/server` (`@kindred-log/server`, Kindred Sync; **AGPL-3.0**, everything else is MIT)
+### `apps/server` (`@kindred-log/server`, Subby Sync; **AGPL-3.0**, everything else is MIT)
 - **What it is:** a zero-knowledge sync relay. NestJS 12 (Fastify 5; the Fastify adapter pins its fastify version, so keep the direct `fastify` dependency equal to it) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
   - The server stores only ids, public keys, signatures, versions and ciphertext. Never add a column that holds readable user data.
   - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod 4: use `z.uuid()` and `.loose()`, not the deprecated `z.string().uuid()` and `.passthrough()`). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
@@ -232,7 +232,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Tests:** `test/e2e.test.ts` runs the real server on a throwaway database. `test/client.ts` is a full simulated app (pairing, sync, removal + rotation, recovery) and the reference for the mobile sync engine. The tests are skipped, with a warning, when the dev Postgres isn't running.
 
 ### Native builds (local, no EAS)
-- `expo-dev-client` is installed, so `pnpm run dev` / `expo start` now targets the **Kindred Log dev build**. Use `pnpm --filter @kindred-log/mobile dev:go` (or press `s`) for Expo Go.
+- `expo-dev-client` is installed, so `pnpm run dev` / `expo start` now targets the **Subby dev build**. Use `pnpm --filter @kindred-log/mobile dev:go` (or press `s`) for Expo Go.
 - `android/` and `ios/` are generated (Continuous Native Generation) and gitignored. Never edit them: change `app.json` or a config plugin instead.
 - Build and install on a USB-connected phone or an emulator: `cd apps/mobile && pnpm android`. After native changes (new native package, `app.json` plugins), run `pnpm android:clean`.
 - Rebuild only for native changes; JS changes hot-reload as usual.

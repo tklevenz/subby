@@ -1,10 +1,13 @@
-# Kindred Sync server
+# Subby Sync server
 
-The sync server for Kindred Log. It relays end-to-end encrypted data between a family's phones and stores only
+The sync server for Subby, the private baby tracker. It relays end-to-end encrypted data between a family's phones and stores only
 what it needs to do that: ids, public keys, signatures, versions, timestamps of writes, sizes, and ciphertext.
 It can't read names, entries or photos.
 
 License: AGPL-3.0 (the app and the shared package are MIT).
+
+Some internal names keep the project's old name, Kindred, on purpose: the `kindred-sync` service id and Docker
+image, and the `kindred` Postgres user and database. Renaming them would break existing apps and installs.
 
 ## Self-hosting with Docker
 
