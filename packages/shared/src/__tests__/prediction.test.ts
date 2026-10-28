@@ -47,7 +47,7 @@ describe('predictNextSleep', () => {
     const norms = ageNorms(8);
     const center = 150 * 0.7 + ((norms.wakeMin + norms.wakeMax) / 2) * 0.3;
     expect(p).toMatchObject({ kind: 'nap', basis: 'personal', napIndex: 0, napMinutes: 60 });
-    expect(p.earliest).toBe(at(0, 7) + (center - 15) * MIN);
+    expect(p.earliest).toBe(at(0, 7) + (center - 30) * MIN);
   });
 
   it('predicts bedtime after the usual number of naps', () => {
@@ -57,7 +57,7 @@ describe('predictNextSleep', () => {
       entry({ type: 'sleep', nap: true }, at(0, 13, 30), at(0, 15)),
     ];
     const p = predictNextSleep(logs, child, at(0, 16))!;
-    expect(p).toMatchObject({ kind: 'bedtime', earliest: at(0, 19, 15), latest: at(0, 19, 45) });
+    expect(p).toMatchObject({ kind: 'bedtime', earliest: at(0, 19), latest: at(0, 20) });
   });
 
   it('moves on to bedtime once the nap window has passed', () => {
@@ -68,7 +68,15 @@ describe('predictNextSleep', () => {
   it('learns that naps are not taken (or not logged)', () => {
     const nightsOnly = week(7).filter((l) => l.payload.type === 'sleep' && l.payload.nap === false);
     expect(sleepHabits(nightsOnly, at(0, 8)).napsPerDay).toBe(0);
-    expect(predictNextSleep(nightsOnly, child, at(0, 8))).toMatchObject({ kind: 'bedtime', earliest: at(0, 19, 15) });
+    expect(predictNextSleep(nightsOnly, child, at(0, 8))).toMatchObject({ kind: 'bedtime', earliest: at(0, 19) });
+  });
+
+  it('keeps a nap that only some days have', () => {
+    // A nap on 2 of the 6 complete days (≥ 30 %; the median is 0): still part of the day, so the morning predicts it.
+    const napDays = [at(-6, 9, 30), at(-3, 9, 30)];
+    const some = week(7).filter((l) => l.payload.type === 'sleep' && (l.payload.nap === false || napDays.includes(l.startedAt)));
+    expect(sleepHabits(some, at(0, 8)).napsPerDay).toBe(1);
+    expect(predictNextSleep(some, child, at(0, 8))).toMatchObject({ kind: 'nap', napIndex: 0 });
   });
 
   it('falls back to age norms without history', () => {

@@ -107,10 +107,22 @@ export type SleepHabits = {
   napLengths: Map<number, number>;
   /** Median length of any nap, minutes. */
   napLength: number | null;
+  /** The most naps at least `NAP_DAY_SHARE` of the days had (0 when naps are rarely taken or logged). */
   napsPerDay: number | null;
 };
 
 const MIN_SAMPLES = 3;
+/**
+ * A nap counts as part of the day when at least this share of days had it. A median would drop it as soon as most
+ * days skip it (a nap being phased out, or days it went unlogged), and predict bedtime in the morning; predicting a
+ * nap costs little, since the prediction moves on to bedtime once the nap window has passed.
+ */
+const NAP_DAY_SHARE = 0.3;
+/**
+ * Half the predicted window when it comes from the baby's own history, minutes. Replaying two years of real
+ * history put the actual start within ±30 min about half the time (±15 min: a third).
+ */
+const RANGE_MIN = 30;
 
 /** The baby's own patterns over the 7 days before `now`. */
 export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabits {
@@ -152,11 +164,13 @@ export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabit
       [...napLengths].filter(([, xs]) => xs.length >= MIN_SAMPLES).map(([i, xs]) => [i, median(xs)!]),
     ),
     napLength: naps.length >= MIN_SAMPLES ? median(naps.map((n) => (n.endedAt! - n.startedAt) / MIN)) : null,
-    // Naps per day over complete days with a logged morning wake-up (so zero-nap days count too).
+    // Over complete days with a logged morning wake-up (so zero-nap days count too).
     napsPerDay: (() => {
       const days = [...new Set(nights.map((n) => startOfDay(n.endedAt!)))].filter((d) => d < startOfDay(now));
       if (days.length < MIN_SAMPLES) return null;
-      return Math.round(median(days.map((d) => naps.filter((n) => startOfDay(n.startedAt) === d).length))!);
+      const counts = days.map((d) => naps.filter((n) => startOfDay(n.startedAt) === d).length);
+      for (let k = Math.max(...counts); k > 0; k--) if (counts.filter((c) => c >= k).length >= NAP_DAY_SHARE * days.length) return k;
+      return 0;
     })(),
   };
 }
@@ -217,7 +231,7 @@ export function predictNextSleep(
   const napStart = wakeAt + nap.center * MIN;
   const bedtimeClock = habits.bedtimeClock !== null ? atClock(wakeAt, habits.bedtimeClock) : null;
 
-  const half = nap.personal ? 15 : (norms.wakeMax - norms.wakeMin) / 2;
+  const half = nap.personal ? RANGE_MIN : (norms.wakeMax - norms.wakeMin) / 2;
 
   // Bedtime once the day's naps are done, when a nap would run into the usual bedtime, or
   // when the nap window has already passed (skipped, or not logged).
@@ -233,8 +247,8 @@ export function predictNextSleep(
     const center = bedtimeClock !== null && bedtimeClock - wakeAt >= norms.wakeMin * 0.75 * MIN ? bedtimeClock : byWindow;
     return {
       kind: 'bedtime',
-      earliest: center - 15 * MIN,
-      latest: center + 15 * MIN,
+      earliest: center - RANGE_MIN * MIN,
+      latest: center + RANGE_MIN * MIN,
       basis: bed.personal || bedtimeClock !== null ? 'personal' : 'age',
       wakeAt,
       napIndex,
