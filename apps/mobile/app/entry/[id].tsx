@@ -35,6 +35,8 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const running = timed && endedAt === null;
   const invalid = endedAt !== null && endedAt < startedAt;
   const overlap = useSleepOverlap(entry.logType === 'sleep', startedAt, endedAt, entry.id);
+  // Save lights up only once something changed (an unset field and a missing one compare equal).
+  const changed = startedAt !== entry.startedAt || endedAt !== entry.endedAt || JSON.stringify(payload) !== JSON.stringify(entry.payload);
 
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
 
@@ -88,7 +90,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
 
       <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={invalid || overlap !== null || !isCompletePayload(payload)} />
+      <Button label="Save" onPress={save} disabled={!changed || invalid || overlap !== null || !isCompletePayload(payload)} />
       <Button label="Delete" variant="danger" onPress={confirmDelete} />
     </ScrollView>
   );

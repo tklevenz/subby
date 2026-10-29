@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Modal, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, ImageIcon, Plus, Xmark } from '../icons';
 import { recentTags } from '@kindred-log/shared';
 import { pickPhoto } from '../../features/photos';
@@ -113,31 +114,86 @@ export function TagsField({ value, onChange }: { value: string[] | undefined; on
 }
 
 export function PhotoField({ value, onChange }: { value: string | undefined; onChange: (uri: string | undefined) => void }) {
+  // The photo just removed, so it can be put back before saving.
+  const [removed, setRemoved] = useState<string>();
+  const [viewing, setViewing] = useState(false);
+  const [ratio, setRatio] = useState<number>();
+  useEffect(() => {
+    setRatio(undefined);
+    if (value) Image.getSize(value, (w, h) => setRatio(w / h), () => {});
+  }, [value]);
+
   const pick = async (camera: boolean) => {
     const uri = await pickPhoto(camera ? 'camera' : 'library');
-    if (uri) onChange(uri);
+    if (uri) {
+      setRemoved(undefined);
+      onChange(uri);
+    }
   };
 
   if (value) {
     return (
       <View>
-        <Image source={{ uri: value }} className="w-full h-48 rounded-xl" resizeMode="cover" />
-        <Pressable onPress={() => onChange(undefined)} className="absolute top-2 right-2 bg-scrim/60 rounded-full p-1.5">
+        {/* Shown at its own shape, up to square for portrait photos; tap for the whole photo. */}
+        <Pressable onPress={() => setViewing(true)} accessibilityRole="imagebutton" accessibilityLabel="View photo">
+          <Image source={{ uri: value }} className="w-full rounded-xl" style={{ aspectRatio: Math.max(ratio ?? 4 / 3, 1) }} resizeMode="cover" />
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            setRemoved(value);
+            onChange(undefined);
+          }}
+          hitSlop={8}
+          accessibilityLabel="Remove photo"
+          className="absolute top-2 right-2 bg-scrim/60 rounded-full p-1.5"
+        >
           <Xmark color={colors.ink} size={16} />
         </Pressable>
+        <PhotoViewer uri={viewing ? value : undefined} onClose={() => setViewing(false)} />
       </View>
     );
   }
   return (
-    <View className="flex-row gap-2">
-      <Pressable onPress={() => pick(false)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
-        <ImageIcon color={colors.inkSoft} size={18} />
-        <Text className="text-ink-soft ml-2">Library</Text>
-      </Pressable>
-      <Pressable onPress={() => pick(true)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
-        <Camera color={colors.inkSoft} size={18} />
-        <Text className="text-ink-soft ml-2">Camera</Text>
-      </Pressable>
+    <View>
+      {removed ? (
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-ink-muted">Photo removed when you save</Text>
+          <Pressable
+            onPress={() => {
+              onChange(removed);
+              setRemoved(undefined);
+            }}
+            hitSlop={8}
+          >
+            <Text className="text-violet-soft font-semibold">Undo</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      <View className="flex-row gap-2">
+        <Pressable onPress={() => pick(false)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
+          <ImageIcon color={colors.inkSoft} size={18} />
+          <Text className="text-ink-soft ml-2">Library</Text>
+        </Pressable>
+        <Pressable onPress={() => pick(true)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
+          <Camera color={colors.inkSoft} size={18} />
+          <Text className="text-ink-soft ml-2">Camera</Text>
+        </Pressable>
+      </View>
     </View>
+  );
+}
+
+/** The whole photo, full screen; tap anywhere or back to close. */
+function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal transparent animationType="fade" visible={!!uri} statusBarTranslucent onRequestClose={onClose}>
+      <Pressable onPress={onClose} accessibilityLabel="Close photo" className="flex-1 bg-scrim">
+        {uri ? <Image source={{ uri }} style={{ flex: 1 }} resizeMode="contain" /> : null}
+        <View style={{ top: insets.top + 12 }} className="absolute right-4 bg-ground/60 rounded-full p-2">
+          <Xmark color={colors.ink} size={18} />
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
