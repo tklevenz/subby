@@ -26,6 +26,8 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';
 import { logTile } from '../logTypes';
+import { SubMono, Sub } from '../brand/Sub';
+import { DozingSub } from '../brand/loaders';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
 
@@ -48,7 +50,7 @@ type TileContent = {
 };
 
 /** A tap on a big tile can be taken back for a few seconds: the tile is easy to hit by accident. */
-type UndoOffer = { label: string; undo: () => void };
+type UndoOffer = { label: string; undo: () => void; /** Sleep's: the bar carries the sub. */ sub?: boolean };
 const UNDO_MS = 5000;
 
 /**
@@ -96,6 +98,11 @@ export default function HomeTiles({ child }: { child: Child }) {
       <Shortcuts logs={logs} />
       {offer ? (
         <View className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5">
+          {offer.sub ? (
+            <View className="mr-2.5">
+              <Sub width={34} />
+            </View>
+          ) : null}
           <Text className="flex-1 text-ink text-sm" numberOfLines={1}>
             {offer.label}
           </Text>
@@ -146,7 +153,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const slept = formatHoursMinutes(Date.now() - sleeping.startedAt);
         await stopTimer(sleeping.id);
-        offerUndo({ label: `Woke up after ${slept}`, undo: () => updateLog(sleeping.id, { endedAt: null }) });
+        offerUndo({ label: `Woke up after ${slept}`, undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
       },
       onDiscard: () =>
         Alert.alert('Discard this sleep?', "It's deleted, as if it never started.", [
@@ -171,7 +178,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Daytime sleeps default to naps; editable afterwards.
         const entry = await startTimer({ type: 'sleep', nap: isNapTime(Date.now()) });
-        offerUndo({ label: 'Sleep started', undo: () => softDeleteLog(entry.id) });
+        offerUndo({ label: 'Sleep started', undo: () => softDeleteLog(entry.id), sub: true });
       },
     };
   }
@@ -226,10 +233,28 @@ const STYLE: Record<HomeTile, { box: string; boxActive: string; label: string; i
 
 function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: TileContent; large?: boolean; onLongPress: () => void }) {
   const s = STYLE[tile];
+  const [height, setHeight] = useState(0);
+  // Discard sits in the bottom-right; a small tile has room only for a round ✕ beside the lines.
+  const discard = content.onDiscard ? (
+    <Pressable
+      onPress={content.onDiscard}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={`Discard this ${LABEL[tile].toLowerCase()}`}
+      className={`absolute right-4 bottom-4 rounded-full border border-line-strong bg-ground/40 ${large ? 'flex-row items-center px-3 py-1.5' : 'w-8 h-8 items-center justify-center'}`}
+    >
+      <Xmark color={colors.inkMuted} size={12} />
+      {large ? <Text className="text-ink-muted text-xs ml-1.5">Discard</Text> : null}
+    </Pressable>
+  ) : null;
   // The tile's action is a full-size button underneath; the content on top lets taps through to it, except for
   // the time and its lines (open the entry) and Discard. Buttons nested inside a button don't reliably get their own taps.
   return (
-    <View className={`flex-1 border justify-between ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}>
+    <View
+      onLayout={tile === 'sleep' ? (e) => setHeight(e.nativeEvent.layout.height) : undefined}
+      className={`flex-1 border justify-between overflow-hidden ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}
+    >
+      {tile === 'sleep' ? <SleepSub large={large} asleep={!!content.active} height={height} /> : null}
       <Pressable
         onPress={content.onPress}
         onLongPress={onLongPress}
@@ -271,24 +296,35 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
             {content.value}
           </Text>
           {content.lines.map((line) => (
-            <Text key={line} className="text-ink-muted text-xs mt-0.5" numberOfLines={large ? 2 : 1}>
+            // Clear of a small tile's ✕ (a 12-hour "since 12:06 PM" is long enough to reach it).
+            <Text key={line} className={`text-ink-muted text-xs mt-0.5 ${!large && content.onDiscard ? 'mr-9' : ''}`} numberOfLines={large ? 2 : 1}>
               {line}
             </Text>
           ))}
         </Pressable>
       </View>
-      {content.onDiscard ? (
-        <Pressable
-          onPress={content.onDiscard}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Discard this ${LABEL[tile].toLowerCase()}`}
-          className="absolute right-4 bottom-4 flex-row items-center rounded-full border border-line-strong bg-ground/40 px-3 py-1.5"
-        >
-          <Xmark color={colors.inkMuted} size={12} />
-          <Text className="text-ink-muted text-xs ml-1.5">Discard</Text>
-        </Pressable>
-      ) : null}
+      {discard}
+    </View>
+  );
+}
+
+/**
+ * The sub on the sleep tile, behind the content: faint while awake, dozing while asleep. The large tile has room in
+ * its bottom-right (above Discard while asleep); a small tile's free corner is the top-right.
+ */
+function SleepSub({ large, asleep, height }: { large?: boolean; asleep: boolean; height: number }) {
+  if (asleep) {
+    // Above Discard, below the header row: smaller on short tiles.
+    const width = large ? Math.min(128, Math.max(72, (height - 110) * 1.375)) : 56;
+    return (
+      <View pointerEvents="none" className="absolute" style={large ? { right: 20, bottom: 64 } : { right: 12, top: 12 }}>
+        <DozingSub width={width} bubbles={!!large} />
+      </View>
+    );
+  }
+  return (
+    <View pointerEvents="none" className="absolute" style={[{ opacity: 0.08 }, large ? { right: -18, bottom: -14 } : { right: -8, top: 6 }]}>
+      <SubMono width={large ? 170 : 64} color={colors.violetStrong} />
     </View>
   );
 }

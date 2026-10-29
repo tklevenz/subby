@@ -3,7 +3,7 @@
 ## 1. Project Overview
 `kindred-log` is a local-first, offline-capable baby/child activity tracking mobile application (logging feeds, diapers, and sleep/wake windows) built within a `pnpm` monorepo (`~/src/kindred-log`)[cite: 4].
 
-**Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo and package name. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; Home stays brand-free.
+**Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo and package name. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; on Home the brand lives only in the sleep tile and its Undo bar (canvas row "Subby on Home").
 - User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme, and on the server (Subby Sync) the `kindred-sync` service id and Docker image and the `kindred` Postgres user and database.
 - The package id `com.kindred.log` also stays for now: a new id is a different app (fresh install). Decide once, before the first store release.
 
@@ -134,6 +134,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - `SubProgress`: a known 0–1 progress (backup, restore, Baby Buddy import).
     - `SubSpinner`: small inline waits (buttons, rows, loading an entry).
     - `SyncPing`: two sonar rings once, when the Sync screen is up to date (new `key` per sync).
+    - `DozingSub`: the sub bobbing with z's (bubbles when there's room): Home's sleep tile during a sleep. Awake, that tile shows a faint `SubMono` (8 %) instead; large tile bottom-right (above Discard), small tile top-right. Sleep's Undo bar carries the sub too.
     - `EmptyState`: the sub asleep on the sea floor (History day, Trends, Export).
   - `DateTimeField`: our own wheel sheet (`components/datetime/`: `WheelColumn`, tested `parts.ts`), the same on iOS and Android, replacing the system pickers.
     - `datetime` mode: day ("Today", "Yesterday", "Sat, Oct 24"…, a year back or to the value), hour and minute, plus AM/PM on a 12-hour clock.

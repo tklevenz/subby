@@ -18,12 +18,18 @@ import { Periscope, Sub, SUB_VIEWBOX } from './Sub';
 
 // Loaders with the sub from the app icon. With reduced motion turned on they stand still.
 
+// Created once: `useLoop` restarts when its easing changes, and Home redraws every second for its timers.
+const SWAY = Easing.inOut(Easing.sin);
+const RISE = Easing.out(Easing.quad);
+
 /** A shared value running 0 → 1 on repeat (back and forth with `reverse`), from `delay` ms. */
 function useLoop(duration: number, { reverse = false, delay = 0, easing = Easing.linear } = {}) {
   const t = useSharedValue(0);
   const reduced = useReducedMotion();
   useEffect(() => {
     if (reduced) return;
+    // From 0, so a restart can't begin at the end and repeat 1 → 1.
+    t.value = 0;
     t.value = withDelay(delay, withRepeat(withTiming(1, { duration, easing }), -1, reverse));
     return () => cancelAnimation(t);
   }, [reduced, duration, reverse, delay, easing, t]);
@@ -32,12 +38,12 @@ function useLoop(duration: number, { reverse = false, delay = 0, easing = Easing
 
 /** Bob: up and down with a slight roll. */
 function useBob() {
-  const t = useLoop(1300, { reverse: true, easing: Easing.inOut(Easing.sin) });
+  const t = useLoop(1300, { reverse: true, easing: SWAY });
   return { t, reduced: useReducedMotion() };
 }
 
 function Bubble({ x, y, r, delay }: { x: number; y: number; r: number; delay: number }) {
-  const t = useLoop(2400, { delay, easing: Easing.out(Easing.quad) });
+  const t = useLoop(2400, { delay, easing: RISE });
   const reduced = useReducedMotion();
   const style = useAnimatedStyle(() => ({
     opacity: reduced ? 0.6 : interpolate(t.value, [0, 0.15, 1], [0, 0.85, 0]),
@@ -65,6 +71,42 @@ export function SubLoader({ width = 112 }: { width?: number }) {
       <Animated.View style={[{ position: 'absolute', left: 6 * s, top: 22 * s }, style]}>
         <Sub width={width * 0.88} />
       </Animated.View>
+    </View>
+  );
+}
+
+function Z({ x, y, size, delay }: { x: number; y: number; size: number; delay: number }) {
+  const t = useLoop(3000, { delay, easing: RISE });
+  const reduced = useReducedMotion();
+  const style = useAnimatedStyle(() => ({
+    opacity: reduced ? 0.6 : interpolate(t.value, [0, 0.25, 1], [0, 0.9, 0]),
+    transform: [{ translateX: 14 * t.value }, { translateY: -34 * t.value }, { scale: 0.7 + 0.45 * t.value }],
+  }));
+  return <Animated.Text style={[{ position: 'absolute', left: x, top: y, fontSize: size, fontWeight: '700', color: colors.subBubble }, style]}>z</Animated.Text>;
+}
+
+/** The sub asleep: bobbing slowly while z's drift up (and bubbles rise, when there's room). Home's running sleep. */
+export function DozingSub({ width, bubbles = true }: { width: number; bubbles?: boolean }) {
+  const { t } = useBob();
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: 5 * t.value }, { rotate: `${-3 + 6 * t.value}deg` }],
+  }));
+  const height = (width * SUB_VIEWBOX.h) / SUB_VIEWBOX.w;
+  const z = Math.max(10, width * 0.14);
+  return (
+    <View style={{ width, height }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {bubbles ? (
+        <>
+          <Bubble x={width * 0.04} y={height * 0.6} r={3} delay={300} />
+          <Bubble x={-width * 0.04} y={height * 0.68} r={2.2} delay={1400} />
+        </>
+      ) : null}
+      <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, style]}>
+        <Sub width={width} />
+      </Animated.View>
+      <Z x={width * 0.62} y={-z * 0.4} size={z} delay={0} />
+      <Z x={width * 0.74} y={-z} size={z * 0.75} delay={1100} />
+      {bubbles ? <Z x={width * 0.55} y={0} size={z * 0.65} delay={2100} /> : null}
     </View>
   );
 }
