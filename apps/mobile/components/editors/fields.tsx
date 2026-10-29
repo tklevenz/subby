@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, Text, View } from 'react-native';
+import { Alert, Image, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Camera, ImageIcon, Plus, Xmark } from '../icons';
+import { ArrowUpFromBracket, Camera, Download, ImageIcon, Plus, ShareNodes, Xmark } from '../icons';
 import { recentTags } from '@kindred-log/shared';
-import { pickPhoto } from '../../features/photos';
+import { canSavePhoto, pickPhoto, savePhoto, sharePhoto } from '../../features/photos';
 import { useLogStore } from '../../store/useLogStore';
 import { Chip, TextField } from '../ui';
 import { colors } from '../../theme/colors';
@@ -183,17 +183,51 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
   );
 }
 
-/** The whole photo, full screen; tap anywhere or back to close. */
+/** The whole photo, full screen, with Share (and Save on Android); tap the photo or back to close. */
 function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const [saved, setSaved] = useState<string>();
+  useEffect(() => setSaved(undefined), [uri]);
+
+  const share = () => uri && sharePhoto(uri).catch(() => Alert.alert("Couldn't share the photo"));
+  const save = () =>
+    uri &&
+    savePhoto(uri)
+      .then((name) => setSaved(name))
+      .catch(() => Alert.alert("Couldn't save the photo"));
+
+  // The buttons sit beside the photo's Pressable, not inside it: nested Pressables don't reliably get their own taps on Android.
   return (
     <Modal transparent animationType="fade" visible={!!uri} statusBarTranslucent onRequestClose={onClose}>
-      <Pressable onPress={onClose} accessibilityLabel="Close photo" className="flex-1 bg-scrim">
-        {uri ? <Image source={{ uri }} style={{ flex: 1 }} resizeMode="contain" /> : null}
-        <View style={{ top: insets.top + 12 }} className="absolute right-4 bg-ground/60 rounded-full p-2">
+      <View className="flex-1 bg-scrim">
+        <Pressable onPress={onClose} accessibilityLabel="Close photo" className="flex-1">
+          {uri ? <Image source={{ uri }} style={{ flex: 1 }} resizeMode="contain" /> : null}
+        </Pressable>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          accessibilityLabel="Close photo"
+          style={{ top: insets.top + 12 }}
+          className="absolute right-4 bg-ground/60 rounded-full p-2"
+        >
           <Xmark color={colors.ink} size={18} />
+        </Pressable>
+        <View style={{ bottom: insets.bottom + 20 }} className="absolute left-0 right-0 items-center">
+          {saved ? <Text className="text-ink text-sm mb-3">Saved to Downloads as {saved}</Text> : null}
+          <View className="flex-row gap-3">
+            <Pressable onPress={share} className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
+              {Platform.OS === 'ios' ? <ArrowUpFromBracket color={colors.ink} size={16} /> : <ShareNodes color={colors.ink} size={16} />}
+              <Text className="text-ink font-medium ml-2">Share</Text>
+            </Pressable>
+            {canSavePhoto ? (
+              <Pressable onPress={save} className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
+                <Download color={colors.ink} size={16} />
+                <Text className="text-ink font-medium ml-2">Save</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }

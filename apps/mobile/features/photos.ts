@@ -1,5 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
 import { Directory, File, Paths } from 'expo-file-system';
+import { downloads } from '../modules/kindred-downloads';
 
 const photosDir = () => new Directory(Paths.document, 'photos');
 
@@ -26,6 +28,23 @@ export async function pickPhoto(source: 'camera' | 'library', square = false): P
   if (source === 'camera' && !(await ImagePicker.requestCameraPermissionsAsync()).granted) return null;
   const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
   return !res.canceled && res.assets[0] ? persistPhoto(res.assets[0].uri) : null;
+}
+
+const imageType = (uri: string) => (/\.png$/i.test(uri) ? 'image/png' : 'image/jpeg');
+
+/** Opens the share sheet for a photo (iOS's has "Save Image"). */
+export const sharePhoto = (uri: string) => Sharing.shareAsync(uri, { mimeType: imageType(uri), dialogTitle: 'Share photo' });
+
+/** Whether `savePhoto` can save straight to the phone (Android's Downloads folder). */
+export const canSavePhoto = downloads !== null;
+
+/** Saves a copy to the public Downloads folder (Android); returns the saved name. */
+export async function savePhoto(uri: string): Promise<string> {
+  if (!downloads) throw new Error('Saving is not available here');
+  const ext = /\.png$/i.test(uri) ? 'png' : 'jpg';
+  const d = new Date();
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return downloads.saveToDownloads(uri, `Subby photo ${day}.${ext}`, imageType(uri));
 }
 
 /** A photo's size in bytes; null when the file is gone. */
