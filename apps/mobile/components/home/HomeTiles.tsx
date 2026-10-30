@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, Pills, Plus, PoopDroplet, Xmark } from '../icons';
+import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, Plus, PoopDroplet, Xmark, type IconComponent } from '../icons';
 import {
   activeSleep,
   describeDiaper,
@@ -16,7 +16,7 @@ import {
   lastWakeAt,
   medicationsDue,
   predictNextSleep,
-  recentShortcuts,
+  pumpingDue,
   startOfDay,
   suggestedNextSide,
   type Child,
@@ -25,7 +25,7 @@ import {
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';
-import { logTile } from '../logTypes';
+import { TYPE_META } from '../logTypes';
 import { SubMono, Sub } from '../brand/Sub';
 import { DozingSub } from '../brand/loaders';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
@@ -55,7 +55,7 @@ const UNDO_MS = 5000;
 
 /**
  * Home: the pinned tile on top (sleep by default), the other two side by side below, then
- * what's coming up and shortcuts. Long-press a tile to pin it; saved per child.
+ * what's due and links. Long-press a tile to pin it; saved per child.
  */
 export default function HomeTiles({ child }: { child: Child }) {
   const logs = useLogStore((s) => s.logs);
@@ -94,8 +94,8 @@ export default function HomeTiles({ child }: { child: Child }) {
           <Tile key={t} tile={t} content={content[t]} onLongPress={() => longPress(t)} />
         ))}
       </View>
-      <UpNext logs={logs} now={now} />
-      <Shortcuts logs={logs} />
+      <UpNext logs={logs} now={now} offerUndo={offerUndo} />
+      <LogSomethingElse />
       {offer ? (
         <View className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5">
           {offer.sub ? (
@@ -329,20 +329,62 @@ function SleepSub({ large, asleep, height }: { large?: boolean; asleep: boolean;
   );
 }
 
-/** Medication doses due (until 12 h past due), the sleep schedule and today's full log. */
-function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
+/** How long a due row stays after its time: a medicine or pumping that has stopped shouldn't linger. */
+const DUE_FOR_MS = 12 * 3_600_000;
+
+type Due = { key: string; label: string; dueAt: number; Icon: IconComponent; color: string; bg: string; action: string; onPress: () => void };
+
+/**
+ * What's due, each with its own button: medication doses logged with a next-dose interval, and pumping when its
+ * reminder is on (the same time as the notification). Then the sleep schedule and today's full log.
+ */
+function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offerUndo: (o: UndoOffer) => void }) {
   const formatTime = useFormatTime();
-  const meds = medicationsDue(logs).filter((m) => now - m.dueAt < 12 * 3_600_000);
+  const open = useSheetStore((s) => s.open);
+  const startTimer = useLogStore((s) => s.startTimer);
+  const softDeleteLog = useLogStore((s) => s.softDeleteLog);
+  const pumpReminder = useSettingsStore((s) => s.reminders.pumping);
   const today = logs.filter((l) => l.startedAt >= startOfDay(now)).length;
+
+  const due: Due[] = medicationsDue(logs).map((m) => {
+    const { name, dose, unit, nextDoseIntervalMin } = m.last;
+    return {
+      ...TYPE_META.medication,
+      key: `med:${m.name}`,
+      label: m.name,
+      dueAt: m.dueAt,
+      action: 'Log',
+      onPress: () => open({ kind: 'log', type: 'medication', payload: { name, dose, unit, nextDoseIntervalMin } }),
+    };
+  });
+  const pump = pumpReminder.enabled ? pumpingDue(logs, pumpReminder.intervalMin) : null;
+  if (pump) {
+    due.push({
+      ...TYPE_META.pumping,
+      key: 'pumping',
+      dueAt: pump.dueAt,
+      action: 'Start',
+      onPress: async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        const entry = await startTimer({ type: 'pumping' });
+        offerUndo({ label: 'Pumping started', undo: () => softDeleteLog(entry.id) });
+      },
+    });
+  }
+  const shown = due.filter((d) => now - d.dueAt < DUE_FOR_MS).sort((a, b) => a.dueAt - b.dueAt);
+
   return (
     <View className="bg-surface border border-line rounded-2xl">
-      {meds.map((m) => (
-        <View key={m.name} className="flex-row items-center px-3.5 py-3 border-b border-line">
-          <Pills color={colors.blueSoft} size={16} />
-          <Text className="flex-1 text-ink text-sm ml-2.5" numberOfLines={1}>{m.name}</Text>
-          <Text className={`text-xs ${m.dueAt <= now ? 'text-red-soft' : 'text-blue-pale'}`}>
-            {m.dueAt <= now ? `Overdue by ${formatDuration(now - m.dueAt)}` : `Due at ${formatTime(m.dueAt)}`}
+      {shown.map(({ key, label, dueAt, Icon, color, bg, action, onPress }) => (
+        <View key={key} className="flex-row items-center pl-3.5 pr-2 py-2 border-b border-line">
+          <Icon color={color} size={16} />
+          <Text className="flex-1 text-ink text-sm ml-2.5" numberOfLines={1}>{label}</Text>
+          <Text className={`text-xs ${dueAt <= now ? 'text-red-soft' : 'text-ink-muted'}`}>
+            {dueAt <= now ? `Overdue by ${formatDuration(now - dueAt)}` : `Due at ${formatTime(dueAt)}`}
           </Text>
+          <Pressable onPress={onPress} accessibilityLabel={`${action} ${label.toLowerCase()}`} className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}>
+            <Text className="text-ink text-[13px] font-semibold">{action}</Text>
+          </Pressable>
         </View>
       ))}
       <Pressable onPress={() => router.push('/schedule')} className="flex-row items-center px-3.5 py-3 border-b border-line">
@@ -360,27 +402,17 @@ function UpNext({ logs, now }: { logs: LogEntry[]; now: number }) {
   );
 }
 
-/** The three categories (besides the big tiles) logged most recently, one tap away; More opens everything. */
-function Shortcuts({ logs }: { logs: LogEntry[] }) {
+/** Everything without a tile of its own; replaced the recent-category shortcuts (canvas row "Home · only the +", A). */
+function LogSomethingElse() {
   const open = useSheetStore((s) => s.open);
-  const items = useMemo(() => recentShortcuts(logs).map(logTile), [logs]);
   return (
-    <View className="flex-row gap-2">
-      {items.map(({ key, short, Icon, color, bg, request }) => (
-        <Pressable key={key} onPress={() => open(request)} className={`flex-1 h-12 rounded-xl border flex-row items-center justify-center ${bg}`}>
-          <Icon color={color} size={16} />
-          <Text className="text-ink text-[13px] font-medium ml-1.5" numberOfLines={1}>
-            {short}
-          </Text>
-        </Pressable>
-      ))}
-      <Pressable
-        onPress={() => open({ kind: 'add' })}
-        accessibilityLabel="More log types"
-        className="w-12 h-12 rounded-xl border border-line-strong bg-raised items-center justify-center"
-      >
-        <Plus color={colors.inkSoft} size={18} />
-      </Pressable>
-    </View>
+    <Pressable
+      onPress={() => open({ kind: 'add' })}
+      accessibilityRole="button"
+      className="h-12 rounded-xl border border-line-strong bg-raised flex-row items-center justify-center"
+    >
+      <Plus color={colors.inkSoft} size={16} />
+      <Text className="text-ink-soft text-sm font-medium ml-2">Log something else</Text>
+    </Pressable>
   );
 }

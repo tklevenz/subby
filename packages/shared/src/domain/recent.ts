@@ -1,4 +1,4 @@
-import type { LogEntry, LogPayload, LogType, PayloadOf } from '../schemas/log.schema';
+import type { LogEntry, PayloadOf } from '../schemas/log.schema';
 
 /** Distinct values ordered by most recent use (logs sorted startedAt DESC). */
 function distinctRecent(values: Iterable<string>, limit: number): string[] {
@@ -44,7 +44,8 @@ export function flaggedFoods(logs: LogEntry[]): string[] {
   );
 }
 
-export type MedicationDue = { name: string; dueAt: number; lastAt: number };
+/** `last`: the latest dose, to log the next one like it. */
+export type MedicationDue = { name: string; dueAt: number; lastAt: number; last: PayloadOf<'medication'> };
 
 /** Next due time per medication with a dosing interval (latest dose of each name). */
 export function medicationsDue(logs: LogEntry[]): MedicationDue[] {
@@ -56,36 +57,19 @@ export function medicationsDue(logs: LogEntry[]): MedicationDue[] {
     if (seen.has(key)) continue;
     seen.add(key);
     if (l.payload.nextDoseIntervalMin) {
-      out.push({ name: l.payload.name, lastAt: l.startedAt, dueAt: l.startedAt + l.payload.nextDoseIntervalMin * 60_000 });
+      out.push({ name: l.payload.name, lastAt: l.startedAt, dueAt: l.startedAt + l.payload.nextDoseIntervalMin * 60_000, last: l.payload });
     }
   }
   return out.sort((a, b) => a.dueAt - b.dueAt);
 }
 
-/** What a Home shortcut opens: a log type, or tummy time (an activity kind, but logged often enough to be its own). */
-export type ShortcutKey = Exclude<LogType, 'sleep' | 'feed' | 'diaper'> | 'tummy';
-
-/** Until there's history (or for the slots it doesn't fill). */
-export const DEFAULT_SHORTCUTS: readonly ShortcutKey[] = ['pumping', 'medication', 'tummy'];
-
-/** Sleep, feeds and diapers have their own big tiles on Home, so they're never shortcuts. */
-export function shortcutKey(p: LogPayload): ShortcutKey | null {
-  if (p.type === 'sleep' || p.type === 'feed' || p.type === 'diaper') return null;
-  if (p.type === 'activity' && p.kind === 'tummy_time') return 'tummy';
-  return p.type;
-}
-
-/** The `count` most recently logged shortcut categories, newest first, topped up with the defaults. */
-export function recentShortcuts(logs: Pick<LogEntry, 'startedAt' | 'payload'>[], count = 3): ShortcutKey[] {
-  const out: ShortcutKey[] = [];
-  for (const log of [...logs].sort((a, b) => b.startedAt - a.startedAt)) {
-    const key = shortcutKey(log.payload);
-    if (key && !out.includes(key)) out.push(key);
-    if (out.length === count) return out;
-  }
-  for (const key of DEFAULT_SHORTCUTS) {
-    if (out.length === count) break;
-    if (!out.includes(key)) out.push(key);
-  }
-  return out;
+/**
+ * When the next pumping session is due: the last completed session's start plus `intervalMin` (the pumping
+ * reminder's interval, the same time its notification uses). Null without one, or while a session is running.
+ */
+export function pumpingDue(logs: LogEntry[], intervalMin: number): { dueAt: number; lastAt: number } | null {
+  const pumps = logs.filter((l) => l.payload.type === 'pumping');
+  if (pumps.some((l) => l.endedAt === null)) return null;
+  const lastAt = Math.max(...pumps.map((l) => l.startedAt));
+  return pumps.length ? { lastAt, dueAt: lastAt + intervalMin * 60_000 } : null;
 }

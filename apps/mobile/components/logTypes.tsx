@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { Baby, BottleWater, ChildReaching, Flag, Moon, PenToSquare, Pills, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent } from './icons';
-import { LOG_TYPES, type LogPayload, type LogType, type ShortcutKey } from '@kindred-log/shared';
+import { LOG_TYPES, type LogPayload, type LogType } from '@kindred-log/shared';
 import type { SheetRequest } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
 
@@ -27,25 +27,23 @@ export const TYPE_META: Record<LogType, LogTypeMeta> = {
 };
 
 /**
- * The things you can log, as tiles (the "log something" grid, Home shortcuts): every log type, with tummy time,
- * the activity logged most, as its own tile. "Activity" opens with Play, for the rest.
+ * The things you can log, as tiles (the "log something" grid): every log type, with tummy time, the activity
+ * logged most, as its own tile. "Activity" opens with Play, for the rest.
  */
-export type LogTileKey = LogType | ShortcutKey;
-export type LogTile = LogTypeMeta & { key: LogTileKey; short: string; request: SheetRequest };
+export type LogTileKey = LogType | 'tummy';
+export type LogTile = LogTypeMeta & { key: LogTileKey; request: SheetRequest };
 
 export const LOG_TILE_KEYS: readonly LogTileKey[] = LOG_TYPES.flatMap((t): LogTileKey[] => (t === 'activity' ? ['tummy', t] : [t]));
-
-const SHORT: Partial<Record<LogTileKey, string>> = { pumping: 'Pump', medication: 'Meds', temperature: 'Temp', tummy: 'Tummy' };
 
 export function logTile(key: LogTileKey): LogTile {
   if (key === 'tummy') {
     const { color, bg } = TYPE_META.activity;
-    return { key, label: 'Tummy time', short: 'Tummy', Icon: ChildReaching, color, bg, request: { kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } } };
+    return { key, label: 'Tummy time', Icon: ChildReaching, color, bg, request: { kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } } };
   }
   const meta = TYPE_META[key];
   const request: SheetRequest =
     key === 'feed' ? { kind: 'feed' } : key === 'activity' ? { kind: 'log', type: key, payload: { kind: 'play' } } : { kind: 'log', type: key };
-  return { key, label: meta.label, short: SHORT[key] ?? meta.label, Icon: meta.Icon, get color() { return meta.color; }, bg: meta.bg, request };
+  return { key, label: meta.label, Icon: meta.Icon, get color() { return meta.color; }, bg: meta.bg, request };
 }
 
 /** Starting payload for a new entry of each type. */
