@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, Plus, PoopDroplet, Xmark, type IconComponent } from '../icons';
+import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, PoopDroplet, Xmark, type IconComponent } from '../icons';
 import {
   activeSleep,
   describeDiaper,
@@ -97,7 +97,6 @@ export default function HomeTiles({ child }: { child: Child }) {
         ))}
       </View>
       <UpNext logs={logs} now={now} offerUndo={offerUndo} />
-      <LogSomethingElse />
       {offer ? (
         <View className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5">
           {offer.sub ? (
@@ -408,20 +407,5 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
         <AngleRight color={colors.inkGhost} size={16} />
       </Pressable>
     </View>
-  );
-}
-
-/** Everything without a tile of its own; replaced the recent-category shortcuts (canvas row "Home · only the +", A). */
-function LogSomethingElse() {
-  const open = useSheetStore((s) => s.open);
-  return (
-    <Pressable
-      onPress={() => open({ kind: 'add' })}
-      accessibilityRole="button"
-      className="h-12 rounded-xl border border-line-strong bg-raised flex-row items-center justify-center"
-    >
-      <Plus color={colors.inkSoft} size={16} />
-      <Text className="text-ink-soft text-sm font-medium ml-2">Log something else</Text>
-    </Pressable>
   );
 }

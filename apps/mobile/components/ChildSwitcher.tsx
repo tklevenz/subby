@@ -26,7 +26,7 @@ export default function ChildSwitcher() {
 
   return (
     <>
-      <View className="flex-row items-center mb-4">
+      <View className="flex-row items-center">
         {active ? (
           <Pressable
             onPress={() => router.push(`/child/${active.id}`)}

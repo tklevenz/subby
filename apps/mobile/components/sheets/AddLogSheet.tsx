@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useSheetStore } from '../../store/useSheetStore';
 import { LOG_TILE_KEYS, logTile } from '../logTypes';
 
-/** Grid of everything that can be logged; second tap of the 2-tap rule for anything without a Home tile ("Log something else" opens it). */
+/** Grid of everything that can be logged; second tap of the 2-tap rule for anything without a Home tile (the + in Home's header opens it). */
 export default function AddLogSheet() {
   const open = useSheetStore((s) => s.open);
 
