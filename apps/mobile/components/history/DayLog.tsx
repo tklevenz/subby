@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -8,6 +8,7 @@ import {
   startOfDay,
   type DayStats,
   type LogEntry,
+  type Night,
   type TimelineItem,
   type UnitSystem,
 } from '@kindred-log/shared';
@@ -18,6 +19,7 @@ import { TYPE_META } from '../logTypes';
 import { Moon } from '../icons';
 import { colors } from '../../theme/colors';
 import { EmptyState } from '../brand/EmptyState';
+import NightBar, { stretchesOf } from '../NightBar';
 
 /** The day's sleep, feeds and diapers as plain figures in one row. */
 export function DayTotals({ stats, units }: { stats: DayStats; units: UnitSystem }) {
@@ -65,6 +67,8 @@ export function DayLog({ logs, day, now }: { logs: LogEntry[]; day: number; now:
       {items.map((item) =>
         item.kind === 'awake' ? (
           <AwakeRow key={`awake-${item.from}`} item={item} />
+        ) : item.kind === 'night' ? (
+          <NightRow key={`night-${item.night.pieces[0]!.id}`} night={item.night} day={day} now={now} />
         ) : (
           <EntryRow key={item.entry.id} entry={item.entry} day={day} />
         ),
@@ -85,6 +89,72 @@ function AwakeRow({ item }: { item: Extract<TimelineItem, { kind: 'awake' }> }) 
         ))}
       </View>
       <Text className="ml-2.5 text-xs font-medium text-amber-pale">{item.ongoing ? `Awake ${length} so far` : `Awake ${length}`}</Text>
+    </View>
+  );
+}
+
+/**
+ * A night with wakings as one block: time asleep, a bar of sleep and wakings, and the wakings listed when opened.
+ * Tapping it opens the night editor. The toggle sits beside the open target, not inside it: buttons nested in a
+ * Pressable don't reliably get their own taps on Android.
+ */
+function NightRow({ night, day, now }: { night: Night; day: number; now: number }) {
+  const formatTime = useFormatTime();
+  const [open, setOpen] = useState(false);
+  const edit = () => router.push(`/entry/${night.pieces[0]!.id}`);
+  const n = night.wakings.length;
+  const running = night.end === null;
+  return (
+    <View className="flex-row" style={{ minHeight: 64 }}>
+      <View className="w-12 pt-4">
+        <Text className="text-[13px] text-ink-soft" style={{ fontVariant: ['tabular-nums'] }}>
+          {formatTime(night.start)}
+        </Text>
+        {night.start < day ? (
+          <Text className="text-[11px] text-ink-faint">{new Date(startOfDay(night.start)).toLocaleDateString([], { weekday: 'short' })}</Text>
+        ) : null}
+      </View>
+      <View className="w-7 self-stretch items-center pt-3">
+        <View className="absolute top-0 bottom-0 w-1.5 rounded-full bg-violet" />
+        <View className="w-7 h-7 rounded-full bg-violet-deep items-center justify-center">
+          <Moon color={colors.ink} size={13} />
+        </View>
+      </View>
+      <View className="flex-1 min-w-0 ml-2.5 py-1.5">
+        <View className="bg-violet/10 border border-violet/35 rounded-2xl">
+          <View className="flex-row items-center">
+            <Pressable onPress={edit} accessibilityRole="button" className="flex-1 pl-3.5 pt-3 pb-2">
+              <Text className="text-[15px] font-semibold text-ink" numberOfLines={1}>
+                Night · {formatHoursMinutes(night.asleepMs)} asleep{running ? ' so far' : ''}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setOpen(!open)} hitSlop={8} accessibilityRole="button" className="px-3.5 pt-3 pb-2">
+              <Text className="text-violet-soft text-[13px]">{open ? 'Hide' : `${n} waking${n === 1 ? '' : 's'}`}</Text>
+            </Pressable>
+          </View>
+          <Pressable onPress={edit} className="px-3.5 pb-3">
+            <NightBar stretches={stretchesOf(night.pieces, now)} />
+            <View className="flex-row justify-between mt-1.5">
+              <Text className="text-ink-muted text-xs">{formatTime(night.start)}</Text>
+              <Text className="text-ink-muted text-xs">{running ? 'asleep now' : formatTime(night.end!)}</Text>
+            </View>
+            {open ? (
+              <View className="mt-1">
+                {night.wakings.map((w) => (
+                  <View key={w.start} className="flex-row items-center pt-2 mt-2 border-t border-violet/20">
+                    <View className="w-2 h-2 rounded-full bg-amber-pale" />
+                    <Text className="flex-1 text-ink text-sm ml-2.5">
+                      Awake {formatTime(w.start)} – {formatTime(w.end)}
+                    </Text>
+                    <Text className="text-ink-muted text-xs">{formatHoursMinutes(w.end - w.start)}</Text>
+                  </View>
+                ))}
+                <Text className="text-ink-faint text-xs mt-2.5">Longest stretch {formatHoursMinutes(night.longestMs)}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }

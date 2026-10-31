@@ -15,7 +15,9 @@ describe('dayTimeline', () => {
   const yesterday = entry({ type: 'diaper', condition: 'dirty' }, at(-6));
   const logs = [night, feed, nap1, nap2, diaper, yesterday];
   const shape = (now: number) =>
-    dayTimeline(logs, day, now).map((i) => (i.kind === 'entry' ? i.entry.id : `awake ${(i.to - i.from) / H}h${i.ongoing ? ' so far' : ''}`));
+    dayTimeline(logs, day, now).map((i) =>
+      i.kind === 'entry' ? i.entry.id : i.kind === 'night' ? 'night' : `awake ${(i.to - i.from) / H}h${i.ongoing ? ' so far' : ''}`,
+    );
 
   it("lists the day's entries newest first, with the night that ran into it", () => {
     const items = shape(at(14.33));
@@ -42,5 +44,17 @@ describe('dayTimeline', () => {
     const items = dayTimeline([...logs, running], day, at(14.5));
     expect(items.some((i) => i.kind === 'awake' && i.ongoing)).toBe(false);
     expect(dayTimeline(logs, day, at(30)).some((i) => i.kind === 'awake' && i.ongoing)).toBe(false);
+  });
+
+  it('shows a night with wakings as one block, without the wake windows inside it', () => {
+    const a = entry({ type: 'sleep', nap: false }, at(-4.33), at(1.17));
+    const b = entry({ type: 'sleep', nap: false }, at(1.58), at(6.58));
+    const bottle = entry({ type: 'feed', method: 'bottle', amountMl: 90 }, at(1.33), at(1.33));
+    const items = dayTimeline([a, b, bottle, nap1], day, at(10));
+    const nights = items.filter((i) => i.kind === 'night');
+    expect(nights).toHaveLength(1);
+    expect(items.at(-1)).toMatchObject({ kind: 'night', night: { start: at(-4.33), end: at(6.58) } });
+    expect(items.flatMap((i) => (i.kind === 'awake' ? [(i.to - i.from) / H] : []))).toEqual([0.42, 1.75]);
+    expect(items.some((i) => i.kind === 'entry' && i.entry.id === bottle.id)).toBe(true);
   });
 });

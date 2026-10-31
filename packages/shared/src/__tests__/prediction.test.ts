@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageNorms, predictNextSleep, sleepHabits, suggestedSchedule, wakeWindows } from '../domain/prediction';
+import { ageNorms, isNightWaking, predictNextSleep, sleepHabits, suggestedSchedule, wakeWindows } from '../domain/prediction';
 import { addDays } from '../domain/stats';
 import { entry } from './fixtures';
 
@@ -147,6 +147,26 @@ describe('night wakings', () => {
     expect(h.bedtimeClock).toBe(19.5 * 60);
     expect(h.wakeClock).toBe(7 * 60);
     expect(h.bedtimeWindow).toBe(270);
+  });
+});
+
+describe('awake in the night', () => {
+  // The usual night is 19:30–07:00; tonight ended early, at 04:00.
+  const early = [...week(7).slice(0, -1), entry({ type: 'sleep', nap: false }, at(-1, 19, 30), at(0, 4))];
+
+  it('is a night waking until the usual morning, or 3 h at most', () => {
+    expect(isNightWaking(early, at(0, 4, 20))).toBe(true);
+    expect(predictNextSleep(early, child, at(0, 4, 20))).toBeNull();
+    // 3 h on, before 07:00: it was the day's start, and nap 1 is predicted from 04:00.
+    expect(isNightWaking(early, at(0, 7, 1))).toBe(false);
+    expect(predictNextSleep(early, child, at(0, 7, 1))).toMatchObject({ kind: 'nap', napIndex: 0, wakeAt: at(0, 4) });
+    expect(suggestedSchedule(early, child, at(0, 7, 1)).items[0]).toEqual({ kind: 'wake', at: at(0, 4), logged: true });
+  });
+
+  it('counts a waking just after bedtime too, and not a late morning', () => {
+    const late = [...week(7), entry({ type: 'sleep', nap: false }, at(0, 19, 30), at(0, 23, 30))];
+    expect(isNightWaking(late, at(0, 23, 45))).toBe(true);
+    expect(isNightWaking(week(7), at(0, 7, 15))).toBe(false);
   });
 });
 

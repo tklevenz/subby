@@ -21,6 +21,7 @@ export default function DateTimeField({
   maximumDate,
   title,
   placeholder,
+  timeOnly,
 }: {
   /** null: not set yet; the field shows `placeholder` and the wheels open at now. */
   value: number | null;
@@ -30,6 +31,8 @@ export default function DateTimeField({
   /** Sheet heading, e.g. "Start time". */
   title?: string;
   placeholder?: string;
+  /** Show only the time (where the day is clear from around it, e.g. a night's wakings). */
+  timeOnly?: boolean;
 }) {
   const formatTime = useFormatTime();
   const [open, setOpen] = useState(false);
@@ -43,7 +46,9 @@ export default function DateTimeField({
           <Text className="text-ink text-base">
             {mode === 'date'
               ? new Date(value).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
-              : `${formatDayLabel(value)} · ${formatTime(value)}`}
+              : timeOnly
+                ? formatTime(value)
+                : `${formatDayLabel(value)} · ${formatTime(value)}`}
           </Text>
         )}
       </Pressable>

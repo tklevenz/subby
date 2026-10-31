@@ -28,13 +28,14 @@ export function activeSleep(logs: LogEntry[]): EntryOf<'sleep'> | undefined {
 
 /**
  * A sleep overlapping [start, end) (end null: still going), so the same time isn't logged as two sleeps.
- * Running sleeps last until stopped. `excludeId` skips the entry being edited. Touching ends don't overlap.
+ * Running sleeps last until stopped. `exclude` skips the entry (or entries) being edited. Touching ends don't overlap.
  */
-export function overlappingSleep(logs: LogEntry[], start: number, end: number | null, excludeId?: string): EntryOf<'sleep'> | undefined {
+export function overlappingSleep(logs: LogEntry[], start: number, end: number | null, exclude?: string | string[]): EntryOf<'sleep'> | undefined {
   const until = end ?? Infinity;
+  const excluded = new Set(typeof exclude === 'string' ? [exclude] : exclude);
   return logs.find(
     (l): l is EntryOf<'sleep'> =>
-      isType('sleep')(l) && !l.isDeleted && l.id !== excludeId && l.startedAt < until && (l.endedAt ?? Infinity) > start,
+      isType('sleep')(l) && !l.isDeleted && !excluded.has(l.id) && l.startedAt < until && (l.endedAt ?? Infinity) > start,
   );
 }
 

@@ -5,12 +5,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AngleRight } from '../../components/icons';
 import {
   addDays,
+  averageNights,
   averageStats,
   dailyStats,
   dayRange,
   formatHoursMinutes,
   formatVolume,
+  groupNights,
   mlToOz,
+  nightsByDay,
   startOfDay,
   type DayStats,
 } from '@kindred-log/shared';
@@ -40,10 +43,14 @@ export default function TrendsScreen() {
   const count = Number(range);
   const today = startOfDay(now);
   const days = useMemo(() => dayRange(today, count), [today, count]);
-  const logs = useLogQuery({ from: days[0], to: addDays(today, 1) });
+  // From the day before: the first day's night started the evening before.
+  const logs = useLogQuery({ from: addDays(days[0]!, -1), to: addDays(today, 1) });
   const stats = useMemo(() => (logs ? dailyStats(logs, days, now) : null), [logs, days, now]);
   // Today is still in progress: drawn faded and left out of the averages.
   const avg = useMemo(() => (stats ? averageStats(stats.slice(0, -1)) : null), [stats]);
+  // Each day's night is the one that ended that morning, so today's counts once it's over.
+  const nights = useMemo(() => (logs ? nightsByDay(groupNights(logs, now), days) : null), [logs, days, now]);
+  const avgNight = useMemo(() => (nights ? averageNights(nights) : null), [nights]);
   const chevron = <AngleRight color={colors.inkGhost} size={16} />;
 
   const bars = (values: (s: DayStats) => number[]): Bar[] =>
@@ -51,6 +58,12 @@ export default function TrendsScreen() {
       label: count <= 7 ? new Date(s.day).toLocaleDateString([], { weekday: 'narrow' }) : String(new Date(s.day).getDate()),
       values: values(s),
       dim: s.day === today,
+    }));
+
+  const nightBars = (value: (n: NonNullable<NonNullable<typeof nights>[number]>) => number): Bar[] =>
+    days.map((day, i) => ({
+      label: count <= 7 ? new Date(day).toLocaleDateString([], { weekday: 'narrow' }) : String(new Date(day).getDate()),
+      values: [nights?.[i] ? value(nights[i]!) : 0],
     }));
 
   const volume = (ml: number) => (units === 'metric' ? ml : mlToOz(ml));
@@ -82,6 +95,32 @@ export default function TrendsScreen() {
                   average={avg.sleepMs / H}
                   formatValue={(v) => `${v}h`}
                 />
+              </Section>
+            ) : null}
+
+            {/* Only once wakings are logged: without them, a night's longest stretch is just the night. */}
+            {avgNight && nights?.some((n) => n && n.wakings > 0) ? (
+              <Section
+                title="Nights"
+                color={colors.violetDeep}
+                stats={[
+                  ['Asleep', formatHoursMinutes(avgNight.asleepMs)],
+                  ['Wakings', avgNight.wakings.toFixed(1)],
+                  ['Longest stretch', formatHoursMinutes(avgNight.longestMs)],
+                  ['Awake', formatHoursMinutes(avgNight.awakeMs)],
+                ]}
+              >
+                <Text className="text-ink-muted text-xs mb-1">Wakings</Text>
+                <BarChart bars={nightBars((n) => n.wakings)} colors={[colors.amberPale]} average={avgNight.wakings} />
+                <View className="mt-4">
+                  <Text className="text-ink-muted text-xs mb-1">Longest stretch</Text>
+                  <BarChart
+                    bars={nightBars((n) => n.longestMs / H)}
+                    colors={[colors.violetDeep]}
+                    average={avgNight.longestMs / H}
+                    formatValue={(v) => `${v}h`}
+                  />
+                </View>
               </Section>
             ) : null}
 

@@ -10,7 +10,9 @@ import {
   formatDuration,
   formatHoursMinutes,
   formatRelative,
+  groupNights,
   isNapTime,
+  isNightWaking,
   isRunning,
   lastOfType,
   lastWakeAt,
@@ -132,6 +134,11 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   const open = useSheetStore((s) => s.open);
   const minute = Math.floor(now / 60_000);
   const prediction = useMemo(() => predictNextSleep(logs, child, minute * 60_000), [logs, child, minute]);
+  // Awake in the night: how long they've slept tonight instead of a prediction.
+  const tonight = useMemo(
+    () => (isNightWaking(logs, minute * 60_000) ? groupNights(logs, minute * 60_000).at(-1) : undefined),
+    [logs, minute],
+  );
 
   // "2h 15m ago" → value "2h 15m", first line "ago · <detail>".
   const since = (at: number, detail: string) => {
@@ -163,7 +170,9 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
     };
   } else {
     const lines: string[] = [];
-    if (prediction?.kind === 'nap') {
+    if (tonight) {
+      lines.push(`slept ${formatHoursMinutes(tonight.asleepMs)} tonight, since ${formatTime(tonight.start)}`);
+    } else if (prediction?.kind === 'nap') {
       lines.push(`Down for nap ${prediction.napIndex + 1} around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
       if (prediction.napMinutes) lines.push(`Naps usually ~${formatHoursMinutes(prediction.napMinutes * 60_000)}`);
     } else if (prediction) {

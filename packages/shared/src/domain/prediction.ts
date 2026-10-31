@@ -1,6 +1,7 @@
 import type { Child } from '../schemas/child.schema';
-import type { LogEntry, PayloadOf } from '../schemas/log.schema';
+import type { LogEntry } from '../schemas/log.schema';
 import { growthAgeMonths } from './growth';
+import { NIGHT_GAP_MS, isSleepEntry as isSleep, type SleepEntry } from './nights';
 import { isNap, addDays } from './stats';
 import { startOfDay } from './time';
 
@@ -37,8 +38,6 @@ export function ageNorms(months: number): AgeNorms {
   return AGE_NORMS.find(([max]) => months < max)![1];
 }
 
-type SleepEntry = LogEntry & { payload: PayloadOf<'sleep'> };
-const isSleep = (l: LogEntry): l is SleepEntry => l.payload.type === 'sleep';
 
 const median = (xs: number[]) => {
   if (!xs.length) return null;
@@ -58,7 +57,7 @@ function completedSleeps(logs: LogEntry[]): SleepEntry[] {
   const out: SleepEntry[] = [];
   for (const s of sorted) {
     const prev = out.at(-1);
-    if (prev && !isNap(prev) && !isNap(s) && s.startedAt - prev.endedAt! < 3 * H) {
+    if (prev && !isNap(prev) && !isNap(s) && s.startedAt - prev.endedAt! < NIGHT_GAP_MS) {
       out[out.length - 1] = { ...prev, endedAt: Math.max(prev.endedAt!, s.endedAt!) };
     } else out.push(s);
   }
@@ -200,6 +199,27 @@ function blend(personal: number | null | undefined, norms: AgeNorms): { center: 
 const atClock = (ref: number, minutes: number) => addDays(startOfDay(ref), Math.floor(minutes / 1440)) + (minutes % 1440) * MIN;
 
 /**
+ * Whether being awake after `night` (a night sleep, merged) is still a night waking at `now`: it ended at least
+ * 90 min before the usual wake-up that follows its start, that wake-up hasn't come yet, and less than
+ * NIGHT_GAP_MS have passed (after that, a further sleep would be a new night). Otherwise it was the day's start,
+ * an early one maybe, and the day's naps are predicted from it.
+ */
+function stillNight(night: SleepEntry, now: number, usualWake: number | null): boolean {
+  const clock = usualWake ?? 6 * 60;
+  let morning = atClock(night.startedAt, clock);
+  if (morning <= night.startedAt) morning = atClock(addDays(startOfDay(night.startedAt), 1), clock);
+  return night.endedAt! < morning - 90 * MIN && now < morning && now - night.endedAt! < NIGHT_GAP_MS;
+}
+
+/** Awake in the night (after a night sleep, before the usual morning): Home shows how long they've slept tonight. */
+export function isNightWaking(logs: LogEntry[], now: number): boolean {
+  const sleeps = logs.filter(isSleep);
+  if (sleeps.some((s) => s.endedAt === null)) return false;
+  const last = completedSleeps(sleeps).at(-1);
+  return !!last && !isNap(last) && stillNight(last, now, sleepHabits(sleeps, now).wakeClock);
+}
+
+/**
  * When the baby will likely be ready for the next sleep, or null while asleep / without a
  * recent wake-up. `logs` needs at least the last 7 days of sleep.
  */
@@ -217,9 +237,8 @@ export function predictNextSleep(
   const habits = sleepHabits(sleeps, now);
   const wakeAt = last.endedAt!;
 
-  // Woke from night sleep well before the usual morning: a night waking, not the day's start.
-  const wakeClock = (wakeAt - startOfDay(wakeAt)) / MIN;
-  if (!isNap(last) && wakeClock < (habits.wakeClock ?? 6 * 60) - 90) return null;
+  // Awake in the night: nothing to predict until it turns out to be the day's start.
+  if (!isNap(last) && stillNight(last, now, habits.wakeClock)) return null;
 
   // Which nap comes next today: count naps since the last night sleep.
   const sorted = completedSleeps(sleeps);
@@ -286,13 +305,14 @@ export function suggestedSchedule(
   const habits = sleepHabits(logs, now);
   const today = startOfDay(now);
 
-  // Today's logged wake-up, unless it was a night waking (well before the usual morning).
+  // Today's logged wake-up, unless the night may not be over: awake in the night, or back asleep since.
   const usualWake = habits.wakeClock ?? 7 * 60;
-  const nightEnd = completedSleeps(logs)
+  const night = completedSleeps(logs)
     .filter((l) => !isNap(l) && l.endedAt! >= today && l.endedAt! < today + 14 * H)
-    .at(-1)?.endedAt;
-  const wakeLogged = nightEnd != null && (nightEnd - today) / MIN >= usualWake - 90;
-  const wake = wakeLogged ? nightEnd : atClock(today, usualWake);
+    .at(-1);
+  const backAsleep = night && logs.some((l) => isSleep(l) && l.endedAt === null && !isNap(l) && l.startedAt - night.endedAt! < NIGHT_GAP_MS);
+  const wakeLogged = night !== undefined && !backAsleep && !stillNight(night, now, habits.wakeClock);
+  const wake = wakeLogged ? night.endedAt! : atClock(today, usualWake);
   const napLength = (i: number) => (habits.napLengths.get(i) ?? norms.napLength) * MIN;
   const usualBedtime = habits.bedtimeClock !== null ? atClock(today, habits.bedtimeClock) : null;
 

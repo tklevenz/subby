@@ -1,7 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { TIMED_LOG_TYPES, isCompletePayload, pauseFeed, type LogEntry, type LogPayload } from '@kindred-log/shared';
+import {
+  TIMED_LOG_TYPES,
+  groupNights,
+  isCompletePayload,
+  isNap,
+  isSleepEntry,
+  nightOf,
+  pauseFeed,
+  type LogEntry,
+  type LogPayload,
+  type Night,
+} from '@kindred-log/shared';
 import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
 import { CommonFields } from '../../components/sheets/LogSheet';
@@ -10,6 +21,10 @@ import { Button, FieldLabel } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import { SubSpinner } from '../../components/brand/loaders';
+import NightForm from '../../components/NightForm';
+import { useLogQuery } from '../../store/queries';
+
+const DAY = 86_400_000;
 
 /** Edit/backdate any log entry, including ones older than the loaded window. */
 export default function EntryScreen() {
@@ -21,7 +36,22 @@ export default function EntryScreen() {
   }, [id]);
 
   if (entry === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
-  return entry ? <EntryForm entry={entry} /> : <Stack.Screen options={{ title: 'Entry not found' }} />;
+  if (!entry) return <Stack.Screen options={{ title: 'Entry not found' }} />;
+  // A finished night sleep opens as its whole night (with its wakings); anything else as itself.
+  return isSleepEntry(entry) && entry.endedAt !== null && !isNap(entry) ? <NightLoader entry={entry} /> : <EntryForm entry={entry} />;
+}
+
+function NightLoader({ entry }: { entry: LogEntry }) {
+  const rows = useLogQuery({ from: entry.startedAt - DAY, to: entry.startedAt + DAY, types: ['sleep'] });
+  // Found once: saving rewrites the pieces, and the form shouldn't switch nights under itself meanwhile.
+  const [night, setNight] = useState<Night | null>();
+  useEffect(() => {
+    if (rows && night === undefined) setNight(nightOf(groupNights(rows, Date.now()), entry.id) ?? null);
+  }, [rows, night, entry.id]);
+
+  if (night === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
+  // Still running at its end (back asleep after a waking): edit the piece itself.
+  return night && night.end !== null ? <NightForm night={night} /> : <EntryForm entry={entry} />;
 }
 
 function EntryForm({ entry }: { entry: LogEntry }) {
