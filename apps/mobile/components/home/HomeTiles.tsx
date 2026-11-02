@@ -11,7 +11,7 @@ import {
   formatHoursMinutes,
   formatRelative,
   groupNights,
-  isNapTime,
+  defaultNap,
   isNightWaking,
   isRunning,
   lastOfType,
@@ -184,8 +184,8 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       entryId: logs.find((l) => l.logType === 'sleep' && l.endedAt !== null)?.id,
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        // Daytime sleeps default to naps; editable afterwards.
-        const entry = await startTimer({ type: 'sleep', nap: isNapTime(Date.now()) });
+        // Nap or night from the usual bedtime (else the clock); editable afterwards.
+        const entry = await startTimer({ type: 'sleep', nap: defaultNap(logs, Date.now()) });
         offerUndo({ label: 'Sleep started', undo: () => softDeleteLog(entry.id), sub: true });
       },
     };

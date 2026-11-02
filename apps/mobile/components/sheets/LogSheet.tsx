@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { formatHoursMinutes, isCompletePayload, isNapTime, type LogPayload, type LogType } from '@kindred-log/shared';
+import { defaultNap, formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@kindred-log/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import DateTimeField from '../DateTimeField';
@@ -55,11 +55,12 @@ export default function LogSheet({
   // Timed types start now with no end: "Start timer" runs from the start; logging a past one needs an end.
   const [startedAt, setStart] = useState(() => Date.now() - startOffsetMin * 60_000);
   const [end, setEnd] = useState<number | null>(null);
-  // A sleep is a nap if it starts during the day, following the start time until the toggle is used.
+  // Nap or night follows the start time (the usual bedtime, else the clock) until the toggle is used.
+  const isNapAt = (t: number) => defaultNap(useLogStore.getState().logs, t);
   const [napChosen, setNapChosen] = useState(initial !== undefined && 'nap' in initial);
   const [payload, setPayload] = useState<LogPayload>(() => {
     const p = { ...defaultPayload(type), ...initial } as LogPayload;
-    return p.type === 'sleep' && !napChosen ? { ...p, nap: isNapTime(startedAt) } : p;
+    return p.type === 'sleep' && !napChosen ? { ...p, nap: isNapAt(startedAt) } : p;
   });
 
   const patch = (p: Partial<LogPayload>) => {
@@ -68,7 +69,7 @@ export default function LogSheet({
   };
   const setStartedAt = (t: number) => {
     setStart(t);
-    if (type === 'sleep' && !napChosen) setPayload((cur) => ({ ...cur, nap: isNapTime(t) }) as LogPayload);
+    if (type === 'sleep' && !napChosen) setPayload((cur) => ({ ...cur, nap: isNapAt(t) }) as LogPayload);
   };
   const complete = isCompletePayload(payload);
   const invalidEnd = timed && end !== null && end <= startedAt;

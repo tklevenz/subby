@@ -2,7 +2,7 @@ import type { Child } from '../schemas/child.schema';
 import type { LogEntry } from '../schemas/log.schema';
 import { growthAgeMonths } from './growth';
 import { NIGHT_GAP_MS, isSleepEntry as isSleep, type SleepEntry } from './nights';
-import { isNap, addDays } from './stats';
+import { isNap, isNapTime, addDays } from './stats';
 import { startOfDay } from './time';
 
 // SweetSpot-style nap prediction, entirely on device: typical wake windows for the
@@ -172,6 +172,18 @@ export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabit
       return 0;
     })(),
   };
+}
+
+/**
+ * The nap flag a sleep starting at `t` gets until someone sets it: night from an hour before the usual bedtime
+ * until the usual wake-up (the last 7 days), so an early bedtime isn't a nap; the clock (`isNapTime`) until enough
+ * nights are logged.
+ */
+export function defaultNap(logs: LogEntry[], t: number): boolean {
+  const { bedtimeClock, wakeClock } = sleepHabits(logs.filter(isSleep), t);
+  if (bedtimeClock === null || wakeClock === null) return isNapTime(t);
+  const m = clockMinutes(t);
+  return !(m >= bedtimeClock - 60 && m < wakeClock + 24 * 60);
 }
 
 export type SleepPrediction = {

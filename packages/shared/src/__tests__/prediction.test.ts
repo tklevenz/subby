@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageNorms, isNightWaking, predictNextSleep, sleepHabits, suggestedSchedule, wakeWindows } from '../domain/prediction';
+import { ageNorms, defaultNap, isNightWaking, predictNextSleep, sleepHabits, suggestedSchedule, wakeWindows } from '../domain/prediction';
 import { addDays } from '../domain/stats';
 import { entry } from './fixtures';
 
@@ -171,3 +171,17 @@ describe('awake in the night', () => {
 });
 
 const startOfNight = (wake: number) => new Date(new Date(wake).setHours(0, 0, 0, 0)).getTime();
+
+describe('defaultNap', () => {
+  it('makes a sleep from an hour before the usual bedtime a night, not a nap', () => {
+    const nights = Array.from({ length: 7 }, (_, i) => entry({ type: 'sleep', nap: false }, at(-8 + i, 19, 40), at(-7 + i, 7, 0)));
+    expect(defaultNap(nights, at(0, 18, 49))).toBe(false);
+    expect(defaultNap(nights, at(0, 18, 30))).toBe(true);
+    expect(defaultNap(nights, at(0, 13, 0))).toBe(true);
+    expect(defaultNap(nights, at(1, 5, 30))).toBe(false);
+    expect(defaultNap(nights, at(1, 9, 0))).toBe(true);
+    // Without habits: the clock.
+    expect(defaultNap([], at(0, 18, 49))).toBe(true);
+    expect(defaultNap([], at(0, 19, 10))).toBe(false);
+  });
+});
