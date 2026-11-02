@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { eq } from 'drizzle-orm';
-import { DEFAULT_REMINDERS, type ReminderSettings, type UnitSystem } from '@kindred-log/shared';
+import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, type ReminderSettings, type UnitSystem } from '@kindred-log/shared';
 import type { LogSeen } from '@kindred-log/shared/crypto';
 import { db, schema } from '../db/client';
 
@@ -10,6 +10,8 @@ export type Settings = {
   activeChildId: string | null;
   /** Device-local: each caregiver picks their own notifications. */
   reminders: ReminderSettings;
+  /** Device-local: notifications when another phone logs a sleep (not a reminder, so not under its switch). */
+  familyAlerts: FamilyAlertSettings;
   /** Entitlement stub until payments exist (gates CSV export, multiple children). */
   isPremium: boolean;
   /** Last Baby Buddy server used for import (the API key is never stored). */
@@ -48,6 +50,7 @@ const DEFAULTS: Settings = {
   clock: '24h',
   activeChildId: null,
   reminders: DEFAULT_REMINDERS,
+  familyAlerts: DEFAULT_FAMILY_ALERTS,
   isPremium: false,
   bbUrl: null,
   homeTop: {},
@@ -69,7 +72,8 @@ export const useSettingsStore = create<SettingsState>((setState) => ({
     const stored = Object.fromEntries(rows.map((r) => [r.key, r.value])) as Partial<Settings>;
     // Nested defaults, so reminder kinds added later get their defaults too.
     const reminders = { ...DEFAULTS.reminders, ...stored.reminders };
-    setState({ ...DEFAULTS, ...stored, reminders, hydrated: true });
+    const familyAlerts = { ...DEFAULTS.familyAlerts, ...stored.familyAlerts };
+    setState({ ...DEFAULTS, ...stored, reminders, familyAlerts, hydrated: true });
   },
 
   set: async (key, value) => {

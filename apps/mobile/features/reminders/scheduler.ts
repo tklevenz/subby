@@ -36,7 +36,7 @@ function loadNotifications(): typeof NotificationsModule | null {
   }
 }
 
-const Notifications = loadNotifications();
+export const Notifications = loadNotifications();
 
 /** False in Expo Go on Android; reminders need a development build there. */
 export const remindersAvailable = Notifications !== null;

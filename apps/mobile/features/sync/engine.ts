@@ -25,6 +25,7 @@ import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
+import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, isValidBody, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
@@ -193,6 +194,9 @@ async function runOnce() {
     if (!syncSettings()?.names?.[settings.deviceId]) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
+    const pulled = pulledLogs;
+    pulledLogs = [];
+    await notifyFamily(pulled).catch((e) => console.warn('Family notifications failed', e));
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
   } catch (e) {
     const removed = isRemoved(e);
@@ -400,6 +404,9 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedA
   }
 }
 
+/** Entries other phones wrote, applied during this run (for `notifyFamily`). */
+let pulledLogs: PulledLog[] = [];
+
 /** Applies one page in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
   // Decrypt first: a record we can't open fails the run before anything is written. One that opens but is
@@ -465,10 +472,12 @@ function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>,
           .set({ isDeleted: true, payload: scrubbedPayload(old.logType), importRef: null, updatedAt: r.updatedAt, syncStatus: 'synced' })
           .where(eq(schema.logsTable.id, r.id))
           .run();
+        if (r.deviceId !== ownDeviceId) pulledLogs.push({ before: old, after: { ...old, isDeleted: true }, deviceId: r.deviceId });
       } else {
         const row = bodyToLog(r.id, body as LogBody, r, local as LogEntry | undefined);
         tx.insert(schema.logsTable).values(row).onConflictDoUpdate({ target: schema.logsTable.id, set: row }).run();
         const old = local as LogEntry | undefined;
+        if (r.deviceId !== ownDeviceId) pulledLogs.push({ before: old ?? null, after: row, deviceId: r.deviceId });
         const oldPhoto = old?.payload.type === 'note' ? old.payload.photoUri : undefined;
         if (oldPhoto && oldPhoto !== (row.payload.type === 'note' ? row.payload.photoUri : undefined)) photos.push(oldPhoto);
       }

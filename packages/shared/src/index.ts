@@ -16,3 +16,4 @@ export * from './domain/reminders';
 export * from './domain/story';
 export * from './domain/timeline';
 export * from './domain/nights';
+export * from './domain/familyAlerts';

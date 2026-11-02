@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AngleRight, Plus } from '../../components/icons';
 import { activeReminderCount, formatAge } from '@kindred-log/shared';
-import { remindersAvailable, setRemindersEnabled } from '../../features/reminders/scheduler';
+import { remindersAvailable, requestNotifications, setRemindersEnabled } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useCanAddChild, useChildStore } from '../../store/useChildStore';
@@ -58,6 +58,11 @@ export default function SettingsScreen() {
   const isPremium = useSettingsStore((s) => s.isPremium);
   const reminders = useSettingsStore((s) => s.reminders);
   const reminderCount = activeReminderCount(reminders);
+  const familyAlerts = useSettingsStore((s) => s.familyAlerts);
+  const setFamilyAlerts = async (patch: Partial<typeof familyAlerts>) => {
+    if (patch.enabled && !(await requestNotifications())) return;
+    await setSetting('familyAlerts', { ...familyAlerts, ...patch });
+  };
   const setSetting = useSettingsStore((s) => s.set);
   const chevron = <AngleRight color={colors.inkGhost} size={16} />;
   const sync = useSettingsStore((s) => s.sync);
@@ -112,6 +117,26 @@ export default function SettingsScreen() {
           right={chevron}
         />
       </Card>
+      {sync ? (
+        <View className="mt-3">
+          <Card>
+            <Row
+              label="When another phone logs a sleep"
+              right={<Switch value={familyAlerts.enabled} onValueChange={(enabled) => setFamilyAlerts({ enabled })} disabled={!remindersAvailable} />}
+            />
+            {familyAlerts.enabled ? (
+              <>
+                <Row label="And when they wake up" right={<Switch value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />} />
+                <Row label="Bedtime and morning too" right={<Switch value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
+              </>
+            ) : null}
+          </Card>
+          <Text className="text-ink-ghost text-xs mt-2 mx-1 leading-5">
+            Naps{familyAlerts.nights ? ', bedtime and the morning' : ''}, never night wakings. Each phone chooses for itself, so a grandparent's
+            can stay quiet.{sync.push ? '' : " This server doesn't send pushes, so they only arrive while Subby is open."}
+          </Text>
+        </View>
+      ) : null}
 
       <SectionTitle>Data</SectionTitle>
       <Card>
