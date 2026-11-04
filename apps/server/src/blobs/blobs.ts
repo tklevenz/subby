@@ -17,7 +17,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { and, eq, inArray, isNull, lt, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, notInArray, or } from 'drizzle-orm';
 import { MAX_BLOB_BYTES, UNLINKED_BLOB_TTL_MS, type SyncRecord } from '@kindred-log/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
@@ -55,11 +55,20 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
 
   async put(auth: AuthContext, id: string, data: Uint8Array) {
     if (!(await this.entitlements.canStore(auth.familyId, data.length))) throw new ForbiddenException('No storage left for this family');
-    const [existing] = await this.db.select({ id: schema.blobs.id }).from(schema.blobs).where(eq(schema.blobs.id, id));
-    if (existing) throw new ConflictException('A file with this id already exists');
-    // File first, row second: a row never points at a missing file (a crash in between leaves an orphan file).
-    await this.store.put(id, data);
-    await this.db.insert(schema.blobs).values({ id, familyId: auth.familyId, size: data.length, createdAt: Date.now() });
+    // Row first, claiming the id: a second upload under the same id (another family's too) gets a conflict before it
+    // can touch the stored file. A failed write takes the row back; until the file is there, a read finds nothing.
+    const claimed = await this.db
+      .insert(schema.blobs)
+      .values({ id, familyId: auth.familyId, size: data.length, createdAt: Date.now() })
+      .onConflictDoNothing()
+      .returning({ id: schema.blobs.id });
+    if (!claimed.length) throw new ConflictException('A file with this id already exists');
+    try {
+      await this.store.put(id, data);
+    } catch (e) {
+      await this.db.delete(schema.blobs).where(eq(schema.blobs.id, id));
+      throw e;
+    }
   }
 
   async get(auth: AuthContext, id: string) {
@@ -85,7 +94,8 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
         await tx
           .update(schema.blobs)
           .set({ recordId: r.id })
-          .where(and(eq(schema.blobs.familyId, familyId), inArray(schema.blobs.id, keep)));
+          // Only unlinked uploads, or this record's own: a record can't take over (and later delete) another's photo.
+          .where(and(eq(schema.blobs.familyId, familyId), inArray(schema.blobs.id, keep), or(isNull(schema.blobs.recordId), eq(schema.blobs.recordId, r.id))));
       }
       const gone = await tx
         .delete(schema.blobs)

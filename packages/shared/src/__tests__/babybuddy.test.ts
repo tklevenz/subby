@@ -49,6 +49,7 @@ describe('Baby Buddy mapping', () => {
     expect(mapRecord('height', { ...base, date: '2025-11-10', height: 20 }, H, imperial).payload).toMatchObject({ heightCm: 50.8 });
     expect(mapRecord('temperature', { ...base, time: '2025-01-24T11:37:00Z', temperature: 98.6 }, H, imperial).payload).toMatchObject({ celsius: 37 });
     expect(mapRecord('pumping', { ...base, start: '2025-01-01T09:33:00Z', end: '2025-01-01T09:40:00Z', amount: 2 }, H, imperial).payload).toMatchObject({ amountMl: 59 });
+    expect(mapRecord('pumping', { ...base, start: '2025-01-01T09:33:00Z', end: '2025-01-01T09:40:00Z', amount: null }, H, imperial).payload).not.toHaveProperty('amountMl', 0);
   });
 
   it('maps medication intervals and parses durations', () => {
@@ -61,6 +62,8 @@ describe('Baby Buddy mapping', () => {
   it('detects units from magnitudes', () => {
     expect(detectUnits({ volume: [60, 90], weight: [3715, 14260], length: [85], head: [47], temperature: [37] }, 'metric'))
       .toEqual(METRIC);
+    // Pumping sessions without an amount don't count: a ml history stays ml.
+    expect(detectUnits({ volume: [60, 90, null, 0, null, 0], weight: [], length: [], head: [], temperature: [] }, 'imperial').volume).toBe('ml');
     expect(detectUnits({ volume: [3, 4], weight: [12, 20], length: [30], head: [17], temperature: [99] }, 'imperial'))
       .toEqual({ volume: 'oz', weight: 'lb', length: 'in', temperature: 'f' });
   });

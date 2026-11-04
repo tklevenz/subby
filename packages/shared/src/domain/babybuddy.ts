@@ -24,7 +24,7 @@ export type BBFeeding = BBBase & {
 export type BBChange = BBBase & { time: string; wet: boolean; solid: boolean; color: string; amount: number | null };
 export type BBSleep = BBBase & { start: string; end: string; nap?: boolean | null };
 export type BBTummyTime = BBBase & { start: string; end: string; milestone?: string };
-export type BBPumping = BBBase & { start: string; end: string; amount: number };
+export type BBPumping = BBBase & { start: string; end: string; amount: number | null };
 export type BBTemperature = BBBase & { time: string; temperature: number };
 export type BBWeight = BBBase & { date: string; weight: number };
 export type BBHeight = BBBase & { date: string; height: number };
@@ -64,9 +64,11 @@ export type ImportUnits = {
   temperature: 'c' | 'f';
 };
 
-const median = (xs: number[]) => {
+const median = (values: (number | null | undefined)[]) => {
+  // Missing and zero amounts say nothing about the unit (and would pull a ml history towards oz).
+  const xs = values.filter((x): x is number => typeof x === 'number' && Number.isFinite(x) && x > 0);
   if (!xs.length) return undefined;
-  const s = [...xs].sort((a, b) => a - b);
+  const s = xs.sort((a, b) => a - b);
   return s[Math.floor(s.length / 2)];
 };
 
@@ -75,7 +77,7 @@ const median = (xs: number[]) => {
  * `fallback` (the user's unit setting) decides when there is no data.
  */
 export function detectUnits(
-  samples: { volume: number[]; weight: number[]; length: number[]; head: number[]; temperature: number[] },
+  samples: Record<'volume' | 'weight' | 'length' | 'head' | 'temperature', (number | null)[]>,
   fallback: 'metric' | 'imperial',
 ): ImportUnits {
   const metric = fallback === 'metric';
@@ -219,7 +221,7 @@ export function mapRecord<E extends BBEndpoint>(
       }
       case 'pumping': {
         const p = r as BBPumping;
-        return { ...span(p), payload: { type: 'pumping', amountMl: round(toMl(p.amount, units), 0), ...common(p) } };
+        return { ...span(p), payload: { type: 'pumping', amountMl: p.amount != null ? round(toMl(p.amount, units), 0) : undefined, ...common(p) } };
       }
       case 'temperature': {
         const t = r as BBTemperature;

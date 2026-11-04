@@ -5,6 +5,7 @@ import { fromBase64, verify } from '@kindred-log/shared/crypto';
 import { authMessage, type ChallengeResponse, type VerifyResponse } from '@kindred-log/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { sha256b64 } from '../common/hash';
+import { lockFamily } from '../db/lock';
 
 export const RECOVERY = 'recovery';
 /** Who is calling: a member device, or the recovery key (`deviceId === 'recovery'`). */
@@ -52,11 +53,26 @@ export class AuthService {
     }
     const token = randomBytes(32).toString('base64url');
     const expiresAt = Date.now() + SESSION_MS;
-    await this.db.insert(schema.sessions).values({
-      tokenHash: sha256b64(token),
-      familyId: pending.familyId,
-      deviceId: pending.deviceId,
-      expiresAt: new Date(expiresAt),
+    await this.db.transaction(async (tx) => {
+      // Still a member (or still the recovery key)? A removal between challenge and verify deleted the sessions,
+      // and must not be followed by a new one. Locked, so a removal can't commit in between either.
+      const family = await lockFamily(tx, pending.familyId);
+      const current =
+        pending.deviceId === RECOVERY
+          ? family.recoverySignKey === pending.signKey
+          : (
+              await tx
+                .select({ id: schema.devices.id })
+                .from(schema.devices)
+                .where(and(eq(schema.devices.id, pending.deviceId), eq(schema.devices.familyId, pending.familyId), eq(schema.devices.active, true)))
+            ).length > 0;
+      if (!current) throw new UnauthorizedException('Not a member of this family any more');
+      await tx.insert(schema.sessions).values({
+        tokenHash: sha256b64(token),
+        familyId: pending.familyId,
+        deviceId: pending.deviceId,
+        expiresAt: new Date(expiresAt),
+      });
     });
     return { token, expiresAt, familyId: pending.familyId, deviceId: pending.deviceId };
   }

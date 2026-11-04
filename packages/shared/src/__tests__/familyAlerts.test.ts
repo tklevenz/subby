@@ -64,6 +64,8 @@ describe('familyAlerts', () => {
     // Back asleep at 01:35: the same night.
     const second = entry({ type: 'sleep', nap: false }, at(1, 1, 35), null);
     expect(run([{ before: null, after: second, by: 'x' }], at(1, 1, 36), [...past, first, second], nights)).toEqual([]);
+    // Up and back asleep, both in one pull: still the same night, no "woke up".
+    expect(run([{ before: bed, after: first, by: 'x' }, { before: null, after: second, by: 'x' }], at(1, 1, 36), [...past, first, second], nights)).toEqual([]);
     // The morning: replaces the night's notification, counting the whole night.
     const morning = ended(second, at(1, 6, 35));
     expect(run([{ before: second, after: morning, by: 'x' }], at(1, 6, 36), [...past, first, morning], nights)).toEqual([

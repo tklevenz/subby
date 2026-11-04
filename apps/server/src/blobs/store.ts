@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { DeleteObjectCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type { BlobStoreConfig } from '../config';
@@ -30,7 +31,7 @@ class DiskStore implements BlobStore {
     const path = this.path(id);
     await mkdir(dirname(path), { recursive: true });
     // Write then rename, so a crash never leaves a half-written blob under its real name.
-    const tmp = `${path}.tmp`;
+    const tmp = `${path}.${randomUUID()}.tmp`;
     await writeFile(tmp, data);
     await rename(tmp, path);
   }

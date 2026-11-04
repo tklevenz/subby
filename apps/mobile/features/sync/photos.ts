@@ -64,9 +64,10 @@ export async function queueUnsyncedPhotos() {
 /**
  * Before a push: encrypts each new photo with its own key, uploads it, and records the reference on the row
  * (in place, so the push carries it). The row's version is untouched; if it was edited meanwhile, the
- * reference is saved with the next push instead.
+ * reference is saved with the next push instead. Returns whether any row changed (the loaded stores are stale then).
  */
-export async function uploadPhotos(api: SyncSession, children: Child[], logs: LogEntry[]) {
+export async function uploadPhotos(api: SyncSession, children: Child[], logs: LogEntry[]): Promise<boolean> {
+  let changed = false;
   for (const child of children) {
     if (!needsPhotoUpload(child)) continue;
     const blob = await upload(api, child.photoUri!);
@@ -74,6 +75,7 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
     // A missing file: forget it, so the entry syncs without a photo instead of retrying forever.
     const change = blob ? { photoBlob: blob } : { photoUri: null };
     Object.assign(child, change);
+    changed = true;
     await db
       .update(schema.childrenTable)
       .set(change)
@@ -85,11 +87,13 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
     if (blob === TOO_LARGE) continue;
     const { photoUri: _, ...note } = log.payload;
     log.payload = blob ? { ...log.payload, photoBlob: blob } : note;
+    changed = true;
     await db
       .update(schema.logsTable)
       .set({ payload: log.payload })
       .where(and(eq(schema.logsTable.id, log.id), eq(schema.logsTable.updatedAt, log.updatedAt)));
   }
+  return changed;
 }
 
 const TOO_LARGE = 'tooLarge';
@@ -166,5 +170,13 @@ async function download(api: SyncSession, blob: PhotoBlob): Promise<string | nul
   if (!UUID.test(blob.id)) return null;
   const data = await api.getBlob(blob.id);
   if (!data) return null; // replaced or deleted on the server since; the next pull brings the newer version
-  return savePhotoBytes(`${blob.id}.jpg`, decryptFile(fromBase64(blob.key), data));
+  let bytes: Uint8Array;
+  try {
+    bytes = decryptFile(fromBase64(blob.key), data);
+  } catch (e) {
+    // Damaged or tampered with on the server: skipped (retried next run), so one photo can't stop sync.
+    console.warn(`[sync] photo ${blob.id} doesn't decrypt`, e);
+    return null;
+  }
+  return savePhotoBytes(`${blob.id}.jpg`, bytes);
 }

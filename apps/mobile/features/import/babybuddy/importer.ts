@@ -37,7 +37,7 @@ export async function previewImport(client: BBClient, fallback: UnitSystem): Pro
 
   const volume = [
     ...feedings.flatMap((f) => (f.amount ? [f.amount] : [])),
-    ...pumping.map((p) => p.amount),
+    ...pumping.flatMap((p) => (p.amount ? [p.amount] : [])),
   ];
   const samples = {
     volume,

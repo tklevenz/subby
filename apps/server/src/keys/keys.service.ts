@@ -70,8 +70,8 @@ export class KeysService {
       const family = await lockFamily(tx, auth.familyId);
       if (epoch !== family.currentEpoch + 1) throw new BadRequestException(`Next epoch is ${family.currentEpoch + 1}`);
       // The entry closes the old epochs at this seq: the phone must have pulled everything, so no genuine record
-      // lies beyond it. (Older apps send none.)
-      if (entry.closedSeq != null && entry.closedSeq !== family.seq) {
+      // lies beyond it. Required: without it the log would leave the old epochs open.
+      if (entry.closedSeq !== family.seq) {
         throw new ConflictException(`Pull first: the family is at seq ${family.seq}`);
       }
       await appendVerified(tx, auth.familyId, entry);

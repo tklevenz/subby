@@ -28,7 +28,8 @@ FROM node:24-alpine
 ENV NODE_ENV=production PORT=8787 BLOB_DIR=/data/blobs
 WORKDIR /app
 COPY --from=build /out/package.json ./
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+# No install scripts: the dependencies are pure JS and need none.
+RUN npm install --omit=dev --no-audit --no-fund --ignore-scripts && npm cache clean --force
 COPY --from=build /repo/apps/server/dist ./dist
 COPY --from=build /repo/apps/server/drizzle ./drizzle
 RUN mkdir -p /data/blobs && chown -R node:node /data

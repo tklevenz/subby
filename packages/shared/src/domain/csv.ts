@@ -56,11 +56,14 @@ export function csvDateTime(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** RFC 4180 quoting; text starting with = + - @ is prefixed with ' so spreadsheets don't run it as a formula. */
+/**
+ * RFC 4180 quoting; text starting with = + - @ | (after any leading whitespace) or a tab or line break is prefixed
+ * with ' so spreadsheets don't run it as a formula.
+ */
 export function csvCell(v: Value): string {
   if (v === undefined) return '';
   if (typeof v !== 'string') return String(v);
-  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  const safe = /^(\s|[=+\-@|])/.test(v) ? `'${v}` : v;
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 

@@ -18,7 +18,7 @@ import {
   type DeviceLogEntry,
   type DeviceLogState,
 } from '@kindred-log/shared/crypto';
-import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
+import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, settlePush, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
@@ -329,7 +329,12 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
   let done = 0;
   // Rows too large for the server (a huge note): left pending and skipped, so they can't block everything else.
   const tooLarge = new Set<string>();
-  const notTooLarge = <T extends { id: SQLiteColumn }>(t: T) => (tooLarge.size ? [notInArray(t.id, [...tooLarge])] : []);
+  // Rows the server called stale without sending a version that beats them: left pending for the next run.
+  const held = new Set<string>();
+  const notTooLarge = <T extends { id: SQLiteColumn }>(t: T) => {
+    const skip = [...tooLarge, ...held];
+    return skip.length ? [notInArray(t.id, skip)] : [];
+  };
 
   for (;;) {
     // Children first, so a fresh device sees a child before its entries.
@@ -341,7 +346,8 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       : [];
     if (!children.length && !logs.length) return { applied, tooLarge: tooLarge.size };
 
-    await uploadPhotos(api, children, logs);
+    // The rows now carry photo references the loaded stores don't have yet: reload them afterwards.
+    if (await uploadPhotos(api, children, logs)) applied = true;
     const sealed: SyncRecord[] = [
       ...children.map((row) => sealRecord(key, epoch, meta(row.id, 'child', row), childToBody(row))),
       ...logs.map((row) => sealRecord(key, epoch, meta(row.id, 'log', row), logToBody(row))),
@@ -355,8 +361,11 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     if (!records.length) continue;
     const res = await api.push(records);
 
-    // Stale ones are marked synced too: the server's newer version (sent back as `newer`) replaces them below.
-    const settled = new Set([...res.accepted, ...res.stale]);
+    // The winning versions the server sent back for stale ones, of any epoch we hold, unless the log closed that
+    // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
+    // (an older epoch's version this phone pulled long ago, or a server that withholds it) it stays pending.
+    const { settled, held: kept, newer } = settlePush(records, res, (r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
+    for (const id of kept) held.add(id);
     const version = new Map([...children, ...logs].map((r) => [r.id, r.updatedAt]));
     db.transaction((tx) => {
       for (const id of settled) {
@@ -366,8 +375,6 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
         tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
       }
     });
-    // Only current-epoch versions: an older one that won would come with the regular pull, checked there.
-    const newer = (res.newer ?? []).filter((r) => r.epoch === epoch && withinEpoch({ closedAt }, r.epoch, r.seq));
     if (newer.length) applied = applyPage(newer, keys, settings.deviceId) || applied;
     done += records.length;
     useSyncStore.setState({ progress: { label: 'Uploading', done } });
@@ -388,6 +395,7 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedA
   let done = 0;
   for (;;) {
     const page = await api.pull(seq);
+    if (!pageContinues(seq, page)) throw new Error(`The server sent a page that doesn't continue from ${seq}`);
     const genuine = page.records.filter((r) => {
       if (r.seq > seq && r.seq <= page.seq && withinEpoch({ closedAt }, r.epoch, r.seq)) return true;
       console.warn(`[sync] refused ${r.kind} record ${r.id}: seq ${r.seq} isn't valid for epoch ${r.epoch}`);
@@ -409,15 +417,18 @@ let pulledLogs: PulledLog[] = [];
 
 /** Applies one page in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
-  // Decrypt first: a record we can't open fails the run before anything is written. One that opens but is
-  // malformed (a buggy or hostile phone), or a tombstone nobody sealed (an older app's, or a server's), is skipped.
+  // Decrypt first: a record of an epoch we have no key for fails the run before anything is written (the next run
+  // fetches the key). One that doesn't open with a key we have (damaged or tampered with), one that opens but is
+  // malformed (a buggy or hostile phone), or a tombstone nobody sealed (an older app's, or a server's), is skipped,
+  // so a single bad record can't stop sync for good.
   const opened = records
     .flatMap((r) => {
       try {
         return [{ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }];
       } catch (e) {
-        if (!(e instanceof UnsealedRecordError)) throw e;
-        console.warn(`[sync] skipped unsealed ${r.kind} record ${r.id}`);
+        if (e instanceof UnsealedRecordError) console.warn(`[sync] skipped unsealed ${r.kind} record ${r.id}`);
+        else if (keys.has(r.epoch)) console.warn(`[sync] skipped ${r.kind} record ${r.id}: it doesn't open`, e);
+        else throw e;
         return [];
       }
     })

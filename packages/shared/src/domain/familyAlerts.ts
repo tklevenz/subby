@@ -77,8 +77,9 @@ export function familyAlerts(input: {
         childId: after.childId,
       });
     } else if (was && !isRunning(after)) {
-      // Up in the night: the night isn't over, so nothing changes yet.
-      if (!nap && isNightWaking(sleeps(), now)) continue;
+      // Up in the night: the night isn't over, so nothing changes yet. Also when back asleep already (the waking
+      // and the next piece arrived in one pull; isNightWaking is false then, a sleep is running).
+      if (!nap && (isNightWaking(sleeps(), now) || sleeps().some((s) => isRunning(s) && s.startedAt >= after.endedAt!))) continue;
       // A night's notification belongs to its first piece, the one that said "down for the night".
       const night = nap ? undefined : nightOf(groupNights(sleeps(), now), after.id);
       const nightId = night ? `${FAMILY_ALERT_ID_PREFIX}sleep:${night.pieces[0]!.id}` : id;

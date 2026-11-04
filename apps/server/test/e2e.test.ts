@@ -323,13 +323,36 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(row.epoch).toBe(2);
     // The server refuses a rotation that leaves out or adds anyone, and epochs without their keys.
     const { appendEntry, newSymmetricKey } = await import('@kindred-log/shared/crypto');
+    await a.pull();
     const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, {
       type: 'epoch',
       deviceId: a.deviceId,
       familyKey: { epoch: 3, key: newSymmetricKey() },
+      closedSeq: a.lastSeq,
     }, Date.now());
     await expectStatus(a.request('POST', '/v1/keys/rotate', { entry, sealed: {} }), 400);
     await expectStatus(a.request('POST', '/v1/families/me/log', { entry }), 400);
+  });
+
+  it("a phone removed between challenge and verify doesn't get a session", async () => {
+    const { a, b } = await pairedFamily();
+    const { challenge } = await b.request<{ challenge: string }>('POST', '/v1/auth/challenge', { deviceId: b.deviceId }, '');
+    await a.removeDevice(b.deviceId);
+    const { authMessage } = await import('@kindred-log/shared/sync');
+    const { sign } = await import('@kindred-log/shared/crypto');
+    await expectStatus(b.request('POST', '/v1/auth/verify', { challenge, signature: toBase64(sign(b.identity, authMessage(challenge))) }, ''), 401);
+    const [{ n }] = await db`select count(*)::int as n from sessions where device_id = ${b.deviceId}`;
+    expect(n).toBe(0);
+  });
+
+  it('a rotation must say where it closes the old epochs', async () => {
+    const { a } = await pairedFamily();
+    await a.pull();
+    const { appendEntry, newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const key = newSymmetricKey();
+    const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, { type: 'epoch', deviceId: a.deviceId, familyKey: { epoch: 2, key } }, Date.now());
+    const sealed = Object.fromEntries([...a.state!.members].map(([id, m]) => [id, toBase64(seal(m.boxKey, key))]));
+    await expectStatus(a.request('POST', '/v1/keys/rotate', { entry, sealed }), 409);
   });
 
   it("phones refuse family keys the server made up or swapped", async () => {
@@ -610,6 +633,32 @@ describe.skipIf(!reachable)('sync server', () => {
       await expectStatus(stranger.downloadFile(ref), 404);
       await a.removeDevice(b.deviceId);
       await expectStatus(b.downloadFile(ref), 401);
+    });
+
+    it("a record can't take over another record's photo", async () => {
+      const { a, b } = await pairedFamily();
+      const ref = await a.uploadFile(photo('mine'));
+      await a.push([a.seal('child', randomUUID(), { photoBlob: ref }, { blobs: [ref.id] })]);
+      // Another record lists it, then drops it: the photo stays with the first record.
+      const other = randomUUID();
+      await b.push([b.seal('log', other, {}, { blobs: [ref.id], updatedAt: 1 })]);
+      await b.push([b.seal('log', other, {}, { blobs: [], updatedAt: 2 })]);
+      expect(await exists(a, ref.id)).toBe(true);
+    });
+
+    it("a taken id is refused before the stored file is touched, from another family too", async () => {
+      const { a } = await pairedFamily();
+      const ref = await a.uploadFile(photo('original'));
+      const stranger = new TestClient(url);
+      await stranger.createFamily();
+      const res = await fetch(`${url}/v1/blobs/${ref.id}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${stranger.token}` },
+        body: new Uint8Array([1, 2, 3]),
+      });
+      expect(res.status).toBe(409);
+      const got = await a.downloadFile(ref);
+      expect(new TextDecoder().decode(got.subarray(0, 13))).toBe('JPEG original');
     });
 
     it('rejects ids that are taken, empty bodies and missing auth', async () => {

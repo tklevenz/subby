@@ -120,7 +120,10 @@ export function signEntry(signerKeys: IdentityKeys, entry: Unsigned): DeviceLogE
 
 const keysOf = (e: DeviceLogEntry): Member => {
   if (!e.signKey || !e.boxKey) throw new Error(`Device log entry ${e.index} is missing keys`);
-  return { signKey: fromBase64(e.signKey), boxKey: fromBase64(e.boxKey) };
+  const keys = { signKey: fromBase64(e.signKey), boxKey: fromBase64(e.boxKey) };
+  // A malformed key in the (immutable) log would make every later seal to it throw, and so every rotation.
+  if (keys.signKey.length !== 32 || keys.boxKey.length !== 32) throw new Error(`Device log entry ${e.index} has malformed keys`);
+  return keys;
 };
 
 /**

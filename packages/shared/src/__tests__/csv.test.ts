@@ -24,5 +24,6 @@ describe('logsToCsv', () => {
     expect(csvCell('a, "b"')).toBe('"a, ""b"""');
     expect(csvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
     expect(csvCell(-3)).toBe('-3');
+    for (const v of [' =1+1', '\n=1+1', '|cmd', '\t@x']) expect(csvCell(v)).toMatch(/^"?'/);
   });
 });

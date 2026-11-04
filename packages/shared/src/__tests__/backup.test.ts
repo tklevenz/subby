@@ -68,6 +68,11 @@ describe('backup', () => {
 
     expect(() => readBackup(strToU8('hello'))).toThrow(BackupError);
     expect(() => readBackup(zipSync({ 'other.txt': strToU8('x') }))).toThrow(/not a Subby backup/);
+    // Files a backup doesn't have are left packed, and a zip that would inflate far beyond its size is refused.
+    const extra = zipSync({ ...files, 'photos/../../x': strToU8('x'), 'junk.bin': new Uint8Array(1000) });
+    expect(readBackup(extra).backup.logs).toHaveLength(2);
+    const bomb = zipSync({ ...files, 'photos/9.jpg': new Uint8Array(80 * 2 ** 20) }, { level: 9 });
+    expect(() => readBackup(bomb)).toThrow(/damaged/);
     const newer = zipSync({ 'backup.json': strToU8(JSON.stringify({ ...manifest, version: 99 })) });
     expect(() => readBackup(newer)).toThrow(/newer version/);
   });
@@ -86,6 +91,9 @@ describe('backup', () => {
     const greedy = box.slice();
     greedy[5] = 30; // N = 2^30
     await expect(decryptBackup(greedy, 'correct horse')).rejects.toThrow(/damaged/);
+    const wide = box.slice();
+    [wide[5], wide[6]] = [20, 16]; // 2 GiB of memory
+    await expect(decryptBackup(wide, 'correct horse')).rejects.toThrow(/damaged/);
   });
 
   it('plans a restore with newest-edit-wins', () => {

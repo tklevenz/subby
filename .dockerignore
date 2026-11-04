@@ -7,6 +7,12 @@
 **/.env.*
 !**/.env.example
 apps/server/data
+# Keys (the FCM service account) are mounted at runtime, never built in.
+apps/server/secrets
+**/*.pem
+**/*.key
+**/*.p8
+**/*.p12
 # The app isn't part of the server image; only its manifest is needed for the lockfile.
 apps/mobile/*
 !apps/mobile/package.json

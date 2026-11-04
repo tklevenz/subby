@@ -4,6 +4,9 @@ import { verifyDeviceLog, type DeviceLogEntry } from '@kindred-log/shared/crypto
 import { DB, schema, type Db, type Tx } from '../db/db';
 import { RECOVERY, type AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';
+import { lockFamily } from '../db/lock';
+
+export { lockFamily };
 
 /** Replays the log; a broken one is the client's fault (400), never stored. */
 function verified(entries: DeviceLogEntry[]) {
@@ -110,9 +113,3 @@ export async function appendVerified(tx: Tx, familyId: string, entry: DeviceLogE
   return state;
 }
 
-/** Serializes writes per family (log appends, key rotation, sync seq). */
-export async function lockFamily(tx: Tx, familyId: string) {
-  const [family] = await tx.select().from(schema.families).where(eq(schema.families.id, familyId)).for('update');
-  if (!family) throw new BadRequestException('Unknown family');
-  return family;
-}

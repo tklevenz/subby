@@ -66,7 +66,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).
   - `backup` (import from `@kindred-log/shared/domain/backup`, kept off the main index):
     - The file is a zip (`fflate`) holding `backup.json` (children, entries and tombstones) plus `photos/<n>.<ext>`. Photo names are ours, never taken from row data. Device-local fields stay out: photo paths, `photoBlob`, sync status.
-    - An optional passphrase encrypts it: `KLBK` header with scrypt parameters and salt, then `encryptFile`. The parameters are read from the header and bounded.
+    - An optional passphrase encrypts it: `KLBK` header with scrypt parameters and salt, then `encryptFile`. The parameters are read from the header and bounded (≤ 64 MiB of scrypt memory).
+    - Reading unzips only `backup.json` and `photos/<n>.<ext>`, and refuses a zip that would inflate past its size + 64 MiB.
     - `readBackup` validates each row and skips (and counts) bad ones; payloads are checked for shape only.
     - `planRestore` uses newest-edit-wins, like sync.
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
@@ -92,7 +93,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog` (keeps only id and type: the payload becomes `{type}`), `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
   - Note photos are deleted from disk when their entry is deleted or the photo is replaced (`features/photos.ts`).
   - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads on every `revision`. Use these for anything beyond the store's 30-day window: History day/week, Trends, Growth, Solids, Export, and all-time lookups such as allergens in `FoodPicker` and milestones done. `HAS_FOODS` filters feeds that have foods.
-  - `useChildStore` (`deleteChild` hard-deletes the child's logs, reminders and photos and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub; `set` updates memory before the DB write, so back-to-back read-modify-writes like `saveSync` don't lose each other's changes, and `null` deletes the row because `value` is NOT NULL), `useActiveChild`.
+  - `useChildStore` (`deleteChild` turns the child's logs into scrubbed tombstones, deletes its reminders and photos, and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub; `set` updates memory before the DB write, so back-to-back read-modify-writes like `saveSync` don't lose each other's changes, and `null` deletes the row because `value` is NOT NULL), `useActiveChild`.
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
   - `app/(tabs)/`:
@@ -166,8 +167,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
     - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
-    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`) and applies them (current epoch only; older ones come through the pull); there's no re-pull from 0.
-    - Pulled records are refused (skipped, not written) if their seq is outside the page asked for, or `withinEpoch` says the log closed their epoch before them. Unsealed tombstones are skipped too.
+    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`), of any epoch this phone holds (still checked by `withinEpoch`). `settlePush` (shared) marks a stale row synced only if one of them beats it; otherwise the row stays pending for the next run, so a server can't make a phone drop an edit. There's no re-pull from 0.
+    - Pulled records are refused (skipped, not written) if their seq is outside the page asked for, or `withinEpoch` says the log closed their epoch before them. Unsealed tombstones, and records that don't open with a key this phone has (damaged or tampered with), are skipped too, so one bad record can't stop sync; a record of an epoch without a key still fails the run (the next one fetches it). A page that doesn't move forward (`pageContinues`) fails the run.
+    - A photo blob that doesn't decrypt is skipped (retried next run). `uploadPhotos` reports changed rows, so the stores reload.
     - `rotateKeys` pulls everything first and signs `closedSeq` = this phone's `lastSeq`; on 409 (another phone pushed in between) it pulls and retries, up to three times.
     - **Self-healing** (`heal`, every run):
       - Grants epochs that `GET /v1/keys` lists as `missing` for a member or the recovery key, sealed only to public keys from the verified log.
@@ -196,14 +198,14 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod 4: use `z.uuid()` and `.loose()`, not the deprecated `z.string().uuid()` and `.passthrough()`). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
 - **Endpoints (`/v1`):**
   - `info`.
-  - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed.
+  - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed. `verify` re-checks membership (or the current recovery key) under `lockFamily` (`db/lock.ts`), so a phone removed after its challenge gets no session.
   - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
   - `keys`: `GET`, `grant`, and `rotate`.
     - A rotation is the signed `epoch` log entry plus the key sealed to exactly the current members plus the recovery key, stored in one transaction. `families/me/log` refuses `epoch` entries.
-    - Its `closedSeq` must equal the family's seq, otherwise 409 ("Pull first"); entries from older apps without one are taken.
+    - Its `closedSeq` must equal the family's seq, otherwise 409 ("Pull first"); it's required.
     - Grants never overwrite an existing sealed key.
   - `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
-  - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. `Entitlements.canStore` is the hosted quota hook.
+  - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. A record can only link unlinked blobs or its own. An upload claims its id with the row first, so a taken id is refused before the file is touched. `Entitlements.canStore` is the hosted quota hook.
   - `sync/push` and `sync/pull`:
     - Last writer wins via `serverAccepts`, and a per-family `seq`.
     - New data must use the current epoch, deletions too.
