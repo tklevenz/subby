@@ -37,7 +37,7 @@ export type SyncSettings = {
   push?: boolean;
   /** The family this phone's photo references belong to; differs (or is missing) after moving to another family. */
   photosFamily?: string;
-  /** The Expo push token last registered with the server (re-registered when it changes). */
+  /** The push token (FCM on Android) last registered with the server (re-registered when it changes). */
   pushToken?: string;
   /** How far this phone has verified the device log, so a server can't serve an older one (`assertLogContinues`). */
   logSeen?: LogSeen;

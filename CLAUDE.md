@@ -178,8 +178,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
   - `useSyncEngine` (in `_layout`) triggers sync on start, on store changes (debounced), when the app comes to the foreground, and on live messages.
   - **Background** (`background.ts`, imported first by the entry `index.ts`, because headless launches render no screen): `backgroundSync` = `appReady()` (`features/startup.ts`, opens the DB once per runtime) + `syncNow` + `replanReminders`.
-    - Runs from an `expo-background-task` periodic task (everyone; at best every 15 min) and from an `expo-notifications` background task when a hosted server's "sync now" push arrives.
-    - `setUpBackgroundSync` (each foreground start) registers the tasks, stores whether the server pushes (`settings.sync.push`), and registers the Expo push token. The token needs an Expo project id (`extra.eas.projectId`); without one, registration is skipped.
+    - Runs from an `expo-background-task` periodic task (everyone; at best every 15 min) and from an `expo-notifications` background task when a server's "sync now" push arrives.
+    - `setUpBackgroundSync` (each foreground start) registers the tasks, stores whether the server pushes (`settings.sync.push`), and registers the phone's own push token (`getDevicePushTokenAsync`: FCM on Android, with its platform). No Expo push service and no EAS. The FCM token needs `apps/mobile/google-services.json` (the Firebase project's Android config, gitignored; `app.config.js` sets `googleServicesFile` when it exists, or from `GOOGLE_SERVICES_JSON`); without it, registration is skipped.
     - Without push and with other phones, medication reminders say to check the app first (`planReminders({ checkBeforeDosing })`).
   - `family.ts` (pairing): inviter `createInvite` → `inviteStatus` → `claimCode` (checks the claim's MAC) → `approveClaim` (signs the `add`, grants every epoch); joiner `claimInvite` → `joinStatus` → `finishJoin(join, 'merge' | 'replace')`. `removeDevice` signs a `remove`, then rotates: one `keys/rotate` request with the signed `epoch` entry and the key sealed to the remaining phones plus recovery. It also tombstones the removed phone's name.
   - Recovery key (`family.ts`): `setRecoveryKey(words)` signs a `setRecovery` and grants every epoch to it (the server then drops the old recovery key's keys and sessions). `recoverFamily(server, words, local)` logs in as the recovery key (`SyncSession(..., asRecovery)`), checks the log's recovery key matches, signs this phone's `add`, grants it the keys, then finishes like a join (`completeJoin`).
@@ -210,7 +210,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Tombstones may carry a sealed body or (older apps) none; anything else needs data.
     - Records must be written as the calling device.
   - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
-  - `push/token` (PUT/DELETE): hosted only (`PUSH=expo`, the default for `MODE=hosted`; a self-hosted server ignores tokens). After accepted writes, `PushService` sends the family's other phones a data-only `{kind: 'sync'}` ping through the Expo push service (coalesced over 2 s). Tokens are dropped when the service says DeviceNotRegistered or when the device is removed. `/v1/info` reports `push`.
+  - `push/token` (PUT/DELETE, `{token, platform}`): kept only with `PUSH=fcm` (the default for `MODE=hosted`; needs `FCM_SERVICE_ACCOUNT`, a Firebase service-account key, mounted from `./secrets` in Docker). After accepted writes, `PushService` sends the family's other Android phones a data-only, high-priority `{kind: 'sync'}` message straight to FCM HTTP v1 (coalesced over 2 s; OAuth token from a JWT signed with the key via `node:crypto`, cached for the hour). Tokens are dropped on FCM 404/400 or when the device is removed. iOS tokens are stored but not sent to yet (APNs is a TODO). Push only reaches app builds made with the same Firebase project. `/v1/info` reports `push`.
 - **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, and grant. They can't sync or rotate.
 - **Code conventions:**
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
@@ -278,4 +278,5 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - 2026-10-23: **M7 background sync and push done**:
   - Periodic background sync verified headless on the emulator with a release build: app process killed, WorkManager started it without UI, the task logged in, synced and re-queued itself.
   - Push is covered by server e2e tests against a fake Expo push service. A real device push still needs an Expo project id plus FCM/APNs credentials (not set up).
+- 2026-11-04: push goes straight to FCM (no Expo push service): server e2e against a fake Google OAuth + FCM. Android device test pending; APNs not yet.
 - **Next:** M8, open source and hosting readiness (see the plan file).

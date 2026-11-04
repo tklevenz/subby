@@ -23,6 +23,9 @@ apps/mobile/android/
 *.db-wal
 # Sync server's encrypted photo store (BLOB_DIR default)
 apps/server/data/
+# Push credentials: the Firebase config the app is built with, and the server's service-account key
+apps/mobile/google-services.json
+apps/server/secrets/
 .env
 .env.*
 !.env.example

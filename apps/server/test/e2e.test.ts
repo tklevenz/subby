@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createVerify, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,8 +50,12 @@ describe.skipIf(!reachable)('sync server', () => {
   let url = '';
   let db: postgres.Sql;
 
-  /** A stand-in for the Expo push service: records messages; tokens containing "gone" are unregistered. */
-  const pushed: { to: string; data: unknown; title?: string; body?: string }[] = [];
+  /**
+   * A stand-in for Google: trades a JWT signed with the service-account key for an access token, and records FCM
+   * messages sent with it; tokens containing "gone" are unregistered (404).
+   */
+  const pushed: { to: string; data: unknown; notification?: unknown }[] = [];
+  const fcmKey = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
   let pushServer: Server;
   let pushUrl = '';
 
@@ -60,14 +64,23 @@ describe.skipIf(!reachable)('sync server', () => {
       let raw = '';
       req.on('data', (c) => (raw += c));
       req.on('end', () => {
-        const messages = JSON.parse(raw) as { to: string; data: unknown }[];
-        pushed.push(...messages);
-        res.setHeader('content-type', 'application/json');
-        res.end(
-          JSON.stringify({
-            data: messages.map((m) => (m.to.includes('gone') ? { status: 'error', details: { error: 'DeviceNotRegistered' } } : { status: 'ok', id: randomUUID() })),
-          }),
-        );
+        if (req.url === '/token') {
+          const [head, claims, sig] = new URLSearchParams(raw).get('assertion')!.split('.');
+          const valid = createVerify('RSA-SHA256').update(`${head}.${claims}`).verify(fcmKey.publicKey, sig!, 'base64url');
+          const { scope } = JSON.parse(Buffer.from(claims!, 'base64url').toString()) as { scope: string };
+          res.statusCode = valid && scope.includes('firebase.messaging') ? 200 : 401;
+          res.end(JSON.stringify({ access_token: 'fcm-access', expires_in: 3600 }));
+          return;
+        }
+        if (req.headers.authorization !== 'Bearer fcm-access') {
+          res.statusCode = 401;
+          res.end();
+          return;
+        }
+        const { message } = JSON.parse(raw) as { message: { token: string; data: unknown; notification?: unknown } };
+        pushed.push({ to: message.token, data: message.data, notification: message.notification });
+        res.statusCode = message.token.includes('gone') ? 404 : 200;
+        res.end(JSON.stringify(message.token.includes('gone') ? { error: { status: 'NOT_FOUND' } } : { name: randomUUID() }));
       });
     });
     await new Promise<void>((resolve) => pushServer.listen(0, '127.0.0.1', resolve));
@@ -82,7 +95,14 @@ describe.skipIf(!reachable)('sync server', () => {
       mode: 'self',
       migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
       blobs: { kind: 'disk', dir: blobDir },
-      push: { kind: 'expo', url: `${pushUrl}/push/send` },
+      push: {
+        kind: 'fcm',
+        projectId: 'subby-test',
+        clientEmail: 'push@subby-test.iam.gserviceaccount.com',
+        privateKey: fcmKey.privateKey,
+        tokenUri: `${pushUrl}/token`,
+        sendUrl: `${pushUrl}/send`,
+      },
     });
     await app.listen({ port: 0, host: '127.0.0.1' });
     url = await app.getUrl();
@@ -461,7 +481,7 @@ describe.skipIf(!reachable)('sync server', () => {
   });
 
   describe('push', () => {
-    const register = (c: TestClient, token: string) => c.request('PUT', '/v1/push/token', { token });
+    const register = (c: TestClient, token: string, platform = 'android') => c.request('PUT', '/v1/push/token', { token, platform });
     const tokensOf = async (familyId: string) => (await db`select token from push_tokens where family_id = ${familyId}`).map((r) => r.token as string);
 
     it('says whether it sends pushes', async () => {
@@ -470,8 +490,8 @@ describe.skipIf(!reachable)('sync server', () => {
 
     it("wakes the family's other phones with a content-free ping after a write", async () => {
       const { a, b } = await pairedFamily();
-      const tokenA = `ExponentPushToken[a-${randomUUID()}]`;
-      const tokenB = `ExponentPushToken[b-${randomUUID()}]`;
+      const tokenA = `fcm-a-${randomUUID()}`;
+      const tokenB = `fcm-b-${randomUUID()}`;
       await register(a, tokenA);
       await register(b, tokenB);
       await a.push([a.seal('log', randomUUID(), { secret: 'Zebediah' })]);
@@ -479,15 +499,15 @@ describe.skipIf(!reachable)('sync server', () => {
       const toB = pushed.filter((m) => m.to === tokenB);
       expect(toB).toHaveLength(1);
       expect(toB[0]).toMatchObject({ data: { kind: 'sync' } });
-      expect(toB[0]!.title).toBeUndefined();
+      expect(toB[0]!.notification).toBeUndefined();
       expect(JSON.stringify(toB)).not.toMatch(/Zebediah/);
       expect(pushed.some((m) => m.to === tokenA)).toBe(false); // the writer itself isn't woken
     });
 
     it('drops tokens the push service no longer knows, and those of removed phones', async () => {
       const { a, b } = await pairedFamily();
-      await register(a, `ExponentPushToken[gone-${randomUUID()}]`);
-      await register(b, `ExponentPushToken[b-${randomUUID()}]`);
+      await register(a, `fcm-gone-${randomUUID()}`);
+      await register(b, `fcm-b-${randomUUID()}`);
       expect(await tokensOf(a.familyId)).toHaveLength(2);
       await app.get(PushService).send(a.familyId, null);
       expect(await tokensOf(a.familyId)).toHaveLength(1);
@@ -495,11 +515,18 @@ describe.skipIf(!reachable)('sync server', () => {
       expect(await tokensOf(a.familyId)).toHaveLength(0);
     });
 
+    it('keeps iOS tokens but sends only to Android ones (no APNs yet)', async () => {
+      const { a, b } = await pairedFamily();
+      await register(b, `apns-${randomUUID()}`, 'ios');
+      expect(await app.get(PushService).send(a.familyId, a.deviceId)).toBe(0);
+      expect(await tokensOf(a.familyId)).toHaveLength(1);
+    });
+
     it('a phone can replace or remove its token', async () => {
       const { a } = await pairedFamily();
-      await register(a, 'ExponentPushToken[one]');
-      await register(a, 'ExponentPushToken[two]');
-      expect(await tokensOf(a.familyId)).toEqual(['ExponentPushToken[two]']);
+      await register(a, 'fcm-one');
+      await register(a, 'fcm-two');
+      expect(await tokensOf(a.familyId)).toEqual(['fcm-two']);
       await a.request('DELETE', '/v1/push/token');
       expect(await tokensOf(a.familyId)).toEqual([]);
     });

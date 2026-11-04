@@ -95,11 +95,13 @@ With a prebuilt image on the server, `docker compose up -d` (without `--build`) 
 | `MODE` | `self` | `self` (no limits, no push) or `hosted` |
 | `BLOB_STORE` | `disk` | `disk` (`BLOB_DIR`, `/data/blobs` in the image) or `s3` |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | for `BLOB_STORE=s3`, any S3-compatible storage |
-| `PUSH` | `none` (`expo` when hosted) | background "sync now" pings via the Expo push service |
-| `EXPO_ACCESS_TOKEN` | | optional, for the Expo push service |
+| `PUSH` | `none` (`fcm` when hosted) | background "sync now" pings via Firebase Cloud Messaging |
+| `FCM_SERVICE_ACCOUNT` | | for `PUSH=fcm`: path to the Firebase service-account key (`/secrets/firebase.json`, from `./secrets`) |
 
-Self-hosted servers don't send push notifications: phones sync while the app is open, and in the background as
-often as the phone allows (roughly every 15 minutes or more).
+Without push, phones sync while the app is open, and in the background as often as the phone allows (roughly
+every 15 minutes or more). Push only reaches app builds made with the same Firebase project as the key, so the
+store app can't be pushed to from a self-hosted server; if you build the app yourself with your own
+`google-services.json`, `PUSH=fcm` with your project's key works. iOS (APNs) isn't sent to yet.
 
 ## Development
 

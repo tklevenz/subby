@@ -1,0 +1,1 @@
+ALTER TABLE "push_tokens" ADD COLUMN "platform" text DEFAULT 'android' NOT NULL;

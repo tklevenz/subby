@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type * as BackgroundTaskModule from 'expo-background-task';
 import type * as NotificationsModule from 'expo-notifications';
@@ -65,12 +66,16 @@ export async function setUpBackgroundSync() {
   if (!push || !Notifications) return;
   if (!(await TaskManager.isTaskRegisteredAsync(PUSH_TASK))) await Notifications.registerTaskAsync(PUSH_TASK);
 
-  // Expo push tokens belong to an Expo project; builds without one sync when opened and in the background.
-  const projectId: string | undefined = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  if (!projectId) return;
-  const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+  // The phone's own push token (FCM on Android), straight to the server: no Expo push service. Builds without
+  // google-services.json have none, and sync when opened and in the background.
+  let token: string;
+  try {
+    token = String((await Notifications.getDevicePushTokenAsync()).data);
+  } catch {
+    return;
+  }
   if (token === settings.pushToken) return;
-  await sessionFor(settings).request('PUT', '/v1/push/token', { token });
+  await sessionFor(settings).request('PUT', '/v1/push/token', { token, platform: Platform.OS === 'ios' ? 'ios' : 'android' });
   await saveSync({ pushToken: token });
 }
 

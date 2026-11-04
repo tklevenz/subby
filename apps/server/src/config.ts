@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 export type Config = {
   databaseUrl: string;
   port: number;
@@ -6,17 +8,37 @@ export type Config = {
   migrationsFolder: string;
   /** Where encrypted files (photos) go: a local folder, or S3-compatible object storage. */
   blobs: BlobStoreConfig;
-  /** Background "sync now" pings. On by default for hosted, off for self-hosted (no push credentials). */
-  push: { kind: 'none' } | { kind: 'expo'; url: string; accessToken?: string };
+  /** Background "sync now" pings through Firebase Cloud Messaging. On by default for hosted. */
+  push: { kind: 'none' } | FcmConfig;
 };
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+/** From a Firebase service-account key (Project settings → Service accounts). */
+export type FcmConfig = {
+  kind: 'fcm';
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+  /** Where the signed JWT is traded for an access token (the key's `token_uri`). */
+  tokenUri: string;
+  /** FCM HTTP v1 send endpoint. */
+  sendUrl: string;
+};
 
 function pushConfig(env: NodeJS.ProcessEnv, mode: Config['mode']): Config['push'] {
-  const kind = env.PUSH ?? (mode === 'hosted' ? 'expo' : 'none');
+  const kind = env.PUSH || (mode === 'hosted' ? 'fcm' : 'none');
   if (kind === 'none') return { kind };
-  if (kind !== 'expo') throw new Error(`PUSH must be "expo" or "none", got "${kind}"`);
-  return { kind, url: env.EXPO_PUSH_URL ?? EXPO_PUSH_URL, accessToken: env.EXPO_ACCESS_TOKEN };
+  if (kind !== 'fcm') throw new Error(`PUSH must be "fcm" or "none", got "${kind}"`);
+  if (!env.FCM_SERVICE_ACCOUNT) throw new Error('FCM_SERVICE_ACCOUNT (the path to a Firebase service-account key) is required with PUSH=fcm');
+  const key = JSON.parse(readFileSync(env.FCM_SERVICE_ACCOUNT, 'utf8')) as Record<string, string | undefined>;
+  if (!key.project_id || !key.client_email || !key.private_key) throw new Error(`${env.FCM_SERVICE_ACCOUNT} isn't a service-account key`);
+  return {
+    kind,
+    projectId: key.project_id,
+    clientEmail: key.client_email,
+    privateKey: key.private_key,
+    tokenUri: key.token_uri ?? 'https://oauth2.googleapis.com/token',
+    sendUrl: `https://fcm.googleapis.com/v1/projects/${key.project_id}/messages:send`,
+  };
 }
 
 export type BlobStoreConfig =

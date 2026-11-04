@@ -1,7 +1,8 @@
+import { createSign } from 'node:crypto';
 import { Body, Controller, Delete, HttpCode, Inject, Injectable, Put, UseGuards, type OnModuleDestroy } from '@nestjs/common';
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { RegisterPushSchema } from '@kindred-log/shared/sync';
-import { CONFIG, type Config } from '../config';
+import { CONFIG, type Config, type FcmConfig } from '../config';
 import { DB, schema, type Db } from '../db/db';
 import { parse } from '../common/validate';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
@@ -10,17 +11,17 @@ import type { AuthContext } from '../auth/auth.service';
 /** Writes within this window become one ping per phone. */
 const COALESCE_MS = 2000;
 
-type ExpoTicket = { status: 'ok' | 'error'; details?: { error?: string } };
-
 /**
- * Hosted only: wakes the family's other phones with a content-free "sync now" push when new data arrives, so
- * they sync (and re-plan reminders) in the background. The ping carries no data; the phone pulls the
- * encrypted records itself. Sent through the Expo push service, which sees the push token and the timing.
+ * Wakes the family's other phones with a content-free "sync now" push when new data arrives, so they sync (and
+ * re-plan reminders) in the background. The ping carries no data; the phone pulls the encrypted records itself.
+ * Sent straight to Firebase Cloud Messaging, which sees the push token and the timing. Only phones running an app
+ * built with the same Firebase project can be reached (so the official app needs the official server).
  */
 @Injectable()
 export class PushService implements OnModuleDestroy {
   /** Per family: the devices that wrote since the last ping, and the pending timer. */
   private readonly pending = new Map<string, { writers: Set<string>; timer: NodeJS.Timeout }>();
+  private access: { token: string; expiresAt: number } | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -28,7 +29,7 @@ export class PushService implements OnModuleDestroy {
   ) {}
 
   get enabled() {
-    return this.config.push.kind === 'expo';
+    return this.config.push.kind === 'fcm';
   }
 
   onModuleDestroy() {
@@ -36,9 +37,9 @@ export class PushService implements OnModuleDestroy {
     this.pending.clear();
   }
 
-  async register(auth: AuthContext, token: string) {
+  async register(auth: AuthContext, token: string, platform: 'android' | 'ios') {
     if (!this.enabled) return; // nothing would be sent, so don't keep the token
-    const row = { deviceId: auth.deviceId, familyId: auth.familyId, token, updatedAt: Date.now() };
+    const row = { deviceId: auth.deviceId, familyId: auth.familyId, token, platform, updatedAt: Date.now() };
     await this.db.insert(schema.pushTokens).values(row).onConflictDoUpdate({ target: schema.pushTokens.deviceId, set: row });
   }
 
@@ -65,33 +66,67 @@ export class PushService implements OnModuleDestroy {
     this.pending.set(familyId, { writers, timer });
   }
 
-  /** Sends now (also used by tests instead of waiting for the coalescing window). */
+  /** Sends now (also used by tests instead of waiting for the coalescing window). Returns how many were sent. */
   async send(familyId: string, skipDevice: string | null) {
-    if (this.config.push.kind !== 'expo') return 0;
+    const fcm = this.config.push;
+    if (fcm.kind !== 'fcm') return 0;
+    // iOS tokens are APNs tokens: not sent to yet.
     const tokens = await this.db
       .select({ deviceId: schema.pushTokens.deviceId, token: schema.pushTokens.token })
       .from(schema.pushTokens)
-      .where(and(eq(schema.pushTokens.familyId, familyId), ...(skipDevice ? [ne(schema.pushTokens.deviceId, skipDevice)] : [])));
+      .where(
+        and(
+          eq(schema.pushTokens.familyId, familyId),
+          eq(schema.pushTokens.platform, 'android'),
+          ...(skipDevice ? [ne(schema.pushTokens.deviceId, skipDevice)] : []),
+        ),
+      );
     if (!tokens.length) return 0;
 
-    // Data-only: no title or body, so nothing is shown; iOS needs content-available to wake the app.
-    const messages = tokens.map((t) => ({ to: t.token, data: { kind: 'sync' }, priority: 'high', _contentAvailable: true }));
-    const res = await fetch(this.config.push.url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        ...(this.config.push.accessToken ? { authorization: `Bearer ${this.config.push.accessToken}` } : {}),
-      },
-      body: JSON.stringify(messages),
-    });
-    if (!res.ok) throw new Error(`Expo push service answered ${res.status}`);
-    const { data: tickets = [] } = (await res.json()) as { data?: ExpoTicket[] };
+    const access = await this.accessToken(fcm);
+    const results = await Promise.all(
+      tokens.map(async (t) => {
+        // Data-only and high priority: nothing is shown, and Android lets the app run its task right away.
+        const res = await fetch(fcm.sendUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${access}` },
+          body: JSON.stringify({ message: { token: t.token, data: { kind: 'sync' }, android: { priority: 'high' } } }),
+        });
+        if (res.ok) return { ...t, sent: true, gone: false };
+        // 404: the app was uninstalled or the token expired. 400: the message is always the same, so it's the
+        // token (e.g. an Expo token from an older app, or garbage). Either way it's of no use any more.
+        if (res.status !== 404 && res.status !== 400) console.warn(`FCM answered ${res.status}`, await res.text().catch(() => ''));
+        return { ...t, sent: false, gone: res.status === 404 || res.status === 400 };
+      }),
+    );
 
-    // Tokens of uninstalled apps are dropped so we stop sending to them.
-    const gone = tokens.filter((_, i) => tickets[i]?.details?.error === 'DeviceNotRegistered').map((t) => t.deviceId);
+    const gone = results.filter((r) => r.gone).map((r) => r.deviceId);
     if (gone.length) await this.db.delete(schema.pushTokens).where(inArray(schema.pushTokens.deviceId, gone));
-    return tokens.length;
+    return results.filter((r) => r.sent).length;
+  }
+
+  /** An OAuth access token for FCM, from a JWT signed with the service-account key; reused until shortly before it expires. */
+  private async accessToken(fcm: FcmConfig): Promise<string> {
+    if (this.access && this.access.expiresAt > Date.now() + 5 * 60_000) return this.access.token;
+    const now = Math.floor(Date.now() / 1000);
+    const b64 = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
+    const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({
+      iss: fcm.clientEmail,
+      scope: 'https://www.googleapis.com/auth/firebase.messaging',
+      aud: fcm.tokenUri,
+      iat: now,
+      exp: now + 3600,
+    })}`;
+    const signature = createSign('RSA-SHA256').update(unsigned).sign(fcm.privateKey, 'base64url');
+    const res = await fetch(fcm.tokenUri, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${signature}` }),
+    });
+    if (!res.ok) throw new Error(`Google OAuth answered ${res.status}: ${await res.text().catch(() => '')}`);
+    const { access_token, expires_in } = (await res.json()) as { access_token: string; expires_in: number };
+    this.access = { token: access_token, expiresAt: Date.now() + expires_in * 1000 };
+    return access_token;
   }
 }
 
@@ -104,7 +139,8 @@ export class PushController {
   @Put('token')
   @HttpCode(204)
   async register(@Auth() auth: AuthContext, @Body() body: unknown) {
-    await this.push.register(auth, parse(RegisterPushSchema, body).token);
+    const { token, platform } = parse(RegisterPushSchema, body);
+    await this.push.register(auth, token, platform);
   }
 
   @Delete('token')

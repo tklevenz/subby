@@ -146,8 +146,8 @@ export type PullResponse = { records: (z.infer<typeof SyncRecordSchema> & { seq:
 
 // --- push (hosted) -------------------------------------------------------------------------------------
 
-/** PUT /v1/push/token: this phone's Expo push token. `GET /v1/info` says whether the server sends pushes. */
-export const RegisterPushSchema = z.object({ token: z.string().min(1).max(256) });
+/** PUT /v1/push/token: this phone's own push token (FCM on Android, APNs on iOS). `GET /v1/info` says whether the server sends pushes. */
+export const RegisterPushSchema = z.object({ token: z.string().min(1).max(4096), platform: z.enum(['android', 'ios']).default('android') });
 
 // --- live (WebSocket /v1/live?token=) -----------------------------------------------------------------
 
