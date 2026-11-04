@@ -31,7 +31,9 @@ export default function NightForm({ night }: { night: Night }) {
   const first = night.pieces[0]!;
   const [bedtime, setBedtime] = useState(night.start);
   const [wakeUp, setWakeUp] = useState(night.end!);
-  const [wakings, setWakings] = useState<Waking[]>(night.wakings);
+  // Pieces that touch (edited to meet) make a waking of no length: left out, so saving joins them.
+  const [initialWakings] = useState(() => night.wakings.filter((w) => w.end > w.start));
+  const [wakings, setWakings] = useState<Waking[]>(initialWakings);
   const [payload, setPayload] = useState<PayloadOf<'sleep'>>(first.payload);
   // The editors are shared by every type; this one only ever gets a sleep's fields.
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...(p as Partial<PayloadOf<'sleep'>>) }));
@@ -51,7 +53,7 @@ export default function NightForm({ night }: { night: Night }) {
   const changed =
     bedtime !== night.start ||
     wakeUp !== night.end ||
-    JSON.stringify(wakings) !== JSON.stringify(night.wakings) ||
+    JSON.stringify(wakings) !== JSON.stringify(initialWakings) ||
     JSON.stringify(payload) !== JSON.stringify(first.payload);
 
   const setWaking = (i: number, w: Partial<Waking>) => setWakings((cur) => cur.map((x, j) => (j === i ? { ...x, ...w } : x)));

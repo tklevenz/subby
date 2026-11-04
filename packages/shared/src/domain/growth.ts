@@ -55,6 +55,7 @@ export function growthPercentile(
   value: number,
 ): number | null {
   if (sex !== 'male' && sex !== 'female') return null;
+  if (!(value > 0)) return null; // the LMS formula takes a log: no percentile for 0 or less
   const lms = lmsAt(measure, sex, months);
   return lms ? normalCdf(zScore(value, lms)) * 100 : null;
 }

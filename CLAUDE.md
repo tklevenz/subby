@@ -68,8 +68,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - The file is a zip (`fflate`) holding `backup.json` (children, entries and tombstones) plus `photos/<n>.<ext>`. Photo names are ours, never taken from row data. Device-local fields stay out: photo paths, `photoBlob`, sync status.
     - An optional passphrase encrypts it: `KLBK` header with scrypt parameters and salt, then `encryptFile`. The parameters are read from the header and bounded (≤ 64 MiB of scrypt memory).
     - Reading unzips only `backup.json` and `photos/<n>.<ext>`, and refuses a zip that would inflate past its size + 64 MiB.
-    - `readBackup` validates each row and skips (and counts) bad ones; payloads are checked for shape only.
-    - `planRestore` uses newest-edit-wins, like sync.
+    - `readBackup` validates each row and skips (and counts) bad ones; payloads are checked with `LenientPayloadSchema` (log.schema: each known field's primitive type and required fields, no value checks, unknown fields pass).
+    - `planRestore` uses newest-edit-wins, like sync, after keeping one version per row (the newest, live or deleted).
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
 
 ### `apps/mobile`
@@ -114,7 +114,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - The cache copy is deleted afterwards.
     - Restore: pick a file with `File.pickFileAsync` (no document-picker package), preview, then merge in one transaction. Restored rows are `pending`, so they sync.
     - An import ref already used by another row here is dropped from the restored row.
-  - `app/entry/[id].tsx`: edit/backdate any entry. A finished night sleep opens as its whole night (`components/NightForm`): bedtime, wake-up, the wakings (add, edit, remove), notes; saving reuses the pieces in order, adds or deletes the rest (a removed waking joins two pieces; their notes and tags move to the first). Mostly used the morning after: log the night as one, split it later.
+  - `app/entry/[id].tsx`: edit/backdate any entry. A finished night sleep opens as its whole night (`components/NightForm`): bedtime, wake-up, the wakings (add, edit, remove), notes; saving reuses the pieces in order, adds or deletes the rest (a removed waking joins two pieces; their notes and tags move to the first). Pieces that touch (a zero-length waking) open without that waking, so saving joins them. Mostly used the morning after: log the night as one, split it later.
   - `app/child/new.tsx`: add a child (modal). It shows `PremiumGate` instead once the free limit is reached.
   - **Premium gates** (`isPremium` stub; dev toggle in Settings):
     - More than `FREE_CHILD_LIMIT` (1) children. This is checked by `useCanAddChild` in the UI and enforced again in `useChildStore.addChild`.
@@ -132,6 +132,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
   - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags; sleep, pumping and activity: the start defaults to now and the end is empty; Save needs an end (a past one), "Start timer" runs from the chosen start), `AddLogSheet` (grid of `LOG_TILE_KEYS`: every type, with Tummy time as its own tile; `logTile` in `logTypes.tsx`), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes; Wet is blue, Dirty brown, Both neutral with both icons). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
+  - `useSingleFlight`: wrap a sheet's log/save/start handlers in it, so a double tap doesn't log twice.
   - `brand/`: the moon sub from the app icon (`Sub`, `RestingSub`, `SubTile` (onboarding), `SubMono` (one color, portholes cut out: Settings footer, Growth image), `Wordmark` (Fredoka SemiBold, embedded by the `expo-font` plugin from `@expo-google-fonts/fredoka`; Android names it by file, iOS by PostScript name); colors `sub*` and `seaFloor` in the palette), drawn with react-native-svg and animated with Reanimated. They stand still with reduced motion. Use these, not `ActivityIndicator`:
     - `SubLoader` (bobbing, bubbles): general waits without a known total.
     - `PeriscopeLoader`: waiting on the other phone (creating a code, adding, joining).
@@ -146,7 +147,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - A value past `maximumDate` saves as the maximum.
 - **Reminders (`features/reminders/scheduler.ts`):** expo-notifications, local only. `useReminderSync` (in `_layout`) re-plans on log/child/settings changes and app foreground, debounced and serialized. Reminder settings are device-local (`settings.reminders`), not the synced `reminders` table, which is still unused. Kinds: feed, diaper and pumping intervals, medication due, nap/bedtime, and forgotten timers. Not a reminder: "When another phone logs a sleep" (Settings → Notifications, its own switch, `settings.familyAlerts`; only with Sync). `features/reminders/family.ts`: `notifyFamily` runs after each sync run, headless too, on the entries other phones wrote; off by default, so each phone opts in and a grandparent's stays quiet; timely only with push. A master `enabled` switch also appears in Settings. Tapping a notification switches to that child; forgotten-timer reminders also open the entry. expo-notifications is `require`d lazily and skipped in Expo Go on Android (it crashes on import there); `remindersAvailable` is false in that case. Never import it statically.
 - **Baby Buddy import (`features/import/babybuddy/`):**
-  - `client.ts`: read-only REST client (token auth, paging; rewrites `next` links to the user's base URL).
+  - `client.ts`: read-only REST client (token auth, paging: only the offset is taken from `next` (`nextOffset`), and it must move forward, so the token never follows a link elsewhere).
   - `importer.ts`: `previewImport` (counts, children, unit detection) and `runImport` (one transaction per page, `onConflictDoNothing` on `import_ref`, so re-runs only add new records and never overwrite local edits).
   - The API key is never persisted. Only `settings.bbUrl` is remembered.
   - Opt-in tests that hit real data (kept outside the repo): `BB_DUMP=<all.json> pnpm --filter @kindred-log/shared test`, `BB_URL=… BB_TOKEN=… npx vitest run client` in `apps/mobile`.
@@ -155,7 +156,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
   - `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
     - `isValidBody` checks every pulled body before `applyPage` writes it; malformed records are skipped.
-    - Payloads are checked for shape only, so unusual values from another phone still sync. All rows of the real Baby Buddy history pass.
+    - Payloads are checked with `LenientPayloadSchema` (field types, not values), so unusual values from another phone still sync, but nothing a screen would crash on. It accepts everything the strict schema does; all rows of the real Baby Buddy history pass. A refused record is skipped for good (`lastSeq` moves on), so keep it lenient.
   - **Photos** (`photos.ts`): a photo syncs as an encrypted blob with its own key; the reference `photoBlob: {id, key}` sits in the encrypted record (`children.photo_blob`, note `payload.photoBlob`), and `photoUri` stays this device's file.
     - Stores clear `photoBlob` whenever `photoUri` changes; `uploadPhotos` (before each push) uploads rows with a file but no reference, without bumping their version.
     - `downloadPhotos` (after each pull) fetches references without a local file into `photos/<blobId>.jpg` (only UUID ids; the id comes from another phone's record); a pulled version pointing at another blob drops (and deletes) the local copy.
@@ -213,14 +214,15 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Records must be written as the calling device.
   - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
   - `push/token` (PUT/DELETE, `{token, platform}`): kept only with `PUSH=fcm` (the default for `MODE=hosted`; needs `FCM_SERVICE_ACCOUNT`, a Firebase service-account key, mounted from `./secrets` in Docker). After accepted writes, `PushService` sends the family's other Android phones a data-only, high-priority `{kind: 'sync'}` message straight to FCM HTTP v1 (coalesced over 2 s; OAuth token from a JWT signed with the key via `node:crypto`, cached for the hour). Tokens are dropped on FCM 404/400 or when the device is removed. iOS tokens are stored but not sent to yet (APNs is a TODO). Push only reaches app builds made with the same Firebase project. `/v1/info` reports `push`.
-- **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, and grant. They can't sync or rotate.
+- **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, and grant, only to a phone the recovery key added (grants are first-come). They can't sync or rotate.
 - **Code conventions:**
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
   - `lockFamily(tx, id)` serializes writes per family.
 - **Single-instance assumptions:** auth challenges and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
 - **Housekeeping** (`common/housekeeping.ts`, hourly): deletes expired sessions and invites more than a day past expiry.
 - **Shutdown:** Fastify runs with `forceCloseConnections: true`, and `LiveGateway` terminates its sockets on destroy. Otherwise a connection that never sent a request (or a closing WebSocket) holds a restart for up to the 60 s header timeout; that was the flaky e2e teardown.
-- **Query parameters:** numbers are parsed with `queryInt` (whole numbers only, otherwise 400).
+- **Query parameters:** numbers are parsed with `queryInt` (whole numbers only, at most a 32-bit integer unless a larger `max` is given, otherwise 400).
+- **Input bounds** (`protocol.ts`): base64url fields are length-capped and refuse lengths that can't decode (4n+1); epochs and log indexes fit 32 bits; grant and rotate lists are capped. Auth challenges are capped in memory (oldest dropped); live sockets have a 4 KB message limit and aren't tracked if they closed during auth.
 - **Modes:** `MODE=self|hosted`. `Entitlements.canSync` is the hook for the hosted subscription (a stub for now).
 - **Commands** (in `apps/server`):
   - `pnpm db:up`: dev Postgres on port **54329** via `docker-compose.dev.yml`.

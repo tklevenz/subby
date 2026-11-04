@@ -9,6 +9,7 @@ import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { COLOR_SWATCH } from '../editors';
 import { Button } from '../ui';
 import { colors } from '../../theme/colors';
+import { useSingleFlight } from '../useSingleFlight';
 
 type Condition = 'wet' | 'dirty' | 'both';
 type DiaperColor = (typeof DIAPER_COLORS)[number];
@@ -45,10 +46,11 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(t);
   }, [logged, onClose]);
 
-  const log = async (condition: Condition) => {
+  const once = useSingleFlight();
+  const log = once(async (condition: Condition) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setLogged(await addLog({ type: 'diaper', condition }));
-  };
+  });
 
   if (!logged || logged.payload.type !== 'diaper') {
     return (

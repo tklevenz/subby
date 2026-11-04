@@ -38,7 +38,7 @@ export default function EntryScreen() {
   if (entry === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
   if (!entry) return <Stack.Screen options={{ title: 'Entry not found' }} />;
   // A finished night sleep opens as its whole night (with its wakings); anything else as itself.
-  return isSleepEntry(entry) && entry.endedAt !== null && !isNap(entry) ? <NightLoader entry={entry} /> : <EntryForm entry={entry} />;
+  return isSleepEntry(entry) && entry.endedAt !== null && !isNap(entry) ? <NightLoader key={entry.id} entry={entry} /> : <EntryForm key={entry.id} entry={entry} />;
 }
 
 function NightLoader({ entry }: { entry: LogEntry }) {
@@ -61,7 +61,9 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const [payload, setPayload] = useState<LogPayload>(entry.payload);
   const [startedAt, setStartedAt] = useState(entry.startedAt);
   const [endedAt, setEndedAt] = useState<number | null>(entry.endedAt);
-  const timed = TIMED_LOG_TYPES.includes(entry.logType);
+  // A bottle or solids feed logged as a moment (it ends when it starts): moving its time moves both.
+  const instant = entry.endedAt === entry.startedAt && payload.type === 'feed' && payload.method !== 'breast';
+  const timed = TIMED_LOG_TYPES.includes(entry.logType) && !instant;
   const running = timed && endedAt === null;
   const invalid = endedAt !== null && endedAt < startedAt;
   const overlap = useSleepOverlap(entry.logType === 'sleep', startedAt, endedAt, entry.id);
@@ -97,7 +99,15 @@ function EntryForm({ entry }: { entry: LogEntry }) {
       <Stack.Screen options={{ title }} />
 
       <FieldLabel>{timed ? 'Started' : 'Time'}</FieldLabel>
-      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} title="Start time" />
+      <DateTimeField
+        value={startedAt}
+        onChange={(t) => {
+          setStartedAt(t);
+          if (instant) setEndedAt(t);
+        }}
+        maximumDate={new Date()}
+        title="Start time"
+      />
 
       {timed ? (
         <>

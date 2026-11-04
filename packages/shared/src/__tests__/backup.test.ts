@@ -115,4 +115,19 @@ describe('backup', () => {
     const fresh = planRestore(backup, { children: new Map(), logs: new Map() });
     expect([fresh.children.length, fresh.logs.length, fresh.deletions.length, fresh.unchanged]).toEqual([1, 2, 0, 0]);
   });
+
+  it('takes only the newest version of a row a (hand-edited) backup has twice', () => {
+    const { backup } = readBackup(build());
+    const live = backup.logs[0]!;
+    const tomb = (updatedAt: number) => ({ kind: 'log' as const, id: live.id, updatedAt });
+    const local = { children: new Map(), logs: new Map([[live.id, { updatedAt: live.updatedAt - 10, isDeleted: false }]]) };
+    // A newer tombstone wins over the entry: deleted, not restored.
+    const deleted = planRestore({ ...backup, deleted: [tomb(live.updatedAt + 1)] }, local);
+    expect(deleted.logs.map((l) => l.id)).not.toContain(live.id);
+    expect(deleted.deletions.map((d) => d.id)).toEqual([live.id]);
+    // An older one loses: restored, not deleted afterwards.
+    const restored = planRestore({ ...backup, deleted: [tomb(live.updatedAt - 1)], logs: [...backup.logs, { ...live, updatedAt: live.updatedAt - 5 }] }, local);
+    expect(restored.logs.filter((l) => l.id === live.id)).toEqual([live]);
+    expect(restored.deletions).toEqual([]);
+  });
 });

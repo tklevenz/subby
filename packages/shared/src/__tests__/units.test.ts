@@ -12,6 +12,8 @@ describe('units', () => {
     expect(formatVolume(120, 'imperial')).toBe('4.1 oz');
     expect(formatWeight(3450, 'metric')).toBe('3.45 kg');
     expect(formatWeight(850, 'metric')).toBe('850 g');
+    expect(formatWeight(999.6, 'metric')).toBe('1 kg');
+    expect(formatWeight(906, 'imperial')).toBe('2 lb 0 oz');
     expect(formatWeight(3450, 'imperial')).toBe('7 lb 9.7 oz');
     expect(formatTemperature(37, 'imperial')).toBe('98.6 °F');
   });

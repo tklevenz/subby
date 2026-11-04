@@ -135,8 +135,14 @@ export async function restoreBackup(contents: BackupContents, plan: RestorePlan)
         for (const r of tx.select({ id: schema.childrenTable.id, ref: schema.childrenTable.importRef }).from(schema.childrenTable).where(inArray(schema.childrenTable.importRef, refs)).all()) taken.set(r.ref!, r.id);
         for (const r of tx.select({ id: schema.logsTable.id, ref: schema.logsTable.importRef }).from(schema.logsTable).where(inArray(schema.logsTable.importRef, refs)).all()) taken.set(r.ref!, r.id);
       }
-      const ownRef = <T extends { id: string; importRef: string | null }>(row: T): T =>
-        row.importRef && taken.has(row.importRef) && taken.get(row.importRef) !== row.id ? { ...row, importRef: null } : row;
+      // The first restored row with a ref claims it too, so two in one backup can't break the unique index.
+      const ownRef = <T extends { id: string; importRef: string | null }>(row: T): T => {
+        if (!row.importRef) return row;
+        const owner = taken.get(row.importRef);
+        if (owner !== undefined && owner !== row.id) return { ...row, importRef: null };
+        taken.set(row.importRef, row.id);
+        return row;
+      };
 
       for (const c of children.map(ownRef)) {
         const old = tx.select({ photoUri: schema.childrenTable.photoUri }).from(schema.childrenTable).where(eq(schema.childrenTable.id, c.id)).get();

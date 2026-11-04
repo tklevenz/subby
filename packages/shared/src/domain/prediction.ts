@@ -80,8 +80,9 @@ export function wakeWindows(logs: LogEntry[], since: number): WakeWindow[] {
   for (let i = 1; i < sleeps.length; i++) {
     const prev = sleeps[i - 1];
     const cur = sleeps[i];
-    index = isNap(prev) ? index + 1 : 0;
     const gap = cur.startedAt - prev.endedAt!;
+    // A gap over 10 h is a night that wasn't logged: the count of naps starts again.
+    index = isNap(prev) && gap <= 10 * H ? index + 1 : 0;
     if (cur.startedAt < since || gap <= 0 || gap > 10 * H) continue;
     out.push({ index, minutes: gap / MIN, beforeNight: !isNap(cur) });
   }
@@ -90,7 +91,9 @@ export function wakeWindows(logs: LogEntry[], since: number): WakeWindow[] {
 
 /** Minutes after local midnight; evening bedtimes after midnight count as 24 h+. */
 function clockMinutes(t: number, wrapBefore = 12 * 60): number {
-  const m = (t - startOfDay(t)) / MIN;
+  // The wall clock, not time since midnight (an hour off on DST days).
+  const d = new Date(t);
+  const m = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / MIN;
   return m < wrapBefore ? m + 24 * 60 : m;
 }
 
@@ -144,11 +147,12 @@ export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabit
   const napLengths = new Map<number, number[]>();
   let idx = 0;
   let prevWasNight = true;
+  let prevEnd = -Infinity;
   for (const s of recent) {
-    if (!isNap(s)) {
-      prevWasNight = true;
-      continue;
-    }
+    // Over 10 h since the last sleep: a night that wasn't logged.
+    if (!isNap(s) || s.startedAt - prevEnd > 10 * H) prevWasNight = true;
+    prevEnd = s.endedAt!;
+    if (!isNap(s)) continue;
     idx = prevWasNight ? 0 : idx + 1;
     prevWasNight = false;
     napLengths.set(idx, [...(napLengths.get(idx) ?? []), (s.endedAt! - s.startedAt) / MIN]);
@@ -208,7 +212,13 @@ function blend(personal: number | null | undefined, norms: AgeNorms): { center: 
 }
 
 /** Clock time (minutes after midnight, may exceed 24 h) on the day of `ref`. */
-const atClock = (ref: number, minutes: number) => addDays(startOfDay(ref), Math.floor(minutes / 1440)) + (minutes % 1440) * MIN;
+const atClock = (ref: number, minutes: number) => {
+  // Set on the wall clock (adding minutes to midnight is an hour off on DST days).
+  const d = new Date(addDays(startOfDay(ref), Math.floor(minutes / 1440)));
+  const m = minutes % 1440;
+  d.setHours(Math.floor(m / 60), Math.floor(m % 60), Math.round(((m % 1) * MIN) / 1000));
+  return d.getTime();
+};
 
 /**
  * Whether being awake after `night` (a night sleep, merged) is still a night waking at `now`: it ended at least
@@ -254,8 +264,12 @@ export function predictNextSleep(
 
   // Which nap comes next today: count naps since the last night sleep.
   const sorted = completedSleeps(sleeps);
+  // A gap over 10 h between naps is a night that wasn't logged: yesterday's naps don't count.
   let napIndex = 0;
-  for (let i = sorted.length - 1; i >= 0 && isNap(sorted[i]); i--) napIndex++;
+  for (let i = sorted.length - 1; i >= 0 && isNap(sorted[i]); i--) {
+    napIndex++;
+    if (i > 0 && sorted[i].startedAt - sorted[i - 1].endedAt! > 10 * H) break;
+  }
 
   const napsPerDay = habits.napsPerDay ?? norms.naps;
   const nap = blend(habits.napWindows.get(napIndex), norms);

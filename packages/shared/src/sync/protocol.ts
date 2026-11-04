@@ -6,23 +6,35 @@ import { RECORD_KINDS } from './envelope';
  * Every value the server stores is either public key material, a signature, or ciphertext.
  */
 
-const b64 = z.string().regex(/^[A-Za-z0-9_-]*$/, 'Expected base64url');
+/**
+ * base64url, at most `max` characters (keys, signatures and sealed keys are far shorter than the default). A length
+ * of 4n+1 can't be decoded, so it's refused here rather than failing later.
+ */
+const b64Of = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .regex(/^[A-Za-z0-9_-]*$/, 'Expected base64url')
+    .refine((s) => s.length % 4 !== 1, 'Not valid base64url');
+const b64 = b64Of(1024);
+/** Postgres integer columns (epochs, log indexes) hold 32 bits. */
+const int32 = z.number().int().nonnegative().max(2 ** 31 - 1);
 const uuid = z.uuid();
 /** Who a sealed family key is for: a device id, or the recovery key. */
 export const recipient = z.union([uuid, z.literal('recovery')]);
 
 export const DeviceLogEntrySchema = z.object({
-  index: z.number().int().nonnegative(),
-  prev: z.string(),
+  index: int32,
+  prev: z.string().max(128),
   type: z.enum(['create', 'add', 'remove', 'setRecovery', 'epoch']),
   deviceId: recipient,
   signKey: b64.nullable(),
   boxKey: b64.nullable(),
-  epoch: z.number().int().positive().nullable(),
+  epoch: int32.positive().nullable(),
   keyHash: b64.nullable(),
-  closedSeq: z.number().int().nonnegative().nullable().optional(),
+  closedSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   signer: recipient,
-  at: z.number().int(),
+  at: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   sig: b64,
 });
 
@@ -74,7 +86,7 @@ export type KeysResponse = {
 /** POST /v1/keys/grant: give a new member (or the recovery key) all existing epochs. */
 export const GrantKeysSchema = z.object({
   recipient,
-  keys: z.array(z.object({ epoch: z.number().int().positive(), sealed: b64 })).min(1),
+  keys: z.array(z.object({ epoch: int32.positive(), sealed: b64 })).min(1).max(10_000),
 });
 
 /**
@@ -83,7 +95,7 @@ export const GrantKeysSchema = z.object({
  */
 export const RotateKeysSchema = z.object({
   entry: DeviceLogEntrySchema,
-  sealed: z.record(recipient, b64),
+  sealed: z.record(recipient, b64).refine((r) => Object.keys(r).length <= 1000, 'Too many recipients'),
 });
 
 // --- invites (pairing) --------------------------------------------------------------------------------
@@ -128,11 +140,11 @@ export const UNLINKED_BLOB_TTL_MS = 24 * 60 * 60 * 1000;
 export const SyncRecordSchema = z.object({
   id: uuid,
   kind: z.enum(RECORD_KINDS),
-  epoch: z.number().int().positive(),
-  updatedAt: z.number().int().nonnegative(),
+  epoch: int32.positive(),
+  updatedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   deviceId: uuid,
   deleted: z.boolean(),
-  data: b64.max(Math.ceil((MAX_RECORD_DATA * 4) / 3)).nullable(),
+  data: b64Of(Math.ceil((MAX_RECORD_DATA * 4) / 3)).nullable(),
   blobs: z.array(uuid).max(MAX_RECORD_BLOBS).optional(),
 });
 

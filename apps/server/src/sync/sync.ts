@@ -110,6 +110,6 @@ export class SyncController {
 
   @Get('pull')
   pull(@Auth() auth: AuthContext, @Query('since') since?: string, @Query('limit') limit?: string) {
-    return this.sync.pull(auth, queryInt(since, 0), Math.min(Math.max(1, queryInt(limit, PULL_LIMIT)), PULL_LIMIT));
+    return this.sync.pull(auth, queryInt(since, 0, Number.MAX_SAFE_INTEGER), Math.min(Math.max(1, queryInt(limit, PULL_LIMIT)), PULL_LIMIT));
   }
 }

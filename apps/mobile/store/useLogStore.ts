@@ -117,9 +117,10 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   startTimer: (payload, startedAt) => get().addLog(payload, { startedAt, endedAt: null }),
 
-  stopTimer: (id, patch = {}) => {
+  stopTimer: async (id, patch = {}) => {
     const now = Date.now();
-    const current = get().logs.find((l) => l.id === id);
+    // From SQLite too: a running feed of a child whose entries aren't loaded must still get its side's time.
+    const current = await get().getLog(id);
     // Breastfeeding: fold the running side's elapsed time into its total.
     const payload = current?.payload.type === 'feed'
       ? pauseFeed({ ...current.payload, ...(patch.payload as Partial<PayloadOf<'feed'>>) }, now)
@@ -160,7 +161,8 @@ export const useLogStore = create<LogState>((set, get) => ({
     set((state) => {
       // Keep the in-memory window consistent: an entry may move into or out of it.
       const others = state.logs.filter((l) => l.id !== id);
-      const inWindow = updated.childId === state.activeChildId && updated.startedAt >= state.loadedSince;
+      // Running timers are always loaded, however old (see loadLogs).
+      const inWindow = updated.childId === state.activeChildId && (updated.startedAt >= state.loadedSince || (updated.endedAt === null && TIMED_LOG_TYPES.includes(updated.logType)));
       return {
         logs: inWindow ? [...others, updated].sort(byStartedDesc) : others,
         revision: state.revision + 1,

@@ -18,6 +18,7 @@ describe('WHO LMS', () => {
     expect(lmsAt('headCm', 'male', 3.5)![1]).toBeCloseTo((a[1] + b[1]) / 2, 9);
     expect(lmsAt('headCm', 'male', 25)).toBeNull();
     expect(growthPercentile('weightKg', 'other', 3, 6)).toBeNull();
+    expect(growthPercentile('weightKg', 'female', 3, 0)).toBeNull();
   });
 
   it('normal CDF', () => {

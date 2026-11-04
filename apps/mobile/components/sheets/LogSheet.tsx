@@ -9,6 +9,7 @@ import { PayloadEditor } from '../editors';
 import { TagsField } from '../editors/fields';
 import { defaultPayload } from '../logTypes';
 import { Button, FieldLabel, TextField } from '../ui';
+import { useSingleFlight } from '../useSingleFlight';
 
 /** Types logged with a start and an end here, or started as a live timer from the chosen start. */
 const TIMED: readonly LogType[] = ['sleep', 'pumping', 'activity'];
@@ -86,18 +87,19 @@ export default function LogSheet({
     return undefined; // addLog's default for the type
   })();
 
-  const save = async () => {
+  const once = useSingleFlight();
+  const save = once(async () => {
     await addLog(payload, { startedAt, endedAt });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
-  };
+  });
 
   // A timer from the chosen start time (now unless changed), e.g. for a nap that began a few minutes ago.
-  const start = async () => {
+  const start = once(async () => {
     await startTimer(payload, startedAt);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
-  };
+  });
 
   return (
     <>

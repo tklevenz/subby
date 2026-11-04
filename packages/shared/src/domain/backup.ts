@@ -5,7 +5,7 @@ import { bytesToJson, concatBytes, jsonToBytes, utf8ToBytes } from '../crypto/by
 import { decryptFile, encryptFile } from '../crypto/files';
 import { randomBytes } from '../crypto/random';
 import { ChildSchema, type Child } from '../schemas/child.schema';
-import { LogEntrySchema, LogTypeSchema, type LogEntry, type LogPayload } from '../schemas/log.schema';
+import { LenientPayloadSchema, LogEntrySchema, type LogEntry, type LogPayload } from '../schemas/log.schema';
 
 /**
  * A full backup of a phone's data: every child and entry (tombstones too, so a restore doesn't bring back
@@ -96,10 +96,10 @@ const photoRef = z.string().regex(/^photos\/\d+\.[a-z0-9]{1,5}$/).optional();
 
 const BackupChildSchema = ChildSchema.omit({ photoUri: true, photoBlob: true, syncStatus: true, isDeleted: true }).extend({ photo: photoRef });
 
-// The payload is checked for its shape only (an object of the entry's type): a backup must restore what the
-// app stored, even values a stricter schema would reject. Photo fields are device-local and dropped.
+// The payload is checked leniently (field types, not values): a backup must restore what the app stored, even
+// values a stricter schema would reject, but nothing a screen would crash on. Photo fields are device-local and dropped.
 const BackupLogSchema = LogEntrySchema.omit({ syncStatus: true, isDeleted: true, payload: true })
-  .extend({ payload: z.object({ type: LogTypeSchema }).loose(), photo: photoRef })
+  .extend({ payload: LenientPayloadSchema, photo: photoRef })
   .refine((l) => l.payload.type === l.logType, 'payload type differs from logType');
 
 const TombstoneSchema = z.object({ kind: z.enum(['child', 'log']), id: z.uuid(), updatedAt: z.number().int() });
@@ -222,12 +222,39 @@ export type RestorePlan = {
   unchanged: number;
 };
 
+/**
+ * One version per row: the newest, whether live or deleted. Ours never has two, but a hand-edited file could, and
+ * the restore must not apply an older tombstone after a newer entry, or the other way round.
+ */
+function latestOnly(backup: Backup): Backup {
+  const newest = new Map<string, number>();
+  const note = (key: string, updatedAt: number) => newest.set(key, Math.max(newest.get(key) ?? -Infinity, updatedAt));
+  for (const c of backup.children) note(`child:${c.id}`, c.updatedAt);
+  for (const l of backup.logs) note(`log:${l.id}`, l.updatedAt);
+  for (const t of backup.deleted) note(`${t.kind}:${t.id}`, t.updatedAt);
+  // Ties go to the tombstone (it's the later state of the same edit), and only the first of equal copies stays.
+  const kept = new Set<string>();
+  const keep = (key: string, updatedAt: number) => {
+    if (kept.has(key) || newest.get(key) !== updatedAt) return false;
+    kept.add(key);
+    return true;
+  };
+  const deleted = backup.deleted.filter((t) => keep(`${t.kind}:${t.id}`, t.updatedAt));
+  return {
+    ...backup,
+    deleted,
+    children: backup.children.filter((c) => keep(`child:${c.id}`, c.updatedAt)),
+    logs: backup.logs.filter((l) => keep(`log:${l.id}`, l.updatedAt)),
+  };
+}
+
 /** What a restore would change, given the local versions (live and deleted rows) by id. */
 export function planRestore(
   backup: Backup,
   local: { children: ReadonlyMap<string, { updatedAt: number; isDeleted: boolean }>; logs: ReadonlyMap<string, { updatedAt: number; isDeleted: boolean }> },
 ): RestorePlan {
   const plan: RestorePlan = { children: [], logs: [], deletions: [], unchanged: 0 };
+  backup = latestOnly(backup);
   for (const c of backup.children) {
     if (backupWins(local.children.get(c.id), c)) plan.children.push(c);
     else plan.unchanged++;

@@ -24,8 +24,9 @@ export function formatVolume(ml: number, system: UnitSystem): string {
 }
 
 export function formatWeight(g: number, system: UnitSystem): string {
-  if (system === 'metric') return g >= 1000 ? `${round(g / 1000, 2)} kg` : `${Math.round(g)} g`;
-  const totalOz = g / G_PER_OZ;
+  // Rounded before splitting, so 999.6 g is "1 kg" and 31.96 oz is "2 lb 0 oz", never "1000 g" or "1 lb 16 oz".
+  if (system === 'metric') return Math.round(g) >= 1000 ? `${round(g / 1000, 2)} kg` : `${Math.round(g)} g`;
+  const totalOz = round(g / G_PER_OZ, 1);
   const lb = Math.floor(totalOz / 16);
   const oz = round(totalOz - lb * 16, 1);
   return lb > 0 ? `${lb} lb ${oz} oz` : `${oz} oz`;

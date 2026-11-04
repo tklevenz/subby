@@ -124,6 +124,38 @@ export const LogPayloadSchema = z.discriminatedUnion('type', [
   NotePayloadSchema,
 ]);
 
+/**
+ * For data from elsewhere (other phones, backups): each known field has the right primitive type (a string, a
+ * number, a list of strings…), and required ones are there, so screens can rely on them; values aren't checked
+ * (enums are any string, no ranges or minimums, null counts as missing) and unknown fields pass, so nothing
+ * unusual that a phone stored, or a newer app, gets dropped.
+ */
+export const LenientPayloadSchema = z.discriminatedUnion(
+  'type',
+  LogPayloadSchema.options.map((schema) =>
+    z.object(Object.fromEntries(Object.entries(schema.shape).map(([key, field]) => [key, loosen(field as z.ZodType)]))).loose(),
+  ) as unknown as [z.ZodObject, ...z.ZodObject[]],
+);
+
+function loosen(field: z.ZodType): z.ZodType {
+  const def = field.def as { type: string; innerType?: z.ZodType; element?: z.ZodType };
+  switch (def.type) {
+    case 'optional':
+      return loosen(def.innerType!).nullish();
+    case 'string':
+    case 'enum':
+      return z.string();
+    case 'number':
+      return z.number();
+    case 'boolean':
+      return z.boolean();
+    case 'array':
+      return z.array(loosen(def.element!));
+    default:
+      return field; // the type literal, and objects (a photo reference) as they are
+  }
+}
+
 export const LOG_TYPES = [
   'diaper', 'feed', 'sleep', 'pumping', 'growth', 'temperature',
   'medication', 'potty', 'activity', 'milestone', 'note',

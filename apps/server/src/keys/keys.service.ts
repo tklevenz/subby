@@ -47,6 +47,13 @@ export class KeysService {
     await this.db.transaction(async (tx) => {
       const family = await lockFamily(tx, auth.familyId);
       await this.assertRecipient(tx, auth.familyId, recipient, family.recoverySignKey !== null);
+      // The recovery key only grants to the phone it added (recovering a family). Grants are first-come, so leaked
+      // words must not be able to hand other members or itself keys that don't open, before a phone grants real ones.
+      if (auth.deviceId === RECOVERY) {
+        const log = await tx.select({ entry: schema.deviceLog.entry }).from(schema.deviceLog).where(eq(schema.deviceLog.familyId, auth.familyId));
+        const addedByRecovery = log.some(({ entry: e }) => e.type === 'add' && e.deviceId === recipient && e.signer === RECOVERY);
+        if (!addedByRecovery) throw new ForbiddenException('The recovery key only grants to the phone it added');
+      }
       if (keys.some((k) => k.epoch > family.currentEpoch)) throw new BadRequestException('Unknown epoch');
       for (const k of keys) {
         await tx

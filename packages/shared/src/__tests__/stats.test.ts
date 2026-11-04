@@ -53,7 +53,7 @@ describe('sleepSegments', () => {
 describe('solidsReport', () => {
   it('merges foods case-insensitively and collects reactions', () => {
     const r = solidsReport([
-      entry({ type: 'feed', method: 'solids', foods: ['egg', 'Pear'], reaction: 'Rash', allergen: true }, at(1, 12), at(1, 12)),
+      entry({ type: 'feed', method: 'solids', foods: ['egg', 'Pear', 'Egg '], reaction: 'Rash', allergen: true }, at(1, 12), at(1, 12)),
       entry({ type: 'feed', method: 'solids', foods: ['Egg'] }, at(0, 12), at(0, 12)),
     ]);
     expect(r[0]).toMatchObject({ name: 'egg', count: 2, firstAt: at(0, 12), reactions: ['Rash'], allergen: true });

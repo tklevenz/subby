@@ -1,11 +1,21 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BB_ENDPOINTS, detectUnits, mapRecord } from '@kindred-log/shared';
-import { BBClient, BBError, normalizeBaseUrl } from './client';
+import { BBClient, BBError, nextOffset, normalizeBaseUrl } from './client';
 
 describe('normalizeBaseUrl', () => {
   it('adds https and strips trailing slashes and /api', () => {
     expect(normalizeBaseUrl(' bb.example.com/ ')).toBe('https://bb.example.com');
     expect(normalizeBaseUrl('http://10.0.0.2:8000/api/')).toBe('http://10.0.0.2:8000');
+  });
+});
+
+describe('nextOffset', () => {
+  it('takes only the offset from the next link, and only forward', () => {
+    expect(nextOffset('http://internal:8000/api/feedings/?limit=500&offset=500', 0)).toBe(500);
+    expect(nextOffset('https://evil.example/steal?offset=1000&limit=500', 500)).toBe(1000);
+    expect(nextOffset('http://bb/api/feedings/?limit=500&offset=500', 500)).toBeNull();
+    expect(nextOffset('http://bb/api/feedings/?limit=500', 0)).toBeNull();
+    expect(nextOffset(null, 0)).toBeNull();
   });
 });
 

@@ -21,6 +21,27 @@ function week(days: number) {
   return logs;
 }
 
+describe('a night that was not logged', () => {
+  // Yesterday's naps, then no night, then this morning's first nap.
+  const logs = () => [
+    ...week(7).slice(0, -1),
+    entry({ type: 'sleep', nap: true }, at(0, 9, 30), at(0, 10, 30)),
+  ];
+
+  it("doesn't count yesterday's naps as today's", () => {
+    const p = predictNextSleep(logs(), child, at(0, 11))!;
+    expect(p.kind).toBe('nap');
+    expect(p.napIndex).toBe(1);
+  });
+
+  it('starts the wake-window count again', () => {
+    const windows = wakeWindows(logs(), at(0, 0));
+    expect(windows).toEqual([]); // the gap over 10 h is skipped, and today has no second window yet
+    const later = [...logs(), entry({ type: 'sleep', nap: true }, at(0, 13, 30), at(0, 15))];
+    expect(wakeWindows(later, at(0, 0)).map((w) => w.index)).toEqual([1]);
+  });
+});
+
 describe('sleep habits', () => {
   it('measures wake windows by nap index', () => {
     const w = wakeWindows(week(7), at(-7, 0));

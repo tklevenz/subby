@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ChildSchema, LogEntrySchema, LogTypeSchema, PhotoBlobSchema, type Child, type LogEntry, type LogPayload, type PhotoBlob } from '@kindred-log/shared';
+import { ChildSchema, LenientPayloadSchema, LogEntrySchema, PhotoBlobSchema, type Child, type LogEntry, type LogPayload, type PhotoBlob } from '@kindred-log/shared';
 import type { RecordKind } from '@kindred-log/shared/sync';
 
 /**
@@ -10,13 +10,13 @@ import type { RecordKind } from '@kindred-log/shared/sync';
 export type ChildBody = Pick<Child, 'name' | 'birthDate' | 'birthTime' | 'dueDate' | 'sex'> & { photoBlob: PhotoBlob | null };
 export type LogBody = Pick<LogEntry, 'childId' | 'logType' | 'startedAt' | 'endedAt' | 'createdBy' | 'payload'>;
 
-// What a pulled record's body must look like before it touches the database. Payloads are checked for their
-// shape only (an object of the entry's type, photo reference well-formed), so values another phone stored
-// are never dropped for being unusual.
+// What a pulled record's body must look like before it touches the database. Payloads are checked leniently
+// (`LenientPayloadSchema`: field types, not values; photo reference well-formed), so values another phone stored
+// are never dropped for being unusual, but nothing reaches a screen that would crash it.
 const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
   child: ChildSchema.pick({ name: true, birthDate: true, birthTime: true, dueDate: true, sex: true }).extend({ photoBlob: PhotoBlobSchema.nullable() }),
   log: LogEntrySchema.pick({ childId: true, logType: true, startedAt: true, endedAt: true, createdBy: true })
-    .extend({ payload: z.object({ type: LogTypeSchema, photoBlob: PhotoBlobSchema.optional() }).loose() })
+    .extend({ payload: LenientPayloadSchema })
     .refine((l) => l.payload.type === l.logType),
   device: z.object({ name: z.string().min(1).max(100) }),
 };

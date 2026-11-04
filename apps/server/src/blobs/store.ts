@@ -38,7 +38,7 @@ class DiskStore implements BlobStore {
 
   async get(id: string) {
     try {
-      return new Uint8Array(await readFile(this.path(id)));
+      return await readFile(this.path(id)); // a Buffer is a Uint8Array; no copy
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw e;

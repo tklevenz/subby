@@ -12,6 +12,8 @@ export const RECOVERY = 'recovery';
 export type AuthContext = { familyId: string; deviceId: string };
 
 const CHALLENGE_MS = 2 * 60_000;
+/** Open challenges at most (in memory); past it the oldest go, so a flood of requests can't grow the map. */
+const MAX_CHALLENGES = 10_000;
 const SESSION_MS = 7 * 24 * 3_600_000;
 
 type Pending = { familyId: string; deviceId: string; signKey: string; expiresAt: number };
@@ -38,6 +40,11 @@ export class AuthService {
     if (!pending) throw new NotFoundException('Unknown device or recovery key');
 
     this.prune();
+    // Insertion order is age order: drop the oldest.
+    for (const k of this.challenges.keys()) {
+      if (this.challenges.size < MAX_CHALLENGES) break;
+      this.challenges.delete(k);
+    }
     const challenge = randomBytes(32).toString('base64url');
     const expiresAt = Date.now() + CHALLENGE_MS;
     this.challenges.set(challenge, { ...pending, expiresAt });
@@ -89,6 +96,10 @@ export class AuthService {
 
   private prune() {
     const now = Date.now();
-    for (const [k, v] of this.challenges) if (v.expiresAt < now) this.challenges.delete(k);
+    // All live equally long, so insertion order is expiry order: stop at the first one still valid.
+    for (const [k, v] of this.challenges) {
+      if (v.expiresAt >= now) break;
+      this.challenges.delete(k);
+    }
   }
 }

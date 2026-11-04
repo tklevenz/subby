@@ -193,6 +193,16 @@ describe.skipIf(!reachable)('sync server', () => {
     await a.createFamily();
     for (const q of ['since=-1', 'since=abc', 'limit=-1', 'limit=0.5', 'since=1e3']) await expectStatus(a.request('GET', `/v1/sync/pull?${q}`), 400);
     await expectStatus(a.request('GET', '/v1/families/me/log?since=-2'), 400);
+    await expectStatus(a.request('GET', '/v1/families/me/log?since=9999999999'), 400);
+  });
+
+  it('rejects malformed base64 and oversized fields with 400, not 500', async () => {
+    const a = new TestClient(url);
+    await a.createFamily();
+    const { challenge } = await a.request<{ challenge: string }>('POST', '/v1/auth/challenge', { deviceId: a.deviceId }, '');
+    await expectStatus(a.request('POST', '/v1/auth/verify', { challenge, signature: 'a' }, ''), 400);
+    await expectStatus(a.request('POST', '/v1/auth/verify', { challenge, signature: 'a'.repeat(5000) }, ''), 400);
+    await expectStatus(a.request('POST', '/v1/keys/grant', { recipient: 'recovery', keys: [{ epoch: 2 ** 40, sealed: 'AAAA' }] }), 400);
     expect(await a.request('GET', '/v1/sync/pull?since=0&limit=0')).toMatchObject({ records: [] });
   });
 
@@ -474,6 +484,9 @@ describe.skipIf(!reachable)('sync server', () => {
     await rec.login(id, { recoverySignKey: toBase64(id.sign.publicKey) });
     await expectStatus(rec.request('GET', '/v1/sync/pull'), 403);
     await expectStatus(rec.request('POST', '/v1/keys/rotate', { entry: fresh.log[0], sealed: {} }), 403);
+    // Nor grant to anyone but the phone it added: grants are first-come, so it could hand out keys that don't open.
+    await expectStatus(rec.request('POST', '/v1/keys/grant', { recipient: a.deviceId, keys: [{ epoch: 1, sealed: 'AAAA' }] }), 403);
+    await expectStatus(rec.request('POST', '/v1/keys/grant', { recipient: 'recovery', keys: [{ epoch: 1, sealed: 'AAAA' }] }), 403);
   });
 
   it('rotations include the recovery key, so recovery still works afterwards', async () => {

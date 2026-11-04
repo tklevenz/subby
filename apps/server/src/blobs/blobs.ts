@@ -145,6 +145,8 @@ export class BlobsController {
   @Get(':id')
   @Header('content-type', 'application/octet-stream')
   async get(@Auth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    return Buffer.from(await this.blobs.get(auth, id));
+    const data = await this.blobs.get(auth, id);
+    // A view, not a copy (photos are up to 20 MB).
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   }
 }

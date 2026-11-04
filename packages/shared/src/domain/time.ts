@@ -32,7 +32,8 @@ export function startOfDay(epochMs: number): number {
 export function ageInDays(birthDate: string, now: number): number {
   const [y, m, d] = birthDate.split('-').map(Number);
   const birth = new Date(y, m - 1, d).getTime();
-  return Math.floor((startOfDay(now) - birth) / 86_400_000);
+  // Rounded: across a DST change a day is 23 or 25 h, so whole days aren't whole multiples of 24 h.
+  return Math.round((startOfDay(now) - birth) / 86_400_000);
 }
 
 export function formatAge(birthDate: string, now: number): string {

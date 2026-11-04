@@ -39,7 +39,8 @@ export class LiveBus {
 }
 
 /** `/v1/live?token=…`: server → app notifications while the app is open. */
-@WebSocketGateway({ path: '/v1/live' })
+// Apps never send anything but pongs: a small message limit (ws allows 100 MB by default).
+@WebSocketGateway({ path: '/v1/live', maxPayload: 4096 })
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   private readonly heartbeat = setInterval(() => this.ping(), 30_000);
   private readonly alive = new WeakMap<WebSocket, boolean>();
@@ -54,6 +55,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     const token = new URL(req.url ?? '', 'http://localhost').searchParams.get('token') ?? undefined;
     const auth = await this.auth.authenticate(token);
     if (!auth || auth.deviceId === RECOVERY) return socket.close(4401, 'Unauthorized');
+    // Gone while we checked the token: its close already fired, so it must not be tracked (it would never leave).
+    if (socket.readyState !== socket.OPEN) return;
     (socket as WebSocket & { deviceId?: string }).deviceId = auth.deviceId;
     this.all.add(socket);
     this.alive.set(socket, true);
@@ -79,6 +82,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     for (const socket of this.all) {
       if (!this.alive.get(socket)) {
         socket.terminate();
+        this.handleDisconnect(socket);
         continue;
       }
       this.alive.set(socket, false);

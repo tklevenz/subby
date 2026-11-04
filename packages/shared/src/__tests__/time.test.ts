@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageParts, formatAgeLong, nextAgeMilestone } from '../domain/time';
+import { ageInDays, ageParts, formatAgeLong, nextAgeMilestone } from '../domain/time';
 
 const on = (y: number, m: number, d: number) => new Date(y, m - 1, d, 15).getTime();
 
@@ -28,5 +28,13 @@ describe('nextAgeMilestone', () => {
     expect(nextAgeMilestone('2025-10-20', on(2026, 10, 20))).toMatchObject({ label: '1 year', days: 0 });
     expect(nextAgeMilestone('2025-11-25', on(2026, 10, 20))).toMatchObject({ label: '11 months', days: 5 });
     expect(nextAgeMilestone('2025-11-10', on(2026, 10, 20))).toMatchObject({ label: '1 year', days: 21 });
+  });
+});
+
+describe('ageInDays', () => {
+  it('counts whole days across a DST change', () => {
+    // Winter birth, summer day: one day is 23 h long in between (in zones with DST).
+    expect(ageInDays('2026-01-01', new Date(2026, 6, 1, 12).getTime())).toBe(181);
+    expect(ageInDays('2026-07-01', new Date(2026, 11, 1, 0, 30).getTime())).toBe(153);
   });
 });

@@ -23,6 +23,7 @@ import DateTimeField from '../DateTimeField';
 import FoodPicker from '../editors/FoodPicker';
 import { Button, Chip, FieldLabel, Segmented } from '../ui';
 import { colors } from '../../theme/colors';
+import { useSingleFlight } from '../useSingleFlight';
 
 type Tab = 'breast' | 'bottle' | 'solids';
 type Feed = PayloadOf<'feed'>;
@@ -56,12 +57,13 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
   const now = useNow();
   const next = suggestedNextSide(logs);
 
-  const tap = async (side: Side) => {
+  const once = useSingleFlight();
+  const tap = once(async (side: Side) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const t = Date.now();
     if (running) await updateLog(running.id, { payload: toggleSide(running.payload, side, t) });
     else await startTimer(toggleSide({ type: 'feed', method: 'breast' }, side, t), t);
-  };
+  });
 
   const secs = running ? sideSeconds(running.payload, now) : { left: 0, right: 0 };
   const active = running?.payload.timerSide;
@@ -119,6 +121,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
   );
   const [milkType, setMilkType] = useState<Feed['milkType']>(last?.milkType ?? 'breast_milk');
   const [amountMl, setAmountMl] = useState(last?.amountMl ?? 120);
+  const once = useSingleFlight();
   const [at, setAt] = useState(Date.now());
 
   const presets = metric ? ML_PRESETS : OZ_PRESETS.map(ozToMl);
@@ -154,11 +157,11 @@ function BottleTab({ onDone }: { onDone: () => void }) {
       </View>
       <Button
         label={`Log ${formatVolume(amountMl, units)} bottle`}
-        onPress={async () => {
+        onPress={once(async () => {
           await addLog({ type: 'feed', method: 'bottle', milkType, amountMl }, { startedAt: at });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onDone();
-        }}
+        })}
       />
     </View>
   );
@@ -168,6 +171,7 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
   const addLog = useLogStore((s) => s.addLog);
   const [solids, setSolids] = useState<Pick<Feed, 'foods' | 'allergen' | 'reaction'>>({});
   const [at, setAt] = useState(Date.now());
+  const once = useSingleFlight();
 
   return (
     <View>
@@ -176,11 +180,11 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
       <FoodPicker value={solids} onChange={(p) => setSolids((s) => ({ ...s, ...p }))} />
       <Button
         label="Log solids"
-        onPress={async () => {
+        onPress={once(async () => {
           await addLog({ type: 'feed', method: 'solids', ...solids }, { startedAt: at });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onDone();
-        }}
+        })}
       />
     </View>
   );

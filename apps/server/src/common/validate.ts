@@ -10,9 +10,12 @@ export function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infe
   return result.data;
 }
 
-/** A non-negative integer query parameter; `fallback` when missing, 400 when it's anything else. */
-export function queryInt(value: string | undefined, fallback: number): number {
+/**
+ * A non-negative integer query parameter; `fallback` when missing, 400 when it's anything else. At most `max`
+ * (a 32-bit Postgres integer by default, so a huge value is a 400, not a database error).
+ */
+export function queryInt(value: string | undefined, fallback: number, max = 2 ** 31 - 1): number {
   if (value === undefined || value === '') return fallback;
-  if (!/^\d{1,15}$/.test(value)) throw new BadRequestException(`Expected a whole number, got "${value}"`);
+  if (!/^\d{1,15}$/.test(value) || Number(value) > max) throw new BadRequestException(`Expected a whole number up to ${max}, got "${value}"`);
   return Number(value);
 }

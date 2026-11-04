@@ -88,4 +88,17 @@ describe('isValidBody', () => {
     expect(isValidBody('device', { name: '' })).toBe(false);
     expect(isValidBody('log', null)).toBe(false);
   });
+
+  it('checks payload field types, not values', () => {
+    const log = (payload: object) => ({ ...logToBody(note), logType: (payload as { type: string }).type, payload });
+    // What a screen would crash on: a name that isn't a string, foods that aren't a list, a required field missing.
+    expect(isValidBody('log', log({ type: 'medication', name: 123 }))).toBe(false);
+    expect(isValidBody('log', log({ type: 'medication' }))).toBe(false);
+    expect(isValidBody('log', log({ type: 'feed', method: 'solids', foods: 'apple' }))).toBe(false);
+    expect(isValidBody('log', log({ type: 'note', text: 'x', tags: [1] }))).toBe(false);
+    // Unusual values still sync: empty text, an unknown enum value or field, a null, a negative amount.
+    expect(isValidBody('log', log({ type: 'note', text: '' }))).toBe(true);
+    expect(isValidBody('log', log({ type: 'feed', method: 'spoon', amountMl: -5, newField: { a: 1 } }))).toBe(true);
+    expect(isValidBody('log', log({ type: 'diaper', condition: 'wet', color: null }))).toBe(true);
+  });
 });

@@ -67,12 +67,24 @@ export class BBClient {
   }
 
   private async *pagesOf<T>(path: string, pageSize: number): AsyncGenerator<Page<T>> {
-    let url: string | null = `${path}/?limit=${pageSize}&offset=0`;
-    while (url) {
-      const page: Page<T> = await this.get(url);
+    let offset: number | null = 0;
+    while (offset !== null) {
+      const page: Page<T> = await this.get(`${path}/?limit=${pageSize}&offset=${offset}`);
       yield page;
-      // Behind a reverse proxy BB may report its internal origin (e.g. http://); keep ours.
-      url = page.next ? `${this.baseUrl}/api/${page.next.replace(/^.*?\/api\//, '')}` : null;
+      offset = nextOffset(page.next, offset);
     }
   }
+}
+
+/**
+ * The offset of the next page, from Baby Buddy's `next` link. Only its offset is used: behind a reverse proxy BB may
+ * report its internal origin (e.g. http://), and the token must never follow a link elsewhere. null at the end, or
+ * when the link doesn't move forward (so a broken server can't loop the import).
+ */
+export function nextOffset(next: string | null, current: number): number | null {
+  if (!next) return null;
+  // A regex, not URL.searchParams (not available in every React Native version).
+  const match = /[?&]offset=(\d{1,15})(?:&|#|$)/.exec(next);
+  const offset = match ? Number(match[1]) : NaN;
+  return offset > current ? offset : null;
 }

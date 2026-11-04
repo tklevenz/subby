@@ -164,10 +164,13 @@ export function solidsReport(logs: LogEntry[]): FoodStat[] {
   for (const l of logs) {
     const p = l.payload;
     if (p.type !== 'feed' || !p.foods?.length) continue;
+    const seen = new Set<string>();
     for (const raw of p.foods) {
       const name = raw.trim();
       const key = name.toLowerCase();
-      if (!key) continue;
+      // Once per feed, however often it's listed ("egg", "Egg").
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
       const f = foods.get(key) ?? { name, count: 0, firstAt: l.startedAt, lastAt: l.startedAt, reactions: [], allergen: false };
       f.count++;
       f.firstAt = Math.min(f.firstAt, l.startedAt);
