@@ -24,6 +24,12 @@ const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
 /** Whether a decrypted body from another phone is well-formed for its kind. */
 export const isValidBody = (kind: RecordKind, body: unknown) => BODY_SCHEMAS[kind].safeParse(body).success;
 
+/** The body as checked (nulls in optional payload fields become missing), or null when it's malformed. */
+export function validBody<T>(kind: RecordKind, body: unknown): T | null {
+  const res = BODY_SCHEMAS[kind].safeParse(body);
+  return res.success ? (res.data as T) : null;
+}
+
 export const childToBody = (c: Child): ChildBody => ({
   name: c.name,
   birthDate: c.birthDate,

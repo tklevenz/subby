@@ -80,6 +80,14 @@ export async function pickBackup(): Promise<PickedBackup | null> {
   if (picked.canceled) return null;
   const bytes = await picked.result.bytes();
   const name = picked.result.name;
+  // The picker may hand over a copy in our cache: gone once read. Never the original elsewhere (the user's file).
+  if (picked.result.uri.startsWith(Paths.cache.uri)) {
+    try {
+      picked.result.delete();
+    } catch {
+      // already gone
+    }
+  }
   return isEncryptedBackup(bytes) ? { kind: 'locked', bytes, name } : { kind: 'open', contents: readBackup(bytes), name };
 }
 

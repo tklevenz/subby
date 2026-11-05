@@ -26,6 +26,7 @@ export function recentTags(logs: LogEntry[], limit = 12): string[] {
 export function recentMedications(logs: LogEntry[], limit = 6): PayloadOf<'medication'>[] {
   const out = new Map<string, PayloadOf<'medication'>>();
   for (const l of logs) {
+    if (l.isDeleted) continue;
     if (l.payload.type !== 'medication') continue;
     const key = l.payload.name.trim().toLowerCase();
     if (!out.has(key)) out.set(key, l.payload);
@@ -52,6 +53,7 @@ export function medicationsDue(logs: LogEntry[]): MedicationDue[] {
   const seen = new Set<string>();
   const out: MedicationDue[] = [];
   for (const l of logs) {
+    if (l.isDeleted) continue;
     if (l.payload.type !== 'medication') continue;
     const key = l.payload.name.trim().toLowerCase();
     if (seen.has(key)) continue;
@@ -68,7 +70,7 @@ export function medicationsDue(logs: LogEntry[]): MedicationDue[] {
  * reminder's interval, the same time its notification uses). Null without one, or while a session is running.
  */
 export function pumpingDue(logs: LogEntry[], intervalMin: number): { dueAt: number; lastAt: number } | null {
-  const pumps = logs.filter((l) => l.payload.type === 'pumping');
+  const pumps = logs.filter((l) => !l.isDeleted && l.payload.type === 'pumping');
   if (pumps.some((l) => l.endedAt === null)) return null;
   const lastAt = Math.max(...pumps.map((l) => l.startedAt));
   return pumps.length ? { lastAt, dueAt: lastAt + intervalMin * 60_000 } : null;

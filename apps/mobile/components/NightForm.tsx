@@ -12,6 +12,7 @@ import { useLogStore } from '../store/useLogStore';
 import { useSleepOverlap } from '../features/sleepOverlap';
 import { useFormatTime } from '../store/timeHelpers';
 import { colors } from '../theme/colors';
+import { useSingleFlight } from './useSingleFlight';
 
 const MIN = 60_000;
 /** A new waking: this long, in the middle of the night's longest stretch. */
@@ -65,7 +66,8 @@ export default function NightForm({ night }: { night: Night }) {
     setWakings((cur) => [...cur, { start: mid, end: mid + NEW_WAKING_MS }].sort((a, b) => a.start - b.start));
   };
 
-  const save = async () => {
+  const once = useSingleFlight();
+  const save = once(async () => {
     if (!pieces) return;
     const joined = night.pieces.slice(pieces.length);
     const notes = [payload.notes, ...joined.map((p) => p.payload.notes)].filter(Boolean).join('\n') || undefined;
@@ -79,7 +81,7 @@ export default function NightForm({ night }: { night: Night }) {
     }
     for (const p of joined) await softDeleteLog(p.id);
     router.back();
-  };
+  });
 
   const confirmDelete = () =>
     Alert.alert('Delete night', night.pieces.length > 1 ? 'This deletes the whole night, wakings included.' : 'Delete this sleep?', [

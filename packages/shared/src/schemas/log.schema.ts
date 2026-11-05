@@ -141,7 +141,8 @@ function loosen(field: z.ZodType): z.ZodType {
   const def = field.def as { type: string; innerType?: z.ZodType; element?: z.ZodType };
   switch (def.type) {
     case 'optional':
-      return loosen(def.innerType!).nullish();
+      // null counts as missing, and comes out as missing (screens test `!== undefined`).
+      return z.preprocess((v) => (v === null ? undefined : v), loosen(def.innerType!).optional());
     case 'string':
     case 'enum':
       return z.string();

@@ -21,6 +21,14 @@ function week(days: number) {
   return logs;
 }
 
+describe('deleted entries', () => {
+  it("don't count: a discarded running sleep isn't still going", () => {
+    const discarded = { ...entry({ type: 'sleep', nap: true }, at(0, 9), null), isDeleted: true, payload: { type: 'sleep' as const } };
+    expect(predictNextSleep([...week(7), discarded], child, at(0, 8))).toEqual(predictNextSleep(week(7), child, at(0, 8)));
+    expect(predictNextSleep([...week(7), discarded], child, at(0, 8))).not.toBeNull();
+  });
+});
+
 describe('a night that was not logged', () => {
   // Yesterday's naps, then no night, then this morning's first nap.
   const logs = () => [

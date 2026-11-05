@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Child, LogEntry } from '@kindred-log/shared';
-import { blobIdsOf, bodyToChild, bodyToLog, childToBody, isValidBody, logToBody, needsPhotoUpload } from './records';
+import { blobIdsOf, bodyToChild, bodyToLog, childToBody, isValidBody, logToBody, needsPhotoUpload, validBody } from './records';
 
 const blobA = { id: '0190a000-0000-7000-8000-0000000000aa', key: 'a-key' };
 const blobB = { id: '0190a000-0000-7000-8000-0000000000bb', key: 'b-key' };
@@ -100,5 +100,9 @@ describe('isValidBody', () => {
     expect(isValidBody('log', log({ type: 'note', text: '' }))).toBe(true);
     expect(isValidBody('log', log({ type: 'feed', method: 'spoon', amountMl: -5, newField: { a: 1 } }))).toBe(true);
     expect(isValidBody('log', log({ type: 'diaper', condition: 'wet', color: null }))).toBe(true);
+    // A null comes out as missing, so a screen testing `!== undefined` doesn't show "0 ml".
+    const bottle = validBody<{ payload: Record<string, unknown> }>('log', log({ type: 'feed', method: 'bottle', amountMl: null }));
+    expect(bottle?.payload.amountMl).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(bottle!.payload))).toEqual({ type: 'feed', method: 'bottle' });
   });
 });

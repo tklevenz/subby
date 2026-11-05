@@ -27,7 +27,7 @@ import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStor
 import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, isValidBody, logToBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
+import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
 
 const PUSH_BATCH = 500;
@@ -364,7 +364,11 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     // The winning versions the server sent back for stale ones, of any epoch we hold, unless the log closed that
     // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
     // (an older epoch's version this phone pulled long ago, or a server that withholds it) it stays pending.
-    const { settled, held: kept, newer } = settlePush(records, res, (r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
+    // Only versions that actually open and are well-formed count: the metadata alone is the server's word.
+    const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
+    const openedNewer = openAll(candidates, keys);
+    const genuine = new Set<SyncRecord>(openedNewer.map((o) => o.record));
+    const { settled, held: kept, newer } = settlePush(records, res, (r) => genuine.has(r));
     for (const id of kept) held.add(id);
     const version = new Map([...children, ...logs].map((r) => [r.id, r.updatedAt]));
     db.transaction((tx) => {
@@ -375,7 +379,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
         tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
       }
     });
-    if (newer.length) applied = applyPage(newer, keys, settings.deviceId) || applied;
+    if (newer.length) applied = applyOpened(openedNewer.filter((o) => (newer as SyncRecord[]).includes(o.record)), settings.deviceId) || applied;
     done += records.length;
     useSyncStore.setState({ progress: { label: 'Uploading', done } });
   }
@@ -415,13 +419,21 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedA
 /** Entries other phones wrote, applied during this run (for `notifyFamily`). */
 let pulledLogs: PulledLog[] = [];
 
-/** Applies one page in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
+/** Decrypts, checks and applies one page (see `openAll` and `applyOpened`). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
-  // Decrypt first: a record of an epoch we have no key for fails the run before anything is written (the next run
-  // fetches the key). One that doesn't open with a key we have (damaged or tampered with), one that opens but is
-  // malformed (a buggy or hostile phone), or a tombstone nobody sealed (an older app's, or a server's), is skipped,
-  // so a single bad record can't stop sync for good.
-  const opened = records
+  return applyOpened(openAll(records, keys), ownDeviceId);
+}
+
+type Opened = { record: SyncRecord; body: ChildBody | LogBody | DeviceBody | null };
+
+/**
+ * Decrypts and checks records, before anything is written. A record of an epoch we have no key for throws, failing
+ * the run (the next one fetches the key). One that doesn't open with a key we have (damaged or tampered with), one
+ * that opens but is malformed (a buggy or hostile phone), or a tombstone nobody sealed (an older app's, or a
+ * server's), is skipped, so a single bad record can't stop sync for good. Bodies come back as checked.
+ */
+function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>): Opened[] {
+  return records
     .flatMap((r) => {
       try {
         return [{ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }];
@@ -432,18 +444,24 @@ function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>,
         return [];
       }
     })
-    .filter(({ record, body }) => {
-      if (record.deleted || isValidBody(record.kind, body)) return true;
+    .flatMap(({ record, body }) => {
+      if (record.deleted) return [{ record, body }];
+      const valid = validBody<ChildBody | LogBody | DeviceBody>(record.kind, body);
+      if (valid) return [{ record, body: valid }];
       console.warn(`[sync] skipped malformed ${record.kind} record ${record.id}`);
-      return false;
+      return [];
     });
+}
+
+/** Applies opened records in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
+function applyOpened(opened: Opened[], ownDeviceId: string): boolean {
   applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
   const photos: (string | null | undefined)[] = [];
   let changed = false;
 
   db.transaction((tx) => {
-    const childIds = records.filter((r) => r.kind === 'child').map((r) => r.id);
-    const logIds = records.filter((r) => r.kind === 'log').map((r) => r.id);
+    const childIds = opened.filter((o) => o.record.kind === 'child').map((o) => o.record.id);
+    const logIds = opened.filter((o) => o.record.kind === 'log').map((o) => o.record.id);
     const localChildren = new Map(
       (childIds.length ? tx.select().from(schema.childrenTable).where(inArray(schema.childrenTable.id, childIds)).all() : []).map((c) => [c.id, c]),
     );

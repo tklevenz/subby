@@ -64,6 +64,7 @@ export function dailyStats(logs: LogEntry[], days: number[], now: number): DaySt
   const rangeEnd = days.length ? addDays(days[days.length - 1], 1) : 0;
 
   for (const l of logs) {
+    if (l.isDeleted) continue;
     const end = l.endedAt ?? now;
     if (end < rangeStart || l.startedAt >= rangeEnd) continue;
     const p = l.payload;
@@ -135,6 +136,7 @@ export type Segment = { id: string; start: number; end: number; nap: boolean; ru
 export function sleepSegments(logs: LogEntry[], from: number, to: number, now: number): Segment[] {
   const out: Segment[] = [];
   for (const l of logs) {
+    if (l.isDeleted) continue;
     if (l.payload.type !== 'sleep') continue;
     const end = l.endedAt ?? now;
     if (end <= from || l.startedAt >= to) continue;
@@ -162,6 +164,7 @@ export type FoodStat = {
 export function solidsReport(logs: LogEntry[]): FoodStat[] {
   const foods = new Map<string, FoodStat>();
   for (const l of logs) {
+    if (l.isDeleted) continue;
     const p = l.payload;
     if (p.type !== 'feed' || !p.foods?.length) continue;
     const seen = new Set<string>();

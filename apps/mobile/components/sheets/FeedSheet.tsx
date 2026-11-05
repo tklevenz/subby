@@ -84,11 +84,11 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
         <>
           <Button
             label="Done"
-            onPress={async () => {
+            onPress={once(async () => {
               await stopTimer(running.id);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               onDone();
-            }}
+            })}
           />
           <Button
             label="Discard"

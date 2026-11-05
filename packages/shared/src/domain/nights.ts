@@ -2,7 +2,8 @@ import type { LogEntry, PayloadOf } from '../schemas/log.schema';
 import { addDays, isNap } from './stats';
 
 export type SleepEntry = LogEntry & { payload: PayloadOf<'sleep'> };
-export const isSleepEntry = (l: LogEntry): l is SleepEntry => l.payload.type === 'sleep';
+/** A live sleep (a deleted one keeps only `{type}`, so it would otherwise still look like a sleep). */
+export const isSleepEntry = (l: LogEntry): l is SleepEntry => !l.isDeleted && l.payload.type === 'sleep';
 
 /**
  * Night sleeps (not naps) less than this apart are one night, and the gap between them a night waking. A night is

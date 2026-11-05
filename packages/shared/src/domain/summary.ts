@@ -5,7 +5,7 @@ export type EntryOf<T extends LogType> = LogEntry & { logType: T; payload: Paylo
 const isType =
   <T extends LogType>(type: T) =>
   (l: LogEntry): l is EntryOf<T> =>
-    l.logType === type && l.payload.type === type;
+    !l.isDeleted && l.logType === type && l.payload.type === type;
 
 /** Most recent entry of a type. Assumes `logs` is sorted by startedAt DESC. */
 export function lastOfType<T extends LogType>(logs: LogEntry[], type: T): EntryOf<T> | undefined {
@@ -14,7 +14,7 @@ export function lastOfType<T extends LogType>(logs: LogEntry[], type: T): EntryO
 
 /** A timed entry is running while it has no end. Completed timed entries always have endedAt set. */
 export function isRunning(l: LogEntry): boolean {
-  return l.endedAt === null && TIMED_LOG_TYPES.includes(l.logType);
+  return !l.isDeleted && l.endedAt === null && TIMED_LOG_TYPES.includes(l.logType);
 }
 
 /** Running timers, newest first. */
@@ -41,7 +41,7 @@ export function overlappingSleep(logs: LogEntry[], start: number, end: number | 
 
 /** When the current wake window started: end of the most recent finished sleep. */
 export function lastWakeAt(logs: LogEntry[]): number | null {
-  const ended = logs.find((l) => l.logType === 'sleep' && l.endedAt !== null);
+  const ended = logs.find((l) => !l.isDeleted && l.logType === 'sleep' && l.endedAt !== null);
   return ended?.endedAt ?? null;
 }
 

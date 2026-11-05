@@ -9,7 +9,9 @@ const photosDir = () => new Directory(Paths.document, 'photos');
 export async function persistPhoto(uri: string): Promise<string> {
   const dir = photosDir();
   dir.create({ idempotent: true, intermediates: true });
-  const ext = uri.split('.').pop()?.split('?')[0] || 'jpg';
+  // Only a plain extension (a content:// URI may have none, or a path where one would be).
+  const last = uri.split('?')[0]!.split('/').pop() ?? '';
+  const ext = /\.([a-z0-9]{1,5})$/i.exec(last)?.[1]?.toLowerCase() ?? 'jpg';
   const dest = new File(dir, `${Date.now()}.${ext}`);
   await new File(uri).copy(dest);
   return dest.uri;
@@ -72,7 +74,9 @@ export function savePhotoBytes(name: string, data: Uint8Array): string {
 
 /** Delete a photo we own (inside the app's photos dir); anything else is left alone. */
 export function deletePhoto(uri: string | null | undefined) {
-  if (!uri || !uri.startsWith(photosDir().uri)) return;
+  // Only our own photos folder (with its trailing slash, so "photos-other/" doesn't match), and no "..".
+  const dir = photosDir().uri;
+  if (!uri || !uri.startsWith(dir.endsWith('/') ? dir : `${dir}/`) || uri.includes('..')) return;
   try {
     const file = new File(uri);
     if (file.exists) file.delete();

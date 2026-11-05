@@ -23,6 +23,7 @@ import { useSleepOverlap } from '../../features/sleepOverlap';
 import { SubSpinner } from '../../components/brand/loaders';
 import NightForm from '../../components/NightForm';
 import { useLogQuery } from '../../store/queries';
+import { useSingleFlight } from '../../components/useSingleFlight';
 
 const DAY = 86_400_000;
 
@@ -72,12 +73,13 @@ function EntryForm({ entry }: { entry: LogEntry }) {
 
   const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
 
-  const save = async () => {
+  const once = useSingleFlight();
+  const save = once(async () => {
     // Stopping a running breastfeed here: fold the running side's time into its total.
     const stopped = entry.endedAt === null && endedAt !== null && payload.type === 'feed';
     await updateLog(entry.id, { payload: stopped ? pauseFeed(payload, endedAt) : payload, startedAt, endedAt });
     router.back();
-  };
+  });
 
   const confirmDelete = () =>
     Alert.alert('Delete Log', 'Are you sure you want to delete this log entry?', [
@@ -119,7 +121,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
               <Button label="Stop now" variant="ghost" onPress={() => setEndedAt(Date.now())} />
             </View>
           ) : (
-            <DateTimeField value={endedAt!} onChange={setEndedAt} title="End time" />
+            <DateTimeField value={endedAt!} onChange={setEndedAt} maximumDate={new Date()} title="End time" />
           )}
           {invalid ? <Text className="text-red-strong mt-2">End must be after start.</Text> : null}
           {!invalid && overlap ? <Text className="text-red-strong mt-2">{overlap}</Text> : null}

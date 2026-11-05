@@ -93,6 +93,7 @@ export type GrowthPoint = { id: string; at: number; months: number; value: numbe
 export function growthPoints(logs: LogEntry[], child: Pick<Child, 'birthDate'>, measure: GrowthMeasure): GrowthPoint[] {
   const out: GrowthPoint[] = [];
   for (const l of logs) {
+    if (l.isDeleted) continue;
     const p = l.payload;
     if (p.type !== 'growth') continue;
     const value = measure === 'weightKg' ? (p.weightG !== undefined ? p.weightG / 1000 : undefined)
