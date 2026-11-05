@@ -12,6 +12,9 @@ import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
 import { Housekeeping } from '../src/common/housekeeping';
+import { AdminError, runAdmin } from '../src/admin';
+import { DB } from '../src/db/db';
+import { Entitlements } from '../src/sync/entitlements';
 import { HttpError, TestClient } from './client';
 import { appleTestSigner } from './appleCerts';
 
@@ -99,7 +102,7 @@ describe.skipIf(!reachable)('sync server', () => {
       // Every simulated phone comes from 127.0.0.1; the limits have their own tests.
       rateLimit: false,
       trustProxy: false,
-      stores: { google: null, apple: null },
+      stores: { google: null, apple: null, test: false },
       push: {
         kind: 'fcm',
         projectId: 'subby-test',
@@ -809,6 +812,7 @@ describe.skipIf(!reachable)('sync server', () => {
         stores: {
           google: { clientEmail: 'play@subby-test.iam.gserviceaccount.com', privateKey: fcmKey.privateKey, tokenUri: `${playUrl}/token`, packageName: 'baby.subby.app', apiUrl: `${playUrl}/play` },
           apple: { bundleId: 'baby.subby.app', roots: [apple.rootPem], allowSandbox: false },
+          test: true,
         },
       });
       await hosted.listen({ port: 0, host: '127.0.0.1' });
@@ -821,7 +825,7 @@ describe.skipIf(!reachable)('sync server', () => {
     });
 
     const entitlement = (c: TestClient) => c.request<EntitlementResponse>('GET', '/v1/entitlement');
-    const buy = (c: TestClient, store: 'google' | 'apple', product: string, token: string) => c.request<EntitlementResponse>('POST', '/v1/purchases', { store, product, token });
+    const buy = (c: TestClient, store: 'google' | 'apple' | 'test', product: string, token: string) => c.request<EntitlementResponse>('POST', '/v1/purchases', { store, product, token });
     const googlePurchase = (c: TestClient, product: string, state = 0) => {
       const token = `token-${randomUUID()}`;
       playPurchases.set(token, { product, purchaseState: state, obfuscatedExternalAccountId: c.deviceId, consumptionState: 0, acknowledgementState: 0 });
@@ -980,6 +984,39 @@ describe.skipIf(!reachable)('sync server', () => {
       expect((await entitlement(a)).access).toBe('unlock');
     });
 
+    it('the test store unlocks without a payment, only where the server allows it', async () => {
+      const info = async (server: string) => ((await (await fetch(`${server}/v1/info`)).json()) as { testPurchases: boolean }).testPurchases;
+      expect(await info(base)).toBe(true);
+      expect(await info(url)).toBe(false);
+      const { a, b } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const token = `test-${randomUUID()}`;
+      expect((await buy(a, 'test', 'sync_unlock', token)).access).toBe('unlock');
+      expect((await buy(a, 'test', 'sync_slot', `test-${randomUUID()}`)).devices.map((d) => d.access)).toEqual(['unlock', 'slot']);
+      await expectStatus(buy(a, 'test', 'sync_unlock', 'made-up'), 403);
+      const refunded = await a.request<EntitlementResponse>('POST', '/v1/purchases/test/refund', { token });
+      expect(refunded.access).toBe('slot'); // the slot now goes to a, the first phone without an unlock
+      expect((await entitlement(b)).access).toBe('readOnly');
+    });
+
+    it('the admin command grants slots without a payment, and takes them back', async () => {
+      const { a, b } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const lines: string[] = [];
+      const admin = (...args: string[]) => runAdmin(hosted.get(DB), hosted.get(Entitlements), args, (l) => lines.push(l));
+      await admin('grant-slots', a.familyId, '2');
+      expect((await entitlement(a)).devices.map((d) => d.access)).toEqual(['slot', 'slot']);
+      await write(b);
+      await admin('status', a.familyId);
+      expect(lines.join('\n')).toContain('Slots: 2 (0 unused)');
+      await admin('revoke-grants', a.familyId);
+      expect(lines.at(-1)).toBe('Revoked 2 granted slots.');
+      expect((await entitlement(a)).access).toBe('readOnly');
+      await expect(admin('grant-slots', randomUUID())).rejects.toThrow(AdminError);
+      await expect(admin('grant-slots', a.familyId, '0')).rejects.toThrow(AdminError);
+      await expect(admin('nonsense')).rejects.toThrow(AdminError);
+    });
+
     it('stops photo uploads at 2 GB per family', async () => {
       const { a } = await pairedFamily(base);
       await db`insert into blobs (id, family_id, size, created_at) values (${randomUUID()}, ${a.familyId}, ${2 * 1024 ** 3 - 10}, ${Date.now()})`;
@@ -999,7 +1036,7 @@ describe.skipIf(!reachable)('sync server', () => {
         push: { kind: 'none' },
         rateLimit: true,
         trustProxy: 'loopback',
-        stores: { google: null, apple: null },
+        stores: { google: null, apple: null, test: false },
       });
       try {
         await limited.listen({ port: 0, host: '127.0.0.1' });

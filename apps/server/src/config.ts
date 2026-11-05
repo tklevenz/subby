@@ -20,7 +20,7 @@ export type Config = {
    */
   trustProxy: false | string;
   /** Verifying store purchases (hosted only); a store left out can't be bought from. */
-  stores: { google: GooglePlayConfig | null; apple: AppStoreConfig | null };
+  stores: { google: GooglePlayConfig | null; apple: AppStoreConfig | null; test: boolean };
 };
 
 /** Google Play: a service account with access to the app in the Play Console (View financial data, Manage orders). */
@@ -49,7 +49,10 @@ function storesConfig(env: NodeJS.ProcessEnv): Config['stores'] {
   }
   const apple: AppStoreConfig | null =
     env.APPLE_IAP === 'off' ? null : { bundleId: env.APPLE_BUNDLE_ID || APP_ID, roots: [APPLE_ROOT_CA_G3], allowSandbox: env.APPLE_ALLOW_SANDBOX === '1' };
-  return { google, apple };
+  // A pretend store for testing the app's unlock flow end to end. Never on the official server.
+  const test = env.TEST_PURCHASES === '1';
+  if (test) console.warn('TEST_PURCHASES=1: anyone can unlock sync here without paying. Never use this on a public server.');
+  return { google, apple, test };
 }
 
 function trustProxy(value: string | undefined): Config['trustProxy'] {

@@ -45,6 +45,7 @@ services:
       APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-}
       APPLE_ALLOW_SANDBOX: ${APPLE_ALLOW_SANDBOX:-}
       APPLE_IAP: ${APPLE_IAP:-}
+      TEST_PURCHASES: ${TEST_PURCHASES:-}
       TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
       - blobs:/data

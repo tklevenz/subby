@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActiveTimers from '../../components/ActiveTimers';
+import { AccessBanner } from '../../components/SyncAccess';
 import ChildSwitcher from '../../components/ChildSwitcher';
 import HomeTiles from '../../components/home/HomeTiles';
 import SheetHost from '../../components/sheets/SheetHost';
@@ -44,6 +45,7 @@ export default function Dashboard() {
         </View>
         <LogButton />
       </View>
+      <AccessBanner />
       <ActiveTimers />
       <View className="flex-1 mt-2">{child ? <HomeTiles child={child} /> : null}</View>
       <SheetHost />

@@ -87,6 +87,18 @@ docker save kindred-sync | gzip | ssh my-server 'gunzip | docker load'
 
 With a prebuilt image on the server, `docker compose up -d` (without `--build`) uses it.
 
+## Admin (hosted)
+
+Gifted unlocks without a payment (our own family, support, press) are given from inside the container, never over HTTP:
+
+```sh
+docker compose exec server node dist/admin.js status <family-id>
+docker compose exec server node dist/admin.js grant-slots <family-id> 3
+docker compose exec server node dist/admin.js revoke-grants <family-id>
+```
+
+A slot belongs to the family, so it covers its phones through reinstalls and re-joins. The family id is on the app's Sync screen. Phones see a change on their next sync.
+
 ## Configuration
 
 | Variable | Default | |
@@ -102,6 +114,7 @@ With a prebuilt image on the server, `docker compose up -d` (without `--build`) 
 | `GOOGLE_PLAY_SERVICE_ACCOUNT` | | hosted only: a Google service account with access to the app in the Play Console, for checking purchases and refunds (`/secrets/play.json`) |
 | `GOOGLE_PLAY_PACKAGE`, `APPLE_BUNDLE_ID` | `baby.subby.app` | hosted only: the app whose purchases count |
 | `APPLE_ALLOW_SANDBOX` | | hosted only: `1` accepts TestFlight/sandbox purchases (dogfooding); `APPLE_IAP=off` turns App Store purchases off |
+| `TEST_PURCHASES` | | `1` adds a pretend store, so the app's unlock screens can be tried end to end without paying (with `MODE=hosted`). **Never on a public server:** anyone could unlock |
 | `TRUST_PROXY` | (none) | reverse proxies whose `X-Forwarded-For` to believe: `uniquelocal` for Caddy in this compose, or addresses/ranges |
 
 Without push, phones sync while the app is open, and in the background as often as the phone allows (roughly

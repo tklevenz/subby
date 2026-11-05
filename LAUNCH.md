@@ -57,7 +57,7 @@ These block tickets further down.
   - `FREE_CHILD_LIMIT` / `useCanAddChild`, `PremiumGate` on `child/new`, the Baby Buddy import default, the Trends and Settings bits, `childLimit.test.ts`.
   - Keep `isPremium` only as a hosted-sync concept (renamed, e.g. `unlocked`).
 - [x] **A2 Photo compression on pick.** Long edge ~2048 px (avatars ~512 px), re-encoded as JPEG. Existing photos stay.
-- [ ] **A3 Unlock flow.**
+- [ ] **A3 Unlock flow.** Done 2026-11-05 with the test store: access card, phone labels, gifting, Home banner, dev pretend switch, family id for grants (`admin.js grant-slots`). Left: the real stores through `expo-iap` (after D7 and the console setup). Changed from the plan: a read-only phone keeps logging locally (pending until unlocked) instead of being blocked.
   - Trial days left (no card, no auto-renew), the 48-hour grace notice, and buying an unlock for this phone. "Restore purchases" brings back an own unlock.
   - Gifting a slot while adding a phone (or later, from the phone list), and assigning a free slot.
   - The "this phone can read but not log" state on the Sync screen and Home, with logging blocked in the UI (not silently queued for ever).

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -8,6 +8,8 @@ import { deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync, 
 import { defaultDeviceName, removeDevice } from '../../features/sync/family';
 import { Button, Card, FieldLabel, Row, TextField } from '../../components/ui';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
+import { ACCESS_LABEL, AccessCard, AccessDevTools, GiftSlot } from '../../components/SyncAccess';
+import { useAccessStore } from '../../features/sync/access';
 
 /** Sync between phones: set up or join, status, the family's phones, turning it off. */
 export default function SyncScreen() {
@@ -148,11 +150,18 @@ function Status() {
       ) : null}
       <Button label="Sync now" variant="ghost" onPress={() => syncNow().catch(() => {})} disabled={phase === 'syncing'} />
 
+      <AccessCard />
       <Phones />
       <Recovery />
 
       <Button label="Turn off sync on this phone" variant="danger" onPress={confirmOff} />
       {!lastPhone ? <Button label="Delete the family from the server" variant="danger" onPress={confirmDelete} /> : null}
+
+      {/* For support (e.g. a gifted unlock from us); not a secret. */}
+      <Card>
+        <Row label="Family id" value={`${sync.familyId.slice(0, 8)}…`} onPress={() => Share.share({ message: sync.familyId })} />
+      </Card>
+      <AccessDevTools />
     </>
   );
 }
@@ -190,6 +199,8 @@ function Recovery() {
 function Phones() {
   const sync = useSettingsStore((s) => s.sync)!;
   const members = useSyncStore((s) => s.members);
+  const entitlement = useAccessStore((s) => s.entitlement);
+  const accessOf = new Map(entitlement?.devices.map((d) => [d.id, d.access]));
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const nameOf = (id: string) => sync.names?.[id] ?? 'Phone';
@@ -229,7 +240,7 @@ function Phones() {
             <Row
               key={m.id}
               label={nameOf(m.id)}
-              value={m.isMe ? 'This phone' : undefined}
+              value={[m.isMe ? 'This phone' : undefined, ACCESS_LABEL[accessOf.get(m.id) ?? 'free']].filter(Boolean).join(' · ') || undefined}
               onPress={
                 m.isMe
                   ? () => {
@@ -251,6 +262,7 @@ function Phones() {
       </Card>
       <Text className="text-ink-faint text-xs mt-2 ml-1">Tap this phone to rename it.</Text>
       <Button label="Add a phone" onPress={() => router.push('/sync/add')} />
+      <GiftSlot />
     </>
   );
 }

@@ -86,6 +86,20 @@ export class GooglePlay implements Store {
   }
 }
 
+// --- Test store -----------------------------------------------------------------------------------------
+
+/** TEST_PURCHASES=1 only: accepts any well-formed token the app made up, so the unlock screens can be tried end to end. */
+export class TestStore implements Store {
+  async verify(_product: string, token: string): Promise<VerifiedPurchase> {
+    if (!/^test-[A-Za-z0-9-]{8,100}$/.test(token)) throw new PurchaseRefused('Not a test purchase');
+    return { id: testPurchaseId(token), accountId: null };
+  }
+
+  async finish() {}
+}
+
+export const testPurchaseId = (token: string) => `test:${sha256b64(token)}`;
+
 // --- App Store --------------------------------------------------------------------------------------------
 
 /** Marker extensions Apple puts in its StoreKit signing certificates (by their DER-encoded OIDs). */

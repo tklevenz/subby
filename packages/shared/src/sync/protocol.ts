@@ -181,10 +181,11 @@ export const HOSTED_PHOTO_BYTES = 2 * 1024 ** 3;
 
 /**
  * POST /v1/purchases: a store purchase made on this phone (or restored). `token` is Google's purchase token, or
- * Apple's signed StoreKit 2 transaction (`jwsRepresentation`).
+ * Apple's signed StoreKit 2 transaction (`jwsRepresentation`). `test`: a pretend store for development, only
+ * on servers started with TEST_PURCHASES=1 (`GET /v1/info` says `testPurchases`); its tokens are made up by the app.
  */
 export const PurchaseSchema = z.object({
-  store: z.enum(['google', 'apple']),
+  store: z.enum(['google', 'apple', 'test']),
   product: z.enum([PRODUCTS.unlock, PRODUCTS.slot]),
   token: z.string().min(1).max(16_384),
 });

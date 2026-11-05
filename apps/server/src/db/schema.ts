@@ -114,9 +114,12 @@ export const records = pgTable(
 export const purchases = pgTable(
   'purchases',
   {
-    /** `google:` + sha256 of the purchase token, or `apple:` + the original transaction id. */
+    /**
+     * `google:` + sha256 of the purchase token, `apple:` + the original transaction id, `test:` + sha256 of a
+     * test-store token, or `grant:` + a random id (given with the admin command, no payment).
+     */
     id: text('id').primaryKey(),
-    store: text('store', { enum: ['google', 'apple'] }).notNull(),
+    store: text('store', { enum: ['google', 'apple', 'test', 'grant'] }).notNull(),
     kind: text('kind', { enum: ['unlock', 'slot'] }).notNull(),
     /** unlock: the phone using it now (one at a time; a restore moves it). slot: the phone that bought it. */
     deviceId: uuid('device_id').notNull(),

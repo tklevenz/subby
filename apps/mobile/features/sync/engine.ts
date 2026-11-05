@@ -29,6 +29,7 @@ import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
+import { canWrite, forgetAccess, refreshEntitlement } from './access';
 
 const PUSH_BATCH = 500;
 
@@ -133,6 +134,7 @@ export async function deleteFamilyOnServer() {
 
 async function forgetSync() {
   closeLive();
+  forgetAccess();
   session = null;
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
@@ -204,11 +206,13 @@ async function runOnce() {
       await saveSync({ photosFamily: settings.familyId });
     }
     await queueUnsyncedPhotos();
-    const pushed = await pushAll(api, settings, keys);
+    // A phone without an unlock (hosted, after the trial) still pulls; its own changes wait, pending, until it's unlocked.
+    await refreshEntitlement(api);
+    const pushed = canWrite() ? await pushUnlessLocked(api, settings, keys) : { applied: false, tooLarge: 0 };
     const applied = (await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq)) || pushed.applied;
     const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: 'Downloading photos', done } }));
     // Phones set up before names existed (or whose name record was lost) name themselves once.
-    if (!syncSettings()?.names?.[settings.deviceId]) await pushDeviceName(defaultDeviceName());
+    if (!syncSettings()?.names?.[settings.deviceId] && canWrite()) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
     const pulled = pulledLogs;
@@ -220,6 +224,17 @@ async function runOnce() {
     const message = removed ? 'This phone is no longer in the family' : e instanceof Error ? e.message : String(e);
     useSyncStore.setState({ phase: 'error', error: message, removed, progress: null, pending: await pendingCount() });
     throw e;
+  }
+}
+
+/** Pushes; a 402 (the trial or grace just ended) only means this phone's changes wait for an unlock. */
+async function pushUnlessLocked(api: SyncSession, settings: SyncSettings, keys: Keys) {
+  try {
+    return await pushAll(api, settings, keys);
+  } catch (e) {
+    if (!(e instanceof SyncHttpError && e.status === 402)) throw e;
+    await refreshEntitlement(api);
+    return { applied: false, tooLarge: 0 };
   }
 }
 

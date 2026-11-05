@@ -8,6 +8,7 @@ import {
   HttpCode,
   Inject,
   Injectable,
+  NotFoundException,
   Post,
   ServiceUnavailableException,
   UseGuards,
@@ -23,7 +24,7 @@ import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';
 import { Entitlements } from '../sync/entitlements';
-import { AppStore, GooglePlay, PurchasePending, PurchaseRefused, type Store } from './stores';
+import { AppStore, GooglePlay, PurchasePending, PurchaseRefused, TestStore, testPurchaseId, type Store } from './stores';
 
 /** Google keeps voided purchases for 30 days; the first check after a start looks that far back. */
 const VOIDED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -32,6 +33,7 @@ const VOIDED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export class PurchasesService {
   readonly google: GooglePlay | null;
   readonly apple: AppStore | null;
+  readonly test: TestStore | null;
   private voidedCheckedAt: number | null = null;
 
   constructor(
@@ -42,6 +44,7 @@ export class PurchasesService {
   ) {
     this.google = config.stores.google ? new GooglePlay(config.stores.google) : null;
     this.apple = config.stores.apple ? new AppStore(config.stores.apple) : null;
+    this.test = config.stores.test ? new TestStore() : null;
   }
 
   /**
@@ -52,8 +55,9 @@ export class PurchasesService {
   async record(auth: AuthContext, purchase: z.infer<typeof PurchaseSchema>): Promise<EntitlementResponse> {
     if (this.config.mode !== 'hosted') throw new BadRequestException('Sync is free on this server: nothing to buy');
     const kind = productKind(purchase.product)!;
-    const store: Store | null = purchase.store === 'google' ? this.google : this.apple;
-    if (!store) throw new ServiceUnavailableException(`Purchases from the ${purchase.store === 'google' ? 'Play Store' : 'App Store'} aren't set up on this server`);
+    const store: Store | null = purchase.store === 'google' ? this.google : purchase.store === 'apple' ? this.apple : this.test;
+    const name = { google: 'the Play Store', apple: 'the App Store', test: 'the test store' }[purchase.store];
+    if (!store) throw new ServiceUnavailableException(`Purchases from ${name} aren't set up on this server`);
 
     let verified;
     try {
@@ -159,6 +163,17 @@ export class PurchasesController {
   @UseGuards(DeviceGuard)
   record(@Auth() auth: AuthContext, @Body() body: unknown) {
     return this.purchases.record(auth, parse(PurchaseSchema, body));
+  }
+
+  /** TEST_PURCHASES=1 only: refunds a test purchase, to try what a refund does to the app. */
+  @Post('purchases/test/refund')
+  @HttpCode(200)
+  @UseGuards(DeviceGuard)
+  async testRefund(@Auth() auth: AuthContext, @Body() body: unknown) {
+    if (!this.purchases.test) throw new NotFoundException();
+    const { token } = parse(z.object({ token: z.string().min(1).max(200) }), body);
+    await this.purchases.setRevoked([testPurchaseId(token)], true);
+    return this.entitlements.forDevice(auth.familyId, auth.deviceId);
   }
 
   /** Apple calls this; the payload is signed by Apple, so no auth. */

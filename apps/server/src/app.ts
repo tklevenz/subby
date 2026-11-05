@@ -33,7 +33,14 @@ class InfoController {
 
   @Get('info')
   info() {
-    return { service: 'kindred-sync', protocol: PROTOCOL_VERSION, mode: this.config.mode, push: this.config.push.kind !== 'none' };
+    return {
+      service: 'kindred-sync',
+      protocol: PROTOCOL_VERSION,
+      mode: this.config.mode,
+      push: this.config.push.kind !== 'none',
+      // Dev builds of the app offer the pretend store only when the server takes it.
+      testPurchases: this.config.mode === 'hosted' && this.config.stores.test,
+    };
   }
 }
 
