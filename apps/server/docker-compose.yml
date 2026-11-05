@@ -3,6 +3,7 @@
 #   docker compose up -d --build                   # plain HTTP on port 8787 (LAN or a VPN)
 #   docker compose --profile https up -d --build   # HTTPS on DOMAIN via Let's Encrypt (ports 80 and 443)
 #   With HTTPS, also set HTTP_BIND=127.0.0.1 in .env: plain HTTP is otherwise still open on port 8787.
+#   With HTTPS, also set TRUST_PROXY=uniquelocal, so request limits see each client's IP, not Caddy's.
 # See README.md in this folder.
 
 services:
@@ -38,6 +39,8 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       PUSH: ${PUSH:-}
       FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      RATE_LIMIT: ${RATE_LIMIT:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
       - blobs:/data
       # Put the Firebase service-account key here for PUSH=fcm (FCM_SERVICE_ACCOUNT=/secrets/firebase.json).

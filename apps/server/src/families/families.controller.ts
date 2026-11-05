@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Post, Query, UseGuards } from '@nestjs/common';
 import { AppendLogSchema, CreateFamilySchema } from '@kindred-log/shared/sync';
 import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
 import { parse, queryInt } from '../common/validate';
@@ -28,5 +28,13 @@ export class FamiliesController {
   @UseGuards(DeviceOrRecoveryGuard)
   append(@Auth() auth: AuthContext, @Body() body: unknown) {
     return this.families.append(auth, parse(AppendLogSchema, body).entry as DeviceLogEntry);
+  }
+
+  /** Deletes the family and all its data from the server. Any member, or the recovery key (a family whose phones are lost). */
+  @Delete('me')
+  @HttpCode(204)
+  @UseGuards(DeviceOrRecoveryGuard)
+  async remove(@Auth() auth: AuthContext) {
+    await this.families.delete(auth.familyId);
   }
 }

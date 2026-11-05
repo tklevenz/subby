@@ -8,7 +8,7 @@ import { activeReminderCount, formatAge } from '@kindred-log/shared';
 import { remindersAvailable, requestNotifications, setRemindersEnabled } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';
-import { useCanAddChild, useChildStore } from '../../store/useChildStore';
+import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/engine';
 import { Card, Row, Segmented } from '../../components/ui';
@@ -20,14 +20,12 @@ function ChildCard({
   avatar,
   title,
   subtitle,
-  subtitleAccent,
   dashed,
   onPress,
 }: {
   avatar: React.ReactNode;
   title: string;
   subtitle: string;
-  subtitleAccent?: boolean;
   dashed?: boolean;
   onPress: () => void;
 }) {
@@ -39,7 +37,7 @@ function ChildCard({
       <View className="w-16 h-16">{avatar}</View>
       <Text className={`font-semibold mt-2 ${dashed ? 'text-ink-soft' : 'text-ink'}`} numberOfLines={1}>{title}</Text>
       {/* Always rendered (even empty) so every card has the same height. */}
-      <Text className={`text-xs ${subtitleAccent ? 'text-violet-soft' : 'text-ink-muted'}`} numberOfLines={1}>{subtitle || ' '}</Text>
+      <Text className="text-xs text-ink-muted" numberOfLines={1}>{subtitle || ' '}</Text>
     </Pressable>
   );
 }
@@ -52,10 +50,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const children = useChildStore((s) => s.children);
   const activeChild = useActiveChild();
-  const canAddChild = useCanAddChild();
   const units = useSettingsStore((s) => s.units);
   const clock = useSettingsStore((s) => s.clock);
-  const isPremium = useSettingsStore((s) => s.isPremium);
   const reminders = useSettingsStore((s) => s.reminders);
   const reminderCount = activeReminderCount(reminders);
   const familyAlerts = useSettingsStore((s) => s.familyAlerts);
@@ -94,8 +90,7 @@ export default function SettingsScreen() {
             </View>
           }
           title="Add child"
-          subtitle={canAddChild ? '' : 'Premium'}
-          subtitleAccent
+          subtitle=""
         />
       </ScrollView>
 
@@ -158,15 +153,6 @@ export default function SettingsScreen() {
         value={clock}
         onChange={(v) => setSetting('clock', v)}
       />
-
-      {__DEV__ ? (
-        <>
-          <SectionTitle>Developer</SectionTitle>
-          <Card>
-            <Row label="Premium (stub)" right={<Switch value={isPremium} onValueChange={(v) => setSetting('isPremium', v)} />} />
-          </Card>
-        </>
-      ) : null}
 
       <View className="mt-10 items-center">
         <View className="flex-row items-center">

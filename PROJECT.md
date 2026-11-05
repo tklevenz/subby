@@ -39,35 +39,34 @@ Kindred Log is built on a **Local-First, Offline-Capable Architecture**.
 
 ---
 
-## 3. Monetization (draft plan, 2026-10-29)
+## 3. Monetization (decided 2026-11-05)
 
-Subby is open source: the app and shared package are MIT, Subby Sync (the server) is AGPL-3.0, and the name is kept as a trademark. Every app feature is free, for any number of children, because a gate in MIT code can't hold and would hit self-hosters too. We charge for what costs money to run: the official Subby Sync server.
+Subby is open source: the app and shared package are MIT, Subby Sync (the server) is AGPL-3.0, and the name is kept as a trademark. The app is free and complete on its own, for any number of children: a single parent can keep everything on the phone, with the backup file for safety. We charge only for what costs money to run: the official Subby Sync server, which is for sharing between phones. Self-hosting is free.
 
 **The model: a one-time unlock per phone, no subscription.** Baby tracking lasts a few years, so the hosting cost per family is bounded and a one-time price can cover it. Parents also dislike subscriptions for a tool they'll stop using.
 
-| | Official Subby Sync | Self-hosted Subby Sync |
-| --- | --- | --- |
-| **App features, children** | All, unlimited | All, unlimited |
-| **First phone** | Free: encrypted backup off the phone, recovery key, notifications | Free |
-| **Each further phone** | One-time unlock (about €6–8) | Free, unlimited |
-| **Push notifications** | Yes | No (live sync while open, OS background sync); a push relay comes later |
-| **Photo sync** | Included up to an allowance per family | Unlimited (your storage) |
+| | App only | Official Subby Sync | Self-hosted Subby Sync |
+| --- | --- | --- | --- |
+| **App features, children** | All, unlimited | All, unlimited | All, unlimited |
+| **Sharing between phones** | No | €6.99 per phone, once (14-day trial) | Free, unlimited |
+| **Push notifications** | Not needed (reminders are local) | Yes | No at launch; a free relay through our server later |
+| **Photo sync** | No | Up to 2 GB per family | Unlimited (your storage) |
+| **Backup** | The backup file | The backup file, plus recovery from the server with the 24 words | The same, on your server |
 
 **How it works:**
-- **Per phone, not per family:** each phone owns its purchase, so there's no main account or license holder. A purchase is linked to the phone's device id through the store's own account field (Apple `appAccountToken`, Google `obfuscatedAccountId`). "Restore purchases" moves it to a new phone; the server keeps one active phone per purchase.
-- **Trying it out:** a new phone can join a family and pull everything, but it pushes only once it's unlocked. The first phone in a family always syncs.
-- **On the server:** one row per purchase (store transaction id, device id), checked in `Entitlements.canSync`. No expiry and no personal data. Self-hosted mode always allows everything.
-- **Inactive families:** deleted after about 12 months without a sync, with warnings first. The phones keep all their data.
-- **Photos:** stored compressed (see the roadmap). Past the allowance, new photos stay on the phone only, as oversized ones already do.
+- **Every phone that syncs needs an unlock, paid one of two ways:**
+  - *Its own unlock:* a non-consumable purchase on the person's store account. "Restore purchases" brings it back on a new phone, and it comes along into any family. The server records which phone uses it, one at a time.
+  - *A gift from the family:* any member's phone buys a slot (a consumable), usually while adding a grandparent or nanny. The slot belongs to the family, frees up when its phone is removed, and works on Android and iPhone alike.
+  - So the cost can be split however the family likes, with no main account or license holder. There's no free caregiver tier.
+- **Trial:** a new family syncs fully for 14 days. No card, nothing renews. After the trial, a phone without an unlock still syncs for 48 hours (so a partner's phone doesn't stop in the middle of the night), then reads everything but can't log until it's unlocked.
+- **Purchases** carry the buying phone's device id through the store's own account field (Apple `appAccountToken`, Google `obfuscatedAccountId`). The server verifies them itself against Google Play and the App Store (no RevenueCat) and stores only store, transaction id, kind and the device or family it belongs to. No personal data, no expiry. Refunds revoke. Self-hosted mode always allows everything.
+- **Switching between Android and iPhone:** an own unlock stays with its store, so switching means buying again; gifted slots work on both.
+- **Photos:** shrunk when picked (~2048 px). Past the 2 GB allowance, new photos stay on the phone only, as oversized ones already do.
+- **Inactive families:** deleted from the server after 12 months without any phone syncing, with warnings in the app from month 11. That also drops gifted slots. The phones keep all their data.
+- **Hosting:** Hetzner, Germany (a Cloud VPS, Object Storage for photos, encrypted nightly backups).
+- Not at launch: a tip or supporter purchase.
 
-**Open details (not decided):**
-- The price, and whether it's per phone or one price per family.
-- The photo allowance (2–5 GB?), and whether to sell more.
-- Free caregiver invites (nanny, grandparents), limited or read-only, as members who don't pay.
-- Switching between Android and iPhone means buying again (stores don't share purchases). Accept that or allow a manual transfer.
-- The inactivity period and its warnings.
-- An optional tip or supporter purchase.
-- Store billing: verify purchases ourselves or use RevenueCat.
+The launch tickets for all of this are in `LAUNCH.md`.
 
 ---
 
@@ -115,7 +114,7 @@ Subby is open source: the app and shared package are MIT, Subby Sync (the server
   * Remove the app's premium gates: the one-child limit (`FREE_CHILD_LIMIT`, `PremiumGate`, the Baby Buddy import default) and the "Premium" label on CSV export.
   * Compress photos when they're picked: resize to a long edge of about 2048 px (avatars smaller) and re-encode as JPEG. There's no need to keep full-size camera photos (often 5–10 MB) in Subby; this keeps photo sync and the hosted allowance small. Existing photos stay as they are.
   * `LICENSE` files, the self-hosting README and the hosted-mode entitlements.
-* Then: store billing for the per-phone unlock (§3), the photo allowance and inactive-family cleanup on the hosted server.
+* Then: everything in `LAUNCH.md` (store billing for the per-phone unlock (§3), the photo allowance, inactive-family cleanup, iOS, operations, legal, store release).
 
 
 * **Phase 3: Integrations**

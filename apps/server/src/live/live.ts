@@ -30,6 +30,11 @@ export class LiveBus {
     }
   }
 
+  /** Closes every socket of a deleted family. */
+  closeFamily(familyId: string) {
+    for (const socket of this.sockets.get(familyId) ?? []) socket.close(4401, 'Family deleted');
+  }
+
   /** Closes the sockets of a removed device. */
   closeDevice(familyId: string, deviceId: string) {
     for (const socket of this.sockets.get(familyId) ?? []) {

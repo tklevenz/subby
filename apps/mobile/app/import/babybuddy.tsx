@@ -17,7 +17,7 @@ import {
 import { Button, Card, FieldLabel, Row, Segmented, TextField } from '../../components/ui';
 import { BBClient, BBError } from '../../features/import/babybuddy/client';
 import { previewImport, runImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../features/import/babybuddy/importer';
-import { canAddChild, useChildStore } from '../../store/useChildStore';
+import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { SubLoader, SubProgress, SubSpinner } from '../../components/brand/loaders';
@@ -211,26 +211,18 @@ function Review({
   const [units, setUnits] = useState(preview.units);
   const total = BB_ENDPOINTS.reduce((n, e) => n + preview.counts[e], 0);
 
-  // Default mapping: previously imported child → same child; else same birth date; else new
-  // (or "don't import" once the free child limit is reached).
-  const [mapping, setMapping] = useState<Record<number, string>>(() => {
-    let created = 0;
-    return Object.fromEntries(
+  // Default mapping: previously imported child → same child; else same birth date; else new.
+  const [mapping, setMapping] = useState<Record<number, string>>(() =>
+    Object.fromEntries(
       preview.children.map((bb) => {
         const ref = bbRef(client.host, 'children', bb.id);
         const match = kindredChildren.find((k) => k.importRef === ref) ?? kindredChildren.find((k) => k.birthDate === bb.birth_date);
-        if (match) return [bb.id, match.id];
-        if (!canAddChild(kindredChildren.length + created, settings.isPremium)) return [bb.id, SKIP];
-        created++;
-        return [bb.id, NEW];
+        return [bb.id, match ? match.id : NEW];
       }),
-    );
-  });
+    ),
+  );
 
-  // Free covers one child: extra Baby Buddy children must go into an existing one.
-  const newCount = preview.children.filter((bb) => mapping[bb.id] === NEW).length;
   const allSkipped = preview.children.length > 0 && preview.children.every((bb) => mapping[bb.id] === SKIP);
-  const overLimit = newCount > 0 && !canAddChild(kindredChildren.length + newCount - 1, settings.isPremium);
 
   const childOptions = useMemo(
     () => [
@@ -295,12 +287,7 @@ function Review({
         </View>
       ))}
 
-      {overLimit ? (
-        <Text className="text-amber-soft mt-2 leading-5">
-          The free version tracks one child. Import the others into an existing child, choose "Don't import", or get Premium to add them as their own.
-        </Text>
-      ) : null}
-      <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0 || overLimit || allSkipped} />
+      <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0 || allSkipped} />
       {preview.children.length === 0 ? <Text className="text-amber-soft mt-2">No children found on this server.</Text> : null}
     </View>
   );

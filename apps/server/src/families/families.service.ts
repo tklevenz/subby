@@ -4,6 +4,7 @@ import { verifyDeviceLog, type DeviceLogEntry } from '@kindred-log/shared/crypto
 import { DB, schema, type Db, type Tx } from '../db/db';
 import { RECOVERY, type AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';
+import { BlobsService } from '../blobs/blobs';
 import { lockFamily } from '../db/lock';
 
 export { lockFamily };
@@ -22,6 +23,7 @@ export class FamiliesService {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(LiveBus) private readonly live: LiveBus,
+    @Inject(BlobsService) private readonly blobs: BlobsService,
   ) {}
 
   /** The first device creates the family: its self-signed `create` entry and its sealed epoch-1 key. */
@@ -54,15 +56,39 @@ export class FamiliesService {
     if (entry.signer !== auth.deviceId) throw new ForbiddenException('Entries must be signed by the caller');
     // An epoch comes with its sealed keys (POST /v1/keys/rotate), so nobody is left without the new key.
     if (entry.type === 'epoch' || entry.type === 'create') throw new BadRequestException(`"${entry.type}" entries can't be appended here`);
-    const result = await this.db.transaction(async (tx) => {
+    const { result, deleted } = await this.db.transaction(async (tx) => {
       await lockFamily(tx, auth.familyId);
       await appendVerified(tx, auth.familyId, entry);
       await this.apply(tx, auth.familyId, entry);
-      return { index: entry.index };
+      // The last phone left: nobody can sync any more, so nothing of the family stays (recovery words included).
+      const remaining = entry.type === 'remove' ? await tx.$count(schema.devices, and(eq(schema.devices.familyId, auth.familyId), eq(schema.devices.active, true))) : 1;
+      return { result: { index: entry.index }, deleted: remaining === 0 ? await deleteRows(tx, auth.familyId) : null };
     });
+    if (deleted) {
+      await this.afterDelete(auth.familyId, deleted);
+      return result;
+    }
     if (entry.type === 'remove') this.live.closeDevice(auth.familyId, entry.deviceId);
     this.live.publish(auth.familyId, { type: 'log', index: entry.index });
     return result;
+  }
+
+  /**
+   * Deletes everything the server holds for the family: records, keys, the device log, devices, sessions,
+   * invites, push tokens and photo files. The phones keep their own data; the others find out on their next sync
+   * (they can't log in any more, like a removed phone).
+   */
+  async delete(familyId: string) {
+    const blobIds = await this.db.transaction(async (tx) => {
+      await lockFamily(tx, familyId);
+      return deleteRows(tx, familyId);
+    });
+    await this.afterDelete(familyId, blobIds);
+  }
+
+  private async afterDelete(familyId: string, blobIds: string[]) {
+    this.live.closeFamily(familyId);
+    await this.blobs.deleteFiles(blobIds);
   }
 
   private async apply(tx: Tx, familyId: string, entry: DeviceLogEntry) {
@@ -99,6 +125,13 @@ export class FamiliesService {
         break;
     }
   }
+}
+
+/** Inside a locked transaction: deletes the family row (every table cascades from it). Returns its photo ids. */
+async function deleteRows(tx: Tx, familyId: string) {
+  const blobs = await tx.select({ id: schema.blobs.id }).from(schema.blobs).where(eq(schema.blobs.familyId, familyId));
+  await tx.delete(schema.families).where(eq(schema.families.id, familyId));
+  return blobs.map((b) => b.id);
 }
 
 /** Inside a locked transaction: verifies the whole chain with `entry` appended, then stores it. */

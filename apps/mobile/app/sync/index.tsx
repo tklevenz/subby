@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
-import { pushDeviceName, setUpSync, syncNow, turnOffSync, useSyncStore } from '../../features/sync/engine';
+import { deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync, useSyncStore } from '../../features/sync/engine';
 import { defaultDeviceName, removeDevice } from '../../features/sync/family';
 import { Button, Card, FieldLabel, Row, TextField } from '../../components/ui';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
@@ -69,7 +69,7 @@ function SetUp() {
 
 function Status() {
   const sync = useSettingsStore((s) => s.sync)!;
-  const { phase, error, pending: waiting, progress, removed, tooLarge } = useSyncStore();
+  const { phase, error, pending: waiting, progress, removed, tooLarge, members } = useSyncStore();
   // Entries too large to sync stay pending; they're reported on their own, not as "waiting".
   const pending = Math.max(0, waiting - tooLarge);
   const formatTime = useFormatTime();
@@ -86,23 +86,40 @@ function Status() {
           ? `${pending.toLocaleString()} changes waiting`
           : 'Up to date';
 
+  const lastPhone = members.length <= 1;
   const confirmOff = () =>
     Alert.alert(
       'Turn off sync on this phone?',
-      'Everything stays on this phone, but it leaves the family and stops syncing. Joining again needs a new code from another phone.',
+      lastPhone
+        ? "Everything stays on this phone. It's the only phone in the family, so the family and its data are deleted from the server, recovery key included."
+        : 'Everything stays on this phone, but it leaves the family and stops syncing. Joining again needs a new code from another phone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Turn off', style: 'destructive', onPress: () => turnOffSync() },
       ],
     );
 
+  const confirmDelete = () =>
+    Alert.alert(
+      'Delete the family from the server?',
+      'Everything the server holds for your family is deleted: entries, photos, keys and the recovery key. Every phone keeps what it has, but none of them syncs any more. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteFamilyOnServer().catch((e: unknown) => Alert.alert("Couldn't delete it", e instanceof Error ? e.message : String(e))),
+        },
+      ],
+    );
+
   if (removed) {
     return (
       <>
-        <Text className="text-ink text-xl font-bold">This phone was removed from the family</Text>
+        <Text className="text-ink text-xl font-bold">This phone is no longer in the family</Text>
         <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
-          Another phone in the family removed it, so it no longer syncs. Everything already on this phone stays here. To sync again,
-          turn sync off, then join with a new code from a phone in the family.
+          Another phone removed it, or deleted the family from the server, so it no longer syncs. Everything already on this phone
+          stays here. To sync again, turn sync off, then join with a new code from a phone in the family, or set up sync anew.
         </Text>
         <Button label="Turn off sync on this phone" onPress={() => turnOffSync()} />
       </>
@@ -135,6 +152,7 @@ function Status() {
       <Recovery />
 
       <Button label="Turn off sync on this phone" variant="danger" onPress={confirmOff} />
+      {!lastPhone ? <Button label="Delete the family from the server" variant="danger" onPress={confirmDelete} /> : null}
     </>
   );
 }

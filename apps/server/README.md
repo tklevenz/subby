@@ -23,8 +23,9 @@ cp docker.env.example .env
 ### With HTTPS (recommended)
 
 Release builds of the app only talk to `https://` servers. Point a domain (or subdomain) at the machine, open
-ports 80 and 443, set `DOMAIN=sync.example.com` and `HTTP_BIND=127.0.0.1` in `.env` (the second keeps plain HTTP off
-the network, so nothing can reach the server around the certificate), then:
+ports 80 and 443, set `DOMAIN=sync.example.com`, `HTTP_BIND=127.0.0.1` and `TRUST_PROXY=uniquelocal` in `.env` (the second keeps
+plain HTTP off the network, so nothing can reach the server around the certificate; the third lets request limits
+see each client's IP instead of Caddy's), then:
 
 ```sh
 docker compose --profile https up -d --build
@@ -92,11 +93,13 @@ With a prebuilt image on the server, `docker compose up -d` (without `--build`) 
 |---|---|---|
 | `DATABASE_URL` | (set by Compose) | Postgres connection string |
 | `PORT` | `8787` | |
-| `MODE` | `self` | `self` (no limits, no push) or `hosted` |
+| `MODE` | `self` | `self` (no quotas or payment, no push) or `hosted` |
 | `BLOB_STORE` | `disk` | `disk` (`BLOB_DIR`, `/data/blobs` in the image) or `s3` |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | for `BLOB_STORE=s3`, any S3-compatible storage |
 | `PUSH` | `none` (`fcm` when hosted) | background "sync now" pings via Firebase Cloud Messaging |
 | `FCM_SERVICE_ACCOUNT` | | for `PUSH=fcm`: path to the Firebase service-account key (`/secrets/firebase.json`, from `./secrets`) |
+| `RATE_LIMIT` | `on` | per-client request limits (429 past them; generous, to stop scripts) or `off` |
+| `TRUST_PROXY` | (none) | reverse proxies whose `X-Forwarded-For` to believe: `uniquelocal` for Caddy in this compose, or addresses/ranges |
 
 Without push, phones sync while the app is open, and in the background as often as the phone allows (roughly
 every 15 minutes or more). Push only reaches app builds made with the same Firebase project as the key, so the

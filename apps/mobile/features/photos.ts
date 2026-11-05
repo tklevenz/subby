@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import { Directory, File, Paths } from 'expo-file-system';
 import { downloads } from '../modules/kindred-downloads';
@@ -17,19 +18,58 @@ export async function persistPhoto(uri: string): Promise<string> {
   return dest.uri;
 }
 
+/** Longest edge kept: plenty for a phone screen, and keeps photo sync (and the hosted allowance) small. */
+const MAX_EDGE = 2048;
+const MAX_AVATAR_EDGE = 512;
+
 /**
- * Let the user take or choose a photo and keep a copy in the app. `square` crops for avatars.
+ * Let the user take or choose a photo and keep a shrunk copy in the app. `square` crops for avatars.
  * Returns null when cancelled or permission is denied.
  */
 export async function pickPhoto(source: 'camera' | 'library', square = false): Promise<string | null> {
   const opts: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images'],
-    quality: 0.7,
+    // Full quality here: the photo is compressed once, when it's shrunk.
+    quality: 1,
     ...(square ? { allowsEditing: true, aspect: [1, 1] as [number, number] } : {}),
   };
   if (source === 'camera' && !(await ImagePicker.requestCameraPermissionsAsync()).granted) return null;
   const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-  return !res.canceled && res.assets[0] ? persistPhoto(res.assets[0].uri) : null;
+  const asset = !res.canceled ? res.assets[0] : undefined;
+  if (!asset) return null;
+  const shrunk = await shrinkPhoto(asset, square ? MAX_AVATAR_EDGE : MAX_EDGE);
+  try {
+    return await persistPhoto(shrunk);
+  } finally {
+    // The shrunk file is a temporary one in the cache.
+    if (shrunk !== asset.uri) {
+      try {
+        new File(shrunk).delete();
+      } catch {}
+    }
+  }
+}
+
+/**
+ * Scales a photo down to `maxEdge` on its longest side and re-encodes it as JPEG. Re-encoding also drops the
+ * metadata (location, camera), which has no place in a baby log. Falls back to the original if it can't.
+ */
+async function shrinkPhoto(asset: { uri: string; width: number; height: number }, maxEdge: number): Promise<string> {
+  const context = ImageManipulator.manipulate(asset.uri);
+  try {
+    if (Math.max(asset.width, asset.height) > maxEdge) context.resize(asset.width >= asset.height ? { width: maxEdge } : { height: maxEdge });
+    const image = await context.renderAsync();
+    try {
+      return (await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 })).uri;
+    } finally {
+      image.release();
+    }
+  } catch (e) {
+    console.warn("Couldn't shrink the photo, keeping the original", e);
+    return asset.uri;
+  } finally {
+    context.release();
+  }
 }
 
 const imageType = (uri: string) => (/\.png$/i.test(uri) ? 'image/png' : 'image/jpeg');

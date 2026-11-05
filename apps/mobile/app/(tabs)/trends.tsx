@@ -38,7 +38,6 @@ export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
   const now = useNow(60_000);
   const units = useSettingsStore((s) => s.units);
-  const isPremium = useSettingsStore((s) => s.isPremium);
   const [range, setRange] = useState<(typeof RANGES)[number]['value']>('7');
   const count = Number(range);
   const today = startOfDay(now);
@@ -193,7 +192,7 @@ export default function TrendsScreen() {
           <Row label="Sleep schedule" value="Predicted" onPress={() => router.push('/schedule')} right={chevron} />
           <Row label="Growth charts" value="WHO" onPress={() => router.push('/growth')} right={chevron} />
           <Row label="Solids report" onPress={() => router.push('/solids')} right={chevron} />
-          <Row label="Export CSV" value={isPremium ? undefined : 'Premium'} onPress={() => router.push('/export')} right={chevron} />
+          <Row label="Export CSV" onPress={() => router.push('/export')} right={chevron} />
         </Card>
       </View>
     </ScrollView>

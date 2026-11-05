@@ -12,8 +12,6 @@ export type Settings = {
   reminders: ReminderSettings;
   /** Device-local: notifications when another phone logs a sleep (not a reminder, so not under its switch). */
   familyAlerts: FamilyAlertSettings;
-  /** Entitlement stub until payments exist (gates CSV export, multiple children). */
-  isPremium: boolean;
   /** Last Baby Buddy server used for import (the API key is never stored). */
   bbUrl: string | null;
   /** Home tile pinned to the top, per child id (default sleep). Set by long-pressing a tile. */
@@ -51,7 +49,6 @@ const DEFAULTS: Settings = {
   activeChildId: null,
   reminders: DEFAULT_REMINDERS,
   familyAlerts: DEFAULT_FAMILY_ALERTS,
-  isPremium: false,
   bbUrl: null,
   homeTop: {},
   sync: null,

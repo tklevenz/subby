@@ -94,7 +94,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `useLogStore`: date-windowed load + `loadOlder`, `addLog`, `startTimer`/`stopTimer`, `updateLog(id, {payload?, startedAt?, endedAt?})`, `softDeleteLog` (keeps only id and type: the payload becomes `{type}`), `getLog`. Update, delete and `getLog` work for entries outside the loaded window too (falling back to SQLite). `revision` is bumped on every write.
   - Note photos are deleted from disk when their entry is deleted or the photo is replaced (`features/photos.ts`).
   - `queries.ts`: `fetchLogs(childId, {from, to, types, where})` reads SQLite directly; `useLogQuery` re-reads on every `revision`. Use these for anything beyond the store's 30-day window: History day/week, Trends, Growth, Solids, Export, and all-time lookups such as allergens in `FoodPicker` and milestones done. `HAS_FOODS` filters feeds that have foods.
-  - `useChildStore` (`deleteChild` turns the child's logs into scrubbed tombstones, deletes its reminders and photos, and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId, isPremium stub; `set` updates memory before the DB write, so back-to-back read-modify-writes like `saveSync` don't lose each other's changes, and `null` deletes the row because `value` is NOT NULL), `useActiveChild`.
+  - `useChildStore` (`deleteChild` turns the child's logs into scrubbed tombstones, deletes its reminders and photos, and leaves a scrubbed tombstone row), `useSettingsStore` (units, clock, activeChildId…; `set` updates memory before the DB write, so back-to-back read-modify-writes like `saveSync` don't lose each other's changes, and `null` deletes the row because `value` is NOT NULL), `useActiveChild`.
 - **Routes (expo-router):**
   - `app/_layout.tsx`: DB init + hydration; `Stack.Protected` sends users to `onboarding` when no child exists.
   - `app/(tabs)/`:
@@ -105,7 +105,6 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - The header: the avatar opens the child's profile, the name switches child (`ChildSwitcher`).
     - `history`: one day (`components/history/DayLog`): the day as a timeline, newest first: times on a rail, sleeps as thick spans, the wake windows between sleeps (`dayTimeline` in shared), a night with wakings as one block (`NightBar`, wakings listed when opened, tap to edit), plus the day's totals; arrows move by day; tapping the date opens `datetime/CalendarSheet` (month grid, Monday first, a dot on days with entries, swipe or arrows between months; `monthGrid` in `datetime/parts.ts`), and "Back to today" returns. (The Week view was dropped: Trends has the same totals.)
     - `trends`: 7/14/30-day averages and charts. A Nights section (time asleep, wakings, longest stretch, awake at night) appears once wakings are logged in the period.
-    - `settings`: includes a `__DEV__`-only Premium stub toggle.
   - `app/schedule.tsx` (next sleep + suggested day; linked from Home's "Sleep schedule" row), `app/reminders.tsx`.
   - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV).
   - `app/backup.tsx` (Settings → Backup & restore; also linked from onboarding, not route-guarded), backed by `features/backup.ts`:
@@ -116,10 +115,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Restore: pick a file with `File.pickFileAsync` (no document-picker package), preview, then merge in one transaction. Restored rows are `pending`, so they sync.
     - An import ref already used by another row here is dropped from the restored row.
   - `app/entry/[id].tsx`: edit/backdate any entry. A finished night sleep opens as its whole night (`components/NightForm`): bedtime, wake-up, the wakings (add, edit, remove), notes; saving reuses the pieces in order, adds or deletes the rest (a removed waking joins two pieces; their notes and tags move to the first). Pieces that touch (a zero-length waking) open without that waking, so saving joins them. Mostly used the morning after: log the night as one, split it later.
-  - `app/child/new.tsx`: add a child (modal). It shows `PremiumGate` instead once the free limit is reached.
-  - **Premium gates** (`isPremium` stub; dev toggle in Settings):
-    - More than `FREE_CHILD_LIMIT` (1) children. This is checked by `useCanAddChild` in the UI and enforced again in `useChildStore.addChild`.
-    - The Baby Buddy import defaults extra children to "Don't import" for free users.
+  - `app/child/new.tsx`: add a child (modal).
+  - **No feature gates** (removed 2026-11-05): the app is free and complete, any number of children. Only syncing on the hosted server is paid (PROJECT.md §3); never add a paywall in the app.
   - `app/child/[id]/index.tsx`: the child's profile page (no stack header). Full-width photo cover with name and age, a growth chart (Weight/Length/Head, WHO band), and the story of firsts (`childStory`).
   - `app/child/[id]/edit.tsx`: edit details; the danger zone deletes a child after the user types its name.
   - Settings shows children as an avatar strip linking to their profiles. App-wide settings stay in Settings.
@@ -130,7 +127,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `ChildAvatar`: the photo, or the child's initial on a per-child color. `PhotoMenu`: take/choose/remove; it runs the picker only after its modal has dismissed (iOS).
   - `logTypes.tsx`: `TYPE_META` (label/icon/colors) + `defaultPayload` per type. `logDisplay.tsx`: row text per entry.
   - `icons/`: all icons are Font Awesome 6 Free **solid**, drawn with `react-native-svg` (no icon font, no Lucide). `faPaths.ts` is generated from `@fortawesome/fontawesome-free/svgs/solid` (don't edit by hand); add an icon by adding its name there and a `make('<name>')` export in `index.tsx`. `PoopDroplet` (poop with a masked-out droplet) is the diaper icon. The CC BY 4.0 credit is at the bottom of Settings; keep it.
-  - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField (copies into `Paths.document/photos`); `FoodPicker`.
+  - `editors/`: **one editor per log type** (`EDITORS` registry), shared by the "log new" sheet and the edit screen. `fields.tsx` has NumberField/UnitNumberField (canonical value, display unit), TagsField, PhotoField; `FoodPicker`.
+  - Photos (`features/photos.ts` `pickPhoto`) are shrunk when picked with `expo-image-manipulator`: longest edge 2048 px (avatars 512), re-encoded as JPEG (0.8), which also drops location and camera metadata; then copied into `Paths.document/photos`. If shrinking fails, the original is kept.
   - `sheets/`: `SheetHost` owns the **single** `BottomSheet` on Home and swaps content per `useSheetStore` request: `FeedSheet` (live L/R timer, bottle, solids), `LogSheet` (generic, + `CommonFields` notes/tags; sleep, pumping and activity: the start defaults to now and the end is empty; Save needs an end (a past one), "Start timer" runs from the chosen start), `AddLogSheet` (grid of `LOG_TILE_KEYS`: every type, with Tummy time as its own tile; `logTile` in `logTypes.tsx`), `DiaperSheet` (one tap on Wet/Dirty/Both logs now, then optional color, Undo, auto-closes; Wet is blue, Dirty brown, Both neutral with both icons). Keep one Modal (iOS can't present while another dismisses).
   - `ui.tsx`: Chip, Segmented, TextField, Button, Card, Row.
   - `useSingleFlight`: wrap a sheet's log/save/start handlers in it, so a double tap doesn't log twice.
@@ -165,7 +163,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Each record lists its blob ids (`SyncRecord.blobs`, not in the AAD) so the server can delete unused photos.
     - Blob up/download uses `expo/fetch` (raw bytes).
   - `engine.ts`:
-    - `setUpSync` creates the family; `turnOffSync` leaves the family (a self `remove` in the device log, best effort) and forgets this phone's keys.
+    - `setUpSync` creates the family; `turnOffSync` leaves the family (a self `remove` in the device log, best effort) and forgets this phone's keys. The last phone leaving deletes the family on the server.
+    - `deleteFamilyOnServer` (Sync screen, not shown on the last phone) deletes the family and all its server data, then turns sync off. The other phones see it like being removed (`removed`: "no longer in the family").
     - Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
     - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
@@ -202,6 +201,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `info`.
   - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed. `verify` re-checks membership (or the current recovery key) under `lockFamily` (`db/lock.ts`), so a phone removed after its challenge gets no session.
   - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
+  - `DELETE families/me` (any member, or the recovery key): deletes the family row (every table cascades from it) and its photo files, and closes its live sockets. A `remove` that leaves no active phone does the same, recovery key included. Nothing of a deleted family is kept.
   - `keys`: `GET`, `grant`, and `rotate`.
     - A rotation is the signed `epoch` log entry plus the key sealed to exactly the current members plus the recovery key, stored in one transaction. `families/me/log` refuses `epoch` entries.
     - Its `closedSeq` must equal the family's seq, otherwise 409 ("Pull first"); it's required.
@@ -215,16 +215,18 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Records must be written as the calling device.
   - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
   - `push/token` (PUT/DELETE, `{token, platform}`): kept only with `PUSH=fcm` (the default for `MODE=hosted`; needs `FCM_SERVICE_ACCOUNT`, a Firebase service-account key, mounted from `./secrets` in Docker). After accepted writes, `PushService` sends the family's other Android phones a data-only, high-priority `{kind: 'sync'}` message straight to FCM HTTP v1 (coalesced over 2 s; OAuth token from a JWT signed with the key via `node:crypto`, cached for the hour). Tokens are dropped on FCM 404/400 or when the device is removed. iOS tokens are stored but not sent to yet (APNs is a TODO). Push only reaches app builds made with the same Firebase project. `/v1/info` reports `push`.
-- **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, and grant, only to a phone the recovery key added (grants are first-come). They can't sync or rotate.
+- **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, grant (only to a phone the recovery key added; grants are first-come), and delete the family. They can't sync or rotate.
 - **Code conventions:**
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
   - `lockFamily(tx, id)` serializes writes per family.
-- **Single-instance assumptions:** auth challenges and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
+- **Single-instance assumptions:** auth challenges, rate limits and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
 - **Housekeeping** (`common/housekeeping.ts`, hourly): deletes expired sessions and invites more than a day past expiry.
 - **Shutdown:** Fastify runs with `forceCloseConnections: true`, and `LiveGateway` terminates its sockets on destroy. Otherwise a connection that never sent a request (or a closing WebSocket) holds a restart for up to the 60 s header timeout; that was the flaky e2e teardown.
+- **Rate limits** (`common/rateLimit.ts`): token buckets per rule and client IP, in memory and bounded (least recently used dropped). Tight on unauthenticated or costly routes (auth, family create, invites, claims, blob uploads, push tokens), generous for the rest; 429 with `Retry-After`. `RATE_LIMIT=off` disables them (the e2e suite does, since every simulated phone is 127.0.0.1).
+- **Behind a proxy:** `TRUST_PROXY` is Fastify's `trustProxy` (proxy addresses or ranges, e.g. `uniquelocal` for Caddy in the compose; `true` is refused, since any client could then pick its IP). Without it, every request seems to come from the proxy.
 - **Query parameters:** numbers are parsed with `queryInt` (whole numbers only, at most a 32-bit integer unless a larger `max` is given, otherwise 400).
 - **Input bounds** (`protocol.ts`): base64url fields are length-capped and refuse lengths that can't decode (4n+1); epochs and log indexes fit 32 bits; grant and rotate lists are capped. Auth challenges are capped in memory (oldest dropped); live sockets have a 4 KB message limit and aren't tracked if they closed during auth.
-- **Modes:** `MODE=self|hosted`. `Entitlements.canSync` is the hook for the hosted subscription (a stub for now).
+- **Modes:** `MODE=self|hosted`. `Entitlements.canSync`/`canStore` are the hooks for hosted payments and the photo allowance (stubs for now; see `LAUNCH.md` S3, S6).
 - **Commands** (in `apps/server`):
   - `pnpm db:up`: dev Postgres on port **54329** via `docker-compose.dev.yml`.
   - `pnpm serve:dev`: needs `.env`, copied from `.env.example`. Deliberately not named `dev`, so the root `pnpm run dev` still only starts the app.
@@ -284,4 +286,4 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Periodic background sync verified headless on the emulator with a release build: app process killed, WorkManager started it without UI, the task logged in, synced and re-queued itself.
   - Push is covered by server e2e tests against a fake Expo push service. A real device push still needs an Expo project id plus FCM/APNs credentials (not set up).
 - 2026-11-04: push goes straight to FCM (no Expo push service): server e2e against a fake Google OAuth + FCM. Android device test pending; APNs not yet.
-- **Next:** M8, open source and hosting readiness (see the plan file).
+- **Next:** the launch plan in `LAUNCH.md` (all remaining tickets: decisions, server, app, payments, operations, legal, store release). No public beta; we dogfood on the production server.

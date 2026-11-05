@@ -3,14 +3,27 @@ import { readFileSync } from 'node:fs';
 export type Config = {
   databaseUrl: string;
   port: number;
-  /** `self`: self-hosted, no limits, no push. `hosted`: the official Subby Sync service. */
+  /** `self`: self-hosted, no quotas or payment, no push. `hosted`: the official Subby Sync service. */
   mode: 'self' | 'hosted';
   migrationsFolder: string;
   /** Where encrypted files (photos) go: a local folder, or S3-compatible object storage. */
   blobs: BlobStoreConfig;
   /** Background "sync now" pings through Firebase Cloud Messaging. On by default for hosted. */
   push: { kind: 'none' } | FcmConfig;
+  /** Per-client request limits (`common/rateLimit.ts`). On unless RATE_LIMIT=off. */
+  rateLimit: boolean;
+  /**
+   * Which reverse proxies to believe about the client's IP (X-Forwarded-For), as Fastify's `trustProxy`: false
+   * (none, the default), or proxy addresses/ranges such as `uniquelocal` (private networks: Caddy in the same compose).
+   */
+  trustProxy: false | string;
 };
+
+function trustProxy(value: string | undefined): Config['trustProxy'] {
+  if (!value || value === 'false') return false;
+  if (value === 'true') throw new Error("TRUST_PROXY=true would let any client pick its IP: give the proxy's addresses, e.g. uniquelocal");
+  return value;
+}
 
 /** From a Firebase service-account key (Project settings → Service accounts). */
 export type FcmConfig = {
@@ -67,7 +80,17 @@ export function loadConfig(env: NodeJS.ProcessEnv, migrationsFolder: string): Co
   const mode = env.MODE || 'self';
   if (mode !== 'self' && mode !== 'hosted') throw new Error(`MODE must be "self" or "hosted", got "${mode}"`);
   if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-  return { databaseUrl: env.DATABASE_URL, port: Number(env.PORT || 8787), mode, migrationsFolder, blobs: blobStoreConfig(env), push: pushConfig(env, mode) };
+  if (env.RATE_LIMIT && env.RATE_LIMIT !== 'on' && env.RATE_LIMIT !== 'off') throw new Error(`RATE_LIMIT must be "on" or "off", got "${env.RATE_LIMIT}"`);
+  return {
+    databaseUrl: env.DATABASE_URL,
+    port: Number(env.PORT || 8787),
+    mode,
+    migrationsFolder,
+    blobs: blobStoreConfig(env),
+    push: pushConfig(env, mode),
+    rateLimit: env.RATE_LIMIT !== 'off',
+    trustProxy: trustProxy(env.TRUST_PROXY),
+  };
 }
 
 export const CONFIG = Symbol('CONFIG');

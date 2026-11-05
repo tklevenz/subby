@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, toBase64 } from '@kindred-log/shared/crypto';
+import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@kindred-log/shared/crypto';
 import { openRecord } from '@kindred-log/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
@@ -95,6 +95,9 @@ describe.skipIf(!reachable)('sync server', () => {
       mode: 'self',
       migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
       blobs: { kind: 'disk', dir: blobDir },
+      // Every simulated phone comes from 127.0.0.1; the limits have their own tests.
+      rateLimit: false,
+      trustProxy: false,
       push: {
         kind: 'fcm',
         projectId: 'subby-test',
@@ -682,6 +685,106 @@ describe.skipIf(!reachable)('sync server', () => {
       expect((await put(ref.id, new Uint8Array([1]))).status).toBe(409);
       expect((await put(randomUUID(), new Uint8Array())).status).toBe(400);
       expect((await put(randomUUID(), new Uint8Array([1]), '')).status).toBe(401);
+    });
+  });
+
+  describe('deleting a family', () => {
+    const tables = ['families', 'device_log', 'devices', 'family_keys', 'sessions', 'invites', 'blobs', 'push_tokens', 'records'];
+    /** Rows left for the family, per table (the families table is keyed by id). */
+    const leftovers = async (familyId: string) => {
+      const counts: Record<string, number> = {};
+      for (const t of tables) {
+        const [row] = await db.unsafe(`select count(*)::int as n from ${t} where ${t === 'families' ? 'id' : 'family_id'} = $1`, [familyId]);
+        if (row!.n) counts[t] = row!.n as number;
+      }
+      return counts;
+    };
+    const storedFile = (id: string) => readdirSync(blobDir, { recursive: true, withFileTypes: true }).some((f) => f.isFile() && f.name === id);
+
+    /** A family with data in every table: records, a photo, a push token, an open invite, a recovery key. */
+    async function fullFamily() {
+      const { a, b } = await pairedFamily();
+      const ref = await a.uploadFile(new TextEncoder().encode('JPEG of the family'));
+      await a.push([a.seal('child', randomUUID(), { name: 'Sam' }, { blobs: [ref.id] })]);
+      await b.request('PUT', '/v1/push/token', { token: 'fcm-b', platform: 'android' });
+      await a.invite();
+      const words = newRecoveryWords();
+      await a.setRecovery(words);
+      expect(Object.keys(await leftovers(a.familyId))).toEqual(expect.arrayContaining(tables));
+      expect(storedFile(ref.id)).toBe(true);
+      return { a, b, ref, words };
+    }
+
+    it('any member can delete everything the server holds for the family', async () => {
+      const { a, b, ref, words } = await fullFamily();
+      const socket = await b.live();
+      await a.request('DELETE', '/v1/families/me');
+      expect(await leftovers(a.familyId)).toEqual({});
+      expect(storedFile(ref.id)).toBe(false);
+      await until(() => socket.closeCode() === 4401);
+      // The other phone, and the recovery words, can't log in any more (as if removed).
+      await expectStatus(b.login(), 404);
+      await expectStatus(new TestClient(url).recover(words), 404);
+    });
+
+    it('the recovery key can delete a family whose phones are lost', async () => {
+      const { a, words } = await fullFamily();
+      const recovery = recoveryIdentity(words);
+      const rescuer = new TestClient(url);
+      await rescuer.login(recovery, { recoverySignKey: toBase64(recovery.sign.publicKey) });
+      await rescuer.request('DELETE', '/v1/families/me');
+      expect(await leftovers(a.familyId)).toEqual({});
+    });
+
+    it('is deleted when its last phone leaves, recovery key and all', async () => {
+      const { a, b, ref } = await fullFamily();
+      await b.refresh();
+      await b.append({ type: 'remove', deviceId: b.deviceId });
+      expect(await leftovers(a.familyId)).toHaveProperty('records');
+      await a.refresh();
+      await a.append({ type: 'remove', deviceId: a.deviceId });
+      expect(await leftovers(a.familyId)).toEqual({});
+      expect(storedFile(ref.id)).toBe(false);
+    });
+
+    it('needs a login, and only deletes the caller\'s own family', async () => {
+      const { a } = await pairedFamily();
+      const other = await pairedFamily();
+      await expectStatus(new TestClient(url).request('DELETE', '/v1/families/me'), 401);
+      await other.a.request('DELETE', '/v1/families/me');
+      expect(await leftovers(a.familyId)).toMatchObject({ families: 1, devices: 2 });
+      expect(await leftovers(other.a.familyId)).toEqual({});
+    });
+  });
+
+  describe('rate limits', () => {
+    it('answers 429 past the limit, per client IP as told by a trusted proxy', async () => {
+      const limited = await createApp({
+        databaseUrl: ADMIN_URL.replace(/\/[^/]+$/, `/${dbName}`),
+        port: 0,
+        mode: 'self',
+        migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
+        blobs: { kind: 'disk', dir: blobDir },
+        push: { kind: 'none' },
+        rateLimit: true,
+        trustProxy: 'loopback',
+      });
+      try {
+        await limited.listen({ port: 0, host: '127.0.0.1' });
+        const base = (await limited.getUrl()).replace('[::1]', '127.0.0.1');
+        const challenge = (ip: string) =>
+          fetch(`${base}/v1/auth/challenge`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip }, body: '{}' });
+        for (let i = 0; i < 30; i++) expect((await challenge('203.0.113.1')).status).toBe(400);
+        const refused = await challenge('203.0.113.1');
+        expect(refused.status).toBe(429);
+        expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0);
+        // Another client behind the same proxy isn't affected.
+        expect((await challenge('203.0.113.2')).status).toBe(400);
+        // Other routes have their own budget.
+        expect((await fetch(`${base}/v1/info`, { headers: { 'x-forwarded-for': '203.0.113.1' } })).status).toBe(200);
+      } finally {
+        await limited.close();
+      }
     });
   });
 });

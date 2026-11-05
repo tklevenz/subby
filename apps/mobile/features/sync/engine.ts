@@ -114,7 +114,24 @@ export async function setUpSync(serverInput: string, deviceName: string) {
 export async function turnOffSync() {
   const settings = syncSettings();
   // Leave the family properly when the server is reachable; offline, the other phones can remove this one.
+  // The last phone leaving deletes the family on the server.
   if (settings) await leaveFamily(settings).catch(() => {});
+  await forgetSync();
+}
+
+/**
+ * Deletes the family and everything the server holds for it (records, photos, keys, recovery key), then turns
+ * sync off here. Every phone keeps its own data; the others see it like being removed. Throws if the server
+ * can't be reached, so nothing is forgotten here while the data is still there.
+ */
+export async function deleteFamilyOnServer() {
+  const settings = syncSettings();
+  if (!settings) return;
+  await sessionFor(settings).request('DELETE', '/v1/families/me');
+  await forgetSync();
+}
+
+async function forgetSync() {
   closeLive();
   session = null;
   await useSettingsStore.getState().set('sync', null);
@@ -200,7 +217,7 @@ async function runOnce() {
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
   } catch (e) {
     const removed = isRemoved(e);
-    const message = removed ? 'This phone was removed from the family' : e instanceof Error ? e.message : String(e);
+    const message = removed ? 'This phone is no longer in the family' : e instanceof Error ? e.message : String(e);
     useSyncStore.setState({ phase: 'error', error: message, removed, progress: null, pending: await pendingCount() });
     throw e;
   }

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AngleDown, AngleRight, Check, Plus } from './icons';
 import { formatAge } from '@kindred-log/shared';
-import { useCanAddChild, useChildStore } from '../store/useChildStore';
+import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useActiveChild } from '../store/useActiveChild';
 import ChildAvatar from './ChildAvatar';
@@ -15,7 +15,6 @@ export default function ChildSwitcher() {
   const children = useChildStore((s) => s.children);
   const setSetting = useSettingsStore((s) => s.set);
   const active = useActiveChild();
-  const canAddChild = useCanAddChild();
   const [open, setOpen] = useState(false);
 
   const choose = (id: string) => {
@@ -82,7 +81,6 @@ export default function ChildSwitcher() {
             >
               <Plus color={colors.inkMuted} size={18} />
               <Text className="flex-1 text-ink-soft text-base ml-2">Add child</Text>
-              {!canAddChild ? <Text className="text-violet-soft text-xs">Premium</Text> : null}
             </Pressable>
           </View>
         </Pressable>

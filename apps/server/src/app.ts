@@ -20,6 +20,7 @@ import { BlobsController, BlobsService } from './blobs/blobs';
 import { BLOB_STORE, openBlobStore } from './blobs/store';
 import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
+import { installRateLimits } from './common/rateLimit';
 import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
@@ -74,14 +75,14 @@ export async function createApp(config: Config) {
       // On shutdown, cut every connection, not only idle ones: one that opened but hasn't sent a request yet
       // would otherwise hold the restart for the 60 s header timeout. Sync requests are safe to retry.
       forceCloseConnections: true,
+      trustProxy: config.trustProxy,
     }),
     { logger: ['error', 'warn'] },
   );
+  const fastify = app.getHttpAdapter().getInstance();
+  if (config.rateLimit) installRateLimits(fastify);
   // Encrypted files arrive as raw bytes.
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_BLOB_BYTES + 1 }, (_req, body, done) => done(null, body));
+  fastify.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_BLOB_BYTES + 1 }, (_req, body, done) => done(null, body));
   app.useWebSocketAdapter(new WsAdapter(app));
   app.enableShutdownHooks();
   const originalClose = app.close.bind(app);

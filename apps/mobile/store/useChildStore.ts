@@ -4,7 +4,6 @@ import { uuidv7 } from 'uuidv7';
 import type { Child, LogPayload, LogType } from '@kindred-log/shared';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
-import { useSettingsStore } from './useSettingsStore';
 
 export type ChildInput = Pick<Child, 'name' | 'birthDate'> &
   Partial<Pick<Child, 'birthTime' | 'dueDate' | 'sex' | 'photoUri' | 'importRef'>>;
@@ -43,18 +42,6 @@ export async function childSummary(childId: string): Promise<{ total: number; fi
   return { total: row?.total ?? 0, firstAt: row?.firstAt ?? null };
 }
 
-/** Children included without Premium. */
-export const FREE_CHILD_LIMIT = 1;
-
-export const canAddChild = (childCount: number, isPremium: boolean) => isPremium || childCount < FREE_CHILD_LIMIT;
-
-/** Whether another child can be added right now (false = show the Premium upsell). */
-export function useCanAddChild() {
-  const count = useChildStore((s) => s.children.length);
-  const isPremium = useSettingsStore((s) => s.isPremium);
-  return canAddChild(count, isPremium);
-}
-
 export const useChildStore = create<ChildState>((set, get) => ({
   children: [],
 
@@ -81,10 +68,6 @@ export const useChildStore = create<ChildState>((set, get) => ({
       syncStatus: 'pending',
       importRef: input.importRef ?? null,
     };
-    // Enforced here too, so no path (e.g. an import) can get around the UI gates.
-    if (!canAddChild(get().children.length, useSettingsStore.getState().isPremium)) {
-      throw new Error('Adding another child requires Premium');
-    }
     const isFirst = get().children.length === 0;
     await db.insert(schema.childrenTable).values(child);
 
