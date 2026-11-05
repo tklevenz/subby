@@ -22,7 +22,7 @@ import { MAX_BLOB_BYTES, UNLINKED_BLOB_TTL_MS, type SyncRecord } from '@kindred-
 import { DB, schema, type Db } from '../db/db';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
-import { Entitlements } from '../sync/entitlements';
+import { Entitlements, notUnlocked } from '../sync/entitlements';
 import { BLOB_STORE, type BlobStore } from './store';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -54,6 +54,7 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async put(auth: AuthContext, id: string, data: Uint8Array) {
+    if (!(await this.entitlements.canSync(auth.familyId, auth.deviceId))) throw notUnlocked();
     if (!(await this.entitlements.canStore(auth.familyId, data.length))) throw new ForbiddenException('No storage left for this family');
     // Row first, claiming the id: a second upload under the same id (another family's too) gets a conflict before it
     // can touch the stored file. A failed write takes the row back; until the file is there, a read finds nothing.

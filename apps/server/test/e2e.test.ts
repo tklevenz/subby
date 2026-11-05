@@ -7,12 +7,13 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@kindred-log/shared/crypto';
-import { openRecord } from '@kindred-log/shared/sync';
+import { openRecord, type EntitlementResponse } from '@kindred-log/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
 import { Housekeeping } from '../src/common/housekeeping';
 import { HttpError, TestClient } from './client';
+import { appleTestSigner } from './appleCerts';
 
 /**
  * End-to-end: the real server on a throwaway Postgres database, driven by simulated apps.
@@ -98,6 +99,7 @@ describe.skipIf(!reachable)('sync server', () => {
       // Every simulated phone comes from 127.0.0.1; the limits have their own tests.
       rateLimit: false,
       trustProxy: false,
+      stores: { google: null, apple: null },
       push: {
         kind: 'fcm',
         projectId: 'subby-test',
@@ -122,10 +124,10 @@ describe.skipIf(!reachable)('sync server', () => {
   });
 
   /** A family with two paired phones, as most tests need. */
-  async function pairedFamily() {
-    const a = new TestClient(url);
+  async function pairedFamily(server = url) {
+    const a = new TestClient(server);
     await a.createFamily();
-    const b = new TestClient(url);
+    const b = new TestClient(server);
     const { qr, secret } = await a.invite();
     const codeB = await b.claim(qr);
     const { code: codeA, approve } = await a.reviewClaim(qr.i, secret);
@@ -757,6 +759,235 @@ describe.skipIf(!reachable)('sync server', () => {
     });
   });
 
+  describe('payments (hosted)', () => {
+    let hosted: Awaited<ReturnType<typeof createApp>>;
+    let base = '';
+    let play: Server;
+    const apple = appleTestSigner();
+    /** The fake Play API's purchases by token, and what was acknowledged or consumed. */
+    const playPurchases = new Map<string, { product: string; purchaseState: number; obfuscatedExternalAccountId?: string; consumptionState: number; acknowledgementState: number }>();
+    const voided: string[] = [];
+
+    beforeAll(async () => {
+      play = createServer((req, res) => {
+        let raw = '';
+        req.on('data', (c) => (raw += c));
+        req.on('end', () => {
+          const send = (status: number, body: unknown = {}) => {
+            res.statusCode = status;
+            res.end(JSON.stringify(body));
+          };
+          if (req.url === '/token') {
+            const claims = new URLSearchParams(raw).get('assertion')!.split('.')[1]!;
+            const { scope } = JSON.parse(Buffer.from(claims, 'base64url').toString()) as { scope: string };
+            return send(scope.includes('androidpublisher') ? 200 : 401, { access_token: 'play-access', expires_in: 3600 });
+          }
+          if (req.headers.authorization !== 'Bearer play-access') return send(401);
+          const path = decodeURIComponent(req.url!.split('?')[0]!);
+          if (path === '/play/applications/baby.subby.app/purchases/voidedpurchases') {
+            return send(200, { voidedPurchases: voided.map((purchaseToken) => ({ purchaseToken })) });
+          }
+          const m = /^\/play\/applications\/baby\.subby\.app\/purchases\/products\/([^/]+)\/tokens\/([^/:]+)(:consume|:acknowledge)?$/.exec(path);
+          const purchase = m && playPurchases.get(m[2]!);
+          if (!m || !purchase || purchase.product !== m[1]) return send(404);
+          if (m[3] === ':consume') purchase.consumptionState = 1;
+          if (m[3] === ':acknowledge') purchase.acknowledgementState = 1;
+          send(200, m[3] ? {} : purchase);
+        });
+      });
+      await new Promise<void>((resolve) => play.listen(0, '127.0.0.1', resolve));
+      const playUrl = `http://127.0.0.1:${(play.address() as { port: number }).port}`;
+      hosted = await createApp({
+        databaseUrl: ADMIN_URL.replace(/\/[^/]+$/, `/${dbName}`),
+        port: 0,
+        mode: 'hosted',
+        migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
+        blobs: { kind: 'disk', dir: blobDir },
+        push: { kind: 'none' },
+        rateLimit: false,
+        trustProxy: false,
+        stores: {
+          google: { clientEmail: 'play@subby-test.iam.gserviceaccount.com', privateKey: fcmKey.privateKey, tokenUri: `${playUrl}/token`, packageName: 'baby.subby.app', apiUrl: `${playUrl}/play` },
+          apple: { bundleId: 'baby.subby.app', roots: [apple.rootPem], allowSandbox: false },
+        },
+      });
+      await hosted.listen({ port: 0, host: '127.0.0.1' });
+      base = (await hosted.getUrl()).replace('[::1]', '127.0.0.1');
+    });
+
+    afterAll(async () => {
+      await hosted?.close();
+      play?.close();
+    });
+
+    const entitlement = (c: TestClient) => c.request<EntitlementResponse>('GET', '/v1/entitlement');
+    const buy = (c: TestClient, store: 'google' | 'apple', product: string, token: string) => c.request<EntitlementResponse>('POST', '/v1/purchases', { store, product, token });
+    const googlePurchase = (c: TestClient, product: string, state = 0) => {
+      const token = `token-${randomUUID()}`;
+      playPurchases.set(token, { product, purchaseState: state, obfuscatedExternalAccountId: c.deviceId, consumptionState: 0, acknowledgementState: 0 });
+      return token;
+    };
+    const appleTransaction = (c: TestClient, product: string, over: object = {}) =>
+      apple.sign({ originalTransactionId: String(Math.floor(Math.random() * 1e12)), bundleId: 'baby.subby.app', productId: product, environment: 'Production', appAccountToken: c.deviceId, ...over });
+    /** Moves the family's start (and its phones' joining, keeping their order) `days` back. */
+    const ageFamily = async (c: TestClient, days: number) => {
+      const [{ created }] = await db`select extract(epoch from now() - created_at) * 1000 as created from families where id = ${c.familyId}`;
+      const shift = days * 86_400_000 - Number(created);
+      await db`update families set created_at = created_at - make_interval(secs => ${shift / 1000}) where id = ${c.familyId}`;
+      await db`update devices set added_at = added_at - make_interval(secs => ${shift / 1000}) where family_id = ${c.familyId}`;
+    };
+    const write = (c: TestClient) => c.push([c.seal('child', randomUUID(), { name: 'Sam' })]);
+
+    it('a self-hosted server is free: nothing to buy', async () => {
+      const { a } = await pairedFamily();
+      expect(await entitlement(a)).toMatchObject({ access: 'free', trialEndsAt: null, photoLimit: null });
+      await expectStatus(buy(a, 'google', 'sync_unlock', 'x'), 400);
+    });
+
+    it('a new family syncs for 14 days, then 48 hours of grace, then only pulls', async () => {
+      const { a, b } = await pairedFamily(base);
+      const trial = await entitlement(a);
+      expect(trial.access).toBe('trial');
+      expect(trial.trialEndsAt! - Date.now()).toBeGreaterThan(13.9 * 86_400_000);
+      expect(trial.photoLimit).toBe(2 * 1024 ** 3);
+      await write(a);
+
+      await ageFamily(a, 15);
+      expect((await entitlement(a)).access).toBe('grace');
+      await write(a);
+
+      await ageFamily(a, 17);
+      expect((await entitlement(a)).access).toBe('readOnly');
+      await expectStatus(write(a), 402);
+      await expectStatus(a.uploadFile(new Uint8Array([1, 2, 3])), 402);
+      // Pulling, and managing the family, still work.
+      await b.pull();
+      await a.refresh();
+    });
+
+    it('a phone that joins after the trial gets its own 48 hours', async () => {
+      const a = new TestClient(base);
+      await a.createFamily();
+      await ageFamily(a, 30);
+      const { qr, secret } = await a.invite();
+      const late = new TestClient(base);
+      await late.claim(qr);
+      await (await a.reviewClaim(qr.i, secret)).approve();
+      await late.finishJoin(qr);
+      expect((await entitlement(late)).access).toBe('grace');
+      expect((await entitlement(a)).access).toBe('readOnly');
+    });
+
+    it('an own unlock from Google Play, acknowledged, and moved to a new phone by a restore', async () => {
+      const { a } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const token = googlePurchase(a, 'sync_unlock');
+      expect((await buy(a, 'google', 'sync_unlock', token)).access).toBe('unlock');
+      expect(playPurchases.get(token)!.acknowledgementState).toBe(1);
+      await write(a);
+      // Sending it again changes nothing.
+      expect((await buy(a, 'google', 'sync_unlock', token)).access).toBe('unlock');
+
+      // The same store account on a new phone, in another family: the unlock moves there.
+      const other = await pairedFamily(base);
+      await ageFamily(other.a, 30);
+      expect((await buy(other.a, 'google', 'sync_unlock', token)).access).toBe('unlock');
+      expect((await entitlement(a)).access).toBe('readOnly');
+    });
+
+    it('gifted slots go to the phones without an unlock, in the order they joined', async () => {
+      const { a, b } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const unlock = googlePurchase(a, 'sync_unlock');
+      await buy(a, 'google', 'sync_unlock', unlock);
+      const slot = googlePurchase(a, 'sync_slot');
+      const after = await buy(a, 'google', 'sync_slot', slot);
+      expect(playPurchases.get(slot)!.consumptionState).toBe(1);
+      expect(after).toMatchObject({ access: 'unlock', slots: 1, freeSlots: 0 });
+      expect(after.devices).toEqual([
+        { id: a.deviceId, access: 'unlock' },
+        { id: b.deviceId, access: 'slot' },
+      ]);
+      await write(b);
+
+      // Removing b frees its slot.
+      await a.removeDevice(b.deviceId);
+      expect(await entitlement(a)).toMatchObject({ slots: 1, freeSlots: 1 });
+
+      // A slot is for the buyer's own family, once.
+      const other = await pairedFamily(base);
+      await expectStatus(buy(other.a, 'google', 'sync_slot', slot), 403);
+      // Without an account id in the purchase, a slot already given to a family can't be given to another.
+      const unmarked = googlePurchase(a, 'sync_slot');
+      delete playPurchases.get(unmarked)!.obfuscatedExternalAccountId;
+      await buy(other.a, 'google', 'sync_slot', unmarked);
+      await expectStatus(buy(a, 'google', 'sync_slot', unmarked), 409);
+    });
+
+    it('refuses pending, cancelled and unknown purchases, and products sent as the wrong kind', async () => {
+      const { a } = await pairedFamily(base);
+      await expectStatus(buy(a, 'google', 'sync_unlock', googlePurchase(a, 'sync_unlock', 2)), 409);
+      await expectStatus(buy(a, 'google', 'sync_unlock', googlePurchase(a, 'sync_unlock', 1)), 403);
+      await expectStatus(buy(a, 'google', 'sync_unlock', 'nobody-knows'), 403);
+      await expectStatus(buy(a, 'google', 'sync_slot', googlePurchase(a, 'sync_unlock')), 403);
+      await expectStatus(buy(a, 'google', 'sync_other', 'x'), 400);
+    });
+
+    it('a Google refund takes the unlock away (checked hourly)', async () => {
+      const { a } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const token = googlePurchase(a, 'sync_unlock');
+      await buy(a, 'google', 'sync_unlock', token);
+      voided.push(token);
+      expect(await hosted.get(Housekeeping).run()).toMatchObject({ refunds: 1 });
+      expect((await entitlement(a)).access).toBe('readOnly');
+      await expectStatus(buy(a, 'google', 'sync_unlock', token), 403);
+      voided.length = 0;
+    });
+
+    it('App Store purchases are checked by their signature; refunds arrive as notifications', async () => {
+      const { a, b } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const unlock = appleTransaction(a, 'sync_unlock');
+      expect((await buy(a, 'apple', 'sync_unlock', unlock)).access).toBe('unlock');
+      const slot = appleTransaction(a, 'sync_slot');
+      expect(await buy(a, 'apple', 'sync_slot', slot)).toMatchObject({ slots: 1 });
+      expect((await entitlement(b)).access).toBe('slot');
+
+      await expectStatus(buy(a, 'apple', 'sync_unlock', appleTransaction(a, 'sync_unlock', { environment: 'Sandbox' })), 403);
+      await expectStatus(buy(a, 'apple', 'sync_unlock', appleTransaction(a, 'sync_unlock', { bundleId: 'com.other' })), 403);
+      await expectStatus(buy(a, 'apple', 'sync_unlock', appleTestSigner().sign({})), 403);
+
+      const id = (jws: string) => JSON.parse(Buffer.from(jws.split('.')[1]!, 'base64url').toString()) as { originalTransactionId: string };
+      const notify = (type: string, transaction: string) =>
+        fetch(`${base}/v1/purchases/apple/notifications`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ signedPayload: apple.sign({ notificationType: type, data: { signedTransactionInfo: transaction } }) }),
+        });
+      expect((await notify('REFUND', slot)).status).toBe(200);
+      expect((await entitlement(b)).access).toBe('readOnly');
+      expect((await notify('REFUND_REVERSED', slot)).status).toBe(200);
+      expect((await entitlement(b)).access).toBe('slot');
+      expect(id(unlock).originalTransactionId).toBeTruthy();
+      // Unsigned or foreign notifications are refused.
+      const forged = await fetch(`${base}/v1/purchases/apple/notifications`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ signedPayload: appleTestSigner().sign({ notificationType: 'REFUND', data: { signedTransactionInfo: unlock } }) }),
+      });
+      expect(forged.status).toBe(400);
+      expect((await entitlement(a)).access).toBe('unlock');
+    });
+
+    it('stops photo uploads at 2 GB per family', async () => {
+      const { a } = await pairedFamily(base);
+      await db`insert into blobs (id, family_id, size, created_at) values (${randomUUID()}, ${a.familyId}, ${2 * 1024 ** 3 - 10}, ${Date.now()})`;
+      await expectStatus(a.uploadFile(new Uint8Array(100)), 403);
+      expect((await entitlement(a)).photoBytes).toBe(2 * 1024 ** 3 - 10);
+    });
+  });
+
   describe('rate limits', () => {
     it('answers 429 past the limit, per client IP as told by a trusted proxy', async () => {
       const limited = await createApp({
@@ -768,6 +999,7 @@ describe.skipIf(!reachable)('sync server', () => {
         push: { kind: 'none' },
         rateLimit: true,
         trustProxy: 'loopback',
+        stores: { google: null, apple: null },
       });
       try {
         await limited.listen({ port: 0, host: '127.0.0.1' });

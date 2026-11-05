@@ -36,13 +36,13 @@ These block tickets further down.
 
 - [x] **S1 Rate limiting** (per client IP; `common/rateLimit.ts`). On `auth/challenge`, `auth/verify`, `invites` (create, claim, status), `families` (create), blob uploads and push token registration. In memory is fine (the server is single-instance).
 - [x] **S2 `trustProxy`** for Fastify behind Caddy, so limits and logs see the real client IP. Off by default for self-hosters without a proxy.
-- [ ] **S3 Photo allowance.** `Entitlements.canStore` sums the family's blob sizes in hosted mode. Self-hosted stays unlimited. [D2]
+- [x] **S3 Photo allowance.** `Entitlements.canStore` sums the family's blob sizes in hosted mode. Self-hosted stays unlimited. [D2]
 - [ ] **S4 Inactive-family cleanup.** Track the last sync per family; housekeeping warns (a live/push message the app shows) and later deletes. Deleting a family also deletes its gifted slots, so the warnings must say so. [D5, S5]
 - [x] **S5 Deleting a family's data.**
   - When the last phone leaves, delete everything: records, keys, the device log, blobs, push tokens and the family row.
   - Also a "Delete this family from the server" action in the app, for any member. Today nothing is ever deleted.
   - App: Sync settings button with a type-to-confirm.
-- [ ] **S6 Hosted-mode entitlements.**
+- [x] **S6 Hosted-mode entitlements.**
   - A family's trial start (14 days from creation), plus a 48-hour grace per phone after the trial ends.
   - Own unlocks (purchase → the phone currently using it), and gifted slots (a count per family, each assigned to a member phone, freed on removal).
   - `canSync` per device: in the trial, or with an own unlock or an assigned slot → push allowed; otherwise pull only.
@@ -77,10 +77,10 @@ These block tickets further down.
 
 ## Payments
 
-- [ ] **P1 Store products.** Play Billing and StoreKit, two products per store at €6.99: the own unlock (non-consumable) and the family slot (consumable).
+- [ ] **P1 Store products.** Server side done 2026-11-05 (`purchases/`, verified against a fake Play API and a test Apple chain). Left: creating the products and the service account in the consoles, and the app (A3). Play Billing and StoreKit, two products per store at €6.99: the own unlock (non-consumable) and the family slot (consumable).
   - The purchase carries the buyer's device id (`obfuscatedAccountId` / `appAccountToken`).
   - Server: a purchases table (store, transaction id, kind, device or family), our own receipt verification (Play Developer API, App Store Server API), one active phone per own unlock; refunds revoke (Play voided purchases, App Store server notifications). [D1, D4]
-- [ ] **P3 E2E tests** with a fake store verifier:
+- [x] **P3 E2E tests** (server, 2026-11-05) with a fake store verifier:
   - trial expiry → 48 h grace → pull only;
   - own unlock, and restoring it to a new phone in another family;
   - gifting a slot, freeing it on removal, reassigning it;

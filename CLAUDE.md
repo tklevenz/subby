@@ -215,6 +215,13 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Records must be written as the calling device.
   - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
   - `push/token` (PUT/DELETE, `{token, platform}`): kept only with `PUSH=fcm` (the default for `MODE=hosted`; needs `FCM_SERVICE_ACCOUNT`, a Firebase service-account key, mounted from `./secrets` in Docker). After accepted writes, `PushService` sends the family's other Android phones a data-only, high-priority `{kind: 'sync'}` message straight to FCM HTTP v1 (coalesced over 2 s; OAuth token from a JWT signed with the key via `node:crypto`, cached for the hour). Tokens are dropped on FCM 404/400 or when the device is removed. iOS tokens are stored but not sent to yet (APNs is a TODO). Push only reaches app builds made with the same Firebase project. `/v1/info` reports `push`.
+- **Payments** (hosted only, `MODE=hosted`; PROJECT.md §3; `purchases/`, `sync/entitlements.ts`):
+  - `Entitlements.family` works out each active phone's `SyncAccess`, in join order (`devices.added_at`): its own `unlock`, else one of the family's gifted `slot`s (handed out in join order, so a removed phone's slot passes on), else `trial` (14 days from `families.created_at`), else `grace` (48 h after the trial or after joining, if later), else `readOnly`. Self-hosted: `free`.
+  - A `readOnly` phone gets 402 on `sync/push` and blob uploads; pulling, the log and keys still work. Photos stop at 2 GB per family (`canStore`, 403).
+  - `GET /v1/entitlement`; `POST /v1/purchases {store, product, token}` verifies with the store, stores a `purchases` row (`google:`+sha256(token) or `apple:`+originalTransactionId; no personal data), then acknowledges (unlock) or consumes (slot) on Google. An unlock moves to whichever phone sends it (a restore); a slot belongs to the buyer's family for good. Changes publish a live `entitlement` message.
+  - Google: the Android Publisher API with a service account (`common/google.ts` `GoogleAuth`, shared with FCM push); refunds from `voidedpurchases`, checked hourly by Housekeeping.
+  - Apple: StoreKit 2 JWS checked offline against the embedded Apple Root CA G3 (`purchases/appleRoot.ts`; x5c chain, Apple's marker OIDs, ES256); refunds from App Store Server Notifications V2 at `POST /v1/purchases/apple/notifications`. Sandbox purchases only with `APPLE_ALLOW_SANDBOX=1`.
+  - Product ids: `PRODUCTS` in `protocol.ts` (`sync_unlock` non-consumable, `sync_slot` consumable). The e2e suite runs a hosted app against a fake Play API and an openssl-made Apple chain (`test/appleCerts.ts`).
 - **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, grant (only to a phone the recovery key added; grants are first-come), and delete the family. They can't sync or rotate.
 - **Code conventions:**
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
@@ -226,7 +233,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Behind a proxy:** `TRUST_PROXY` is Fastify's `trustProxy` (proxy addresses or ranges, e.g. `uniquelocal` for Caddy in the compose; `true` is refused, since any client could then pick its IP). Without it, every request seems to come from the proxy.
 - **Query parameters:** numbers are parsed with `queryInt` (whole numbers only, at most a 32-bit integer unless a larger `max` is given, otherwise 400).
 - **Input bounds** (`protocol.ts`): base64url fields are length-capped and refuse lengths that can't decode (4n+1); epochs and log indexes fit 32 bits; grant and rotate lists are capped. Auth challenges are capped in memory (oldest dropped); live sockets have a 4 KB message limit and aren't tracked if they closed during auth.
-- **Modes:** `MODE=self|hosted`. `Entitlements.canSync`/`canStore` are the hooks for hosted payments and the photo allowance (stubs for now; see `LAUNCH.md` S3, S6).
+- **Modes:** `MODE=self|hosted`. Hosted adds payments and the photo allowance (see Payments above).
 - **Commands** (in `apps/server`):
   - `pnpm db:up`: dev Postgres on port **54329** via `docker-compose.dev.yml`.
   - `pnpm serve:dev`: needs `.env`, copied from `.env.example`. Deliberately not named `dev`, so the root `pnpm run dev` still only starts the app.

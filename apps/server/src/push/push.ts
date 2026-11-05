@@ -1,8 +1,8 @@
-import { createSign } from 'node:crypto';
 import { Body, Controller, Delete, HttpCode, Inject, Injectable, Put, UseGuards, type OnModuleDestroy } from '@nestjs/common';
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { RegisterPushSchema } from '@kindred-log/shared/sync';
-import { CONFIG, type Config, type FcmConfig } from '../config';
+import { CONFIG, type Config } from '../config';
+import { GoogleAuth } from '../common/google';
 import { DB, schema, type Db } from '../db/db';
 import { parse } from '../common/validate';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
@@ -21,12 +21,15 @@ const COALESCE_MS = 2000;
 export class PushService implements OnModuleDestroy {
   /** Per family: the devices that wrote since the last ping, and the pending timer. */
   private readonly pending = new Map<string, { writers: Set<string>; timer: NodeJS.Timeout }>();
-  private access: { token: string; expiresAt: number } | null = null;
+  private readonly auth: GoogleAuth | null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: Config,
-  ) {}
+  ) {
+    const fcm = config.push;
+    this.auth = fcm.kind === 'fcm' ? new GoogleAuth(fcm, 'https://www.googleapis.com/auth/firebase.messaging') : null;
+  }
 
   get enabled() {
     return this.config.push.kind === 'fcm';
@@ -83,7 +86,7 @@ export class PushService implements OnModuleDestroy {
       );
     if (!tokens.length) return 0;
 
-    const access = await this.accessToken(fcm);
+    const access = await this.auth!.token();
     const results = await Promise.all(
       tokens.map(async (t) => {
         // Data-only and high priority: nothing is shown, and Android lets the app run its task right away.
@@ -103,30 +106,6 @@ export class PushService implements OnModuleDestroy {
     const gone = results.filter((r) => r.gone).map((r) => r.deviceId);
     if (gone.length) await this.db.delete(schema.pushTokens).where(inArray(schema.pushTokens.deviceId, gone));
     return results.filter((r) => r.sent).length;
-  }
-
-  /** An OAuth access token for FCM, from a JWT signed with the service-account key; reused until shortly before it expires. */
-  private async accessToken(fcm: FcmConfig): Promise<string> {
-    if (this.access && this.access.expiresAt > Date.now() + 5 * 60_000) return this.access.token;
-    const now = Math.floor(Date.now() / 1000);
-    const b64 = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
-    const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({
-      iss: fcm.clientEmail,
-      scope: 'https://www.googleapis.com/auth/firebase.messaging',
-      aud: fcm.tokenUri,
-      iat: now,
-      exp: now + 3600,
-    })}`;
-    const signature = createSign('RSA-SHA256').update(unsigned).sign(fcm.privateKey, 'base64url');
-    const res = await fetch(fcm.tokenUri, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${signature}` }),
-    });
-    if (!res.ok) throw new Error(`Google OAuth answered ${res.status}: ${await res.text().catch(() => '')}`);
-    const { access_token, expires_in } = (await res.json()) as { access_token: string; expires_in: number };
-    this.access = { token: access_token, expiresAt: Date.now() + expires_in * 1000 };
-    return access_token;
   }
 }
 

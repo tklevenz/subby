@@ -18,6 +18,8 @@ export const RULES: { name: string; method: string; path: RegExp; limit: Limit }
   { name: 'inviteStatus', method: 'POST', path: /^\/v1\/invites\/[^/]+\/status$/, limit: { burst: 60, perMinute: 60 } },
   // A first sync uploads every photo at once, one request each.
   { name: 'blob', method: 'PUT', path: /^\/v1\/blobs\/[^/]+$/, limit: { burst: 300, perMinute: 120 } },
+  // Each one is checked with the store.
+  { name: 'purchase', method: 'POST', path: /^\/v1\/purchases$/, limit: { burst: 30, perMinute: 30 / 60 } },
   { name: 'pushToken', method: 'PUT', path: /^\/v1\/push\/token$/, limit: { burst: 20, perMinute: 20 / 60 } },
 ];
 /** Everything else (sync push and pull pages, keys, the log, blob downloads). */

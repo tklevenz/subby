@@ -30,6 +30,8 @@ export const devices = pgTable('devices', {
   familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
   signKey: text('sign_key').notNull(),
   active: boolean('active').notNull().default(true),
+  /** When it joined: its grace after the trial counts from here if it joined later (hosted payments). */
+  addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** Family keys sealed to one recipient (device id or 'recovery') per epoch. */
@@ -103,4 +105,26 @@ export const records = pgTable(
     seq: bigint('seq', { mode: 'number' }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.familyId, t.id] }), index('records_family_seq_idx').on(t.familyId, t.seq)],
+);
+
+/**
+ * Store purchases on the hosted server (PROJECT.md §3), verified with the store. No personal data: a hash of
+ * the store's purchase id, the product, and the phone or family it belongs to.
+ */
+export const purchases = pgTable(
+  'purchases',
+  {
+    /** `google:` + sha256 of the purchase token, or `apple:` + the original transaction id. */
+    id: text('id').primaryKey(),
+    store: text('store', { enum: ['google', 'apple'] }).notNull(),
+    kind: text('kind', { enum: ['unlock', 'slot'] }).notNull(),
+    /** unlock: the phone using it now (one at a time; a restore moves it). slot: the phone that bought it. */
+    deviceId: uuid('device_id').notNull(),
+    /** slot: the family it was given to (deleted with it). unlock: null, it follows the phone. */
+    familyId: uuid('family_id').references(() => families.id, { onDelete: 'cascade' }),
+    /** Refunded or revoked by the store. */
+    revoked: boolean('revoked').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('purchases_device_idx').on(t.deviceId), index('purchases_family_idx').on(t.familyId)],
 );

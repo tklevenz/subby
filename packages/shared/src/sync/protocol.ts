@@ -161,10 +161,63 @@ export type PullResponse = { records: (z.infer<typeof SyncRecordSchema> & { seq:
 /** PUT /v1/push/token: this phone's own push token (FCM on Android, APNs on iOS). `GET /v1/info` says whether the server sends pushes. */
 export const RegisterPushSchema = z.object({ token: z.string().min(1).max(4096), platform: z.enum(['android', 'ios']).default('android') });
 
+// --- payments (hosted Subby Sync only; PROJECT.md §3) ---------------------------------------------------
+
+/**
+ * Store product ids, the same on Google Play and the App Store. `unlock`: this phone's own, non-consumable,
+ * restorable on the same store account. `slot`: a consumable gifted to the family, used by a phone without one.
+ */
+export const PRODUCTS = { unlock: 'sync_unlock', slot: 'sync_slot' } as const;
+export type ProductKind = keyof typeof PRODUCTS;
+export const productKind = (product: string): ProductKind | null =>
+  product === PRODUCTS.unlock ? 'unlock' : product === PRODUCTS.slot ? 'slot' : null;
+
+/** A new family syncs fully for this long. */
+export const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
+/** After the trial (or after joining, if later), a phone without an unlock still syncs for this long. */
+export const GRACE_MS = 48 * 60 * 60 * 1000;
+/** Photo storage per family on the hosted server. */
+export const HOSTED_PHOTO_BYTES = 2 * 1024 ** 3;
+
+/**
+ * POST /v1/purchases: a store purchase made on this phone (or restored). `token` is Google's purchase token, or
+ * Apple's signed StoreKit 2 transaction (`jwsRepresentation`).
+ */
+export const PurchaseSchema = z.object({
+  store: z.enum(['google', 'apple']),
+  product: z.enum([PRODUCTS.unlock, PRODUCTS.slot]),
+  token: z.string().min(1).max(16_384),
+});
+
+/**
+ * Why a phone may sync: `free` (a self-hosted server), `trial`, its own `unlock`, a family `slot`, or `grace`.
+ * `readOnly`: it pulls but can't push until it's unlocked.
+ */
+export type SyncAccess = 'free' | 'trial' | 'unlock' | 'slot' | 'grace' | 'readOnly';
+
+/** GET /v1/entitlement: this phone's access and the family's, for the unlock screens. */
+export type EntitlementResponse = {
+  access: SyncAccess;
+  /** Null on a self-hosted server (no trial, nothing to pay). */
+  trialEndsAt: number | null;
+  /** When this phone's grace ends (it applies only without an unlock or slot). */
+  graceEndsAt: number | null;
+  /** Gifted slots the family has, and how many no phone uses yet. */
+  slots: number;
+  freeSlots: number;
+  /** Every active phone and what lets it sync (`trial`/`grace`/`readOnly` for one without an unlock or slot). */
+  devices: { id: string; access: SyncAccess }[];
+  /** Photo storage used and allowed (null: unlimited). */
+  photoBytes: number;
+  photoLimit: number | null;
+};
+
 // --- live (WebSocket /v1/live?token=) -----------------------------------------------------------------
 
 export type LiveMessage =
   | { type: 'seq'; seq: number }
   | { type: 'log'; index: number }
   | { type: 'keys'; epoch: number }
-  | { type: 'invite'; inviteId: string; status: InviteStatus };
+  | { type: 'invite'; inviteId: string; status: InviteStatus }
+  /** A purchase, refund or membership change altered who may sync: re-read GET /v1/entitlement. */
+  | { type: 'entitlement' };

@@ -99,6 +99,9 @@ With a prebuilt image on the server, `docker compose up -d` (without `--build`) 
 | `PUSH` | `none` (`fcm` when hosted) | background "sync now" pings via Firebase Cloud Messaging |
 | `FCM_SERVICE_ACCOUNT` | | for `PUSH=fcm`: path to the Firebase service-account key (`/secrets/firebase.json`, from `./secrets`) |
 | `RATE_LIMIT` | `on` | per-client request limits (429 past them; generous, to stop scripts) or `off` |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT` | | hosted only: a Google service account with access to the app in the Play Console, for checking purchases and refunds (`/secrets/play.json`) |
+| `GOOGLE_PLAY_PACKAGE`, `APPLE_BUNDLE_ID` | `baby.subby.app` | hosted only: the app whose purchases count |
+| `APPLE_ALLOW_SANDBOX` | | hosted only: `1` accepts TestFlight/sandbox purchases (dogfooding); `APPLE_IAP=off` turns App Store purchases off |
 | `TRUST_PROXY` | (none) | reverse proxies whose `X-Forwarded-For` to believe: `uniquelocal` for Caddy in this compose, or addresses/ranges |
 
 Without push, phones sync while the app is open, and in the background as often as the phone allows (roughly

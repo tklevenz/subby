@@ -20,6 +20,7 @@ import { BlobsController, BlobsService } from './blobs/blobs';
 import { BLOB_STORE, openBlobStore } from './blobs/store';
 import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
+import { PurchasesController, PurchasesService } from './purchases/purchases';
 import { installRateLimits } from './common/rateLimit';
 import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
 
@@ -41,7 +42,7 @@ class AppModule {
   static with(config: Config, db: unknown): DynamicModule {
     return {
       module: AppModule,
-      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController, PushController],
+      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController, PushController, PurchasesController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: DB, useValue: db },
@@ -56,6 +57,7 @@ class AppModule {
         InvitesService,
         SyncService,
         Entitlements,
+        PurchasesService,
         LiveBus,
         LiveGateway,
         Housekeeping,

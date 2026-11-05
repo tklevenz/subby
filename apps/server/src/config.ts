@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { serviceAccountFrom, type GoogleServiceAccount } from './common/google';
+import { APPLE_ROOT_CA_G3 } from './purchases/appleRoot';
 
 export type Config = {
   databaseUrl: string;
@@ -17,7 +19,38 @@ export type Config = {
    * (none, the default), or proxy addresses/ranges such as `uniquelocal` (private networks: Caddy in the same compose).
    */
   trustProxy: false | string;
+  /** Verifying store purchases (hosted only); a store left out can't be bought from. */
+  stores: { google: GooglePlayConfig | null; apple: AppStoreConfig | null };
 };
+
+/** Google Play: a service account with access to the app in the Play Console (View financial data, Manage orders). */
+export type GooglePlayConfig = GoogleServiceAccount & {
+  packageName: string;
+  /** The Android Publisher API (a fake in tests). */
+  apiUrl: string;
+};
+
+/** The App Store: StoreKit 2 transactions and server notifications are signed; checked against Apple's root. */
+export type AppStoreConfig = {
+  bundleId: string;
+  /** PEM root certificates to accept (Apple Root CA - G3; a test CA in tests). */
+  roots: string[];
+  /** Refuse sandbox (TestFlight, Xcode) purchases unless allowed, e.g. while dogfooding. */
+  allowSandbox: boolean;
+};
+
+const APP_ID = 'baby.subby.app';
+
+function storesConfig(env: NodeJS.ProcessEnv): Config['stores'] {
+  let google: GooglePlayConfig | null = null;
+  if (env.GOOGLE_PLAY_SERVICE_ACCOUNT) {
+    const account = serviceAccountFrom(env.GOOGLE_PLAY_SERVICE_ACCOUNT, JSON.parse(readFileSync(env.GOOGLE_PLAY_SERVICE_ACCOUNT, 'utf8')));
+    google = { ...account, packageName: env.GOOGLE_PLAY_PACKAGE || APP_ID, apiUrl: 'https://androidpublisher.googleapis.com/androidpublisher/v3' };
+  }
+  const apple: AppStoreConfig | null =
+    env.APPLE_IAP === 'off' ? null : { bundleId: env.APPLE_BUNDLE_ID || APP_ID, roots: [APPLE_ROOT_CA_G3], allowSandbox: env.APPLE_ALLOW_SANDBOX === '1' };
+  return { google, apple };
+}
 
 function trustProxy(value: string | undefined): Config['trustProxy'] {
   if (!value || value === 'false') return false;
@@ -42,15 +75,11 @@ function pushConfig(env: NodeJS.ProcessEnv, mode: Config['mode']): Config['push'
   if (kind === 'none') return { kind };
   if (kind !== 'fcm') throw new Error(`PUSH must be "fcm" or "none", got "${kind}"`);
   if (!env.FCM_SERVICE_ACCOUNT) throw new Error('FCM_SERVICE_ACCOUNT (the path to a Firebase service-account key) is required with PUSH=fcm');
-  const key = JSON.parse(readFileSync(env.FCM_SERVICE_ACCOUNT, 'utf8')) as Record<string, string | undefined>;
-  if (!key.project_id || !key.client_email || !key.private_key) throw new Error(`${env.FCM_SERVICE_ACCOUNT} isn't a service-account key`);
+  const account = serviceAccountFrom(env.FCM_SERVICE_ACCOUNT, JSON.parse(readFileSync(env.FCM_SERVICE_ACCOUNT, 'utf8')));
   return {
     kind,
-    projectId: key.project_id,
-    clientEmail: key.client_email,
-    privateKey: key.private_key,
-    tokenUri: key.token_uri ?? 'https://oauth2.googleapis.com/token',
-    sendUrl: `https://fcm.googleapis.com/v1/projects/${key.project_id}/messages:send`,
+    ...account,
+    sendUrl: `https://fcm.googleapis.com/v1/projects/${account.projectId}/messages:send`,
   };
 }
 
@@ -90,6 +119,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, migrationsFolder: string): Co
     push: pushConfig(env, mode),
     rateLimit: env.RATE_LIMIT !== 'off',
     trustProxy: trustProxy(env.TRUST_PROXY),
+    stores: storesConfig(env),
   };
 }
 

@@ -7,7 +7,7 @@ import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { lockFamily } from '../families/families.service';
 import { LiveBus } from '../live/live';
-import { Entitlements } from './entitlements';
+import { Entitlements, notUnlocked } from './entitlements';
 import { BlobsService } from '../blobs/blobs';
 import { PushService } from '../push/push';
 
@@ -25,7 +25,7 @@ export class SyncService {
 
   /** Stores each record if it is newer than the server's copy; every accepted record gets the next seq. */
   async push(auth: AuthContext, records: SyncRecord[]): Promise<PushResponse> {
-    if (!(await this.entitlements.canSync(auth.familyId))) throw new ForbiddenException('Sync is not active for this family');
+    if (!(await this.entitlements.canSync(auth.familyId, auth.deviceId))) throw notUnlocked();
     for (const r of records) {
       if (r.deviceId !== auth.deviceId) throw new ForbiddenException('Records must be written as the calling device');
       // Tombstones carry a sealed empty body (older apps sent none); everything else needs its data.
