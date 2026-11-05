@@ -4,6 +4,7 @@
 `kindred-log` is a local-first, offline-capable baby/child activity tracking mobile application (logging feeds, diapers, and sleep/wake windows) built within a `pnpm` monorepo (`~/src/kindred-log`)[cite: 4].
 
 **Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo and package name. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; on Home the brand lives only in the sleep tile and its Undo bar (canvas row "Subby on Home").
+- Domain: **subby.baby** (bought 2026-11-05). The hosted Subby Sync will be `sync.subby.baby` (not running yet); self-hosting docs keep `sync.example.com`.
 - User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme, and on the server (Subby Sync) the `kindred-sync` service id and Docker image and the `kindred` Postgres user and database.
 - The package id `com.kindred.log` also stays for now: a new id is a different app (fresh install). Decide once, before the first store release.
 
