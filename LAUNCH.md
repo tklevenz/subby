@@ -128,6 +128,7 @@ These block tickets further down.
 ## After launch
 
 - [ ] **X1 Push relay for self-hosted servers** (D12): free, rate-limited, switched on by the self-hoster; forwards content-free "sync now" pings to FCM/APNs.
+- [ ] **X2 One trial per phone.** Today turning sync off and setting it up again starts a new family with a new 14-day trial, and any client can use the open protocol. If the numbers show trial restarts: Play Integrity (device recall bits) and App Attest/DeviceCheck (2 bits per device) to mark "trial used" on the phone, checked when a family is created or a phone joins. Only for the trial, never a condition for syncing; phones that can't attest just don't get a second trial.
 
 ## Order
 
