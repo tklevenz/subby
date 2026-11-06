@@ -19,6 +19,10 @@ export class SyncHttpError extends Error {
   }
 }
 
+/** The official Subby Sync server (hosted, paid after the trial). Any other address is a self-hosted one. */
+export const OFFICIAL_SERVER = 'https://sync.subby.baby';
+export const isOfficialServer = (server: string) => normalizeServerUrl(server) === OFFICIAL_SERVER;
+
 /** Normalizes what people type: no trailing slash, https:// assumed when no scheme is given. */
 export function normalizeServerUrl(input: string): string {
   const trimmed = input.trim().replace(/\/+$/, '');

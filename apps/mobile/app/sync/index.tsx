@@ -6,10 +6,12 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync, useSyncStore } from '../../features/sync/engine';
 import { defaultDeviceName, removeDevice } from '../../features/sync/family';
-import { Button, Card, FieldLabel, Row, TextField } from '../../components/ui';
+import { Button, Card, Row, TextField } from '../../components/ui';
+import { useServerChoice } from '../../components/ServerChoice';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
 import { ACCESS_LABEL, AccessCard, AccessDevTools, GiftSlot } from '../../components/SyncAccess';
-import { useAccessStore } from '../../features/sync/access';
+import { PRICE, useAccessStore } from '../../features/sync/access';
+import { isOfficialServer } from '../../features/sync/api';
 
 /** Sync between phones: set up or join, status, the family's phones, turning it off. */
 export default function SyncScreen() {
@@ -23,7 +25,7 @@ export default function SyncScreen() {
 
 function SetUp() {
   const child = useActiveChild();
-  const [server, setServer] = useState('');
+  const { server, ready, custom, field, toggle } = useServerChoice();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,20 +53,14 @@ function SetUp() {
       <Button label="Join with a code from that phone" variant="ghost" onPress={() => router.push('/sync/join')} />
 
       <Text className="text-xs font-semibold text-ink-muted uppercase mt-8 mb-2 ml-1">Or start with this phone</Text>
-      <FieldLabel>Sync server</FieldLabel>
-      <TextField
-        value={server}
-        onChangeText={setServer}
-        placeholder="https://sync.example.com"
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-      />
-      <Text className="text-ink-faint text-xs mt-2 ml-1">Hosted Subby Sync is coming. For now, use a server you run yourself.</Text>
-
+      {field}
       {error ? <Text className="text-red-soft text-sm mt-4">{error}</Text> : null}
-      <Button label={busy ? 'Setting up…' : 'Set up sync'} onPress={start} disabled={busy || !server.trim()} />
-      <Text className="text-ink-faint text-xs text-center mt-3">This phone becomes the first phone in your family.</Text>
+      <Button label={busy ? 'Setting up…' : 'Set up sync'} onPress={start} disabled={busy || !ready} />
+      <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
+        This phone becomes the first phone in your family.
+        {custom ? ' Syncing through your own server is free.' : ` 14 days free, then ${PRICE} per phone, once.`}
+      </Text>
+      {toggle}
     </>
   );
 }
@@ -139,7 +135,7 @@ function Status() {
           }
         />
         <Row label="Last synced" value={sync.lastSyncedAt ? formatTime(sync.lastSyncedAt) : 'Not yet'} />
-        <Row label="Server" value={sync.server.replace(/^https?:\/\//, '')} />
+        <Row label="Server" value={isOfficialServer(sync.server) ? 'Subby Sync' : sync.server.replace(/^https?:\/\//, '')} />
       </Card>
       {phase === 'error' && error ? <Text className="text-red-soft text-sm mt-3 ml-1">{error}</Text> : null}
       {tooLarge ? (
@@ -154,13 +150,17 @@ function Status() {
       <Phones />
       <Recovery />
 
-      <Button label="Turn off sync on this phone" variant="danger" onPress={confirmOff} />
-      {!lastPhone ? <Button label="Delete the family from the server" variant="danger" onPress={confirmDelete} /> : null}
-
       {/* For support (e.g. a gifted unlock from us); not a secret. */}
-      <Card>
-        <Row label="Family id" value={`${sync.familyId.slice(0, 8)}…`} onPress={() => Share.share({ message: sync.familyId })} />
-      </Card>
+      <View className="mt-8">
+        <Card>
+          <Row label="Family id" value={`${sync.familyId.slice(0, 8)}…`} onPress={() => Share.share({ message: sync.familyId })} />
+        </Card>
+      </View>
+
+      <View className="mt-4">
+        <Button label="Turn off sync on this phone" variant="danger" onPress={confirmOff} />
+        {!lastPhone ? <Button label="Delete the family from the server" variant="danger" onPress={confirmDelete} /> : null}
+      </View>
       <AccessDevTools />
     </>
   );

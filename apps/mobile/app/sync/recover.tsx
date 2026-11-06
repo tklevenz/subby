@@ -5,6 +5,7 @@ import { isValidRecoveryWords, normalizeRecoveryWords } from '@kindred-log/share
 import { defaultDeviceName, hasLocalData, recoverFamily } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField } from '../../components/ui';
+import { useServerChoice } from '../../components/ServerChoice';
 import { SubLoader } from '../../components/brand/loaders';
 
 type Step = { kind: 'enter' } | { kind: 'choose' } | { kind: 'working' } | { kind: 'error'; message: string };
@@ -12,7 +13,7 @@ type Step = { kind: 'enter' } | { kind: 'choose' } | { kind: 'working' } | { kin
 /** A new phone with only the recovery words: enter them and the server, and get the family's data back. */
 export default function RecoverScreen() {
   const [step, setStep] = useState<Step>({ kind: 'enter' });
-  const [server, setServer] = useState('');
+  const { server, ready, field, toggle } = useServerChoice();
   const [words, setWords] = useState('');
   const count = normalizeRecoveryWords(words).split(' ').filter(Boolean).length;
   const valid = count === 24 && isValidRecoveryWords(words);
@@ -43,18 +44,6 @@ export default function RecoverScreen() {
           </Text>
 
           <View className="mt-6">
-            <FieldLabel>Sync server</FieldLabel>
-            <TextField
-              value={server}
-              onChangeText={setServer}
-              placeholder="https://sync.example.com"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-          </View>
-
-          <View className="mt-5">
             <FieldLabel>The 24 words, in order</FieldLabel>
             <TextField
               value={words}
@@ -70,7 +59,9 @@ export default function RecoverScreen() {
             </Text>
           </View>
 
-          <Button label="Recover" onPress={start} disabled={!valid || !server.trim()} />
+          {field ? <View className="mt-3">{field}</View> : null}
+          <Button label="Recover" onPress={start} disabled={!valid || !ready} />
+          {toggle}
         </>
       ) : null}
 

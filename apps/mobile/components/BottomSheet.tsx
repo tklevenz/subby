@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -35,7 +36,9 @@ export default function BottomSheet({
   useEffect(() => {
     if (!visible) return;
     slideY.setValue(height);
-    Animated.spring(slideY, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 200 }).start();
+    // Not a spring: an underdamped one overshot and then crept to rest for most of a second, and a tap landing while
+    // the sheet still moved under the finger was cancelled (the Diaper sheet's "first tap does nothing").
+    Animated.timing(slideY, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [visible, slideY, height]);
 
   const dismiss = () =>
