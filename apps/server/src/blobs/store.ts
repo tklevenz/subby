@@ -1,7 +1,7 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { access, constants, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
-import { DeleteObjectCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type { BlobStoreConfig } from '../config';
 
 /** Where encrypted files live. Ids are UUIDs checked by the caller, so they are safe as file names and keys. */
@@ -11,6 +11,8 @@ export interface BlobStore {
   get(id: string): Promise<Uint8Array | null>;
   /** Deleting a missing blob is not an error. */
   delete(id: string): Promise<void>;
+  /** Throws when the store can't be used (for /healthz): the folder isn't writable, or the bucket can't be reached. */
+  check(): Promise<void>;
 }
 
 export const BLOB_STORE = Symbol('BLOB_STORE');
@@ -48,6 +50,11 @@ class DiskStore implements BlobStore {
   async delete(id: string) {
     await rm(this.path(id), { force: true });
   }
+
+  async check() {
+    await mkdir(this.root, { recursive: true });
+    await access(this.root, constants.W_OK);
+  }
 }
 
 /** Any S3-compatible object storage (AWS, Hetzner, MinIO, R2…). */
@@ -83,5 +90,9 @@ class S3Store implements BlobStore {
 
   async delete(id: string) {
     await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: id }));
+  }
+
+  async check() {
+    await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
   }
 }

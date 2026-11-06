@@ -1,10 +1,11 @@
 import 'reflect-metadata';
-import { Controller, Get, Inject, Module, type DynamicModule } from '@nestjs/common';
+import { Controller, Get, Inject, Module, ServiceUnavailableException, type DynamicModule } from '@nestjs/common';
+import { sql } from 'drizzle-orm';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { CONFIG, type Config } from './config';
-import { DB, openDb } from './db/db';
+import { DB, openDb, type Db } from './db/db';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { DeviceGuard, DeviceOrRecoveryGuard } from './auth/auth.guard';
@@ -17,7 +18,7 @@ import { SyncController, SyncService } from './sync/sync';
 import { Entitlements } from './sync/entitlements';
 import { LiveBus, LiveGateway } from './live/live';
 import { BlobsController, BlobsService } from './blobs/blobs';
-import { BLOB_STORE, openBlobStore } from './blobs/store';
+import { BLOB_STORE, openBlobStore, type BlobStore } from './blobs/store';
 import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
 import { PurchasesController, PurchasesService } from './purchases/purchases';
@@ -44,12 +45,38 @@ class InfoController {
   }
 }
 
+/**
+ * GET /healthz, for the uptime monitor: 200 when the database answers and photo storage is usable, else 503 with
+ * which one failed. Checked at most every 10 s, so a busy pinger can't turn it into load on the bucket.
+ */
+@Controller()
+class HealthController {
+  private last: { at: number; result: { db: boolean; blobs: boolean } } | null = null;
+
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Inject(BLOB_STORE) private readonly blobs: BlobStore,
+  ) {}
+
+  @Get('healthz')
+  async health() {
+    if (!this.last || Date.now() - this.last.at > 10_000) {
+      const ok = (p: Promise<unknown>) => p.then(() => true, () => false);
+      const [db, blobs] = await Promise.all([ok(this.db.execute(sql`select 1`)), ok(this.blobs.check())]);
+      this.last = { at: Date.now(), result: { db, blobs } };
+    }
+    const { db, blobs } = this.last.result;
+    if (!db || !blobs) throw new ServiceUnavailableException({ ok: false, db, blobs });
+    return { ok: true, db, blobs };
+  }
+}
+
 @Module({})
 class AppModule {
   static with(config: Config, db: unknown): DynamicModule {
     return {
       module: AppModule,
-      controllers: [InfoController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController, PushController, PurchasesController],
+      controllers: [InfoController, HealthController, AuthController, FamiliesController, KeysController, InvitesController, SyncController, BlobsController, PushController, PurchasesController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: DB, useValue: db },

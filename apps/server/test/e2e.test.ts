@@ -141,6 +141,12 @@ describe.skipIf(!reachable)('sync server', () => {
     return { a, b };
   }
 
+  it('reports health for the uptime monitor', async () => {
+    const res = await fetch(`${url}/healthz`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, db: true, blobs: true });
+  });
+
   it('creates a family and logs in', async () => {
     const a = new TestClient(url);
     await a.createFamily();

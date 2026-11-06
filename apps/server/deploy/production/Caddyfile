@@ -1,0 +1,14 @@
+# HTTPS for Subby Sync (Let's Encrypt, automatic). No access log: it would keep IP addresses.
+{
+	admin off
+}
+
+{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy server:8787
+}

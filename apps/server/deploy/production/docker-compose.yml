@@ -1,0 +1,63 @@
+# The official Subby Sync at sync.subby.baby (LAUNCH.md O1). Self-hosters: use ../../docker-compose.yml instead.
+# Lives in /opt/subby on the server, next to .env (from env.example) and secrets/. deploy.sh installs it and sets
+# IMAGE_TAG; nothing is built on the server. Tuned for a 1 GB box (Hetzner CPX02 with 2 GB swap).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kindred
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: kindred
+    # Small memory settings: the rows are small and the disk is NVMe.
+    command: >
+      postgres
+      -c shared_buffers=96MB
+      -c effective_cache_size=256MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=30
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kindred -d kindred"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: kindred-sync:${IMAGE_TAG:?Deploy with deploy.sh (it sets IMAGE_TAG)}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://kindred:${POSTGRES_PASSWORD}@db:5432/kindred
+      # The pretend store must never run here.
+      TEST_PURCHASES: "0"
+      NODE_OPTIONS: --max-old-space-size=320
+    volumes:
+      # The Firebase service-account key for push (FCM_SERVICE_ACCOUNT=/secrets/firebase.json).
+      - ./secrets:/secrets:ro
+    # No published port: only Caddy, on the compose network, reaches the server.
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on:
+      - server
+
+volumes:
+  db:
+  caddy:
