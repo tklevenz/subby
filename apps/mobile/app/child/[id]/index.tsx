@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -27,6 +27,7 @@ import { useChildStore } from '../../../store/useChildStore';
 import { useLogStore } from '../../../store/useLogStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { colors } from '../../../theme/colors';
+import { ScreenScroll } from '../../../components/ScreenScroll';
 
 const MEASURES = [
   { value: 'weightKg', label: 'Weight' },
@@ -75,7 +76,7 @@ function Profile({ child }: { child: Child }) {
   const story = useMemo(() => childStory(logs, child, units), [logs, child, units]);
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ paddingBottom: 40 }}>
       <Cover child={child} isActive={isActive} onPhoto={() => setMenu(true)} />
       <PhotoMenu
         visible={menu}
@@ -102,7 +103,7 @@ function Profile({ child }: { child: Child }) {
           <Text className="text-ink-faint text-sm mt-1 ml-10">Milestones, measurements and first foods you log appear here.</Text>
         ) : null}
       </View>
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

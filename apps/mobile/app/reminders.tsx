@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, Linking, ScrollView, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Switch, Text, View } from 'react-native';
 import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@kindred-log/shared';
 import { Card, Segmented } from '../components/ui';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../features/reminders/scheduler';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
+import { ScreenScroll } from '../components/ScreenScroll';
 
 type Interval = { value: string; label: string };
 const FEED_INTERVALS: Interval[] = [
@@ -66,7 +67,7 @@ export default function RemindersScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       {!remindersAvailable ? (
         <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
           <Text className="text-amber-pale text-sm leading-5">
@@ -157,7 +158,7 @@ export default function RemindersScreen() {
       <Text className="text-ink-ghost text-xs mt-3 leading-5">
         Reminders are set on this phone only and move automatically as you log.
       </Text>
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimInvite, defaultDeviceName, finishJoin, hasLocalData, joinStatus, type Join } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField } from '../../components/ui';
 import { PeriscopeLoader, SubLoader } from '../../components/brand/loaders';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Step =
   | { kind: 'scan' }
@@ -66,7 +67,7 @@ export default function JoinScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'scan' ? <Scan onCode={claim} /> : null}
 
       {step.kind === 'claiming' || step.kind === 'finishing' ? <Busy label={step.kind === 'claiming' ? 'Checking the code…' : 'Joining…'} /> : null}
@@ -105,7 +106,7 @@ export default function JoinScreen() {
           <Button label="Scan a new code" onPress={() => setStep({ kind: 'scan' })} />
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

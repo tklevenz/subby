@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text } from 'react-native';
+import { Text } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChildForm from '../components/ChildForm';
@@ -7,6 +7,7 @@ import { Button } from '../components/ui';
 import { SubTile } from '../components/brand/Sub';
 import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { ScreenScroll } from '../components/ScreenScroll';
 
 export default function Onboarding() {
   const insets = useSafeAreaInsets();
@@ -14,7 +15,7 @@ export default function Onboarding() {
   const setSetting = useSettingsStore((s) => s.set);
 
   return (
-    <ScrollView
+    <ScreenScroll
       className="flex-1 bg-ground"
       contentContainerStyle={{ paddingTop: insets.top + 32, paddingHorizontal: 20, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
@@ -40,6 +41,6 @@ export default function Onboarding() {
 
       <Text className="text-ink-faint text-center mt-6">Have a Subby backup?</Text>
       <Button label="Restore a backup" variant="ghost" onPress={() => router.push('/backup')} />
-    </ScrollView>
+    </ScreenScroll>
   );
 }

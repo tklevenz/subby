@@ -1,16 +1,17 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import {} from 'react-native';
 import { router } from 'expo-router';
 import ChildForm from '../../components/ChildForm';
 import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 /** Add another child; they become the active one. */
 export default function NewChildScreen() {
   const addChild = useChildStore((s) => s.addChild);
   const setSetting = useSettingsStore((s) => s.set);
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <ChildForm
         submitLabel="Add child"
         onSubmit={async (input) => {
@@ -19,6 +20,6 @@ export default function NewChildScreen() {
           router.back();
         }}
       />
-    </ScrollView>
+    </ScreenScroll>
   );
 }

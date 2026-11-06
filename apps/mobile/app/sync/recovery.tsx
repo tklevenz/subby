@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { newRecoveryWords, normalizeRecoveryWords } from '@kindred-log/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
@@ -7,6 +7,7 @@ import { useSyncStore } from '../../features/sync/engine';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Button, FieldLabel, TextField } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Step = { kind: 'intro' } | { kind: 'words'; words: string[] } | { kind: 'check'; words: string[] } | { kind: 'saving' } | { kind: 'done' };
 
@@ -32,7 +33,7 @@ export default function RecoveryKeyScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'intro' ? (
         <>
           <Text className="text-ink text-xl font-bold">{hasRecovery ? 'Make a new recovery key' : 'A way back in if every phone is lost'}</Text>
@@ -87,7 +88,7 @@ export default function RecoveryKeyScreen() {
           <Button label="Done" onPress={() => router.back()} />
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { CloudSun, Moon, Sun } from '../components/icons';
 import {
   addDays,
@@ -13,6 +13,7 @@ import { useLogQuery } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { useFormatTime, useNow } from '../store/timeHelpers';
 import { colors } from '../theme/colors';
+import { ScreenScroll } from '../components/ScreenScroll';
 
 const SLEEP = ['sleep'] as const;
 
@@ -33,7 +34,7 @@ export default function ScheduleScreen() {
   const { norms } = schedule;
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <View className="bg-violet/10 border border-violet/40 rounded-2xl p-4">
         <Text className="text-violet-pale text-xs font-medium">
           {next ? (next.kind === 'bedtime' ? 'Bedtime' : `Next nap`) : 'Next sleep'}
@@ -74,7 +75,7 @@ export default function ScheduleScreen() {
       <Text className="text-ink-ghost text-xs mt-2 leading-5">
         Estimates only. Follow your baby's sleepy cues, and talk to your pediatrician about sleep concerns.
       </Text>
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

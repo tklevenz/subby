@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
+import { Share, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import type { InviteResponse } from '@kindred-log/shared/sync';
 import { approveClaim, claimCode, createInvite, inviteStatus, type Invite } from '../../features/sync/family';
@@ -7,6 +7,7 @@ import QrCode from '../../components/QrCode';
 import { Button } from '../../components/ui';
 import { useNow } from '../../store/timeHelpers';
 import { PeriscopeLoader } from '../../components/brand/loaders';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Claimant = NonNullable<InviteResponse['claimant']>;
 type Step =
@@ -71,7 +72,7 @@ export default function AddPhoneScreen() {
   const size = Math.min(width - 64, 320);
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       {step.kind === 'loading' || step.kind === 'approving' ? (
         <View className="items-center mt-24">
           <PeriscopeLoader />
@@ -134,6 +135,6 @@ export default function AddPhoneScreen() {
           )}
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }

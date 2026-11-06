@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
@@ -20,6 +20,7 @@ import { useActiveChild } from '../store/useActiveChild';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { SubMono } from '../components/brand/Sub';
 import { colors } from '../theme/colors';
+import { ScreenScroll } from '../components/ScreenScroll';
 
 const MEASURES = [
   { value: 'weightKg', label: 'Weight' },
@@ -63,7 +64,7 @@ export default function GrowthScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <Segmented options={MEASURES} value={measure} onChange={setMeasure} />
 
       {!sex ? (
@@ -115,6 +116,6 @@ export default function GrowthScreen() {
           </View>
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }

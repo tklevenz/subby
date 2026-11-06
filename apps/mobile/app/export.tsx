@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { LOG_TYPES, logsToCsv, type LogType } from '@kindred-log/shared';
@@ -10,6 +10,7 @@ import { useActiveChild } from '../store/useActiveChild';
 import { countChildLogs } from '../store/useChildStore';
 import { toIsoDate } from '../store/timeHelpers';
 import { EmptyState } from '../components/brand/EmptyState';
+import { ScreenScroll } from '../components/ScreenScroll';
 
 const RANGES = [
   { value: 'all', label: 'All time' },
@@ -72,7 +73,7 @@ export default function ExportScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
       <Text className="text-ink-muted leading-6">
         One CSV with {child.name}'s entries, oldest first. Values are in ml, g, cm and °C; times are local.
       </Text>
@@ -92,6 +93,6 @@ export default function ExportScreen() {
       <Text className="text-ink-ghost text-xs mt-3 leading-5">
         The file isn't encrypted. Whoever you share it with can read it.
       </Text>
-    </ScrollView>
+    </ScreenScroll>
   );
 }

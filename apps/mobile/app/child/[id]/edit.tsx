@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { Child, LogType } from '@kindred-log/shared';
 import ChildForm from '../../../components/ChildForm';
@@ -8,6 +8,7 @@ import { Button, FieldLabel, TextField } from '../../../components/ui';
 import { countChildLogs, useChildStore } from '../../../store/useChildStore';
 import { useLogStore } from '../../../store/useLogStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { ScreenScroll } from '../../../components/ScreenScroll';
 
 /** Edit a child's details; also home of the delete action. */
 export default function EditChildScreen() {
@@ -16,7 +17,7 @@ export default function EditChildScreen() {
   const updateChild = useChildStore((s) => s.updateChild);
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: child ? `Edit ${child.name}` : 'Child' }} />
       {child ? (
         <>
@@ -31,7 +32,7 @@ export default function EditChildScreen() {
           <DeleteChild child={child} />
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

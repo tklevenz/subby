@@ -3,6 +3,7 @@ import { FlatList, Text, View } from 'react-native';
 import { solidsReport } from '@kindred-log/shared';
 import { Segmented } from '../components/ui';
 import { HAS_FOODS, useLogQuery } from '../store/queries';
+import { useScreenBottom } from '../components/ScreenScroll';
 
 const FILTERS = [
   { value: 'all', label: 'All foods' },
@@ -12,6 +13,7 @@ const FILTERS = [
 const FEEDS = ['feed'] as const;
 
 export default function SolidsScreen() {
+  const bottom = useScreenBottom();
   const logs = useLogQuery({ types: FEEDS, where: HAS_FOODS });
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['value']>('all');
   const foods = useMemo(() => (logs ? solidsReport(logs) : []), [logs]);
@@ -22,7 +24,7 @@ export default function SolidsScreen() {
   return (
     <FlatList
       className="flex-1 bg-ground"
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: bottom }}
       data={logs ? shown : []}
       keyExtractor={(f) => f.name.toLowerCase()}
       ListHeaderComponent={

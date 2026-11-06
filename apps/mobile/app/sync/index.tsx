@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { Alert, Pressable, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -12,14 +12,15 @@ import { SubSpinner, SyncPing } from '../../components/brand/loaders';
 import { ACCESS_LABEL, AccessCard, AccessDevTools, GiftSlot } from '../../components/SyncAccess';
 import { PRICE, useAccessStore } from '../../features/sync/access';
 import { isOfficialServer } from '../../features/sync/api';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 /** Sync between phones: set up or join, status, the family's phones, turning it off. */
 export default function SyncScreen() {
   const sync = useSettingsStore((s) => s.sync);
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {sync ? <Status /> : <SetUp />}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

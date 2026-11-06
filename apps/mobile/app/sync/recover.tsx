@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { isValidRecoveryWords, normalizeRecoveryWords } from '@kindred-log/shared/crypto';
 import { defaultDeviceName, hasLocalData, recoverFamily } from '../../features/sync/family';
@@ -7,6 +7,7 @@ import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubLoader } from '../../components/brand/loaders';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Step = { kind: 'enter' } | { kind: 'choose' } | { kind: 'working' } | { kind: 'error'; message: string };
 
@@ -35,7 +36,7 @@ export default function RecoverScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'enter' ? (
         <>
           <Text className="text-ink text-xl font-bold">Use a recovery key</Text>
@@ -87,7 +88,7 @@ export default function RecoverScreen() {
           <Button label="Try again" onPress={() => setStep({ kind: 'enter' })} />
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

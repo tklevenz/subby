@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { BackupContents, RestorePlan } from '@kindred-log/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
 import { Button, FieldLabel, TextField } from '../components/ui';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
 import { SubLoader, SubProgress } from '../components/brand/loaders';
+import { ScreenScroll } from '../components/ScreenScroll';
 
 const MIN_PASSPHRASE = 8;
 
@@ -53,7 +54,7 @@ export default function BackupScreen() {
     });
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {busy ? <Busy label={busy} progress={progress} /> : null}
 
       {!busy && step.kind === 'home' ? (
@@ -109,7 +110,7 @@ export default function BackupScreen() {
           <Button label="Done" onPress={() => router.replace('/')} />
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

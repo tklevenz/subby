@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/engine';
@@ -9,6 +9,7 @@ import { PRICE } from '../../features/sync/access';
 import { Button } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
 import { useServerChoice } from '../../components/ServerChoice';
+import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Step = { kind: 'choose' } | { kind: 'working'; label: string } | { kind: 'error'; message: string };
 
@@ -48,7 +49,7 @@ export default function MoveScreen() {
     ]);
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'working' ? (
         <View className="items-center mt-24">
           <SubLoader />
@@ -74,6 +75,6 @@ export default function MoveScreen() {
           {toggle}
         </>
       )}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
