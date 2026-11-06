@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "clean": "rm -rf node_modules dist"
+    "clean": "rm -rf node_modules dist",
+    "smoke": "tsx test/smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

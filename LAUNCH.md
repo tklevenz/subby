@@ -47,7 +47,7 @@ These block tickets further down.
   - Own unlocks (purchase → the phone currently using it), and gifted slots (a count per family, each assigned to a member phone, freed on removal).
   - `canSync` per device: in the trial, or with an own unlock or an assigned slot → push allowed; otherwise pull only.
   - Self-hosted mode always allows everything. [D1, P1]
-- [ ] **S7 Metrics and logs without user data.** Request counts, error rates, family/blob totals; never ids or IPs in long-lived logs. A `/healthz` for the uptime monitor.
+- [ ] **S7 Metrics and logs without user data.** Request counts, error rates, family/blob totals; never ids or IPs in long-lived logs. `/healthz` done (Postgres and photo storage); Caddy keeps no access log.
 - [ ] **S8 Dependency refresh** before launch (NestJS 12.2+ / fastify 5.12.7 clears the open low advisory), and `pnpm audit`.
 - [ ] **S9 Far-future `updatedAt` (audit S-7 leftover).** Decide whether to clamp. A phone with a wrong clock would win every edit; a clamp could get it stuck. At minimum, show a clock-skew warning in the app.
 
@@ -93,12 +93,12 @@ These block tickets further down.
 
 ## Operations
 
-- [ ] **O1 Production host.**
+- [ ] **O1 Production host.** Running since 2026-11-06 at `https://sync.subby.baby` (Hetzner CPX02, Ubuntu 26.04, 2 GB swap, ufw 22/80/443, SSH keys only; Object Storage for photos; `apps/server/deploy/production`). Left: the Firebase key (push is off until then).
   - Server + Postgres + blob storage at `sync.subby.baby`, Caddy with HTTPS and HSTS, `HTTP_BIND=127.0.0.1`.
   - The production Firebase service-account key in `./secrets`. [D8]
 - [ ] **O2 Backups.** Nightly Postgres dumps and blob storage versioning, kept off the host, encrypted. **Do a test restore before launch.**
 - [ ] **O3 Monitoring.** Uptime check on `/healthz`, disk and DB size alerts, a TLS expiry check. [S7]
-- [ ] **O4 Deploy procedure.** Image tags instead of `latest`, migrate-then-start, a rollback note. Write it down in the server README.
+- [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `kindred-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @kindred-log/server smoke https://sync.subby.baby`.
 - [ ] **O5 Website** at `subby.baby` (designed separately): home, how Sync works, pricing, self-hosting, privacy, Impressum. Static, no trackers, self-hosted fonts, HSTS.
 - [ ] **O6 Email**: `support@subby.baby`, `privacy@` and `security@` (named in SECURITY.md), with SPF/DKIM/DMARC.
 - [ ] **O7 Public repo.** Done 2026-11-05: LICENSE files (MIT root, app, shared; AGPL server), README, SECURITY.md (security@subby.baby, needs O6). Left: making it public (the AGPL requires offering the hosted server's source).
