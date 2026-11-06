@@ -13,22 +13,39 @@
 	reverse_proxy server:8787
 }
 
-# The homepage (LAUNCH.md O5): static files, kept in their own repo and copied to /opt/subby/site with site.sh.
-# Scripts, fonts and images only from the site itself: no trackers, no third parties. Inline styles are allowed.
+# The homepage (LAUNCH.md O5): static files built in their own repo (subby.baby, Eleventy) and copied to
+# /opt/subby/site with site.sh. Headers and caching follow that repo's deploy/snippets.caddy: change them there
+# first, then here. No scripts, nothing from other hosts, no inline styles. HSTS starts short on purpose (that
+# repo's ramp-up plan: 300, then 604800, then two years with preload).
 {$SITE_DOMAIN} {
 	root * /srv/site
+	header {
+		Strict-Transport-Security "max-age=300; includeSubDomains"
+		Content-Security-Policy "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
 	encode zstd gzip
 	file_server
-	header {
-		Strict-Transport-Security "max-age=63072000"
-		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
-		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), browsing-topics=()"
-		-Server
+
+	# Asset URLs carry a content hash (?v=...), so they can be cached for a year.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	@pages not path /assets/*
+	header @pages Cache-Control "no-cache"
+
+	handle_errors {
+		rewrite * /404.html
+		file_server
 	}
 }
 
 www.{$SITE_DOMAIN} {
+	header -Server
 	redir https://{$SITE_DOMAIN}{uri} permanent
 }
