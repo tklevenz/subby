@@ -239,3 +239,60 @@ export function appendEntry(
     at,
   });
 }
+
+// --- moving to another server -------------------------------------------------------------------------------
+
+/**
+ * The device log of a family moving to another server, made by the phone that moves it (`mover`): it creates the
+ * new family (committing to `familyKey` as epoch 1), adds every other phone of the old family with the keys it
+ * already has there, and keeps the same recovery key. Nobody pairs again; each phone checks the new log with
+ * `verifyMovedLog` against the old one it already trusts.
+ */
+export function movedFamilyLog(old: DeviceLogState, mover: { id: string; keys: IdentityKeys }, familyKey: Uint8Array, at: number): DeviceLogEntry[] {
+  if (!old.members.has(mover.id)) throw new Error('Only a phone in the family can move it');
+  const entries: DeviceLogEntry[] = [];
+  let state: DeviceLogState | null = null;
+  const add = (change: Parameters<typeof appendEntry>[3]) => {
+    entries.push(appendEntry(state, entries.length, mover, change, at));
+    state = verifyDeviceLog(entries);
+  };
+  const keys = { sign: mover.keys.sign.publicKey, box: mover.keys.box.publicKey };
+  add({ type: 'create', deviceId: mover.id, keys, familyKey: { epoch: 1, key: familyKey } });
+  for (const [id, m] of old.members) if (id !== mover.id) add({ type: 'add', deviceId: id, keys: { sign: m.signKey, box: m.boxKey } });
+  if (old.recovery) add({ type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys: { sign: old.recovery.signKey, box: old.recovery.boxKey } });
+  return entries;
+}
+
+/**
+ * A phone following its family to another server checks the new log against the old one (both verified here):
+ * - it was created by `from`, a phone of the old family, with the keys it has there;
+ * - every phone in it is one of the old family's, with the same keys, and none was removed by another phone (a
+ *   lost phone stays out; leaving by itself is fine, that's how a phone that already followed leaves the old one);
+ * - the recovery key is the same one;
+ * - it has `me`.
+ * Throws otherwise. Returns the new log's state.
+ */
+export function verifyMovedLog(oldEntries: DeviceLogEntry[], newEntries: DeviceLogEntry[], from: string, me: string): DeviceLogState {
+  const old = verifyDeviceLog(oldEntries);
+  const next = verifyDeviceLog(newEntries);
+  const fail = (why: string): never => {
+    throw new Error(`The family's new phone list ${why}`);
+  };
+  const added = new Map<string, Member>();
+  const removedByOthers = new Set<string>();
+  for (const e of oldEntries) {
+    if (e.type === 'create' || e.type === 'add') added.set(e.deviceId, keysOf(e));
+    if (e.type === 'remove' && e.signer !== e.deviceId) removedByOthers.add(e.deviceId);
+  }
+  const same = (a: Member | null | undefined, b: Member | null | undefined) =>
+    a === b || (!!a && !!b && equalBytes(a.signKey, b.signKey) && equalBytes(a.boxKey, b.boxKey));
+
+  if (newEntries[0]!.deviceId !== from || !added.has(from)) fail("wasn't made by a phone of this family");
+  for (const [id, m] of next.members) {
+    if (!same(added.get(id), m)) fail('has a phone that isn’t in this family');
+    if (removedByOthers.has(id)) fail('has a phone that was removed from this family');
+  }
+  if (!same(old.recovery, next.recovery)) fail('has another recovery key');
+  if (!next.members.has(me)) fail('doesn’t have this phone');
+  return next;
+}

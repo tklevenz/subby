@@ -6,6 +6,7 @@ import {
   decryptFile,
   encryptFile,
   fromBase64,
+  movedFamilyLog,
   newIdentity,
   newSymmetricKey,
   openFamilyKey,
@@ -15,6 +16,7 @@ import {
   sign,
   toBase64,
   verifyDeviceLog,
+  verifyMovedLog,
   withinEpoch,
   type DeviceLogEntry,
   type DeviceLogState,
@@ -34,6 +36,7 @@ import {
   type InviteResponse,
   type KeysResponse,
   type LiveMessage,
+  type MovedBody,
   type PullResponse,
   type PushResponse,
   type RecordKind,
@@ -345,6 +348,72 @@ export class TestClient {
     this.familyKeys.clear();
     await this.login();
     await this.refresh();
+  }
+
+  // --- moving to another server (the app's features/sync/move.ts) ------------------------------------------
+
+  /**
+   * Moves the family to `server`: a new family there with the same phones and recovery key, the photos `blobs`
+   * uploaded under their ids and keys, then a `moved` record for the old family, and this phone leaves it.
+   * Returns this phone in the new family; its records still have to be pushed there.
+   */
+  async moveTo(server: string, blobs: { id: string; key: string; data: Uint8Array }[] = []) {
+    await this.pull();
+    await this.refresh();
+    const key = newSymmetricKey();
+    const log = movedFamilyLog(this.state!, this.me, key, Date.now());
+    const next = new TestClient(server);
+    next.deviceId = this.deviceId;
+    next.identity = this.identity;
+    const familyId = randomUUID();
+    await next.request('POST', '/v1/families', { familyId, entry: log[0], sealedKey: toBase64(seal(this.identity.box.publicKey, key)) });
+    await next.login();
+    for (const entry of log.slice(1)) await next.request('POST', '/v1/families/me/log', { entry });
+    const state = verifyDeviceLog(log);
+    for (const [id, m] of state.members) {
+      if (id !== this.deviceId) await next.request('POST', '/v1/keys/grant', { recipient: id, keys: [{ epoch: 1, sealed: toBase64(seal(m.boxKey, key)) }] });
+    }
+    if (state.recovery) await next.request('POST', '/v1/keys/grant', { recipient: RECOVERY_SIGNER, keys: [{ epoch: 1, sealed: toBase64(seal(state.recovery.boxKey, key)) }] });
+    for (const b of blobs) {
+      const res = await fetch(`${server}/v1/blobs/${b.id}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${next.token}` },
+        body: encryptFile(fromBase64(b.key), b.data) as Uint8Array<ArrayBuffer>,
+      });
+      if (!res.ok) throw new HttpError(res.status, res.statusText);
+    }
+    const moved: MovedBody = { server, familyId, from: this.deviceId, seq: this.lastSeq };
+    await this.push([this.seal('moved', familyId, moved)]);
+    await this.append({ type: 'remove', deviceId: this.deviceId });
+    await next.refresh();
+    return next;
+  }
+
+  /**
+   * Another phone moved the family: finds its `moved` record, checks the new log against the old one, and joins
+   * the new family as itself. Returns this phone there, and the ids it wrote to the old family after the move.
+   */
+  async follow() {
+    const pulled = await this.pull();
+    const record = pulled.find((p) => p.record.kind === 'moved');
+    if (!record) throw new Error('No move to follow');
+    const move = record.body as MovedBody;
+    const next = new TestClient(move.server);
+    next.deviceId = this.deviceId;
+    next.identity = this.identity;
+    await next.login();
+    const { entries } = await next.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
+    const { entries: oldEntries } = await this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
+    verifyMovedLog(oldEntries, entries, move.from, this.deviceId);
+    await next.refresh();
+    const resend: string[] = [];
+    const since = this.lastSeq;
+    this.lastSeq = move.seq;
+    for (const p of await this.pull()) if (p.record.deviceId === this.deviceId && p.record.kind !== 'moved') resend.push(p.record.id);
+    this.lastSeq = since;
+    await this.refresh();
+    await this.append({ type: 'remove', deviceId: this.deviceId });
+    return { next, resend };
   }
 
   // --- live ---------------------------------------------------------------------------------------------

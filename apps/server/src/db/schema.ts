@@ -96,7 +96,7 @@ export const records = pgTable(
   {
     familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
     id: uuid('id').notNull(),
-    kind: text('kind', { enum: ['child', 'log', 'device'] }).notNull(),
+    kind: text('kind', { enum: ['child', 'log', 'device', 'moved'] }).notNull(),
     epoch: integer('epoch').notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
     deviceId: uuid('device_id').notNull(),

@@ -6,6 +6,7 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { closeLive, openLive, pendingCount, requestSync, useSyncStore } from './engine';
 import { setUpBackgroundSync, stopBackgroundSync } from './background';
+import { isOfficialServer } from './api';
 
 /**
  * Keeps this phone in sync while the app runs: on start, on every local write (debounced), when the app
@@ -47,6 +48,15 @@ export function useSyncEngine(ready: boolean) {
           { text: 'OK' },
           { text: 'Review phones', onPress: () => router.push('/sync') },
         ]);
+      }),
+    );
+    // Another phone moved the family and this one followed: say so once.
+    unsubs.push(
+      useSyncStore.subscribe((s) => {
+        if (s.phase !== 'idle' || !s.movedTo) return;
+        const to = isOfficialServer(s.movedTo) ? 'Subby Sync' : s.movedTo.replace(/^https?:\/\//, '');
+        useSyncStore.setState({ movedTo: null });
+        Alert.alert('Your family moved', `Another phone moved your family to ${to}. This phone followed and syncs there now.`);
       }),
     );
     const appState = AppState.addEventListener('change', (state) => (state === 'active' ? start() : closeLive()));

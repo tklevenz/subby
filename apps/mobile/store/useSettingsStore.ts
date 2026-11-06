@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, type ReminderSettings, type UnitSystem } from '@kindred-log/shared';
 import type { LogSeen } from '@kindred-log/shared/crypto';
+import type { MovedBody } from '@kindred-log/shared/sync';
 import { db, schema } from '../db/client';
 
 export type Settings = {
@@ -39,6 +40,8 @@ export type SyncSettings = {
   pushToken?: string;
   /** How far this phone has verified the device log, so a server can't serve an older one (`assertLogContinues`). */
   logSeen?: LogSeen;
+  /** Another phone moved the family to another server (a `moved` record): this phone follows on its next sync run. */
+  move?: MovedBody;
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';

@@ -106,3 +106,13 @@ describe('isValidBody', () => {
     expect(JSON.parse(JSON.stringify(bottle!.payload))).toEqual({ type: 'feed', method: 'bottle' });
   });
 });
+
+describe('moved records', () => {
+  it('checks the body, and skips kinds this app doesn’t know', () => {
+    const moved = { server: 'https://sync.subby.baby', familyId: '01a1aff5-1af5-7274-9206-349143438004', from: '01a1aff5-1af5-7274-9206-34904232e045', seq: 12 };
+    expect(validBody('moved', moved)).toEqual(moved);
+    expect(validBody('moved', { ...moved, server: 'javascript:alert(1)' })).toBeNull();
+    expect(validBody('moved', { ...moved, seq: -1 })).toBeNull();
+    expect(validBody('somethingNew' as never, { name: 'x' })).toBeNull();
+  });
+});

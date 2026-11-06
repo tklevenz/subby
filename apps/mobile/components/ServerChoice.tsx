@@ -5,10 +5,10 @@ import { OFFICIAL_SERVER } from '../features/sync/api';
 
 /**
  * Which sync server to use: Subby Sync unless asked otherwise. The address field only shows for your own server.
- * `field` goes above the action button, `toggle` below it.
+ * `field` goes above the action button, `toggle` below it. `customOnly`: already on Subby Sync, so only another server.
  */
-export function useServerChoice() {
-  const [custom, setCustom] = useState(false);
+export function useServerChoice({ customOnly = false } = {}) {
+  const [custom, setCustom] = useState(customOnly);
   const [address, setAddress] = useState('');
 
   const field = custom ? (
@@ -18,7 +18,7 @@ export function useServerChoice() {
     </View>
   ) : null;
 
-  const toggle = (
+  const toggle = customOnly ? null : (
     <Pressable onPress={() => setCustom(!custom)} hitSlop={8} className="items-center mt-4">
       <Text className="text-violet-soft text-sm">{custom ? 'Use Subby Sync instead' : 'Use your own server'}</Text>
     </Pressable>

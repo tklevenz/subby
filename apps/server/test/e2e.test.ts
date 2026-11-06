@@ -693,6 +693,69 @@ describe.skipIf(!reachable)('sync server', () => {
     });
   });
 
+  describe('moving to another server', () => {
+    let other: Awaited<ReturnType<typeof createApp>>;
+    let otherUrl = '';
+    const otherDbName = `${dbName}_moved`;
+    const otherBlobs = mkdtempSync(join(tmpdir(), 'kl-blobs-moved-'));
+
+    beforeAll(async () => {
+      await admin.unsafe(`create database ${otherDbName}`);
+      other = await createApp({
+        databaseUrl: ADMIN_URL.replace(/\/[^/]+$/, `/${otherDbName}`),
+        port: 0,
+        mode: 'self',
+        migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
+        blobs: { kind: 'disk', dir: otherBlobs },
+        push: { kind: 'none' },
+        rateLimit: false,
+        trustProxy: false,
+        stores: { google: null, apple: null, test: false },
+      });
+      await other.listen({ port: 0, host: '127.0.0.1' });
+      otherUrl = (await other.getUrl()).replace('[::1]', '127.0.0.1');
+    });
+
+    afterAll(async () => {
+      await other?.close();
+      await admin.unsafe(`drop database if exists ${otherDbName} with (force)`);
+      rmSync(otherBlobs, { recursive: true, force: true });
+    });
+
+    it('moves a family with its photos; the other phone follows without pairing, and the old family is deleted', async () => {
+      const { a, b } = await pairedFamily();
+      const oldFamily = a.familyId;
+      const words = newRecoveryWords();
+      await a.setRecovery(words);
+      const photo = new Uint8Array([1, 2, 3, 4, 5]);
+      const ref = await a.uploadFile(photo);
+      const note = a.seal('log', randomUUID(), { text: 'first', photoBlob: ref }, { blobs: [ref.id] });
+      await a.push([note]);
+      await b.pull();
+
+      const a2 = await a.moveTo(otherUrl, [{ ...ref, data: photo }]);
+      // The mover sends its copy of everything, sealed with the new key; the photo keeps its id and key.
+      await a2.push([a2.seal('log', note.id, { text: 'first', photoBlob: ref }, { updatedAt: note.updatedAt, blobs: [ref.id] })]);
+      // b writes to the old family before it notices the move: that one it sends again itself.
+      const late = b.seal('log', randomUUID(), { text: 'late' });
+      await b.push([late]);
+
+      const { next: b2, resend } = await b.follow();
+      expect(resend).toEqual([late.id]);
+      await b2.push([b2.seal('log', late.id, { text: 'late' }, { updatedAt: late.updatedAt })]);
+      expect((await b2.pull()).map((p) => p.record.id).sort()).toEqual([note.id, late.id].sort());
+      expect(await b2.downloadFile(ref)).toEqual(photo);
+      expect([...b2.state!.members.keys()].sort()).toEqual([a.deviceId, b.deviceId].sort());
+
+      // Both left the old family, so it's gone from the old server.
+      expect(await db`select id from families where id = ${oldFamily}`).toHaveLength(0);
+      // The recovery words work on the new server.
+      const c = new TestClient(otherUrl);
+      await c.recover(words);
+      expect(c.state!.members.has(c.deviceId)).toBe(true);
+    });
+  });
+
   describe('deleting a family', () => {
     const tables = ['families', 'device_log', 'devices', 'family_keys', 'sessions', 'invites', 'blobs', 'push_tokens', 'records'];
     /** Rows left for the family, per table (the families table is keyed by id). */
@@ -867,6 +930,15 @@ describe.skipIf(!reachable)('sync server', () => {
       // Pulling, and managing the family, still work.
       await b.pull();
       await a.refresh();
+    });
+
+    it('a phone without an unlock may still tell its family it moved, and nothing else', async () => {
+      const { a } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const moved = () => a.seal('moved', randomUUID(), { server: 'https://sync.example.com', familyId: randomUUID(), from: a.deviceId, seq: a.lastSeq });
+      await expectStatus(a.push([a.seal('log', randomUUID(), { note: 'x' })]), 402);
+      await a.push([moved()]);
+      await expectStatus(a.push([moved(), a.seal('log', randomUUID(), { note: 'x' })]), 402);
     });
 
     it('a phone that joins after the trial gets its own 48 hours', async () => {

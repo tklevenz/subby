@@ -12,6 +12,8 @@ import { BlobsService } from '../blobs/blobs';
 import { PushService } from '../push/push';
 
 const PULL_LIMIT = 1000;
+/** A `moved` record's sealed body (server URL, two ids, a seq) is far below this. */
+const MOVED_MAX_CHARS = 2048;
 
 @Injectable()
 export class SyncService {
@@ -25,7 +27,10 @@ export class SyncService {
 
   /** Stores each record if it is newer than the server's copy; every accepted record gets the next seq. */
   async push(auth: AuthContext, records: SyncRecord[]): Promise<PushResponse> {
-    if (!(await this.entitlements.canSync(auth.familyId, auth.deviceId))) throw notUnlocked();
+    // A phone without an unlock may still tell its family it moved elsewhere (leaving is always free): one small
+    // `moved` record, nothing else.
+    const onlyMoved = records.length === 1 && records[0]!.kind === 'moved' && (records[0]!.data?.length ?? 0) <= MOVED_MAX_CHARS;
+    if (!onlyMoved && !(await this.entitlements.canSync(auth.familyId, auth.deviceId))) throw notUnlocked();
     for (const r of records) {
       if (r.deviceId !== auth.deviceId) throw new ForbiddenException('Records must be written as the calling device');
       // Tombstones carry a sealed empty body (older apps sent none); everything else needs its data.

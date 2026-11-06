@@ -19,15 +19,20 @@ const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
     .extend({ payload: LenientPayloadSchema })
     .refine((l) => l.payload.type === l.logType),
   device: z.object({ name: z.string().min(1).max(100) }),
+  moved: z.object({ server: z.string().regex(/^https?:\/\/\S+$/i).max(300), familyId: z.uuid(), from: z.uuid(), seq: z.number().int().nonnegative() }),
 };
 
 /** Whether a decrypted body from another phone is well-formed for its kind. */
-export const isValidBody = (kind: RecordKind, body: unknown) => BODY_SCHEMAS[kind].safeParse(body).success;
+export const isValidBody = (kind: RecordKind, body: unknown) => validBody(kind, body) !== null;
 
-/** The body as checked (nulls in optional payload fields become missing), or null when it's malformed. */
+/**
+ * The body as checked (nulls in optional payload fields become missing), or null when it's malformed. A kind this
+ * app doesn't know (from a newer app) is null too, so it's skipped instead of stopping sync.
+ */
 export function validBody<T>(kind: RecordKind, body: unknown): T | null {
-  const res = BODY_SCHEMAS[kind].safeParse(body);
-  return res.success ? (res.data as T) : null;
+  const schema = BODY_SCHEMAS[kind] as z.ZodTypeAny | undefined;
+  const res = schema?.safeParse(body);
+  return res?.success ? (res.data as T) : null;
 }
 
 export const childToBody = (c: Child): ChildBody => ({

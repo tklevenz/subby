@@ -71,6 +71,7 @@ export default function RootLayout() {
           <Stack.Screen name="sync/index" options={{ headerShown: true, title: 'Sync', headerBackTitle: 'Settings' }} />
           <Stack.Screen name="sync/add" options={{ headerShown: true, title: 'Add a phone' }} />
           <Stack.Screen name="sync/recovery" options={{ headerShown: true, title: 'Recovery key' }} />
+          <Stack.Screen name="sync/move" options={{ headerShown: true, title: 'Move to another server' }} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />

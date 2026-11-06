@@ -63,7 +63,7 @@ These block tickets further down.
   - The "this phone can read but not log" state on the Sync screen and Home, with logging blocked in the UI (not silently queued for ever).
   - Setup copy: sharing costs, the app alone is free, self-hosting is free. [P1, S6]
 - [ ] **A4 Server-side warnings** (inactivity, storage full) shown on the Sync screen. [S3, S4]
-- [ ] **A5 Default server.** Set up sync against `https://sync.subby.baby` with one tap; self-hosted stays "Use another server".
+- [x] **A5 Default server.** Done 2026-11-06: setting up and recovering use `https://sync.subby.baby`; the address field only shows after "Use your own server".
 - [ ] **A6 Small UX leftovers.**
   - "Discard changes?" when leaving an editor with edits.
   - "waking" → "night waking" in NightForm (unanswered suggestion).
@@ -73,6 +73,11 @@ These block tickets further down.
 - [ ] **A9 APNs push**: server sender (`node:http2`, ES256 `.p8` JWT, background push), iOS token path, e2e fake. [A7, Apple account]
 - [x] ~~**A10 Crash reporting**~~: not needed (D9).
 - [ ] **A11 About / legal in Settings**: version, licenses (MIT/AGPL, Font Awesome credit already there), privacy policy and terms links, source code link. [L1, L2]
+- [ ] **A13 Move to another server** (Sync screen; official ↔ self-hosted, either way), without re-pairing. Built 2026-11-06 (shared log checks, app, server, e2e between two servers); not yet tried on phones.
+  - The moving phone pulls everything, creates a new family on the new server whose log adds every current phone and keeps the same recovery key, seals the new family key to them, and uploads every entry and photo (same photo ids and keys).
+  - It then writes an encrypted `moved` record (new server, family id, the old seq it had pulled to) to the old family.
+  - The other phones follow on their next sync: they check the new log against the members they already trust, switch, and re-send what they wrote after that seq. The old family is deleted once everyone has moved; a phone that missed it joins with a code.
+  - Moving to the official server starts the trial; unlocks are restored from the store account.
 - [ ] **A12 Accessibility pass**: screen-reader labels on tiles, icon buttons and the wheel picker; font scaling; reduced motion (the brand subs already respect it).
 
 ## Payments

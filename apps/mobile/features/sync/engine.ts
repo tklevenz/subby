@@ -18,7 +18,7 @@ import {
   type DeviceLogEntry,
   type DeviceLogState,
 } from '@kindred-log/shared/crypto';
-import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, settlePush, sealRecord, type SyncRecord } from '@kindred-log/shared/sync';
+import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@kindred-log/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
@@ -30,6 +30,7 @@ import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
 import { canWrite, forgetAccess, refreshEntitlement } from './access';
+import { followMove } from './move';
 
 const PUSH_BATCH = 500;
 
@@ -50,9 +51,11 @@ type SyncStatus = {
   hasRecovery: boolean;
   /** Local changes too large for the server, left unsynced (a very long note). */
   tooLarge: number;
+  /** The family just moved to this server (this phone followed): shown once. */
+  movedTo: string | null;
 };
 
-export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false, tooLarge: 0 }));
+export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false, tooLarge: 0, movedTo: null }));
 
 let session: SyncSession | null = null;
 export function sessionFor(s: SyncSettings) {
@@ -132,10 +135,15 @@ export async function deleteFamilyOnServer() {
   await forgetSync();
 }
 
-async function forgetSync() {
+/** After switching servers (a move): the next request logs in to the new one, and live reconnects there. */
+export function forgetSession() {
   closeLive();
   forgetAccess();
   session = null;
+}
+
+async function forgetSync() {
+  forgetSession();
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
   useSyncStore.setState({ phase: 'off', error: null, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false });
@@ -192,6 +200,13 @@ async function runOnce() {
   }
   useSyncStore.setState({ phase: 'syncing', error: null });
   try {
+    // Another phone moved the family: follow it before anything else touches the old one.
+    if (settings.move) {
+      useSyncStore.setState({ progress: { label: 'Moving to the new server', done: 0 } });
+      await followMove(settings, settings.move);
+      again = true;
+      return;
+    }
     const api = sessionFor(settings);
     let { entries, state } = await refreshMembers(api, settings);
     let keys = await refreshKeys(api, state);
@@ -215,8 +230,11 @@ async function runOnce() {
     if (!syncSettings()?.names?.[settings.deviceId] && canWrite()) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
-    const pulled = pulledLogs;
+    // A pulled `moved` record: the next round follows it.
+    if (syncSettings()?.move) again = true;
+    const pulled = quiet ? [] : pulledLogs;
     pulledLogs = [];
+    quiet = false;
     await notifyFamily(pulled).catch((e) => console.warn('Family notifications failed', e));
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
   } catch (e) {
@@ -450,13 +468,18 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedA
 
 /** Entries other phones wrote, applied during this run (for `notifyFamily`). */
 let pulledLogs: PulledLog[] = [];
+/** The first run after a move pulls everything again, all of it already here: no family notifications for it. */
+let quiet = false;
+export const quietNextRun = () => {
+  quiet = true;
+};
 
 /** Decrypts, checks and applies one page (see `openAll` and `applyOpened`). */
 function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
   return applyOpened(openAll(records, keys), ownDeviceId);
 }
 
-type Opened = { record: SyncRecord; body: ChildBody | LogBody | DeviceBody | null };
+type Opened = { record: SyncRecord; body: ChildBody | LogBody | DeviceBody | MovedBody | null };
 
 /**
  * Decrypts and checks records, before anything is written. A record of an epoch we have no key for throws, failing
@@ -468,7 +491,7 @@ function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>): 
   return records
     .flatMap((r) => {
       try {
-        return [{ record: r, body: openRecord<ChildBody | LogBody | DeviceBody>(keys, r) }];
+        return [{ record: r, body: openRecord<Opened['body']>(keys, r) }];
       } catch (e) {
         if (e instanceof UnsealedRecordError) console.warn(`[sync] skipped unsealed ${r.kind} record ${r.id}`);
         else if (keys.has(r.epoch)) console.warn(`[sync] skipped ${r.kind} record ${r.id}: it doesn't open`, e);
@@ -478,7 +501,7 @@ function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>): 
     })
     .flatMap(({ record, body }) => {
       if (record.deleted) return [{ record, body }];
-      const valid = validBody<ChildBody | LogBody | DeviceBody>(record.kind, body);
+      const valid = validBody<NonNullable<Opened['body']>>(record.kind, body);
       if (valid) return [{ record, body: valid }];
       console.warn(`[sync] skipped malformed ${record.kind} record ${record.id}`);
       return [];
@@ -488,6 +511,7 @@ function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>): 
 /** Applies opened records in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
 function applyOpened(opened: Opened[], ownDeviceId: string): boolean {
   applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
+  noteMove(opened.filter((o) => o.record.kind === 'moved'), ownDeviceId);
   const photos: (string | null | undefined)[] = [];
   let changed = false;
 
@@ -502,7 +526,7 @@ function applyOpened(opened: Opened[], ownDeviceId: string): boolean {
     );
 
     for (const { record: r, body } of opened) {
-      if (r.kind === 'device') continue; // names, applied above
+      if (r.kind === 'device' || r.kind === 'moved') continue; // applied above
       const local: Child | LogEntry | undefined = r.kind === 'child' ? localChildren.get(r.id) : localLogs.get(r.id);
       // Our own upload coming back: already applied.
       if (local && r.deviceId === ownDeviceId && local.updatedAt === r.updatedAt) continue;
@@ -563,6 +587,16 @@ function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]) {
     else names[record.id] = (body as DeviceBody).name;
   }
   saveSync({ names });
+}
+
+/** Another phone moved the family to another server: remember where, and follow on the next round (`followMove`). */
+function noteMove(records: Opened[], ownDeviceId: string) {
+  const current = syncSettings();
+  for (const { record, body } of records) {
+    const moved = body as MovedBody | null;
+    if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.familyId === current.familyId) continue;
+    saveSync({ move: moved });
+  }
 }
 
 /** Publishes a phone's name to the family (this phone's at setup, join and rename). */

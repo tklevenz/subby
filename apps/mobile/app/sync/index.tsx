@@ -136,6 +136,7 @@ function Status() {
         />
         <Row label="Last synced" value={sync.lastSyncedAt ? formatTime(sync.lastSyncedAt) : 'Not yet'} />
         <Row label="Server" value={isOfficialServer(sync.server) ? 'Subby Sync' : sync.server.replace(/^https?:\/\//, '')} />
+        <Row label="Move to another server" onPress={() => router.push('/sync/move')} />
       </Card>
       {phase === 'error' && error ? <Text className="text-red-soft text-sm mt-3 ml-1">{error}</Text> : null}
       {tooLarge ? (
