@@ -56,7 +56,9 @@ echo "→ Shipping the image to $HOST"
 docker save "kindred-sync:$tag" | gzip | ssh "$HOST" 'gunzip | docker load'
 
 echo "→ Installing compose file and Caddyfile"
+caddyfile_before=$(remote "sha256sum Caddyfile 2>/dev/null | cut -d' ' -f1" || true)
 scp -q "$HERE/docker-compose.yml" "$HERE/Caddyfile" "$HOST:$DIR/"
+remote "install -d -m 0755 site"
 
 # The tag running now becomes the rollback target, and the database is dumped before anything changes.
 remote "install -d -m 0700 backups
@@ -69,5 +71,10 @@ remote "install -d -m 0700 backups
   ls -1t backups/pre-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm --"
 
 start "$tag"
+# Caddy reads its Caddyfile only at start (its admin API is off), so a changed one needs a restart.
+if [[ $(remote "sha256sum Caddyfile | cut -d' ' -f1") != "$caddyfile_before" ]]; then
+  echo "→ Caddyfile changed: restarting Caddy"
+  remote "docker compose restart caddy"
+fi
 # Old images, except the running and the previous one.
 remote "docker image ls kindred-sync --format '{{.Tag}}' | grep -vx -e '$tag' -e \"\$(cat previous-tag 2>/dev/null)\" | sed 's/^/kindred-sync:/' | xargs -r docker image rm >/dev/null 2>&1 || true"

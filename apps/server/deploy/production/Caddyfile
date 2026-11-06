@@ -12,3 +12,23 @@
 	}
 	reverse_proxy server:8787
 }
+
+# The homepage (LAUNCH.md O5): static files, kept in their own repo and copied to /opt/subby/site with site.sh.
+# Scripts, fonts and images only from the site itself: no trackers, no third parties. Inline styles are allowed.
+{$SITE_DOMAIN} {
+	root * /srv/site
+	encode zstd gzip
+	file_server
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+		-Server
+	}
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}

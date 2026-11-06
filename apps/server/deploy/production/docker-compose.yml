@@ -48,12 +48,15 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      SITE_DOMAIN: ${SITE_DOMAIN:-subby.baby}
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The homepage's files (site.sh copies them here).
+      - ./site:/srv/site:ro
       - caddy:/data
     depends_on:
       - server
