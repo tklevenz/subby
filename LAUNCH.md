@@ -101,6 +101,8 @@ These block tickets further down.
 - [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `kindred-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @kindred-log/server smoke https://sync.subby.baby`.
 - [ ] **O5 Website** at `subby.baby` (designed separately): home, how Sync works, pricing, self-hosting, privacy, Impressum. Static, no trackers, self-hosted fonts, HSTS.
 - [ ] **O6 Email**: `support@subby.baby`, `privacy@` and `security@` (named in SECURITY.md), with SPF/DKIM/DMARC.
+  - Receiving works since 2026-11-06 (Porkbun forwarding to Gmail).
+  - Left: sending as subby.baby through an SMTP service with a DKIM-signed sender domain (Brevo, SMTP2GO, Mailjet or Porkbun email), used from Gmail's "Send mail as"; one SPF record including it; DMARC on `_dmarc` starting at `p=none`, then `quarantine` once everything goes out signed.
 - [ ] **O7 Public repo.** Done 2026-11-05: LICENSE files (MIT root, app, shared; AGPL server), README, SECURITY.md (security@subby.baby, needs O6). Left: making it public (the AGPL requires offering the hosted server's source).
 - [ ] **O8 Trademark note** for "Subby" in the README, plus checking the name and marks aren't taken in the app category (EU/US).
 - [ ] **O9 Dogfood run.** Our own family on the production server for two weeks or more, both Pixels (and an iPhone if D6), including a phone removal, a recovery and a restore from backup.
