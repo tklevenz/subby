@@ -22,6 +22,7 @@ These block tickets further down.
 - [x] **D5 Inactivity** (decided 2026-11-05): a hosted family with no phone syncing for **12 months** is deleted from the server. The app warns from month 11 (30 days ahead). The phones keep everything. [S4]
 - [x] **D6 Platforms** (decided 2026-11-05): **Android and iOS together.** iOS hasn't been prebuilt, run on a device or given push yet, so A7–A9 and R3 are in scope. Needs the Apple developer account.
 - [x] **D7 Package id** (decided 2026-11-05): **`baby.subby.app`** (Android package and iOS bundle id). The Pixels reinstall once, then restore from a backup or re-join sync. A new Firebase app registration and `google-services.json` are needed. [R1]
+  - Done in code 2026-11-08: `app.json` uses `baby.subby.app`; `app.config.js` skips a `google-services.json` without a client for it (warns, builds without push). Left (user): register the Android app `baby.subby.app` in the Firebase project `subby-4a0d9` and download the new `google-services.json` (the server's service-account key stays valid); move the Pixels over.
 - [x] **D8 Hosting** (decided 2026-11-05): **Hetzner, Germany**. A Cloud VPS running the existing Docker compose (Postgres self-run), Hetzner Object Storage for photo blobs (`BLOB_STORE=s3`), nightly encrypted Postgres dumps to a separate bucket. [O1, O2]
 - [x] **D9 Crash reporting** (decided 2026-11-05): **store consoles only** (Play Console, App Store Connect). No SDK. A10 is dropped.
 - [x] **D10 Android ↔ iPhone** (decided 2026-11-05): an own unlock stays with its store (switching means buying again); gifted slots work on both.
@@ -120,6 +121,7 @@ These block tickets further down.
 
 - [ ] **R1 Final package id and signing.**
   - A real release keystore (today release APKs use the debug key), kept safe and backed up, plus Play App Signing.
+    - Signing plugin done 2026-11-08: `SUBBY_SIGNING=<upload.properties> npx expo prebuild --clean --platform android`. Left: create the upload key (`keytool -genkeypair -keystore subby-upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000`), back it up with its passwords, and enrol in Play App Signing on the first upload (`bundleRelease` for an .aab).
   - Prebuild **without** `KINDRED_ALLOW_HTTP`. [D7]
 - [ ] **R2 Google Play listing**: "Subby: Private Baby Tracker", description, screenshots, feature graphic, the data safety form (matches L1), content rating, target audience (parents, not children), the data deletion URL (S5 + website).
 - [ ] **R3 App Store listing** (if D6): the same, plus privacy nutrition labels and review notes (no account; how to test sync).
