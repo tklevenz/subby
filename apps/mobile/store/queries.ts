@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
-import { TIMED_LOG_TYPES, type LogEntry, type LogType } from '@kindred-log/shared';
+import { TIMED_LOG_TYPES, type LogEntry, type LogType } from '@subby/shared';
 import { db, schema } from '../db/client';
 import { useLogStore } from './useLogStore';
 

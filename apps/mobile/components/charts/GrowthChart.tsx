@@ -9,7 +9,7 @@ import {
   type GrowthPoint,
   type UnitSystem,
   type WhoSex,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { colors } from '../../theme/colors';
 
 const PAD = { left: 34, right: 26, top: 8, bottom: 22 };

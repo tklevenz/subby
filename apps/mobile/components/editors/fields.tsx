@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUpFromBracket, Camera, Download, ImageIcon, Plus, ShareNodes, Xmark } from '../icons';
-import { recentTags } from '@kindred-log/shared';
+import { recentTags } from '@subby/shared';
 import { canSavePhoto, pickPhoto, savePhoto, sharePhoto } from '../../features/photos';
 import { useLogStore } from '../../store/useLogStore';
 import { Chip, TextField } from '../ui';

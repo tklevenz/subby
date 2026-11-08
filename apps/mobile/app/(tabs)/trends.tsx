@@ -16,7 +16,7 @@ import {
   nightsByDay,
   startOfDay,
   type DayStats,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import BarChart, { type Bar } from '../../components/charts/BarChart';
 import { TYPE_META } from '../../components/logTypes';
 import { Card, Row, Segmented } from '../../components/ui';

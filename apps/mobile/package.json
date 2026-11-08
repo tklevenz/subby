@@ -1,5 +1,5 @@
 {
-  "name": "@kindred-log/mobile",
+  "name": "@subby/mobile",
   "version": "0.1.0",
   "license": "MIT",
   "private": true,
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",
-    "@kindred-log/shared": "workspace:*",
+    "@subby/shared": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "expo": "~57.0.0",
     "expo-background-task": "~57.0.21",

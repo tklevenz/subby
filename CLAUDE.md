@@ -3,7 +3,7 @@
 ## 1. Project Overview
 `kindred-log` is a local-first, offline-capable baby/child activity tracking mobile application (logging feeds, diapers, and sleep/wake windows) built within a `pnpm` monorepo (`~/src/kindred-log`)[cite: 4].
 
-**Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo and package name. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; on Home the brand lives only in the sleep tile and its Undo bar (canvas row "Subby on Home").
+**Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo (and directory) name; the workspace packages are `@subby/shared`, `@subby/mobile` and `@subby/server` (renamed from `@kindred-log/*` 2026-11-08), the root package `subby`. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; on Home the brand lives only in the sleep tile and its Undo bar (canvas row "Subby on Home").
 - Domain: **subby.baby** (bought 2026-11-05). The hosted Subby Sync will be `sync.subby.baby` (not running yet); self-hosting docs keep `sync.example.com`.
 - User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme, and on the server (Subby Sync) the `kindred-sync` service id and Docker image and the `kindred` Postgres user and database.
 - The package id is **`baby.subby.app`** (Android package and iOS bundle id, since 2026-11-08; before that `com.kindred.log`, a different app: phones moving over reinstall and restore from a backup or re-join sync). Never change it again after the first store release.
@@ -25,11 +25,11 @@
 
 Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy, phases 1–6) is summarized there.
 
-### `packages/shared` (`@kindred-log/shared`, consumed as TS source)
+### `packages/shared` (`@subby/shared`, consumed as TS source)
 - `src/schemas/log.schema.ts`: `LogEntry` + discriminated `LogPayload` union (feed, diaper, sleep, pumping, growth, temperature, medication, potty, activity, milestone, note). Canonical units only: ml, g, cm, °C, seconds, epoch ms.
 - **`endedAt` rule:** for `TIMED_LOG_TYPES` (sleep, feed, pumping, activity), `endedAt` is always set once the entry is complete (= `startedAt` for instant ones like a bottle), and `null` means a running timer. For other types it's always `null`.
 - `src/schemas/child.schema.ts`: `Child`.
-- `src/crypto/` (import from `@kindred-log/shared/crypto`): end-to-end encryption for sync, shared by the app and the server.
+- `src/crypto/` (import from `@subby/shared/crypto`): end-to-end encryption for sync, shared by the app and the server.
   - Built on the audited `@noble/*` and `@scure/bip39` libraries. Never hand-roll primitives, and never use `Math.random` for keys.
   - React Native must call `setRandomSource` with `expo-crypto` at startup.
   - Contents:
@@ -46,7 +46,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - `epoch` entries carry `closedSeq`: the sync seq the rotating phone had pulled to (the server checks it's the family's latest). Records of older epochs end there (`state.closedAt`, `withinEpoch`), so a removed phone writing with a key it still has, stored by a hostile server, is refused. Signed only when set, so older entries keep their signatures; an epoch without one closes nothing.
       - A phone that joins later can't tell such records from genuine history (the seq isn't signed per record); phones that were in sync can.
     - `files`: chunked photo encryption.
-- `src/sync/` (`@kindred-log/shared/sync`):
+- `src/sync/` (`@subby/shared/sync`):
   - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD.
     - Tombstones carry a sealed empty body: no content stays on the server, but a server can't delete on its own. `openRecord` throws `UnsealedRecordError` for one without data (older apps sent those); phones skip them.
   - `merge`: last-writer-wins with a device-id tie-break, the same rule on server and client.
@@ -65,7 +65,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `familyAlerts`: what to show or withdraw when a pull brings sleeps another phone logged (`kl-family:sleep:<id>`, one per sleep or night, so "woke up" replaces "fell asleep" and an undone sleep takes it away). Naps by default; bedtime and the morning only when asked; never night wakings, nor anything over 10 min old.
   - `story`: `childStory` builds a child's story of firsts (milestones, measurements, first solid food, birth), newest first. No counts or completion: we don't gamify childcare.
   - `csv`: `logsToCsv` (one file, mixed types, only used columns, formula-injection safe).
-  - `backup` (import from `@kindred-log/shared/domain/backup`, kept off the main index):
+  - `backup` (import from `@subby/shared/domain/backup`, kept off the main index):
     - The file is a zip (`fflate`) holding `backup.json` (children, entries and tombstones) plus `photos/<n>.<ext>`. Photo names are ours, never taken from row data. Device-local fields stay out: photo paths, `photoBlob`, sync status.
     - An optional passphrase encrypts it: `KLBK` header with scrypt parameters and salt, then `encryptFile`. The parameters are read from the header and bounded (≤ 64 MiB of scrypt memory).
     - Reading unzips only `backup.json` and `photos/<n>.<ext>`, and refuses a zip that would inflate past its size + 64 MiB.
@@ -149,7 +149,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `client.ts`: read-only REST client (token auth, paging: only the offset is taken from `next` (`nextOffset`), and it must move forward, so the token never follows a link elsewhere).
   - `importer.ts`: `previewImport` (counts, children, unit detection) and `runImport` (one transaction per page, `onConflictDoNothing` on `import_ref`, so re-runs only add new records and never overwrite local edits).
   - The API key is never persisted. Only `settings.bbUrl` is remembered.
-  - Opt-in tests that hit real data (kept outside the repo): `BB_DUMP=<all.json> pnpm --filter @kindred-log/shared test`, `BB_URL=… BB_TOKEN=… npx vitest run client` in `apps/mobile`.
+  - Opt-in tests that hit real data (kept outside the repo): `BB_DUMP=<all.json> pnpm --filter @subby/shared test`, `BB_URL=… BB_TOKEN=… npx vitest run client` in `apps/mobile`.
 - **Sync (`features/sync/`, the client of `apps/server`):**
   - `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore. It installs `expo-crypto` as the shared crypto's random source on import.
   - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
@@ -202,7 +202,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **UX rule:** 2-tap maximum for common logs (sleep: 1 tap on its tile; diaper: tile + type; feed: tile + sheet).
 - **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.
 
-### `apps/server` (`@kindred-log/server`, Subby Sync; **AGPL-3.0**, everything else is MIT)
+### `apps/server` (`@subby/server`, Subby Sync; **AGPL-3.0**, everything else is MIT)
 - **What it is:** a zero-knowledge sync relay. NestJS 12 (Fastify 5; the Fastify adapter pins its fastify version, so keep the direct `fastify` dependency equal to it) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
   - The server stores only ids, public keys, signatures, versions and ciphertext. Never add a column that holds readable user data.
   - The HTTP contract is `packages/shared/src/sync/protocol.ts` (zod 4: use `z.uuid()` and `.loose()`, not the deprecated `z.string().uuid()` and `.passthrough()`). The server validates with `parse()` (`src/common/validate.ts`); the app uses the same types.
@@ -261,7 +261,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Tests:** `test/e2e.test.ts` runs the real server on a throwaway database. `test/client.ts` is a full simulated app (pairing, sync, removal + rotation, recovery) and the reference for the mobile sync engine. The tests are skipped, with a warning, when the dev Postgres isn't running.
 
 ### Native builds (local, no EAS)
-- `expo-dev-client` is installed, so `pnpm run dev` / `expo start` now targets the **Subby dev build**. Use `pnpm --filter @kindred-log/mobile dev:go` (or press `s`) for Expo Go.
+- `expo-dev-client` is installed, so `pnpm run dev` / `expo start` now targets the **Subby dev build**. Use `pnpm --filter @subby/mobile dev:go` (or press `s`) for Expo Go.
 - `android/` and `ios/` are generated (Continuous Native Generation) and gitignored. Never edit them: change `app.json` or a config plugin instead.
 - Build and install on a USB-connected phone or an emulator: `cd apps/mobile && pnpm android`. After native changes (new native package, `app.json` plugins), run `pnpm android:clean`.
 - Rebuild only for native changes; JS changes hot-reload as usual.

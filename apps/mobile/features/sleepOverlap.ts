@@ -1,4 +1,4 @@
-import { overlappingSleep, startOfDay } from '@kindred-log/shared';
+import { overlappingSleep, startOfDay } from '@subby/shared';
 import { useLogQuery } from '../store/queries';
 import { useLogStore } from '../store/useLogStore';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';

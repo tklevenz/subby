@@ -29,7 +29,7 @@ pnpm typecheck
 pnpm run dev     # the app (Subby dev build); see CLAUDE.md for native builds
 ```
 
-The server's end-to-end tests need the dev database: `pnpm --filter @kindred-log/server db:up`.
+The server's end-to-end tests need the dev database: `pnpm --filter @subby/server db:up`.
 
 `CLAUDE.md` is the detailed map of the code (architecture, conventions, how sync and encryption work). `PROJECT.md` has the product plan, and `LAUNCH.md` the work left before the first release.
 

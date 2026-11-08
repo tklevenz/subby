@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { eq } from 'drizzle-orm';
-import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, type ReminderSettings, type UnitSystem } from '@kindred-log/shared';
-import type { LogSeen } from '@kindred-log/shared/crypto';
-import type { MovedBody } from '@kindred-log/shared/sync';
+import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, type ReminderSettings, type UnitSystem } from '@subby/shared';
+import type { LogSeen } from '@subby/shared/crypto';
+import type { MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../db/client';
 
 export type Settings = {

@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
-import { ChallengeRequestSchema, VerifyRequestSchema } from '@kindred-log/shared/sync';
+import { ChallengeRequestSchema, VerifyRequestSchema } from '@subby/shared/sync';
 import { parse } from '../common/validate';
 import { AuthService } from './auth.service';
 

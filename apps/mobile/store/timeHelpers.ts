@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { addDays, startOfDay } from '@kindred-log/shared';
+import { addDays, startOfDay } from '@subby/shared';
 import { useSettingsStore } from './useSettingsStore';
 
-export { formatDuration, formatRelative, formatAge } from '@kindred-log/shared';
+export { formatDuration, formatRelative, formatAge } from '@subby/shared';
 
 /** Current time, re-rendering every `intervalMs` (1 s is plenty for h/m/s timers). */
 export function useNow(intervalMs = 1000) {

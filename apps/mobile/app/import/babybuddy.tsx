@@ -13,7 +13,7 @@ import {
   type BBChild,
   type BBEndpoint,
   type ImportUnits,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { Button, Card, FieldLabel, Row, Segmented, TextField } from '../../components/ui';
 import { BBClient, BBError } from '../../features/import/babybuddy/client';
 import { previewImport, runImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../features/import/babybuddy/importer';

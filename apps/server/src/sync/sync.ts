@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, Inject, Injectable, Post, Query, UseGuards } from '@nestjs/common';
 import { and, asc, eq, gt, inArray } from 'drizzle-orm';
-import { PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@kindred-log/shared/sync';
+import { PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { parse, queryInt } from '../common/validate';
 import { Auth, DeviceGuard } from '../auth/auth.guard';

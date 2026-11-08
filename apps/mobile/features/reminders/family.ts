@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { familyAlerts, type LogEntry } from '@kindred-log/shared';
+import { familyAlerts, type LogEntry } from '@subby/shared';
 import { fetchLogs } from '../../store/queries';
 import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';

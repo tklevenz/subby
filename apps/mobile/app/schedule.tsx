@@ -8,7 +8,7 @@ import {
   startOfDay,
   suggestedSchedule,
   type ScheduleItem,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { useLogQuery } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { useFormatTime, useNow } from '../store/timeHelpers';

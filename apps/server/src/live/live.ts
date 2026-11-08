@@ -2,7 +2,7 @@ import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { WebSocketGateway, type OnGatewayConnection, type OnGatewayDisconnect } from '@nestjs/websockets';
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket } from 'ws';
-import type { LiveMessage } from '@kindred-log/shared/sync';
+import type { LiveMessage } from '@subby/shared/sync';
 import { AuthService, RECOVERY } from '../auth/auth.service';
 
 /** Connected app sockets per family. In memory: one server instance (use Postgres LISTEN/NOTIFY to scale out). */

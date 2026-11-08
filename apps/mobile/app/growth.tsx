@@ -12,7 +12,7 @@ import {
   growthPercentile,
   growthPoints,
   type GrowthMeasure,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import GrowthChart, { chartUnitLabel } from '../components/charts/GrowthChart';
 import { Button, Segmented } from '../components/ui';
 import { useLogQuery } from '../store/queries';

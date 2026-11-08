@@ -23,7 +23,7 @@ import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
 import { PurchasesController, PurchasesService } from './purchases/purchases';
 import { installRateLimits } from './common/rateLimit';
-import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
+import { MAX_BLOB_BYTES } from '@subby/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
 

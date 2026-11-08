@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AngleDown, AngleLeft, AngleRight } from '../../components/icons';
 import CalendarSheet from '../../components/datetime/CalendarSheet';
-import { addDays, dailyStats, startOfDay } from '@kindred-log/shared';
+import { addDays, dailyStats, startOfDay } from '@subby/shared';
 import { DayLog, DayTotals } from '../../components/history/DayLog';
 import { useLogQuery } from '../../store/queries';
 import { useSettingsStore } from '../../store/useSettingsStore';

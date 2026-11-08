@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Linking, Switch, Text, View } from 'react-native';
-import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@kindred-log/shared';
+import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@subby/shared';
 import { Card, Segmented } from '../components/ui';
 import {
   notificationsAllowed,

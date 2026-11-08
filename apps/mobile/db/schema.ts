@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { LogPayload, PhotoBlob } from '@kindred-log/shared';
-import { LOG_TYPES } from '@kindred-log/shared';
+import type { LogPayload, PhotoBlob } from '@subby/shared';
+import { LOG_TYPES } from '@subby/shared';
 
 // Sync-relevant columns shared by every synced table (UUIDv7 ids, LWW updatedAt, soft delete).
 const syncColumns = {

@@ -9,7 +9,7 @@ import {
   type ImportUnits,
   type LogEntry,
   type UnitSystem,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { db, schema } from '../../../db/client';
 import type { BBClient } from './client';
 

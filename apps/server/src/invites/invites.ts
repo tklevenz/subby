@@ -1,7 +1,7 @@
 import { Body, ConflictException, Controller, Get, HttpCode, Inject, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { and, eq, gt } from 'drizzle-orm';
-import { fromBase64 } from '@kindred-log/shared/crypto';
-import { ClaimInviteSchema, CreateInviteSchema, InviteStatusSchema, type InviteResponse } from '@kindred-log/shared/sync';
+import { fromBase64 } from '@subby/shared/crypto';
+import { ClaimInviteSchema, CreateInviteSchema, InviteStatusSchema, type InviteResponse } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { parse } from '../common/validate';
 import { safeEqual, sha256b64 } from '../common/hash';

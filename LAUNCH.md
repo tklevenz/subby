@@ -99,7 +99,7 @@ These block tickets further down.
   - The production Firebase service-account key in `./secrets`. [D8]
 - [ ] **O2 Backups.** Nightly Postgres dumps and blob storage versioning, kept off the host, encrypted. **Do a test restore before launch.**
 - [ ] **O3 Monitoring.** Uptime check on `/healthz`, disk and DB size alerts, a TLS expiry check. [S7]
-- [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `kindred-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @kindred-log/server smoke https://sync.subby.baby`.
+- [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `kindred-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @subby/server smoke https://sync.subby.baby`.
 - [ ] **O5 Website** at `subby.baby` (designed separately): home, how Sync works, pricing, self-hosting, privacy, Impressum. Static, no trackers, self-hosted fonts, HSTS.
 - [ ] **O6 Email**: `support@subby.baby`, `privacy@` and `security@` (named in SECURITY.md), with SPF/DKIM/DMARC.
   - Receiving works since 2026-11-06 (Porkbun forwarding to Gmail).

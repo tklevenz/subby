@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, gte } from 'drizzle-orm';
-import { verifyDeviceLog, type DeviceLogEntry } from '@kindred-log/shared/crypto';
+import { verifyDeviceLog, type DeviceLogEntry } from '@subby/shared/crypto';
 import { DB, schema, type Db, type Tx } from '../db/db';
 import { RECOVERY, type AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';

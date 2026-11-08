@@ -1,5 +1,5 @@
 import { X509Certificate, verify as verifySignature } from 'node:crypto';
-import type { ProductKind } from '@kindred-log/shared/sync';
+import type { ProductKind } from '@subby/shared/sync';
 import type { AppStoreConfig, GooglePlayConfig } from '../config';
 import { GoogleAuth } from '../common/google';
 import { sha256b64 } from '../common/hash';

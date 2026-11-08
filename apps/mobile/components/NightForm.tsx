@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking } from '@kindred-log/shared';
+import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking } from '@subby/shared';
 import DateTimeField from './DateTimeField';
 import { PayloadEditor } from './editors';
 import { CommonFields } from './sheets/LogSheet';

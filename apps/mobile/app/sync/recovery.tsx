@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { newRecoveryWords, normalizeRecoveryWords } from '@kindred-log/shared/crypto';
+import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
 import { useSyncStore } from '../../features/sync/engine';
 import { useSettingsStore } from '../../store/useSettingsStore';

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LogPayload, LogType } from '@kindred-log/shared';
+import type { LogPayload, LogType } from '@subby/shared';
 
 export type SheetRequest =
   | { kind: 'feed'; tab?: 'breast' | 'bottle' | 'solids' }

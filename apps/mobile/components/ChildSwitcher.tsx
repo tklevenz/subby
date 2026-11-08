@@ -3,7 +3,7 @@ import { View, Text, Pressable, Modal } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AngleDown, AngleRight, Check, Plus } from './icons';
-import { formatAge } from '@kindred-log/shared';
+import { formatAge } from '@subby/shared';
 import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useActiveChild } from '../store/useActiveChild';

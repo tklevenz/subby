@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Stop } from './icons';
-import { activeTimers, formatDuration } from '@kindred-log/shared';
+import { activeTimers, formatDuration } from '@subby/shared';
 import { useLogStore } from '../store/useLogStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime, useNow } from '../store/timeHelpers';

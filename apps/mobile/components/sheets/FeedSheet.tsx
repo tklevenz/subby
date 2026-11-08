@@ -14,7 +14,7 @@ import {
   type LogEntry,
   type PayloadOf,
   type Side,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';

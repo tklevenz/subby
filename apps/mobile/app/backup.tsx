@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import type { BackupContents, RestorePlan } from '@kindred-log/shared/domain/backup';
+import type { BackupContents, RestorePlan } from '@subby/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
 import { Button, FieldLabel, TextField } from '../components/ui';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';

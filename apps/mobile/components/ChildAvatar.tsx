@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Image, Text, View } from 'react-native';
-import type { Child } from '@kindred-log/shared';
+import type { Child } from '@subby/shared';
 import { colors, type ColorName } from '../theme/colors';
 
 // Six fill/initial pairs (avatar1Bg/avatar1Ink …); picked per child so siblings differ.

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { startOfDay } from '@kindred-log/shared';
+import { startOfDay } from '@subby/shared';
 import { useLogQuery } from '../../store/queries';
 import { AngleLeft, AngleRight } from '../icons';
 import { colors } from '../../theme/colors';

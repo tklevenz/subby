@@ -16,7 +16,7 @@ import {
   recentMedications,
   type LogPayload,
   type PayloadOf,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { useLogQuery } from '../../store/queries';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';

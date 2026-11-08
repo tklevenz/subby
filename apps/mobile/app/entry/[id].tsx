@@ -12,7 +12,7 @@ import {
   type LogEntry,
   type LogPayload,
   type Night,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
 import { CommonFields } from '../../components/sheets/LogSheet';

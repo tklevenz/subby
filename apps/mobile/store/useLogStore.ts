@@ -9,7 +9,7 @@ import {
   type LogEntry,
   type LogPayload,
   type PayloadOf,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 
 const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 30;

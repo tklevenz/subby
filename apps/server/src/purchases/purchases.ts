@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { PurchaseSchema, productKind, type EntitlementResponse } from '@kindred-log/shared/sync';
+import { PurchaseSchema, productKind, type EntitlementResponse } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
 import { lockFamily } from '../db/lock';

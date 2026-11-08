@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import type { Child, LogType } from '@kindred-log/shared';
+import type { Child, LogType } from '@subby/shared';
 import ChildForm from '../../../components/ChildForm';
 import { TYPE_META } from '../../../components/logTypes';
 import { Button, FieldLabel, TextField } from '../../../components/ui';

@@ -10,7 +10,7 @@ import {
   milestoneLabel,
   type LogEntry,
   type UnitSystem,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { TYPE_META, activityLabel } from './logTypes';
 import { ChildReaching } from './icons';
 

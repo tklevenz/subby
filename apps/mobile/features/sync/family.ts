@@ -9,7 +9,7 @@ import {
   seal,
   toBase64,
   verifyDeviceLog,
-} from '@kindred-log/shared/crypto';
+} from '@subby/shared/crypto';
 import {
   checkClaimMac,
   claimHashOf,
@@ -22,7 +22,7 @@ import {
   type InviteQr,
   type InviteResponse,
   type KeysResponse,
-} from '@kindred-log/shared/sync';
+} from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deleteAllPhotos } from '../photos';
 import { forgetPhotoUploads } from './photos';

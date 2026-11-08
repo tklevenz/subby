@@ -1,6 +1,6 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sum } from 'drizzle-orm';
-import { GRACE_MS, HOSTED_PHOTO_BYTES, TRIAL_MS, type EntitlementResponse, type SyncAccess } from '@kindred-log/shared/sync';
+import { GRACE_MS, HOSTED_PHOTO_BYTES, TRIAL_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Share, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
-import type { InviteResponse } from '@kindred-log/shared/sync';
+import type { InviteResponse } from '@subby/shared/sync';
 import { approveClaim, claimCode, createInvite, inviteStatus, type Invite } from '../../features/sync/family';
 import QrCode from '../../components/QrCode';
 import { Button } from '../../components/ui';

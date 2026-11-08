@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { getRandomBytes } from 'expo-crypto';
-import { bytesToHex, hexToBytes, identityFromSeed, setRandomSource, type IdentityKeys } from '@kindred-log/shared/crypto';
+import { bytesToHex, hexToBytes, identityFromSeed, setRandomSource, type IdentityKeys } from '@subby/shared/crypto';
 
 // The shared crypto draws randomness from here; Hermes has no Web Crypto.
 setRandomSource((length) => getRandomBytes(length));

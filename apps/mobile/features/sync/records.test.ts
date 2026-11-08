@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Child, LogEntry } from '@kindred-log/shared';
+import type { Child, LogEntry } from '@subby/shared';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, isValidBody, logToBody, needsPhotoUpload, validBody } from './records';
 
 const blobA = { id: '0190a000-0000-7000-8000-0000000000aa', key: 'a-key' };

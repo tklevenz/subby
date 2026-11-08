@@ -1,8 +1,8 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogEntry, PhotoBlob } from '@kindred-log/shared';
-import { decryptFile, encryptFile, encryptedFileSize, fromBase64, newSymmetricKey, toBase64 } from '@kindred-log/shared/crypto';
-import { MAX_BLOB_BYTES } from '@kindred-log/shared/sync';
+import type { Child, LogEntry, PhotoBlob } from '@subby/shared';
+import { decryptFile, encryptFile, encryptedFileSize, fromBase64, newSymmetricKey, toBase64 } from '@subby/shared/crypto';
+import { MAX_BLOB_BYTES } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto, photoSize, readPhotoBytes, savePhotoBytes } from '../photos';
 import type { SyncSession } from './api';

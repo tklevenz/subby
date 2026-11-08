@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
+import type { DeviceLogEntry } from '@subby/shared/crypto';
 import { and, eq } from 'drizzle-orm';
-import type { KeysResponse } from '@kindred-log/shared/sync';
+import type { KeysResponse } from '@subby/shared/sync';
 import { DB, schema, type Db, type Tx } from '../db/db';
 import { RECOVERY, type AuthContext } from '../auth/auth.service';
 import { appendVerified, lockFamily } from '../families/families.service';

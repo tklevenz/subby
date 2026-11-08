@@ -11,7 +11,7 @@ import {
   type Night,
   type TimelineItem,
   type UnitSystem,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime } from '../../store/timeHelpers';
 import { logDisplay } from '../logDisplay';

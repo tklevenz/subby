@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
-import { solidsReport } from '@kindred-log/shared';
+import { solidsReport } from '@subby/shared';
 import { Segmented } from '../components/ui';
 import { HAS_FOODS, useLogQuery } from '../store/queries';
 import { useScreenBottom } from '../components/ScreenScroll';

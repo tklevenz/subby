@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Check, Droplet, Poop, PoopDroplet, type IconProps } from '../icons';
-import type { DIAPER_COLORS, LogEntry } from '@kindred-log/shared';
+import type { DIAPER_COLORS, LogEntry } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSheetStore } from '../../store/useSheetStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';

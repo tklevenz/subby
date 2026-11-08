@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { Baby, BottleWater, ChildReaching, Flag, Moon, PenToSquare, Pills, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent } from './icons';
-import { LOG_TYPES, type LogPayload, type LogType } from '@kindred-log/shared';
+import { LOG_TYPES, type LogPayload, type LogType } from '@subby/shared';
 import type { SheetRequest } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
 

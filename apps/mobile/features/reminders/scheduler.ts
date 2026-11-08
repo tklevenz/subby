@@ -13,7 +13,7 @@ import {
   planReminders,
   predictNextSleep,
   type ReminderChild,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { fetchLogs } from '../../store/queries';
 import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';

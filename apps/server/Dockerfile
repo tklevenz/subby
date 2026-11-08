@@ -10,16 +10,16 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json apps/server/
 COPY apps/mobile/package.json apps/mobile/
 COPY packages/shared/package.json packages/shared/
-RUN pnpm install --frozen-lockfile --filter "@kindred-log/server..."
+RUN pnpm install --frozen-lockfile --filter "@subby/server..."
 COPY packages/shared packages/shared
 COPY apps/server apps/server
-RUN pnpm --filter @kindred-log/server build
+RUN pnpm --filter @subby/server build
 # The bundle (dist/main.js) already contains the shared package; at runtime only the server's own npm dependencies
 # are needed. They're pinned to the exact versions the build used. (pnpm deploy would also pull in the app's
 # React Native tree through drizzle-orm's optional peers, shared with the app in the lockfile.)
 RUN cd apps/server && mkdir /out && pnpm list --prod --depth 0 --json | node -e " \
   const [server] = JSON.parse(require('fs').readFileSync(0, 'utf8')); \
-  const deps = Object.entries(server.dependencies).filter(([name]) => !name.startsWith('@kindred-log/')); \
+  const deps = Object.entries(server.dependencies).filter(([name]) => !name.startsWith('@subby/')); \
   const pkg = { name: 'kindred-sync', private: true, type: 'module', dependencies: Object.fromEntries(deps.map(([n, d]) => [n, d.version])) }; \
   require('fs').writeFileSync('/out/package.json', JSON.stringify(pkg, null, 2));"
 

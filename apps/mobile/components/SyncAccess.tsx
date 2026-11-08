@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import type { SyncAccess } from '@kindred-log/shared/sync';
+import type { SyncAccess } from '@subby/shared/sync';
 import { Button, Card, Row, Segmented } from './ui';
 import { PRICE, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools } from '../features/sync/access';
 import { sessionFor, syncNow, useSyncStore } from '../features/sync/engine';

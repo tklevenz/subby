@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LogEntrySchema } from '@kindred-log/shared';
+import { LogEntrySchema } from '@subby/shared';
 import { upgradeLegacyRow, type LegacyLogRow } from './legacy';
 
 const row = (payload: object, started_at = 1_000_000): LegacyLogRow => ({

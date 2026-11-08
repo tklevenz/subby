@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Post, Query, UseGuards } from '@nestjs/common';
-import { AppendLogSchema, CreateFamilySchema } from '@kindred-log/shared/sync';
-import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
+import { AppendLogSchema, CreateFamilySchema } from '@subby/shared/sync';
+import type { DeviceLogEntry } from '@subby/shared/crypto';
 import { parse, queryInt } from '../common/validate';
 import { Auth, DeviceOrRecoveryGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';

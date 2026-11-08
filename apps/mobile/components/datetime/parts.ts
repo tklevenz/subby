@@ -1,4 +1,4 @@
-import { addDays, startOfDay } from '@kindred-log/shared';
+import { addDays, startOfDay } from '@subby/shared';
 
 /** How far back the day wheel goes (further when the value itself is older, e.g. an imported entry). */
 export const DAYS_BACK = 365;

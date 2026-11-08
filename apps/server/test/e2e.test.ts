@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@kindred-log/shared/crypto';
-import { openRecord, type EntitlementResponse } from '@kindred-log/shared/sync';
+import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@subby/shared/crypto';
+import { openRecord, type EntitlementResponse } from '@subby/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
@@ -20,7 +20,7 @@ import { appleTestSigner } from './appleCerts';
 
 /**
  * End-to-end: the real server on a throwaway Postgres database, driven by simulated apps.
- * Needs the dev database: `pnpm --filter @kindred-log/server db:up`. Skipped (loudly) when it isn't running.
+ * Needs the dev database: `pnpm --filter @subby/server db:up`. Skipped (loudly) when it isn't running.
  */
 const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://kindred:kindred@localhost:54329/kindred';
 const dbName = `kl_test_${randomUUID().replace(/-/g, '')}`;
@@ -30,7 +30,7 @@ const reachable = await admin`select 1`.then(
   () => true,
   () => false,
 );
-if (!reachable) console.warn('\n⚠ Server e2e tests SKIPPED: no Postgres. Run `pnpm --filter @kindred-log/server db:up`.\n');
+if (!reachable) console.warn('\n⚠ Server e2e tests SKIPPED: no Postgres. Run `pnpm --filter @subby/server db:up`.\n');
 
 const until = async (check: () => boolean | Promise<boolean>, ms = 3000) => {
   const end = Date.now() + ms;
@@ -296,7 +296,7 @@ describe.skipIf(!reachable)('sync server', () => {
     await a.pull();
     // Another phone pushes after a pulled: an entry claiming a's seq would hide b's record, so the server refuses it.
     await b.push([b.seal('log', randomUUID(), { late: true })]);
-    const { appendEntry, newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const { appendEntry, newSymmetricKey, seal } = await import('@subby/shared/crypto');
     const key = newSymmetricKey();
     const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, {
       type: 'epoch',
@@ -346,7 +346,7 @@ describe.skipIf(!reachable)('sync server', () => {
     const [row] = await db`select epoch from records where family_id = ${a.familyId} order by seq desc limit 1`;
     expect(row.epoch).toBe(2);
     // The server refuses a rotation that leaves out or adds anyone, and epochs without their keys.
-    const { appendEntry, newSymmetricKey } = await import('@kindred-log/shared/crypto');
+    const { appendEntry, newSymmetricKey } = await import('@subby/shared/crypto');
     await a.pull();
     const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, {
       type: 'epoch',
@@ -362,8 +362,8 @@ describe.skipIf(!reachable)('sync server', () => {
     const { a, b } = await pairedFamily();
     const { challenge } = await b.request<{ challenge: string }>('POST', '/v1/auth/challenge', { deviceId: b.deviceId }, '');
     await a.removeDevice(b.deviceId);
-    const { authMessage } = await import('@kindred-log/shared/sync');
-    const { sign } = await import('@kindred-log/shared/crypto');
+    const { authMessage } = await import('@subby/shared/sync');
+    const { sign } = await import('@subby/shared/crypto');
     await expectStatus(b.request('POST', '/v1/auth/verify', { challenge, signature: toBase64(sign(b.identity, authMessage(challenge))) }, ''), 401);
     const [{ n }] = await db`select count(*)::int as n from sessions where device_id = ${b.deviceId}`;
     expect(n).toBe(0);
@@ -372,7 +372,7 @@ describe.skipIf(!reachable)('sync server', () => {
   it('a rotation must say where it closes the old epochs', async () => {
     const { a } = await pairedFamily();
     await a.pull();
-    const { appendEntry, newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const { appendEntry, newSymmetricKey, seal } = await import('@subby/shared/crypto');
     const key = newSymmetricKey();
     const entry = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, { type: 'epoch', deviceId: a.deviceId, familyKey: { epoch: 2, key } }, Date.now());
     const sealed = Object.fromEntries([...a.state!.members].map(([id, m]) => [id, toBase64(seal(m.boxKey, key))]));
@@ -381,7 +381,7 @@ describe.skipIf(!reachable)('sync server', () => {
 
   it("phones refuse family keys the server made up or swapped", async () => {
     const { a, b } = await pairedFamily();
-    const { newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const { newSymmetricKey, seal } = await import('@subby/shared/crypto');
     const fake = () => toBase64(seal(b.identity.box.publicKey, newSymmetricKey()));
 
     // A new epoch, but the server hands b its own key instead of the one a sealed.
@@ -459,7 +459,7 @@ describe.skipIf(!reachable)('sync server', () => {
   it("a grant can't replace a key someone already has", async () => {
     const { a, b } = await pairedFamily();
     const [before] = await db`select sealed from family_keys where family_id = ${a.familyId} and recipient = ${b.deviceId} and epoch = 1`;
-    const { newSymmetricKey, seal } = await import('@kindred-log/shared/crypto');
+    const { newSymmetricKey, seal } = await import('@subby/shared/crypto');
     await a.request('POST', '/v1/keys/grant', { recipient: b.deviceId, keys: [{ epoch: 1, sealed: toBase64(seal(b.identity.box.publicKey, newSymmetricKey())) }] });
     const [after] = await db`select sealed from family_keys where family_id = ${a.familyId} and recipient = ${b.deviceId} and epoch = 1`;
     expect(after.sealed).toBe(before.sealed);
@@ -469,7 +469,7 @@ describe.skipIf(!reachable)('sync server', () => {
     const a = new TestClient(url);
     await a.createFamily();
     const outsider = new TestClient(url);
-    const { appendEntry } = await import('@kindred-log/shared/crypto');
+    const { appendEntry } = await import('@subby/shared/crypto');
     const forged = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: outsider.identity }, {
       type: 'add',
       deviceId: outsider.deviceId,
@@ -493,7 +493,7 @@ describe.skipIf(!reachable)('sync server', () => {
 
     // The recovery key can enroll, but not sync or rotate by itself.
     const rec = new TestClient(url);
-    const { recoveryIdentity } = await import('@kindred-log/shared/crypto');
+    const { recoveryIdentity } = await import('@subby/shared/crypto');
     const id = recoveryIdentity(words);
     await rec.login(id, { recoverySignKey: toBase64(id.sign.publicKey) });
     await expectStatus(rec.request('GET', '/v1/sync/pull'), 403);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, View, Text } from 'react-native';
 import { Camera } from './icons';
-import type { Child } from '@kindred-log/shared';
+import type { Child } from '@subby/shared';
 import type { ChildInput } from '../store/useChildStore';
 import { fromIsoDate, toIsoDate } from '../store/timeHelpers';
 import ChildAvatar from './ChildAvatar';

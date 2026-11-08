@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { LOG_TYPES, logsToCsv, type LogType } from '@kindred-log/shared';
+import { LOG_TYPES, logsToCsv, type LogType } from '@subby/shared';
 import { TYPE_META } from '../components/logTypes';
 import { Button, Chip, FieldLabel, Segmented } from '../components/ui';
 import { fetchLogs } from '../store/queries';

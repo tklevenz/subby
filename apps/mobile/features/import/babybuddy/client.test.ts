@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { BB_ENDPOINTS, detectUnits, mapRecord } from '@kindred-log/shared';
+import { BB_ENDPOINTS, detectUnits, mapRecord } from '@subby/shared';
 import { BBClient, BBError, nextOffset, normalizeBaseUrl } from './client';
 
 describe('normalizeBaseUrl', () => {

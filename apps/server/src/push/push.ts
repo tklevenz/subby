@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, HttpCode, Inject, Injectable, Put, UseGuards, type OnModuleDestroy } from '@nestjs/common';
 import { and, eq, inArray, ne } from 'drizzle-orm';
-import { RegisterPushSchema } from '@kindred-log/shared/sync';
+import { RegisterPushSchema } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { GoogleAuth } from '../common/google';
 import { DB, schema, type Db } from '../db/db';

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as Crypto from 'expo-crypto';
-import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess } from '@kindred-log/shared/sync';
+import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess } from '@subby/shared/sync';
 import { SyncHttpError, checkServer, type SyncSession } from './api';
 
 /**

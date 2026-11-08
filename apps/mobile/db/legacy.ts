@@ -1,4 +1,4 @@
-import type { LogEntry, LogPayload } from '@kindred-log/shared';
+import type { LogEntry, LogPayload } from '@subby/shared';
 
 /** Row shape of the v0 `logs` table created by the old bootstrap SQL. */
 export type LegacyLogRow = {

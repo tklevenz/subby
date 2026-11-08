@@ -16,7 +16,7 @@ import {
   type GrowthMeasure,
   type LogEntry,
   type StoryItem,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { avatarColors } from '../../../components/ChildAvatar';
 import GrowthChart from '../../../components/charts/GrowthChart';
 import PhotoMenu from '../../../components/PhotoMenu';

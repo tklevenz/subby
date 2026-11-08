@@ -1,5 +1,5 @@
 import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { DeviceLogEntry } from '@kindred-log/shared/crypto';
+import type { DeviceLogEntry } from '@subby/shared/crypto';
 
 // Nothing here is readable user data: ids, public keys, signatures, versions and ciphertext.
 

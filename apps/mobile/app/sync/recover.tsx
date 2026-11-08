@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { isValidRecoveryWords, normalizeRecoveryWords } from '@kindred-log/shared/crypto';
+import { isValidRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { defaultDeviceName, hasLocalData, recoverFamily } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField } from '../../components/ui';

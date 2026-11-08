@@ -1,5 +1,5 @@
 import { fetch as expoFetch } from 'expo/fetch';
-import { sign, toBase64, type DeviceLogEntry, type IdentityKeys } from '@kindred-log/shared/crypto';
+import { sign, toBase64, type DeviceLogEntry, type IdentityKeys } from '@subby/shared/crypto';
 import {
   authMessage,
   type ChallengeResponse,
@@ -8,7 +8,7 @@ import {
   type PushResponse,
   type SyncRecord,
   type VerifyResponse,
-} from '@kindred-log/shared/sync';
+} from '@subby/shared/sync';
 
 export class SyncHttpError extends Error {
   constructor(

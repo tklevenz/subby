@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { Plus, TriangleExclamation } from '../icons';
-import { flaggedFoods, recentFoods, type PayloadOf } from '@kindred-log/shared';
+import { flaggedFoods, recentFoods, type PayloadOf } from '@subby/shared';
 import { HAS_FOODS, useLogQuery } from '../../store/queries';
 import { Chip, FieldLabel, TextField } from '../ui';
 import { colors } from '../../theme/colors';

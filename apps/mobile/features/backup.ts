@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { eq, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogEntry } from '@kindred-log/shared';
+import type { Child, LogEntry } from '@subby/shared';
 import {
   decryptBackup,
   encryptBackup,
@@ -12,7 +12,7 @@ import {
   readBackup,
   type BackupContents,
   type RestorePlan,
-} from '@kindred-log/shared/domain/backup';
+} from '@subby/shared/domain/backup';
 import { db, schema } from '../db/client';
 import { deletePhoto, readPhotoBytes, savePhotoBytes } from './photos';
 import { childTombstone, scrubbedPayload } from './sync/records';

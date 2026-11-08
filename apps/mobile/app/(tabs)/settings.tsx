@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AngleRight, Plus } from '../../components/icons';
-import { activeReminderCount, formatAge } from '@kindred-log/shared';
+import { activeReminderCount, formatAge } from '@subby/shared';
 import { remindersAvailable, requestNotifications, setRemindersEnabled } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';

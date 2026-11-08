@@ -1,4 +1,4 @@
-import type { BBChild, BBEndpoint, BBRecords } from '@kindred-log/shared';
+import type { BBChild, BBEndpoint, BBRecords } from '@subby/shared';
 
 type Page<T> = { count: number; next: string | null; results: T[] };
 

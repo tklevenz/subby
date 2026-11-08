@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { defaultNap, formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@kindred-log/shared';
+import { defaultNap, formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import DateTimeField from '../DateTimeField';

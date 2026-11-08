@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { and, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogEntry } from '@kindred-log/shared';
+import type { Child, LogEntry } from '@subby/shared';
 import {
   RECOVERY_SIGNER,
   appendEntry,
@@ -17,8 +17,8 @@ import {
   withinEpoch,
   type DeviceLogEntry,
   type DeviceLogState,
-} from '@kindred-log/shared/crypto';
-import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@kindred-log/shared/sync';
+} from '@subby/shared/crypto';
+import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';

@@ -23,7 +23,7 @@ import {
   suggestedNextSide,
   type Child,
   type LogEntry,
-} from '@kindred-log/shared';
+} from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';

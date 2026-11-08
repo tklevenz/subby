@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ChildSchema, LenientPayloadSchema, LogEntrySchema, PhotoBlobSchema, type Child, type LogEntry, type LogPayload, type PhotoBlob } from '@kindred-log/shared';
-import type { RecordKind } from '@kindred-log/shared/sync';
+import { ChildSchema, LenientPayloadSchema, LogEntrySchema, PhotoBlobSchema, type Child, type LogEntry, type LogPayload, type PhotoBlob } from '@subby/shared';
+import type { RecordKind } from '@subby/shared/sync';
 
 /**
  * What a child or log entry looks like inside its encrypted sync record. Device-local fields stay out:

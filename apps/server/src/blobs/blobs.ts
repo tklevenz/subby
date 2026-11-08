@@ -18,7 +18,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { and, eq, inArray, isNull, lt, notInArray, or } from 'drizzle-orm';
-import { MAX_BLOB_BYTES, UNLINKED_BLOB_TTL_MS, type SyncRecord } from '@kindred-log/shared/sync';
+import { MAX_BLOB_BYTES, UNLINKED_BLOB_TTL_MS, type SyncRecord } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';

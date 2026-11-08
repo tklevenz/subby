@@ -1,6 +1,6 @@
 /**
  * Smoke test against a running server, e.g. after a deploy:
- *   pnpm --filter @kindred-log/server smoke https://sync.subby.baby
+ *   pnpm --filter @subby/server smoke https://sync.subby.baby
  * A throwaway family: create, upload an encrypted photo, push and pull a record, then delete it all again.
  */
 import { randomUUID } from 'node:crypto';

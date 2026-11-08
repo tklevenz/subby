@@ -21,7 +21,7 @@ import {
   type DeviceLogEntry,
   type DeviceLogState,
   type IdentityKeys,
-} from '@kindred-log/shared/crypto';
+} from '@subby/shared/crypto';
 import {
   authMessage,
   checkClaimMac,
@@ -42,7 +42,7 @@ import {
   type RecordKind,
   type SyncRecord,
   type VerifyResponse,
-} from '@kindred-log/shared/sync';
+} from '@subby/shared/sync';
 
 export class HttpError extends Error {
   constructor(

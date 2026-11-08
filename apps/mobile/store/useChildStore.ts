@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { and, asc, count, eq, min, notInArray, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogPayload, LogType } from '@kindred-log/shared';
+import type { Child, LogPayload, LogType } from '@subby/shared';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
 

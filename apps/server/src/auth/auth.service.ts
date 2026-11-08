@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { and, eq, gt } from 'drizzle-orm';
-import { fromBase64, verify } from '@kindred-log/shared/crypto';
-import { authMessage, type ChallengeResponse, type VerifyResponse } from '@kindred-log/shared/sync';
+import { fromBase64, verify } from '@subby/shared/crypto';
+import { authMessage, type ChallengeResponse, type VerifyResponse } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { sha256b64 } from '../common/hash';
 import { lockFamily } from '../db/lock';

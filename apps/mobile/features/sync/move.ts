@@ -14,8 +14,8 @@ import {
   verifyDeviceLog,
   verifyMovedLog,
   type DeviceLogEntry,
-} from '@kindred-log/shared/crypto';
-import { sealRecord, type MovedBody } from '@kindred-log/shared/sync';
+} from '@subby/shared/crypto';
+import { sealRecord, type MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { readPhotoBytes } from '../photos';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
