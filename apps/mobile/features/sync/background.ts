@@ -10,9 +10,9 @@ import { checkServer } from './api';
 import { saveSync, sessionFor, syncNow, syncSettings } from './engine';
 
 /** Periodic sync for everyone (as often as the OS allows, at best every 15 minutes). */
-const SYNC_TASK = 'kindred-sync-periodic';
+const SYNC_TASK = 'subby-sync-periodic';
 /** Runs when a hosted server's "sync now" push arrives while the app is in the background. */
-const PUSH_TASK = 'kindred-sync-push';
+const PUSH_TASK = 'subby-sync-push';
 
 // Background tasks and push need a development or store build; Expo Go has neither (and crashes on
 // importing expo-notifications on Android), so the modules are loaded lazily.

@@ -68,7 +68,7 @@ type Unsigned = Omit<DeviceLogEntry, 'sig'>;
 const canonical = (e: Unsigned) =>
   utf8ToBytes(
     JSON.stringify([
-      'kindred/devicelog/v2', e.index, e.prev, e.type, e.deviceId, e.signKey, e.boxKey, e.epoch, e.keyHash, e.signer, e.at,
+      'subby/devicelog/v1', e.index, e.prev, e.type, e.deviceId, e.signKey, e.boxKey, e.epoch, e.keyHash, e.signer, e.at,
       ...(typeof e.closedSeq === 'number' ? [e.closedSeq] : []),
     ]),
   );
@@ -77,7 +77,7 @@ export const entryHash = (e: DeviceLogEntry) => bytesToHex(sha256(concatBytes(ca
 
 /** Commitment to a family key, published in the signed log. Reveals nothing about the 256-bit random key. */
 export const epochKeyHash = (epoch: number, key: Uint8Array) =>
-  toBase64(sha256(concatBytes(utf8ToBytes('kindred/epoch/v1'), u64(epoch), key)));
+  toBase64(sha256(concatBytes(utf8ToBytes('subby/epoch/v1'), u64(epoch), key)));
 
 /**
  * Whether a record of `epoch` at sync `seq` can be genuine: an epoch's records end where the log closed it.

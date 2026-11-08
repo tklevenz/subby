@@ -56,11 +56,22 @@ describe('backup', () => {
     expect(backup.deleted).toEqual([{ kind: 'log', id: gone.id, updatedAt: gone.updatedAt }]);
   });
 
+  it('restores backups made before the rename (kindred-log-backup)', () => {
+    const files = unzipSync(build());
+    const manifest = JSON.parse(new TextDecoder().decode(files['backup.json']));
+    expect(manifest.format).toBe('subby-backup');
+    manifest.format = 'kindred-log-backup';
+    const { backup, invalid } = readBackup(zipSync({ ...files, 'backup.json': strToU8(JSON.stringify(manifest)) }));
+    expect(invalid).toBe(0);
+    expect(backup.format).toBe('subby-backup');
+    expect(backup.logs).toHaveLength(2);
+  });
+
   it('skips bad rows, ignores stray files and rejects other files', () => {
     const files = unzipSync(build());
     const manifest = JSON.parse(new TextDecoder().decode(files['backup.json']));
     manifest.logs.push({ id: 'nope' }, { ...manifest.logs[1], payload: { type: 'sleep' } });
-    manifest.children[0].photo = '../../SQLite/kindred.db';
+    manifest.children[0].photo = '../../SQLite/subby.db';
     const zip = zipSync({ ...files, 'backup.json': strToU8(JSON.stringify(manifest)) });
     const res = readBackup(zip);
     expect(res.invalid).toBe(3); // the child (bad photo path) and two logs

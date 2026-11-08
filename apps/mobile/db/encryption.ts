@@ -1,6 +1,6 @@
 /** Database files. The plain one is the pre-encryption database, and the only one in Expo Go. */
-export const PLAIN_DB = 'kindred-log.db';
-export const ENCRYPTED_DB = 'kindred.db';
+export const PLAIN_DB = 'subby-plain.db';
+export const ENCRYPTED_DB = 'subby.db';
 
 export type OpenState = {
   /** The SQLite build is SQLCipher (dev/release builds; not Expo Go). */

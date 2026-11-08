@@ -13,8 +13,8 @@ export type IdentityKeys = { sign: KeyPair; box: KeyPair };
 export function identityFromSeed(seed: Uint8Array): IdentityKeys {
   const derive = (info: string) => hkdf(sha256, seed, undefined, utf8ToBytes(info), 32);
   return {
-    sign: ed25519.keygen(derive('kindred/identity/sign/v1')),
-    box: x25519.keygen(derive('kindred/identity/box/v1')),
+    sign: ed25519.keygen(derive('subby/identity/sign/v1')),
+    box: x25519.keygen(derive('subby/identity/box/v1')),
   };
 }
 
@@ -31,7 +31,7 @@ export function verify(signPublicKey: Uint8Array, message: Uint8Array, signature
 }
 
 const sealKey = (shared: Uint8Array, ephemeral: Uint8Array, recipient: Uint8Array) =>
-  hkdf(sha256, shared, concatBytes(ephemeral, recipient), utf8ToBytes('kindred/seal/v1'), 32);
+  hkdf(sha256, shared, concatBytes(ephemeral, recipient), utf8ToBytes('subby/seal/v1'), 32);
 
 /**
  * Anonymous sealed box: only the holder of `recipientBoxPublicKey`'s secret can open it. Used to hand the

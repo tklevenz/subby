@@ -27,29 +27,29 @@ export type InviteQr = {
 const derive = (secret: Uint8Array, info: string) => hkdf(sha256, secret, undefined, utf8ToBytes(info), 32);
 
 export const newInviteSecret = () => randomBytes(32);
-export const claimKeyOf = (secret: Uint8Array) => derive(secret, 'kindred/invite/claim/v1');
+export const claimKeyOf = (secret: Uint8Array) => derive(secret, 'subby/invite/claim/v1');
 export const claimHashOf = (claimKey: Uint8Array) => toBase64(sha256(claimKey));
 
 const macInput = (deviceId: string, signKey: Uint8Array, boxKey: Uint8Array) =>
-  concatBytes(utf8ToBytes(`kindred/invite/mac/v1:${deviceId}:`), signKey, boxKey);
+  concatBytes(utf8ToBytes(`subby/invite/mac/v1:${deviceId}:`), signKey, boxKey);
 
 export const claimMac = (secret: Uint8Array, deviceId: string, signKey: Uint8Array, boxKey: Uint8Array) =>
-  toBase64(hmac(sha256, derive(secret, 'kindred/invite/mac/v1'), macInput(deviceId, signKey, boxKey)));
+  toBase64(hmac(sha256, derive(secret, 'subby/invite/mac/v1'), macInput(deviceId, signKey, boxKey)));
 
 export function checkClaimMac(secret: Uint8Array, claimant: { deviceId: string; signKey: string; boxKey: string; mac: string }) {
   const expected = fromBase64(claimMac(secret, claimant.deviceId, fromBase64(claimant.signKey), fromBase64(claimant.boxKey)));
   return equalBytes(expected, fromBase64(claimant.mac));
 }
 
-/** `kindred:` + base64url(JSON): URL-safe, so the same text works in a QR code or pasted by hand. */
-export const encodeInviteQr = (qr: InviteQr) => `kindred:${toBase64(jsonToBytes(qr))}`;
+/** `subby:` + base64url(JSON): URL-safe, so the same text works in a QR code or pasted by hand. */
+export const encodeInviteQr = (qr: InviteQr) => `subby:${toBase64(jsonToBytes(qr))}`;
 
 export function decodeInviteQr(input: string): InviteQr {
   const text = input.trim();
-  if (!text.startsWith('kindred:')) throw new Error('Not a Subby code');
+  if (!text.startsWith('subby:')) throw new Error('Not a Subby code');
   let qr: InviteQr;
   try {
-    qr = bytesToJson<InviteQr>(fromBase64(text.slice('kindred:'.length)));
+    qr = bytesToJson<InviteQr>(fromBase64(text.slice('subby:'.length)));
   } catch {
     throw new Error('This code is damaged');
   }

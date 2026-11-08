@@ -1,11 +1,11 @@
 import { requireOptionalNativeModule } from 'expo';
 
-type KindredDownloads = {
+type SubbyDownloads = {
   isAvailable: boolean;
   /** Copies a local file (file:// uri) into the public Downloads folder; returns its final name. */
   saveToDownloads(sourceUri: string, name: string, mimeType: string): Promise<string>;
 };
 
 /** Android only (and not in Expo Go); null elsewhere. */
-const native = requireOptionalNativeModule<KindredDownloads>('KindredDownloads');
+const native = requireOptionalNativeModule<SubbyDownloads>('SubbyDownloads');
 export const downloads = native?.isAvailable ? native : null;

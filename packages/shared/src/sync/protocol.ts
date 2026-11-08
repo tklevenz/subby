@@ -64,7 +64,7 @@ export type ChallengeResponse = { challenge: string; expiresAt: number };
 export const VerifyRequestSchema = z.object({ challenge: b64, signature: b64 });
 export type VerifyResponse = { token: string; expiresAt: number; familyId: string; deviceId: string };
 
-export const AUTH_CONTEXT = 'kindred/auth/v1';
+export const AUTH_CONTEXT = 'subby/auth/v1';
 
 // --- keys ---------------------------------------------------------------------------------------------
 

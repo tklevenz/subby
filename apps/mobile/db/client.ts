@@ -52,7 +52,7 @@ function openAppDatabase(): SQLiteDatabase {
 
   if (plan.kind === 'setAside') {
     // Never delete data we can't read: move it aside, it can still be opened if the key turns up.
-    dbFile(ENCRYPTED_DB).moveSync(dbFile(`kindred.unreadable-${Date.now()}.db`));
+    dbFile(ENCRYPTED_DB).moveSync(dbFile(`subby.unreadable-${Date.now()}.db`));
     for (const ext of ['-wal', '-shm']) {
       const f = dbFile(ENCRYPTED_DB + ext);
       if (f.exists) f.delete();

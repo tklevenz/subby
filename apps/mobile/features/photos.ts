@@ -2,7 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import { Directory, File, Paths } from 'expo-file-system';
-import { downloads } from '../modules/kindred-downloads';
+import { downloads } from '../modules/subby-downloads';
 
 const photosDir = () => new Directory(Paths.document, 'photos');
 

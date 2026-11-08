@@ -12,8 +12,9 @@ import { LenientPayloadSchema, LogEntrySchema, type LogEntry, type LogPayload } 
  * something deleted later) plus the photos, in one zip. Optionally encrypted with a passphrase.
  * Device-local fields stay out: photo paths (the photos themselves are in the zip), sync references and status.
  */
-// Internal: keeps the old name (Kindred Log) so existing backups still restore. Never change it.
-export const BACKUP_FORMAT = 'kindred-log-backup';
+export const BACKUP_FORMAT = 'subby-backup';
+// Backups made before the rename (2026-11-08) still restore; never drop it.
+const LEGACY_BACKUP_FORMAT = 'kindred-log-backup';
 export const BACKUP_VERSION = 1;
 const MANIFEST = 'backup.json';
 
@@ -105,7 +106,7 @@ const BackupLogSchema = LogEntrySchema.omit({ syncStatus: true, isDeleted: true,
 const TombstoneSchema = z.object({ kind: z.enum(['child', 'log']), id: z.uuid(), updatedAt: z.number().int() });
 
 const ManifestSchema = z.object({
-  format: z.literal(BACKUP_FORMAT),
+  format: z.enum([BACKUP_FORMAT, LEGACY_BACKUP_FORMAT]),
   version: z.number().int(),
   createdAt: z.number().int(),
   children: z.array(z.unknown()),

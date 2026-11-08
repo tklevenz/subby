@@ -3,7 +3,7 @@ import { DIAPER_COLORS } from '../schemas/log.schema';
 import { G_PER_LB, G_PER_OZ, fToC, inToCm, ozToMl } from './units';
 
 /*
- * Baby Buddy (https://docs.baby-buddy.net/api/) → Kindred Log mapping. Pure: no I/O.
+ * Baby Buddy (https://docs.baby-buddy.net/api/) → Subby mapping. Pure: no I/O.
  * Baby Buddy doesn't store units, so quantities are converted using ImportUnits
  * (detected from the data with detectUnits(), confirmable by the user).
  */

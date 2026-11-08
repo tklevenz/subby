@@ -21,7 +21,7 @@ import { useChildStore } from '../store/useChildStore';
 import { useLogStore } from '../store/useLogStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { toIsoDate } from '../store/timeHelpers';
-import { downloads } from '../modules/kindred-downloads';
+import { downloads } from '../modules/subby-downloads';
 
 const notePhoto = (l: LogEntry) => (l.payload.type === 'note' ? l.payload.photoUri : undefined);
 

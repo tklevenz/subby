@@ -75,7 +75,8 @@ describe('sealed boxes', () => {
 });
 
 describe('recovery words', () => {
-  // BIP39 test entropy 0x00…00 → "abandon … art". Pins the derivation so it never changes across versions.
+  // BIP39 test entropy 0x00…00 → "abandon … art". Pins the derivation so it never changes across versions
+  // (re-pinned once, before launch, for the subby/… labels on 2026-11-08; never again).
   const ZERO_WORDS = `${'abandon '.repeat(23)}art`;
 
   it('derives a stable identity (test vector)', () => {
@@ -269,8 +270,8 @@ describe('file encryption', () => {
 });
 
 // Derived once from the zero-entropy words; must never change, or existing recovery keys stop working.
-const SIGN_VECTOR = '1d5cfc1df788fb56134d66d69577b102085e334f0c16c1903ac14ccd61bc11a8';
-const BOX_VECTOR = 'db681b557fa30bbc15ad52eea85575d4d062f1452fa4c36d4a6acc5cf304b821';
+const SIGN_VECTOR = '6d74091dd01450e79a0aa4abefa64302928f99b39afd21606cecff8c9cf0af8e';
+const BOX_VECTOR = '6181ce45de77d44067c101289e771c898797ba40ff294fec9f45200d37cf405b';
 
 describe('u64', () => {
   it('encodes big-endian across the 32-bit boundary', async () => {

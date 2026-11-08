@@ -35,7 +35,7 @@ class InfoController {
   @Get('info')
   info() {
     return {
-      service: 'kindred-sync',
+      service: 'subby-sync',
       protocol: PROTOCOL_VERSION,
       mode: this.config.mode,
       push: this.config.push.kind !== 'none',

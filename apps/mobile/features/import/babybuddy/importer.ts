@@ -77,8 +77,8 @@ export async function runImport(opts: {
   client: BBClient;
   units: ImportUnits;
   counts: Record<BBEndpoint, number>;
-  /** Baby Buddy child id → Kindred child id. */
-  /** BB child id → Kindred child id, or null to leave that child's records out. */
+  /** Baby Buddy child id → local child id. */
+  /** BB child id → local child id, or null to leave that child's records out. */
   childMap: Map<number, string | null>;
   /** For records without a child (BB allows that on feedings/sleep/pumping…). */
   fallbackChildId: string;

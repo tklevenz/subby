@@ -22,7 +22,7 @@ import { appleTestSigner } from './appleCerts';
  * End-to-end: the real server on a throwaway Postgres database, driven by simulated apps.
  * Needs the dev database: `pnpm --filter @subby/server db:up`. Skipped (loudly) when it isn't running.
  */
-const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://kindred:kindred@localhost:54329/kindred';
+const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://subby:subby@localhost:54329/subby';
 const dbName = `kl_test_${randomUUID().replace(/-/g, '')}`;
 const blobDir = mkdtempSync(join(tmpdir(), 'kl-blobs-'));
 const admin = postgres(ADMIN_URL, { max: 1, onnotice: () => {}, connect_timeout: 3 });

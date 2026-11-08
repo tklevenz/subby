@@ -81,7 +81,7 @@ describe('isValidBody', () => {
 
   it('rejects malformed bodies, including photo ids that aren\'t UUIDs', () => {
     expect(isValidBody('child', { ...childToBody(child), birthDate: 'soon' })).toBe(false);
-    expect(isValidBody('child', { ...childToBody(child), photoBlob: { id: '../../SQLite/kindred.db', key: 'x' } })).toBe(false);
+    expect(isValidBody('child', { ...childToBody(child), photoBlob: { id: '../../SQLite/subby.db', key: 'x' } })).toBe(false);
     expect(isValidBody('log', { ...logToBody(note), logType: 'sleep' })).toBe(false);
     expect(isValidBody('log', { ...logToBody(note), payload: { ...note.payload, photoBlob: { id: 'nope', key: 'x' } } })).toBe(false);
     expect(isValidBody('log', { ...logToBody(note), startedAt: 'yesterday' })).toBe(false);

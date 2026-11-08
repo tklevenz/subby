@@ -1,10 +1,10 @@
 {
   "expo": {
     "name": "Subby",
-    "slug": "kindred-log",
+    "slug": "subby",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "kindred-log",
+    "scheme": "subby",
     "icon": "./assets/icon.png",
     "platforms": [
       "ios",

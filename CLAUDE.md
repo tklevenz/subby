@@ -4,8 +4,8 @@
 `kindred-log` is a local-first, offline-capable baby/child activity tracking mobile application (logging feeds, diapers, and sleep/wake windows) built within a `pnpm` monorepo (`~/src/kindred-log`)[cite: 4].
 
 **Name and brand:** the app is called **Subby** (store title "Subby: Private Baby Tracker"); `kindred-log` remains the repo (and directory) name; the workspace packages are `@subby/shared`, `@subby/mobile` and `@subby/server` (renamed from `@kindred-log/*` 2026-11-08), the root package `subby`. The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Design canvas row "Subby 1 in the app" maps where the brand goes on every screen; on Home the brand lives only in the sleep tile and its Undo bar (canvas row "Subby on Home").
-- Domain: **subby.baby** (bought 2026-11-05). The hosted Subby Sync will be `sync.subby.baby` (not running yet); self-hosting docs keep `sync.example.com`.
-- User-facing text says Subby. Internal identifiers keep the old name and must never be renamed: the `kindred/…` crypto contexts (they'd break signatures, the device log and recovery words), the `kindred:` QR prefix, `BACKUP_FORMAT = 'kindred-log-backup'`, `kindred.db` and the `kl.*` SecureStore keys, the `kindred-log` URL scheme, and on the server (Subby Sync) the `kindred-sync` service id and Docker image and the `kindred` Postgres user and database.
+- Domain: **subby.baby** (bought 2026-11-05). The hosted Subby Sync runs at `sync.subby.baby` (since 2026-11-06); self-hosting docs keep `sync.example.com`.
+- Everything is called Subby except the repo and its directory (`kindred-log`). The old internal names were dropped in one clean break before launch (2026-11-08), which made every earlier family, recovery key and synced record unreadable. From now on these are frozen, because changing them breaks existing data: the `subby/…` crypto labels (signatures, the device log, sealed keys, records, and the recovery words' identity, pinned by its test vector), the `subby:` QR prefix, `BACKUP_FORMAT = 'subby-backup'` (`readBackup` also accepts the old `kindred-log-backup`; keep that), `subby.db` and the `kl.*` SecureStore keys, the `subby` URL scheme, the background task names, and on the server the `subby-sync` service id and the `subby` Postgres user and database.
 - The package id is **`baby.subby.app`** (Android package and iOS bundle id, since 2026-11-08; before that `com.kindred.log`, a different app: phones moving over reinstall and restore from a backup or re-join sync). Never change it again after the first store release.
 
 ## 2. Tech Stack & Environment
@@ -37,7 +37,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - `keys`: device identity (Ed25519 sign + X25519 box) and sealed boxes.
     - `recovery`: 24 words to an identity. Its test vector must never change, or existing recovery keys stop working.
     - `pairing`: the 6-digit code.
-    - `deviceLog`: the signed, hash-chained family membership (`kindred/devicelog/v2`). Every client verifies it.
+    - `deviceLog`: the signed, hash-chained family membership (`subby/devicelog/v1`). Every client verifies it.
       - It also records every family key epoch. `create` (epoch 1) and `epoch` entries carry `keyHash = epochKeyHash(epoch, key)`, a commitment to the key.
       - Sealed boxes are anonymous, so the server could seal a key of its own. Phones therefore open keys only with `openFamilyKey`, which checks the commitment, and take the current epoch from the log (`state.epoch`), never from the server.
       - `assertLogContinues` rejects a log older than the one a phone already saw (`settings.sync.logSeen`), because a server could otherwise serve a prefix that hides a removal or a newer epoch.
@@ -84,10 +84,10 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **DB:**
   - `db/schema.ts` (Drizzle): tables `children`, `logs` (generic, JSON `payload`, `ended_at`, `import_ref` unique), `settings` (kv), `reminders`.
   - `db/client.ts`: `initDatabase()` runs migrations at startup and upgrades pre-migration v0 databases via `db/legacy.ts`.
-  - **Encryption:** `app.json` sets `expo-sqlite` `useSQLCipher`. `openAppDatabase()` opens `kindred.db` with a random 256-bit raw key from `expo-secure-store` (`kl.dbKey`, `AFTER_FIRST_UNLOCK`). The startup decision is the pure `planOpen` in `db/encryption.ts` (tested):
-    - The pre-encryption plain `kindred-log.db` is copied in once with `sqlcipher_export`, then deleted. Every step is safe to re-run after a crash.
-    - An encrypted file whose key is missing (e.g. Android restore) is moved aside as `kindred.unreadable-<ts>.db`, never deleted.
-    - Expo Go has no SQLCipher (`PRAGMA cipher_version` is empty) and keeps using plain `kindred-log.db`.
+  - **Encryption:** `app.json` sets `expo-sqlite` `useSQLCipher`. `openAppDatabase()` opens `subby.db` with a random 256-bit raw key from `expo-secure-store` (`kl.dbKey`, `AFTER_FIRST_UNLOCK`). The startup decision is the pure `planOpen` in `db/encryption.ts` (tested):
+    - The pre-encryption plain `subby-plain.db` is copied in once with `sqlcipher_export`, then deleted. Every step is safe to re-run after a crash.
+    - An encrypted file whose key is missing (e.g. Android restore) is moved aside as `subby.unreadable-<ts>.db`, never deleted.
+    - Expo Go has no SQLCipher (`PRAGMA cipher_version` is empty) and keeps using plain `subby-plain.db`.
     - Never log or export the key. Inspect a device database with `sqlcipher`, not `sqlite3`.
   - **Schema changes:** edit `db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`. Commit the generated `db/migrations/*`, and never edit an applied migration.
 - **Stores (Zustand, write-through to SQLite):**
@@ -109,7 +109,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `app/growth.tsx` (WHO chart, share as PNG via view-shot + expo-sharing), `app/solids.tsx`, `app/export.tsx` (CSV).
   - `app/backup.tsx` (Settings → Backup & restore; also linked from onboarding, not route-guarded), backed by `features/backup.ts`:
     - Back up: everything on the phone into one file.
-      - Android saves straight to the public Downloads folder through the local native module `modules/kindred-downloads` (MediaStore, Android 10+, no permission; autolinked, so changing it needs a prebuild). Android's folder picker doesn't allow Downloads itself.
+      - Android saves straight to the public Downloads folder through the local native module `modules/subby-downloads` (MediaStore, Android 10+, no permission; autolinked, so changing it needs a prebuild). Android's folder picker doesn't allow Downloads itself.
       - iOS opens the share sheet, which has "Save to Files".
       - The cache copy is deleted afterwards.
     - Restore: pick a file with `File.pickFileAsync` (no document-picker package), preview, then merge in one transaction. Restored rows are `pending`, so they sync.
@@ -266,7 +266,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - Build and install on a USB-connected phone or an emulator: `cd apps/mobile && pnpm android`. After native changes (new native package, `app.json` plugins), run `pnpm android:clean`.
 - Rebuild only for native changes; JS changes hot-reload as usual.
 - **Release builds** (`./gradlew assembleRelease`): Gradle runs the Expo CLI directly, without pnpm's `NODE_PATH`, so Babel resolves presets from `apps/mobile/node_modules`. That's why `babel-preset-expo` and `@babel/plugin-transform-react-jsx` (named by NativeWind's preset) are direct devDependencies; keep them.
-- **Standalone builds for a LAN server**: `app.config.js` adds `usesCleartextTraffic` (via `expo-build-properties`) only when `KINDRED_ALLOW_HTTP=1` is set during prebuild: `KINDRED_ALLOW_HTTP=1 npx expo prebuild --clean --platform android && (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)`. Release APKs are signed with the debug key unless `SUBBY_SIGNING=/path/to/upload.properties` is set during prebuild (`plugins/withReleaseSigning.js`: Gradle reads `storeFile`, `storePassword`, `keyAlias`, `keyPassword` from that file at build time; keystore and file live outside the repo). Debug-signed release APKs install over the dev build and keep the data; upload-signed ones don't. Never set the switch for a store build: the local `android/` is usually prebuilt with it (for the LAN server), so run `npx expo prebuild --clean` without it before building anything for a store.
+- **Standalone builds for a LAN server**: `app.config.js` adds `usesCleartextTraffic` (via `expo-build-properties`) only when `SUBBY_ALLOW_HTTP=1` is set during prebuild: `SUBBY_ALLOW_HTTP=1 npx expo prebuild --clean --platform android && (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)`. Release APKs are signed with the debug key unless `SUBBY_SIGNING=/path/to/upload.properties` is set during prebuild (`plugins/withReleaseSigning.js`: Gradle reads `storeFile`, `storePassword`, `keyAlias`, `keyPassword` from that file at build time; keystore and file live outside the repo). Debug-signed release APKs install over the dev build and keep the data; upload-signed ones don't. Never set the switch for a store build: the local `android/` is usually prebuilt with it (for the LAN server), so run `npx expo prebuild --clean` without it before building anything for a store.
 - **Background tasks don't run headless in dev-client builds** (the headless runtime can't load the bundle from Metro). Test them in a release build. Release builds block `http://`, so test against an https server, or temporarily allow cleartext in the generated manifest.
 - Toolchain (Android): JDK 17, Android SDK 36, build-tools 36.0.0, NDK 27.1.12297006 (Gradle fetches the NDK). `JAVA_HOME` and `ANDROID_HOME` must be set.
 

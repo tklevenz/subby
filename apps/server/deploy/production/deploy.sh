@@ -20,13 +20,13 @@ remote() { ssh "$HOST" "cd $DIR && $*"; }
 
 start() {
   local tag=$1
-  echo "→ Starting kindred-sync:$tag"
+  echo "→ Starting subby-sync:$tag"
   # IMAGE_TAG lives in .env with the other settings; only that line changes (nothing is printed).
   remote "sed -i '/^IMAGE_TAG=/d' .env && echo IMAGE_TAG=$tag >> .env && docker compose up -d --remove-orphans"
   echo "→ Waiting for $URL/healthz"
   for _ in $(seq 1 30); do
     if curl -fsS --max-time 5 "$URL/healthz" >/dev/null 2>&1; then
-      echo "✓ Healthy: kindred-sync:$tag"
+      echo "✓ Healthy: subby-sync:$tag"
       return 0
     fi
     sleep 2
@@ -49,11 +49,11 @@ if [[ -n $(git -C "$ROOT" status --porcelain -- apps/server packages/shared pnpm
 fi
 tag=$(git -C "$ROOT" rev-parse --short=12 HEAD)
 
-echo "→ Building kindred-sync:$tag (linux/amd64)"
-docker build --platform linux/amd64 -f "$ROOT/apps/server/Dockerfile" -t "kindred-sync:$tag" "$ROOT"
+echo "→ Building subby-sync:$tag (linux/amd64)"
+docker build --platform linux/amd64 -f "$ROOT/apps/server/Dockerfile" -t "subby-sync:$tag" "$ROOT"
 
 echo "→ Shipping the image to $HOST"
-docker save "kindred-sync:$tag" | gzip | ssh "$HOST" 'gunzip | docker load'
+docker save "subby-sync:$tag" | gzip | ssh "$HOST" 'gunzip | docker load'
 
 echo "→ Installing compose file and Caddyfile"
 caddyfile_before=$(remote "sha256sum Caddyfile 2>/dev/null | cut -d' ' -f1" || true)
@@ -65,7 +65,7 @@ remote "install -d -m 0700 backups
   current=\$(grep '^IMAGE_TAG=' .env | cut -d= -f2 || true)
   if [ -n \"\$current\" ] && [ \"\$current\" != '$tag' ]; then echo \"\$current\" > previous-tag; fi
   if docker compose ps --status running db | grep -q db; then
-    docker compose exec -T db pg_dump -U kindred kindred | gzip > backups/pre-$tag.sql.gz
+    docker compose exec -T db pg_dump -U subby subby | gzip > backups/pre-$tag.sql.gz
     echo '→ Database dumped to backups/pre-$tag.sql.gz'
   fi
   ls -1t backups/pre-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm --"
@@ -77,4 +77,4 @@ if [[ $(remote "sha256sum Caddyfile | cut -d' ' -f1") != "$caddyfile_before" ]];
   remote "docker compose restart caddy"
 fi
 # Old images, except the running and the previous one.
-remote "docker image ls kindred-sync --format '{{.Tag}}' | grep -vx -e '$tag' -e \"\$(cat previous-tag 2>/dev/null)\" | sed 's/^/kindred-sync:/' | xargs -r docker image rm >/dev/null 2>&1 || true"
+remote "docker image ls subby-sync --format '{{.Tag}}' | grep -vx -e '$tag' -e \"\$(cat previous-tag 2>/dev/null)\" | sed 's/^/subby-sync:/' | xargs -r docker image rm >/dev/null 2>&1 || true"

@@ -1,5 +1,5 @@
 # Subby Sync server. Build from the repository root (the server bundles the shared workspace package):
-#   docker build -f apps/server/Dockerfile -t kindred-sync .
+#   docker build -f apps/server/Dockerfile -t subby-sync .
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /repo
@@ -20,7 +20,7 @@ RUN pnpm --filter @subby/server build
 RUN cd apps/server && mkdir /out && pnpm list --prod --depth 0 --json | node -e " \
   const [server] = JSON.parse(require('fs').readFileSync(0, 'utf8')); \
   const deps = Object.entries(server.dependencies).filter(([name]) => !name.startsWith('@subby/')); \
-  const pkg = { name: 'kindred-sync', private: true, type: 'module', dependencies: Object.fromEntries(deps.map(([n, d]) => [n, d.version])) }; \
+  const pkg = { name: 'subby-sync', private: true, type: 'module', dependencies: Object.fromEntries(deps.map(([n, d]) => [n, d.version])) }; \
   require('fs').writeFileSync('/out/package.json', JSON.stringify(pkg, null, 2));"
 
 # Runtime: pure-JS dependencies only, so the small Alpine image is enough.

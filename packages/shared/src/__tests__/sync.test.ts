@@ -99,9 +99,9 @@ describe('invite code', () => {
     const { decodeInviteQr, encodeInviteQr } = await import('../sync');
     const qr = { v: 1 as const, s: 'http://localhost:8787', i: 'id', k: 'secret', d: 'dev', p: 'key' };
     const text = encodeInviteQr(qr);
-    expect(text).toMatch(/^kindred:[A-Za-z0-9_-]+$/);
+    expect(text).toMatch(/^subby:[A-Za-z0-9_-]+$/);
     expect(decodeInviteQr(`  ${text}\n`)).toEqual(qr);
-    expect(() => decodeInviteQr('kindred:!!!')).toThrow('damaged');
+    expect(() => decodeInviteQr('subby:!!!')).toThrow('damaged');
     expect(() => decodeInviteQr('https://example.com')).toThrow('Not a Subby code');
   });
 });

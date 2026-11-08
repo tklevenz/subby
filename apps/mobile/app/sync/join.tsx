@@ -131,7 +131,7 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             onBarcodeScanned={({ data }) => {
-              if (scanned.current || !data.startsWith('kindred:')) return;
+              if (scanned.current || !data.startsWith('subby:')) return;
               scanned.current = true;
               onCode(data);
             }}
@@ -146,7 +146,7 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
 
       <View className="mt-8">
         <FieldLabel>Or paste the code</FieldLabel>
-        <TextField value={pasted} onChangeText={setPasted} placeholder="kindred:…" autoCapitalize="none" autoCorrect={false} />
+        <TextField value={pasted} onChangeText={setPasted} placeholder="subby:…" autoCapitalize="none" autoCorrect={false} />
         <Button label="Use this code" variant="ghost" onPress={() => onCode(pasted)} disabled={!pasted.trim()} />
       </View>
 

@@ -205,7 +205,7 @@ function Review({
   preview: ImportPreview;
   onStart: (units: ImportUnits, childMap: Map<number, string | null>, fallbackChildId: string) => void;
 }) {
-  const kindredChildren = useChildStore((s) => s.children);
+  const localChildren = useChildStore((s) => s.children);
   const { addChild, updateChild } = useChildStore.getState();
   const settings = useSettingsStore();
   const [units, setUnits] = useState(preview.units);
@@ -216,7 +216,7 @@ function Review({
     Object.fromEntries(
       preview.children.map((bb) => {
         const ref = bbRef(client.host, 'children', bb.id);
-        const match = kindredChildren.find((k) => k.importRef === ref) ?? kindredChildren.find((k) => k.birthDate === bb.birth_date);
+        const match = localChildren.find((k) => k.importRef === ref) ?? localChildren.find((k) => k.birthDate === bb.birth_date);
         return [bb.id, match ? match.id : NEW];
       }),
     ),
@@ -227,10 +227,10 @@ function Review({
   const childOptions = useMemo(
     () => [
       { value: NEW, label: 'New child' },
-      ...kindredChildren.map((k) => ({ value: k.id, label: k.name })),
+      ...localChildren.map((k) => ({ value: k.id, label: k.name })),
       { value: SKIP, label: "Don't import" },
     ],
-    [kindredChildren],
+    [localChildren],
   );
 
   const start = async () => {
@@ -245,12 +245,12 @@ function Review({
         const child = await addChild(bbChildInput(bb, ref));
         childMap.set(bb.id, child.id);
       } else {
-        const existing = kindredChildren.find((k) => k.id === target);
+        const existing = localChildren.find((k) => k.id === target);
         if (existing && existing.importRef !== ref) await updateChild(target, { importRef: ref });
         childMap.set(bb.id, target);
       }
     }
-    const fallback = [...childMap.values()].find((id) => id !== null) ?? kindredChildren[0]?.id;
+    const fallback = [...childMap.values()].find((id) => id !== null) ?? localChildren[0]?.id;
     if (!fallback) return;
     if (!settings.activeChildId) await settings.set('activeChildId', fallback);
     onStart(units, childMap, fallback);

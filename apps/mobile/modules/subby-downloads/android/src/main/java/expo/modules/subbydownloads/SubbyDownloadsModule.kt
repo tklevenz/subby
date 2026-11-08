@@ -1,4 +1,4 @@
-package expo.modules.kindreddownloads
+package expo.modules.subbydownloads
 
 import android.content.ContentValues
 import android.net.Uri
@@ -14,9 +14,9 @@ import java.io.File
  * Saves a file into the phone's public Downloads folder through MediaStore (Android 10+, no permission
  * needed), like a browser download. Returns the name the system gave it (it adds " (1)" for duplicates).
  */
-class KindredDownloadsModule : Module() {
+class SubbyDownloadsModule : Module() {
   override fun definition() = ModuleDefinition {
-    Name("KindredDownloads")
+    Name("SubbyDownloads")
 
     Constant("isAvailable") { Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q }
 

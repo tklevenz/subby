@@ -6,8 +6,7 @@ It can't read names, entries or photos.
 
 License: AGPL-3.0 (the app and the shared package are MIT).
 
-Some internal names keep the project's old name, Kindred, on purpose: the `kindred-sync` service id and Docker
-image, and the `kindred` Postgres user and database. Renaming them would break existing apps and installs.
+The repository keeps the project's old name, `kindred-log`; everything else is called Subby.
 
 ## Self-hosting with Docker
 
@@ -48,7 +47,7 @@ tokens are not.
 
 ```sh
 docker compose ps                              # both services "healthy"
-curl http://localhost:8787/v1/info             # {"service":"kindred-sync",...}
+curl http://localhost:8787/v1/info             # {"service":"subby-sync",...}
 docker compose logs -f server
 ```
 
@@ -67,7 +66,7 @@ Everything lives in two Docker volumes: `db` (Postgres) and `blobs` (encrypted p
 example:
 
 ```sh
-docker compose exec db pg_dump -U kindred kindred | gzip > kindred-$(date +%F).sql.gz
+docker compose exec db pg_dump -U subby subby | gzip > subby-$(date +%F).sql.gz
 docker run --rm -v server_blobs:/data -v "$PWD":/backup alpine tar czf /backup/blobs-$(date +%F).tgz -C /data .
 ```
 
@@ -79,10 +78,10 @@ docker run --rm -v server_blobs:/data -v "$PWD":/backup alpine tar czf /backup/b
 The image builds from the repository root:
 
 ```sh
-docker build -f apps/server/Dockerfile -t kindred-sync .
+docker build -f apps/server/Dockerfile -t subby-sync .
 # For a server with another CPU architecture, e.g. building on an Apple Silicon Mac for an x86 server:
-docker buildx build --platform linux/amd64 -f apps/server/Dockerfile -t kindred-sync --load .
-docker save kindred-sync | gzip | ssh my-server 'gunzip | docker load'
+docker buildx build --platform linux/amd64 -f apps/server/Dockerfile -t subby-sync --load .
+docker save subby-sync | gzip | ssh my-server 'gunzip | docker load'
 ```
 
 With a prebuilt image on the server, `docker compose up -d` (without `--build`) uses it.

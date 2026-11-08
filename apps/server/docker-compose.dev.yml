@@ -3,12 +3,12 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: kindred
-      POSTGRES_PASSWORD: kindred
-      POSTGRES_DB: kindred
+      POSTGRES_USER: subby
+      POSTGRES_PASSWORD: subby
+      POSTGRES_DB: subby
     ports:
       - "127.0.0.1:54329:5432"
     volumes:
-      - kindred-dev-db:/var/lib/postgresql/data
+      - subby-dev-db:/var/lib/postgresql/data
 volumes:
-  kindred-dev-db:
+  subby-dev-db:

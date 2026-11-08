@@ -1,7 +1,7 @@
-# Project Overview: Kindred Log
+# Project Overview: Subby
 
 > **Master Hand-off Document for AI Agents & Developers**
-> *Project Name:* Kindred Log
+> *Project Name:* Subby
 > *Core Vision:* A privacy-first, offline-first, exceptionally fast baby tracking mobile application combining the data-ownership ethos of Signal with the reliability and speed required by tired parents at 3 AM.
 
 ---
@@ -12,7 +12,7 @@ Mainstream baby tracking applications (e.g., Huckleberry, Glow, Nara Baby) offer
 
 Conversely, existing self-hosted open-source alternatives (like Baby Buddy) respect privacy but suffer from clunky, slow web interfaces that fail the "Wife/Partner Acceptance Factor" during middle-of-the-night care routines.
 
-**Kindred Log bridges this gap:**
+**Subby bridges this gap:**
 
 * **Zero-Knowledge Privacy:** End-to-end encrypted (E2EE) synchronization where the server acts as an encrypted storage blob relay and cannot read user data.
 * **Frictionless UI:** Designed specifically for one-handed, 3 AM operation with high-contrast dark modes, haptic feedback, and a 2-tap maximum logging rule.
@@ -22,7 +22,7 @@ Conversely, existing self-hosted open-source alternatives (like Baby Buddy) resp
 
 ## 2. Architecture & Security Model (The "Signal" Approach)
 
-Kindred Log is built on a **Local-First, Offline-Capable Architecture**.
+Subby is built on a **Local-First, Offline-Capable Architecture**.
 
 ### Data Storage & Encryption
 

@@ -43,7 +43,7 @@ export type FamilyKeys = ReadonlyMap<number, Uint8Array>;
 // The metadata is authenticated with the ciphertext, so the server can't move data between records,
 // replay it under another version or resurrect a tombstone with old content.
 const aad = (m: RecordMeta, epoch: number) =>
-  utf8ToBytes(JSON.stringify(['kindred/record/v1', m.id, m.kind, epoch, m.updatedAt, m.deviceId, m.deleted]));
+  utf8ToBytes(JSON.stringify(['subby/record/v1', m.id, m.kind, epoch, m.updatedAt, m.deviceId, m.deleted]));
 
 export function sealRecord(key: Uint8Array, epoch: number, meta: RecordMeta, body: unknown): SyncRecord {
   return { ...meta, epoch, data: toBase64(encrypt(key, jsonToBytes(meta.deleted ? null : body), aad(meta, epoch))) };

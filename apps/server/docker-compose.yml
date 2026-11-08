@@ -11,25 +11,25 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kindred
+      POSTGRES_USER: subby
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: kindred
+      POSTGRES_DB: subby
     volumes:
-      - db:/var/lib/postgresql/data
+      - postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kindred -d kindred"]
+      test: ["CMD-SHELL", "pg_isready -U subby -d subby"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   server:
-    image: kindred-sync:latest
+    image: subby-sync:latest
     build:
       context: ../..
       dockerfile: apps/server/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://kindred:${POSTGRES_PASSWORD}@db:5432/kindred
+      DATABASE_URL: postgres://subby:${POSTGRES_PASSWORD}@db:5432/subby
       MODE: ${MODE:-self}
       BLOB_STORE: ${BLOB_STORE:-disk}
       S3_BUCKET: ${S3_BUCKET:-}
@@ -73,6 +73,6 @@ services:
       - server
 
 volumes:
-  db:
+  postgres:
   blobs:
   caddy:

@@ -99,7 +99,7 @@ These block tickets further down.
   - The production Firebase service-account key in `./secrets`. [D8]
 - [ ] **O2 Backups.** Nightly Postgres dumps and blob storage versioning, kept off the host, encrypted. **Do a test restore before launch.**
 - [ ] **O3 Monitoring.** Uptime check on `/healthz`, disk and DB size alerts, a TLS expiry check. [S7]
-- [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `kindred-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @subby/server smoke https://sync.subby.baby`.
+- [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `subby-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @subby/server smoke https://sync.subby.baby`.
 - [ ] **O5 Website** at `subby.baby` (designed separately): home, how Sync works, pricing, self-hosting, privacy, Impressum. Static, no trackers, self-hosted fonts, HSTS.
 - [ ] **O6 Email**: `support@subby.baby`, `privacy@` and `security@` (named in SECURITY.md), with SPF/DKIM/DMARC.
   - Receiving works since 2026-11-06 (Porkbun forwarding to Gmail).
@@ -122,7 +122,7 @@ These block tickets further down.
 - [ ] **R1 Final package id and signing.**
   - A real release keystore (today release APKs use the debug key), kept safe and backed up, plus Play App Signing.
     - Signing plugin done 2026-11-08: `SUBBY_SIGNING=<upload.properties> npx expo prebuild --clean --platform android`. Left: create the upload key (`keytool -genkeypair -keystore subby-upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000`), back it up with its passwords, and enrol in Play App Signing on the first upload (`bundleRelease` for an .aab).
-  - Prebuild **without** `KINDRED_ALLOW_HTTP`. [D7]
+  - Prebuild **without** `SUBBY_ALLOW_HTTP`. [D7]
 - [ ] **R2 Google Play listing**: "Subby: Private Baby Tracker", description, screenshots, feature graphic, the data safety form (matches L1), content rating, target audience (parents, not children), the data deletion URL (S5 + website).
 - [ ] **R3 App Store listing** (if D6): the same, plus privacy nutrition labels and review notes (no account; how to test sync).
 - [ ] **R4 Internal / closed testing track.** Play requires a closed test with testers for new personal developer accounts before production. Check what applies to the account.

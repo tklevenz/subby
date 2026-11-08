@@ -7,9 +7,9 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kindred
+      POSTGRES_USER: subby
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: kindred
+      POSTGRES_DB: subby
     # Small memory settings: the rows are small and the disk is NVMe.
     command: >
       postgres
@@ -19,19 +19,19 @@ services:
       -c maintenance_work_mem=32MB
       -c max_connections=30
     volumes:
-      - db:/var/lib/postgresql/data
+      - postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kindred -d kindred"]
+      test: ["CMD-SHELL", "pg_isready -U subby -d subby"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   server:
-    image: kindred-sync:${IMAGE_TAG:?Deploy with deploy.sh (it sets IMAGE_TAG)}
+    image: subby-sync:${IMAGE_TAG:?Deploy with deploy.sh (it sets IMAGE_TAG)}
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgres://kindred:${POSTGRES_PASSWORD}@db:5432/kindred
+      DATABASE_URL: postgres://subby:${POSTGRES_PASSWORD}@db:5432/subby
       # The pretend store must never run here.
       TEST_PURCHASES: "0"
       NODE_OPTIONS: --max-old-space-size=320
@@ -62,5 +62,5 @@ services:
       - server
 
 volumes:
-  db:
+  postgres:
   caddy:
