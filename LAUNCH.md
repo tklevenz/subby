@@ -131,6 +131,10 @@ These block tickets further down.
 
 - [ ] **X1 Push relay for self-hosted servers** (D12): free, rate-limited, switched on by the self-hoster; forwards content-free "sync now" pings to FCM/APNs.
 - [ ] **X2 One trial per phone.** Today turning sync off and setting it up again starts a new family with a new 14-day trial, and any client can use the open protocol. If the numbers show trial restarts: Play Integrity (device recall bits) and App Attest/DeviceCheck (2 bits per device) to mark "trial used" on the phone, checked when a family is created or a phone joins. Only for the trial, never a condition for syncing; phones that can't attest just don't get a second trial.
+- [ ] **X3 Home Assistant bridge.** For families coming from Baby Buddy. The server only holds ciphertext, so Home Assistant joins the family as a phone of its own:
+  - A small bridge (Node, Docker, next to Home Assistant) pairs by QR code + 6-digit code, holds the family key, decrypts locally and publishes sensors over MQTT discovery ("sleeping since", "last feed", "diapers today", "next nap"); optionally services to log ("log a diaper").
+  - Reuses `packages/shared` (crypto, device log, records) and the sync flow of `apps/server/test/client.ts`. It shows up in the phone list and is removed like any phone. No native Python integration (that would mean re-implementing the crypto).
+  - Payments: reading needs no unlock (a read-only phone still pulls), so sensors are free on Subby Sync after the trial; logging from Home Assistant needs an unlock like any phone (the server can't tell a bridge from a phone in an open protocol). Free on self-hosted servers, where most Home Assistant users will be.
 
 ## Order
 
