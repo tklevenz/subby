@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActiveTimers from '../../components/ActiveTimers';
 import { AccessBanner } from '../../components/SyncAccess';
+import { RecoveryNudge } from '../../components/RecoveryNudge';
 import ChildSwitcher from '../../components/ChildSwitcher';
 import HomeTiles from '../../components/home/HomeTiles';
 import SheetHost from '../../components/sheets/SheetHost';
@@ -46,6 +47,7 @@ export default function Dashboard() {
         <LogButton />
       </View>
       <AccessBanner />
+      <RecoveryNudge />
       <ActiveTimers />
       <View className="flex-1 mt-2">{child ? <HomeTiles child={child} /> : null}</View>
       <SheetHost />

@@ -503,6 +503,30 @@ describe.skipIf(!reachable)('sync server', () => {
     await expectStatus(rec.request('POST', '/v1/keys/grant', { recipient: 'recovery', keys: [{ epoch: 1, sealed: 'AAAA' }] }), 403);
   });
 
+  it('after a recovery, the lost phones are removed with one new epoch', async () => {
+    const { a, b } = await pairedFamily();
+    const words = newRecoveryWords();
+    await a.setRecovery(words);
+
+    // Both phones are lost. The recovered phone removes them in one go: two removes, then a single rotation.
+    const fresh = new TestClient(url);
+    await fresh.recover(words);
+    expect([...fresh.state!.members.keys()].sort()).toEqual([a.deviceId, b.deviceId, fresh.deviceId].sort());
+    await fresh.removeDevices([a.deviceId, b.deviceId]);
+    expect([...fresh.state!.members.keys()]).toEqual([fresh.deviceId]);
+    expect(fresh.state!.epoch).toBe(2);
+    expect(fresh.state!.rotationDue).toBe(false);
+
+    // The lost phones can't sign in any more (no longer members); the words still recover the new epoch.
+    await expectStatus(a.login(), 404);
+    await expectStatus(b.login(), 404);
+    await fresh.push([fresh.seal('log', randomUUID(), { after: 'recovery' })]);
+    const again = new TestClient(url);
+    await again.recover(words);
+    expect(again.familyKeys.has(2)).toBe(true);
+    expect((await again.pull()).map((r) => r.body)).toContainEqual({ after: 'recovery' });
+  });
+
   it('rotations include the recovery key, so recovery still works afterwards', async () => {
     const { a, b } = await pairedFamily();
     const words = newRecoveryWords();

@@ -301,6 +301,12 @@ export class TestClient {
     await this.rotate();
   }
 
+  /** Removes several devices with one new epoch (the app does this for the lost phones after a recovery). */
+  async removeDevices(deviceIds: string[]) {
+    for (const deviceId of deviceIds) await this.append({ type: 'remove', deviceId });
+    await this.rotate();
+  }
+
   /**
    * Starts the next epoch: its log entry commits to the new key, which is sealed to every member left, and closes
    * the old epochs at the seq this client has pulled to. The server takes it only if that's the family's latest,

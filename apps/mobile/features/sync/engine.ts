@@ -106,6 +106,7 @@ export async function setUpSync(serverInput: string, deviceName: string) {
       deviceId,
       lastSeq: 0,
       lastSyncedAt: null,
+      since: Date.now(),
       knownDevices: [deviceId],
       photosFamily: familyId,
       logSeen: { length: 1, head: verifyDeviceLog([entry]).head },

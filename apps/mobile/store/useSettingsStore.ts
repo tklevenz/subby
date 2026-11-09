@@ -42,6 +42,10 @@ export type SyncSettings = {
   logSeen?: LogSeen;
   /** Another phone moved the family to another server (a `moved` record): this phone follows on its next sync run. */
   move?: MovedBody;
+  /** When this phone started syncing with this family (set up, joined or recovered); kept across a server move. */
+  since?: number;
+  /** The Home card suggesting a recovery key was dismissed (per family: joining another one shows it again). */
+  recoveryNudgeDismissed?: boolean;
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';

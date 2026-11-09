@@ -91,20 +91,36 @@ export async function approveClaim(claimant: NonNullable<InviteResponse['claiman
  * Removes a phone and starts a new family key that only the remaining phones (and the recovery key) get,
  * so the removed phone can't read anything written from now on.
  */
-export async function removeDevice(deviceId: string) {
+export const removeDevice = (deviceId: string) => removeDevices([deviceId]);
+
+/**
+ * Removes phones from the family: a signed `remove` for each, then one new family key for the rest (instead of a
+ * rotation per phone). Used for a single phone on the Sync screen, and for the lost phones after a recovery.
+ */
+export async function removeDevices(deviceIds: string[]) {
+  if (!deviceIds.length) return;
   const { settings, api, me } = member();
   const { entries, state } = await refreshMembers(api, settings);
   const { keys } = await refreshKeys(api, state);
-  const entry = appendEntry(state, entries.length, me, { type: 'remove', deviceId }, Date.now());
-  await api.request('POST', '/v1/families/me/log', { entry });
-  const after = verifyDeviceLog([...entries, entry]);
+  const log = [...entries];
+  let after = state;
+  for (const deviceId of deviceIds) {
+    if (deviceId === me.id || !after.members.has(deviceId)) continue;
+    const entry = appendEntry(after, log.length, me, { type: 'remove', deviceId }, Date.now());
+    await api.request('POST', '/v1/families/me/log', { entry });
+    log.push(entry);
+    after = verifyDeviceLog(log);
+  }
+  if (after === state) return;
   // If this stops here (no connection, app closed), the log says a rotation is owed and the next sync does it.
-  const { epoch, key } = await rotateKeys(api, settings, [...entries, entry], after, keys);
-  // Its name goes too (a tombstone, so the server drops the ciphertext and other phones forget it).
-  await api.push([sealRecord(key, epoch, { id: deviceId, kind: 'device', updatedAt: Date.now(), deviceId: me.id, deleted: true }, null)]);
+  const { epoch, key } = await rotateKeys(api, settings, log, after, keys);
+  // Their names go too (tombstones, so the server drops the ciphertext and other phones forget them).
+  await api.push(
+    deviceIds.map((deviceId) => sealRecord(key, epoch, { id: deviceId, kind: 'device', updatedAt: Date.now(), deviceId: me.id, deleted: true }, null)),
+  );
 
   const names = { ...settings.names };
-  delete names[deviceId];
+  for (const deviceId of deviceIds) delete names[deviceId];
   await saveSync({ names, knownDevices: [...after.members.keys()] });
   await refreshMembers(api, { ...settings, knownDevices: [...after.members.keys()] });
   requestSync(0);
@@ -284,6 +300,7 @@ async function completeJoin(
     deviceId,
     lastSeq: 0,
     lastSyncedAt: null,
+    since: Date.now(),
     knownDevices: [...state.members.keys()],
     photosFamily: familyId,
     logSeen: { length: entries.length, head: state.head },
