@@ -119,7 +119,9 @@ export class PurchasesService {
   /** Hourly (Housekeeping): Google has no push for refunds without Pub/Sub, so it's asked. */
   async checkVoided(now = Date.now()) {
     if (!this.google || this.config.mode !== 'hosted') return 0;
-    const since = this.voidedCheckedAt ? this.voidedCheckedAt - 60 * 60 * 1000 : now - VOIDED_WINDOW_MS;
+    // Google refuses a start more than 30 days back, judged when the request arrives: an hour inside it, or the first
+    // check after a start would be refused every hour.
+    const since = this.voidedCheckedAt ? this.voidedCheckedAt - 60 * 60 * 1000 : now - VOIDED_WINDOW_MS + 60 * 60 * 1000;
     const ids = await this.google.voidedSince(since);
     this.voidedCheckedAt = now;
     return this.setRevoked(ids, true);

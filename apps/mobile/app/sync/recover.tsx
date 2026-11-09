@@ -31,14 +31,17 @@ export default function RecoverScreen() {
     setStep({ kind: 'working' });
     try {
       await recoverFamily(server, words, local, defaultDeviceName());
-      await syncNow();
-      // Recovering means the other phones are gone; while they stay in the family they could read what comes next.
-      const others = useSyncStore.getState().members.filter((m) => !m.isMe).map((m) => m.id);
-      if (others.length) setStep({ kind: 'lost', ids: others });
-      else router.replace('/');
     } catch (e) {
       setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      return;
     }
+    // The phone is in the family now: a failed first sync is retried by the next one, never by recovering again
+    // (that would add this phone a second time).
+    await syncNow().catch(() => {});
+    // Recovering means the other phones are gone; while they stay in the family they could read what comes next.
+    const others = useSyncStore.getState().members.filter((m) => !m.isMe).map((m) => m.id);
+    if (others.length) setStep({ kind: 'lost', ids: others });
+    else router.replace('/');
   };
 
   return (

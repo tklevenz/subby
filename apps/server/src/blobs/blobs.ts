@@ -20,6 +20,7 @@ import {
 import { and, eq, inArray, isNull, lt, notInArray, or } from 'drizzle-orm';
 import { MAX_BLOB_BYTES, UNLINKED_BLOB_TTL_MS, type SyncRecord } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
+import { lockFamily } from '../db/lock';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { Entitlements, notUnlocked } from '../sync/entitlements';
@@ -55,14 +56,18 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
 
   async put(auth: AuthContext, id: string, data: Uint8Array) {
     if (!(await this.entitlements.canSync(auth.familyId, auth.deviceId))) throw notUnlocked();
-    if (!(await this.entitlements.canStore(auth.familyId, data.length))) throw new ForbiddenException('No storage left for this family');
     // Row first, claiming the id: a second upload under the same id (another family's too) gets a conflict before it
     // can touch the stored file. A failed write takes the row back; until the file is there, a read finds nothing.
-    const claimed = await this.db
-      .insert(schema.blobs)
-      .values({ id, familyId: auth.familyId, size: data.length, createdAt: Date.now() })
-      .onConflictDoNothing()
-      .returning({ id: schema.blobs.id });
+    // The allowance check and the claim happen under the family's lock, so uploads at once can't all pass it.
+    const claimed = await this.db.transaction(async (tx) => {
+      await lockFamily(tx, auth.familyId);
+      if (!(await this.entitlements.canStore(auth.familyId, data.length, tx))) throw new ForbiddenException('No storage left for this family');
+      return tx
+        .insert(schema.blobs)
+        .values({ id, familyId: auth.familyId, size: data.length, createdAt: Date.now() })
+        .onConflictDoNothing()
+        .returning({ id: schema.blobs.id });
+    });
     if (!claimed.length) throw new ConflictException('A file with this id already exists');
     try {
       await this.store.put(id, data);
@@ -137,7 +142,10 @@ export class BlobsController {
   /** Body: the encrypted file, `content-type: application/octet-stream`. */
   @Put(':id')
   @HttpCode(204)
-  async put(@Auth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  async put(@Auth() auth: AuthContext, @Param('id', ParseUUIDPipe) rawId: string, @Body() body: unknown) {
+    // One spelling per id: Postgres hands back ids in lowercase, and every later delete uses those. A file stored
+    // under an uppercase name would never be deleted.
+    const id = rawId.toLowerCase();
     if (!(body instanceof Uint8Array) || body.length === 0) throw new BadRequestException('Send the file as application/octet-stream');
     if (body.length > MAX_BLOB_BYTES) throw new BadRequestException('File too large');
     await this.blobs.put(auth, id, body);
@@ -146,7 +154,7 @@ export class BlobsController {
   @Get(':id')
   @Header('content-type', 'application/octet-stream')
   async get(@Auth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    const data = await this.blobs.get(auth, id);
+    const data = await this.blobs.get(auth, id.toLowerCase());
     // A view, not a copy (photos are up to 20 MB).
     return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   }

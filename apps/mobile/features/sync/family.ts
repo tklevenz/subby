@@ -114,10 +114,11 @@ export async function removeDevices(deviceIds: string[]) {
   if (after === state) return;
   // If this stops here (no connection, app closed), the log says a rotation is owed and the next sync does it.
   const { epoch, key } = await rotateKeys(api, settings, log, after, keys);
-  // Their names go too (tombstones, so the server drops the ciphertext and other phones forget them).
-  await api.push(
-    deviceIds.map((deviceId) => sealRecord(key, epoch, { id: deviceId, kind: 'device', updatedAt: Date.now(), deviceId: me.id, deleted: true }, null)),
-  );
+  // Their names go too (tombstones, so the server drops the ciphertext and other phones forget them). Best effort:
+  // the removal is done by now, and a phone that may not push (hosted, read-only) gets a 402 here.
+  await api
+    .push(deviceIds.map((deviceId) => sealRecord(key, epoch, { id: deviceId, kind: 'device', updatedAt: Date.now(), deviceId: me.id, deleted: true }, null)))
+    .catch((e) => console.warn("[sync] couldn't remove the removed phones' names", e));
 
   const names = { ...settings.names };
   for (const deviceId of deviceIds) delete names[deviceId];

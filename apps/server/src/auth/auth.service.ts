@@ -86,7 +86,8 @@ export class AuthService {
 
   /** Resolves a bearer token. Sessions of removed devices are deleted on removal, so they fail here. */
   async authenticate(token: string | undefined): Promise<AuthContext | null> {
-    if (!token) return null;
+    // Tokens are 32 random bytes in base64url: anything else is refused without a database query.
+    if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
     const [session] = await this.db
       .select()
       .from(schema.sessions)

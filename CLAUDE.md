@@ -160,7 +160,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - **Photos** (`photos.ts`): a photo syncs as an encrypted blob with its own key; the reference `photoBlob: {id, key}` sits in the encrypted record (`children.photo_blob`, note `payload.photoBlob`), and `photoUri` stays this device's file.
     - Stores clear `photoBlob` whenever `photoUri` changes; `uploadPhotos` (before each push) uploads rows with a file but no reference, without bumping their version.
     - `downloadPhotos` (after each pull) fetches references without a local file into `photos/<blobId>.jpg` (only UUID ids; the id comes from another phone's record); a pulled version pointing at another blob drops (and deletes) the local copy.
-    - `queueUnsyncedPhotos` re-queues photos from before photo sync, as an edit.
+    - `queueUnsyncedPhotos` re-queues photos from before photo sync, as an edit, only when the family changes (with `forgetPhotoUploads`): run every time, it would re-push a photo that stays local forever.
+    - A photo the server refuses (403: the family's allowance is full; 413) stays on the phone like a too-large one; the entry syncs without it.
     - Each record lists its blob ids (`SyncRecord.blobs`, not in the AAD) so the server can delete unused photos.
     - Blob up/download uses `expo/fetch` (raw bytes).
   - `engine.ts`:
@@ -169,7 +170,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one.
     - Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
     - `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
-    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`), of any epoch this phone holds (still checked by `withinEpoch`). `settlePush` (shared) marks a stale row synced only if one of them beats it, and that version actually opens and passes the body check (`openAll`, before anything is marked); otherwise the row stays pending for the next run, so a server can't make a phone drop an edit. There's no re-pull from 0.
+    - Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`), of any epoch this phone holds (still checked by `withinEpoch`). `settlePush` (shared) marks a stale row synced only if one of them beats it or is the very same version (a push whose answer got lost), and that version actually opens and passes the body check (`openAll`, before anything is marked); otherwise the row stays pending for the next run, so a server can't make a phone drop an edit. There's no re-pull from 0.
     - Pulled records are refused (skipped, not written) if their seq is outside the page asked for, or `withinEpoch` says the log closed their epoch before them. Unsealed tombstones, and records that don't open with a key this phone has (damaged or tampered with), are skipped too, so one bad record can't stop sync; a record of an epoch without a key still fails the run (the next one fetches it). A page that doesn't move forward, or claims more to come without ending at its last record (`pageContinues`), fails the run.
     - A photo blob that doesn't decrypt is skipped (retried next run). `uploadPhotos` reports changed rows, so the stores reload.
     - `rotateKeys` pulls everything first and signs `closedSeq` = this phone's `lastSeq`; on 409 (another phone pushed in between) it pulls and retries, up to three times.
@@ -177,6 +178,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - Grants epochs that `GET /v1/keys` lists as `missing` for a member or the recovery key, sealed only to public keys from the verified log.
       - Rotates when `rotationDue` (`rotateKeys`, also used by `removeDevice`). A concurrent rotation by another phone (400) is fine.
       - So an approval, recovery-key setup or removal that stopped halfway is finished by the next sync. `approveClaim` and `setRecoveryKey` are also safe to retry, and `completeJoin` waits up to ~20 s for keys.
+    - Pushes are split by size (`pushChunks`, under the server's `MAX_REQUEST_BYTES`); pushed ids the server answers neither way are held for the run, so a push can't loop.
     - Rows whose sealed data exceeds `MAX_RECORD_DATA` stay pending and are skipped (`useSyncStore.tooLarge`, shown on the Sync screen).
     - Photos over `MAX_BLOB_BYTES` stay on the phone only (`encryptedFileSize`), so neither can block sync.
     - The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
@@ -217,13 +219,13 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Its `closedSeq` must equal the family's seq, otherwise 409 ("Pull first"); it's required.
     - Grants never overwrite an existing sealed key.
   - `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
-  - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. A record can only link unlinked blobs or its own. An upload claims its id with the row first, so a taken id is refused before the file is touched. `Entitlements.canStore` is the hosted quota hook.
+  - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. A record can only link unlinked blobs or its own. Ids are lowercased (Postgres returns them so, and deletes use those). The allowance check and the id claim run under `lockFamily`. An upload claims its id with the row first, so a taken id is refused before the file is touched. `Entitlements.canStore` is the hosted quota hook.
   - `sync/push` and `sync/pull`:
     - Last writer wins via `serverAccepts`, and a per-family `seq`.
     - New data must use the current epoch, deletions too.
     - Tombstones may carry a sealed body or (older apps) none; anything else needs data.
     - Records must be written as the calling device.
-  - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`).
+  - WebSocket `live?token=` sends data-free notifications (`seq`, `log`, `keys`, `invite`). At most 4 sockets per phone (the oldest go); errors while connecting close the socket instead of reaching Nest (an unhandled rejection would end the process).
   - `push/token` (PUT/DELETE, `{token, platform}`): kept only with `PUSH=fcm` (the default for `MODE=hosted`; needs `FCM_SERVICE_ACCOUNT`, a Firebase service-account key, mounted from `./secrets` in Docker). After accepted writes, `PushService` sends the family's other Android phones a data-only, high-priority `{kind: 'sync'}` message straight to FCM HTTP v1 (coalesced over 2 s; OAuth token from a JWT signed with the key via `node:crypto`, cached for the hour). Tokens are dropped on FCM 404/400 or when the device is removed. iOS tokens are stored but not sent to yet (APNs is a TODO). Push only reaches app builds made with the same Firebase project. `/v1/info` reports `push`.
 - **Payments** (hosted only, `MODE=hosted`; PROJECT.md §3; `purchases/`, `sync/entitlements.ts`):
   - `Entitlements.family` works out each active phone's `SyncAccess`, in join order (`devices.added_at`): its own `unlock`, else one of the family's gifted `slot`s (handed out in join order, so a removed phone's slot passes on), else `trial` (14 days from `families.created_at`), else `grace` (48 h after the trial or after joining, if later), else `readOnly`. Self-hosted: `free`.

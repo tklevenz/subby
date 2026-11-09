@@ -58,12 +58,14 @@ export default function JoinScreen() {
     setStep({ kind: 'finishing' });
     try {
       await finishJoin(join, local, defaultDeviceName());
-      // Download everything before leaving, so a phone joining from onboarding lands on Home with the family's data.
-      await syncNow();
-      router.replace('/');
     } catch (e) {
       fail(e);
+      return;
     }
+    // Download everything before leaving, so a phone joining from onboarding lands on Home with the family's data.
+    // The phone is in the family now: a failed first sync is retried by the next one, never by joining again.
+    await syncNow().catch(() => {});
+    router.replace('/');
   };
 
   return (

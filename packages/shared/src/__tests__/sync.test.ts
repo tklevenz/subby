@@ -86,6 +86,14 @@ describe('settling a push', () => {
     expect(settlePush(mine, { accepted: ['x'], stale: ['y'], newer: [winner('y', 999)] }, () => true)).toEqual({ settled: [], held: [], newer: [] });
   });
 
+  it('settles a row the server already has in exactly this version (an answer that got lost)', () => {
+    const pushed = [{ id: 'a', updatedAt: 100, deviceId: 'me' }];
+    const echo = { id: 'a', updatedAt: 100, deviceId: 'me', seq: 5, epoch: 1 };
+    expect(settlePush(pushed, { accepted: [], stale: ['a'], newer: [echo] }, () => true)).toEqual({ settled: ['a'], held: [], newer: [] });
+    // Still only if it opens.
+    expect(settlePush(pushed, { accepted: [], stale: ['a'], newer: [echo] }, () => false).held).toEqual(['a']);
+  });
+
   it('only takes pull pages that move forward', () => {
     const at = (...seqs: number[]) => seqs.map((seq) => ({ seq }));
     expect(pageContinues(10, { seq: 12, more: true, records: at(11, 12) })).toBe(true);

@@ -51,6 +51,12 @@ These block tickets further down.
 - [ ] **S7 Metrics and logs without user data.** Request counts, error rates, family/blob totals; never ids or IPs in long-lived logs. `/healthz` done (Postgres and photo storage); Caddy keeps no access log.
 - [ ] **S8 Dependency refresh** before launch (NestJS 12.2+ / fastify 5.12.7 clears the open low advisory), and `pnpm audit`.
 - [ ] **S9 Far-future `updatedAt` (audit S-7 leftover).** Decide whether to clamp. A phone with a wrong clock would win every edit; a clamp could get it stuck. At minimum, show a clock-skew warning in the app.
+- [ ] **S10 Moving between servers, robustly** (from the ultrareview 2026-11-09; moves are rare, nothing uses them yet).
+  - **Moving back** to a server the family left fails: device ids, blob ids and the recovery key are unique per server, and the old family keeps them while any phone (a lost one) never left it. Free inactive device ids, or have the move delete the old family once the others followed.
+  - **An interrupted move** (network down or app killed during the photo copy) leaves a half-built family that blocks every retry ("already in a family on that server"). Save the move in progress before `createFamily`; resume it or delete that family on the next try.
+  - **Leaving the old family** is best effort and never retried. Save a pending leave before `switchTo` and retry it until it's done (or 401/404).
+  - **The move runs outside the sync lock:** a run against the old family that's still going can write the old `lastSeq` into the new family's settings. Run the move while holding the lock (its own syncs then call `runOnce`).
+- [ ] **S11 Request limits left from the review.** Done: rate limits match the decoded path, malformed tokens are refused without a query, a failed live socket can't crash the process, at most 4 sockets per phone, 5-minute request timeout. Left: a per-IP limit on WebSocket upgrades (needs the same `trustProxy` IP logic as Fastify), and refusing unauthenticated requests before their body is read (large bodies only on the push and blob routes). Check Caddy's `request_body max_size` too.
 
 ## App
 
@@ -86,6 +92,7 @@ These block tickets further down.
 - [ ] **P1 Store products.** Server side done 2026-11-05 (`purchases/`, verified against a fake Play API and a test Apple chain). Left: creating the products and the service account in the consoles, and the app (A3). Play Billing and StoreKit, two products per store at €6.99: the own unlock (non-consumable) and the family slot (consumable).
   - The purchase carries the buyer's device id (`obfuscatedAccountId` / `appAccountToken`).
   - Server: a purchases table (store, transaction id, kind, device or family), our own receipt verification (Play Developer API, App Store Server API), one active phone per own unlock; refunds revoke (Play voided purchases, App Store server notifications). [D1, D4]
+  - Finish (acknowledge/consume) is best effort once: if it fails and the app doesn't send the purchase again, Google refunds it after 3 days. Have the app re-send unfinished purchases at start (expo-iap does), or retry unfinished ones from Housekeeping (from the ultrareview 2026-11-09).
 - [x] **P3 E2E tests** (server, 2026-11-05) with a fake store verifier:
   - trial expiry → 48 h grace → pull only;
   - own unlock, and restoring it to a new phone in another family;

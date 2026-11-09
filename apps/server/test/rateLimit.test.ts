@@ -43,6 +43,10 @@ describe('rate limits', () => {
   it('picks the rule by method and path, ignoring the query', () => {
     expect(ruleFor('POST', '/v1/auth/challenge').name).toBe('auth');
     expect(ruleFor('POST', '/v1/auth/verify').name).toBe('auth');
+    // Percent-encoded paths are routed like the plain ones, so they count against the same limit.
+    expect(ruleFor('POST', '/v1/f%61milies').name).toBe('family');
+    expect(ruleFor('POST', '/v1/invites/x/cl%61im?y=1').name).toBe('claim');
+    expect(ruleFor('POST', '/v1/%zz').name).toBe('default');
     expect(ruleFor('POST', '/v1/families').name).toBe('family');
     expect(ruleFor('POST', '/v1/families/me/log').name).toBe('default');
     expect(ruleFor('POST', '/v1/invites/abc/claim').name).toBe('claim');

@@ -108,6 +108,9 @@ export async function createApp(config: Config) {
     new FastifyAdapter({
       // Records are small, but a first upload of a long history comes in 500-record batches (split by size).
       bodyLimit: MAX_REQUEST_BYTES,
+      // A request must arrive whole within 5 minutes (a 20 MB photo on a slow connection fits), so bodies sent
+      // slowly on purpose can't pile up in memory forever.
+      requestTimeout: 5 * 60 * 1000,
       // On shutdown, cut every connection, not only idle ones: one that opened but hasn't sent a request yet
       // would otherwise hold the restart for the 60 s header timeout. Sync requests are safe to retry.
       forceCloseConnections: true,

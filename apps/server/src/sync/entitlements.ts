@@ -2,7 +2,7 @@ import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sum } from 'drizzle-orm';
 import { GRACE_MS, HOSTED_PHOTO_BYTES, TRIAL_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
-import { DB, schema, type Db } from '../db/db';
+import { DB, schema, type Db, type Tx } from '../db/db';
 
 /** 402: this phone's trial and grace are over and it has no unlock; it can still pull. The app shows the unlock screen. */
 export const notUnlocked = () => new HttpException({ statusCode: 402, message: 'This phone needs Subby Sync unlocked to write' }, 402);
@@ -99,13 +99,13 @@ export class Entitlements {
   }
 
   /** Whether the family has room for another encrypted file of `bytes` (2 GB of photos per family when hosted). */
-  async canStore(familyId: string, bytes: number): Promise<boolean> {
+  async canStore(familyId: string, bytes: number, db: Db | Tx = this.db): Promise<boolean> {
     if (!this.hosted) return true;
-    return (await this.photoBytes(familyId)) + bytes <= HOSTED_PHOTO_BYTES;
+    return (await this.photoBytes(familyId, db)) + bytes <= HOSTED_PHOTO_BYTES;
   }
 
-  private async photoBytes(familyId: string) {
-    const [row] = await this.db.select({ total: sum(schema.blobs.size) }).from(schema.blobs).where(eq(schema.blobs.familyId, familyId));
+  private async photoBytes(familyId: string, db: Db | Tx = this.db) {
+    const [row] = await db.select({ total: sum(schema.blobs.size) }).from(schema.blobs).where(eq(schema.blobs.familyId, familyId));
     return Number(row?.total ?? 0);
   }
 }

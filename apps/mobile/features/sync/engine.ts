@@ -217,11 +217,13 @@ async function runOnce() {
       keys = await refreshKeys(api, state);
     }
     // A phone moved to another family before photo references were tracked: re-upload its own photos once.
+    // Only then: run every time, it would re-queue a photo that stays on this phone (too large, or no room on the
+    // server) with a new version on every run, pushing it forever and overwriting other phones' edits.
     if (settings.photosFamily !== settings.familyId) {
       await forgetPhotoUploads({ onlyLocal: true });
+      await queueUnsyncedPhotos();
       await saveSync({ photosFamily: settings.familyId });
     }
-    await queueUnsyncedPhotos();
     // A phone without an unlock (hosted, after the trial) still pulls; its own changes wait, pending, until it's unlocked.
     await refreshEntitlement(api);
     const pushed = canWrite() ? await pushUnlessLocked(api, settings, keys) : { applied: false, tooLarge: 0 };
@@ -422,8 +424,11 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
       const openedNewer = openAll(candidates, keys);
       const genuine = new Set<SyncRecord>(openedNewer.map((o) => o.record));
-      const { settled, held: kept, newer } = settlePush(chunk, res, (r) => genuine.has(r));
-      for (const id of kept) held.add(id);
+      const { settled, newer } = settlePush(chunk, res, (r) => genuine.has(r));
+      // Pushed ids the server answered neither way are held too: each pass must leave the query smaller, or a
+      // server could keep a phone pushing the same batch forever.
+      const settledIds = new Set(settled);
+      for (const r of chunk) if (!settledIds.has(r.id)) held.add(r.id);
       db.transaction((tx) => {
         for (const id of settled) {
           // Only if unchanged since it was read; an edit made meanwhile stays pending for the next round.

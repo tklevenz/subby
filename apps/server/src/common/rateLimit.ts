@@ -26,7 +26,13 @@ export const RULES: { name: string; method: string; path: RegExp; limit: Limit }
 export const DEFAULT_LIMIT: Limit = { burst: 600, perMinute: 600 };
 
 export function ruleFor(method: string, url: string): { name: string; limit: Limit } {
-  const path = url.split('?')[0];
+  // Matched on the decoded path, as the router routes it: /v1/f%61milies is /v1/families.
+  let path = url.split('?')[0]!;
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Not valid percent-encoding: the router refuses it too.
+  }
   return RULES.find((r) => r.method === method && r.path.test(path)) ?? { name: 'default', limit: DEFAULT_LIMIT };
 }
 

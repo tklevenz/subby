@@ -37,8 +37,12 @@ export function settlePush<R extends Version & { id: string; seq: number; epoch:
 ): { settled: string[]; held: string[]; newer: R[] } {
   const mine = new Map(pushed.map((r) => [r.id, r]));
   const stale = new Set(res.stale.filter((id) => mine.has(id)));
-  const newer = (res.newer ?? []).filter((r) => stale.has(r.id) && usable(r) && compareVersions(r, mine.get(r.id)!) > 0);
-  const beaten = new Set(newer.map((r) => r.id));
+  const shown = (res.newer ?? []).filter((r) => stale.has(r.id) && usable(r));
+  const newer = shown.filter((r) => compareVersions(r, mine.get(r.id)!) > 0);
+  // The same version as the pushed one (same time, same phone): an earlier push of it got through, but its answer
+  // was lost. Settled, nothing to apply.
+  const same = shown.filter((r) => compareVersions(r, mine.get(r.id)!) === 0);
+  const beaten = new Set([...newer, ...same].map((r) => r.id));
   return {
     settled: [...res.accepted.filter((id) => mine.has(id) && !stale.has(id)), ...beaten],
     held: [...stale].filter((id) => !beaten.has(id)),
