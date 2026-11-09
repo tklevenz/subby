@@ -265,14 +265,23 @@ export function movedFamilyLog(old: DeviceLogState, mover: { id: string; keys: I
 
 /**
  * A phone following its family to another server checks the new log against the old one (both verified here):
- * - it was created by `from`, a phone of the old family, with the keys it has there;
- * - every phone in it is one of the old family's, with the same keys, and none was removed by another phone (a
- *   lost phone stays out; leaving by itself is fine, that's how a phone that already followed leaves the old one);
- * - the recovery key is the same one;
+ * - it was created by `from`, a phone of the old family that no other phone removed, with the keys it has there
+ *   (the new server can't stand in for it, and a lost phone can't lead the family away);
+ * - in the part the mover wrote (its first `moverEntries` entries; the whole log for moves from older apps), every
+ *   phone is one of the old family's, with the same keys, and none was removed by another phone (a lost phone stays
+ *   out; leaving by itself is fine, that's how a phone that already followed leaves the old one), and the recovery
+ *   key is the same one. What the family did on the new server afterwards (pairing, new recovery words) is signed by
+ *   its phones, and `verifyDeviceLog` already checks that;
  * - it has `me`.
  * Throws otherwise. Returns the new log's state.
  */
-export function verifyMovedLog(oldEntries: DeviceLogEntry[], newEntries: DeviceLogEntry[], from: string, me: string): DeviceLogState {
+export function verifyMovedLog(
+  oldEntries: DeviceLogEntry[],
+  newEntries: DeviceLogEntry[],
+  from: string,
+  me: string,
+  moverEntries?: number,
+): DeviceLogState {
   const old = verifyDeviceLog(oldEntries);
   const next = verifyDeviceLog(newEntries);
   const fail = (why: string): never => {
@@ -287,12 +296,17 @@ export function verifyMovedLog(oldEntries: DeviceLogEntry[], newEntries: DeviceL
   const same = (a: Member | null | undefined, b: Member | null | undefined) =>
     a === b || (!!a && !!b && equalBytes(a.signKey, b.signKey) && equalBytes(a.boxKey, b.boxKey));
 
-  if (newEntries[0]!.deviceId !== from || !added.has(from)) fail("wasn't made by a phone of this family");
-  for (const [id, m] of next.members) {
+  const creator = newEntries[0]!;
+  if (creator.deviceId !== from || !same(added.get(from), keysOf(creator)) || removedByOthers.has(from)) fail("wasn't made by a phone of this family");
+  const count = moverEntries ?? newEntries.length;
+  const moverPart = newEntries.slice(0, count);
+  if (count < 1 || count > newEntries.length || (moverEntries !== undefined && moverPart.some((e) => e.signer !== from))) fail("wasn't made by a phone of this family");
+  const moved = verifyDeviceLog(moverPart);
+  for (const [id, m] of moved.members) {
     if (!same(added.get(id), m)) fail('has a phone that isn’t in this family');
     if (removedByOthers.has(id)) fail('has a phone that was removed from this family');
   }
-  if (!same(old.recovery, next.recovery)) fail('has another recovery key');
+  if (!same(old.recovery, moved.recovery)) fail('has another recovery key');
   if (!next.members.has(me)) fail('doesn’t have this phone');
   return next;
 }

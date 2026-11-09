@@ -46,6 +46,13 @@ export function settlePush<R extends Version & { id: string; seq: number; epoch:
   };
 }
 
-/** Client side: a pull page must move forward from `since`, or a server could loop a phone forever or rewind it. */
-export const pageContinues = (since: number, page: { seq: number; more: boolean }) =>
-  page.seq > since || (page.seq === since && !page.more);
+/**
+ * Client side: a pull page must move forward from `since`, or a server could loop a phone forever or rewind it.
+ * A page with more to come ends at its last record (as the server sends it), so empty pages can't keep a phone
+ * pulling forever.
+ */
+export function pageContinues(since: number, page: { seq: number; more: boolean; records: { seq: number }[] }) {
+  if (!page.more) return page.seq >= since;
+  const last = page.records.reduce((max, r) => Math.max(max, r.seq), -Infinity);
+  return page.seq > since && page.seq === last;
+}

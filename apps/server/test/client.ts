@@ -388,7 +388,7 @@ export class TestClient {
       });
       if (!res.ok) throw new HttpError(res.status, res.statusText);
     }
-    const moved: MovedBody = { server, familyId, from: this.deviceId, seq: this.lastSeq };
+    const moved: MovedBody = { server, familyId, from: this.deviceId, seq: this.lastSeq, entries: log.length };
     await this.push([this.seal('moved', familyId, moved)]);
     await this.append({ type: 'remove', deviceId: this.deviceId });
     await next.refresh();
@@ -410,7 +410,7 @@ export class TestClient {
     await next.login();
     const { entries } = await next.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
     const { entries: oldEntries } = await this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
-    verifyMovedLog(oldEntries, entries, move.from, this.deviceId);
+    verifyMovedLog(oldEntries, entries, move.from, this.deviceId, move.entries);
     await next.refresh();
     const resend: string[] = [];
     const since = this.lastSeq;

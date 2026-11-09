@@ -19,7 +19,7 @@ const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
     .extend({ payload: LenientPayloadSchema })
     .refine((l) => l.payload.type === l.logType),
   device: z.object({ name: z.string().min(1).max(100) }),
-  moved: z.object({ server: z.string().regex(/^https?:\/\/\S+$/i).max(300), familyId: z.uuid(), from: z.uuid(), seq: z.number().int().nonnegative() }),
+  moved: z.object({ server: z.string().regex(/^https?:\/\/\S+$/i).max(300), familyId: z.uuid(), from: z.uuid(), seq: z.number().int().nonnegative(), entries: z.number().int().positive().max(10_000).optional() }),
 };
 
 /** Whether a decrypted body from another phone is well-formed for its kind. */

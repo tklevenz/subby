@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fromBase64, newSymmetricKey } from '../crypto';
-import { UnsealedRecordError, clientApplies, compareVersions, openRecord, pageContinues, sealRecord, serverAccepts, settlePush, type RecordMeta } from '../sync';
+import { MAX_PUSH, UnsealedRecordError, clientApplies, compareVersions, openRecord, pageContinues, pushChunks, sealRecord, serverAccepts, settlePush, type RecordMeta } from '../sync';
 
 describe('records', () => {
   const key = newSymmetricKey();
@@ -87,10 +87,26 @@ describe('settling a push', () => {
   });
 
   it('only takes pull pages that move forward', () => {
-    expect(pageContinues(10, { seq: 12, more: true })).toBe(true);
-    expect(pageContinues(10, { seq: 10, more: false })).toBe(true);
-    expect(pageContinues(10, { seq: 10, more: true })).toBe(false);
-    expect(pageContinues(10, { seq: 9, more: false })).toBe(false);
+    const at = (...seqs: number[]) => seqs.map((seq) => ({ seq }));
+    expect(pageContinues(10, { seq: 12, more: true, records: at(11, 12) })).toBe(true);
+    expect(pageContinues(10, { seq: 12, more: false, records: at(12) })).toBe(true);
+    expect(pageContinues(10, { seq: 10, more: false, records: [] })).toBe(true);
+    expect(pageContinues(10, { seq: 10, more: true, records: [] })).toBe(false);
+    expect(pageContinues(10, { seq: 9, more: false, records: [] })).toBe(false);
+    // More to come, but nothing (or not up to the claimed seq) in this page: a server stringing the phone along.
+    expect(pageContinues(10, { seq: 11, more: true, records: [] })).toBe(false);
+    expect(pageContinues(10, { seq: 20, more: true, records: at(11, 12) })).toBe(false);
+  });
+});
+
+describe('pushChunks', () => {
+  it('splits a push by size and count, never leaving a record out', () => {
+    const recs = (n: number, size: number) => Array.from({ length: n }, (_, i) => ({ id: i, data: 'x'.repeat(size) }));
+    expect(pushChunks(recs(3, 10), 25).map((c) => c.length)).toEqual([2, 1]);
+    expect(pushChunks(recs(2, 100), 25).map((c) => c.length)).toEqual([1, 1]); // larger than the budget: alone
+    expect(pushChunks(recs(MAX_PUSH + 1, 1)).map((c) => c.length)).toEqual([MAX_PUSH, 1]);
+    expect(pushChunks([{ data: null }, {}]).flat()).toHaveLength(2);
+    expect(pushChunks([])).toEqual([]);
   });
 });
 

@@ -8,8 +8,11 @@ import { decrypt, encrypt } from '../crypto/aead';
  */
 export const RECORD_KINDS = ['child', 'log', 'device', 'moved'] as const;
 
-/** Inside a `moved` record (id = the new family's id): where the family went, who moved it, and how far it had pulled. */
-export type MovedBody = { server: string; familyId: string; from: string; seq: number };
+/**
+ * Inside a `moved` record (id = the new family's id): where the family went, who moved it, how far it had pulled,
+ * and how many entries of the new device log it wrote (`verifyMovedLog`; missing from older apps).
+ */
+export type MovedBody = { server: string; familyId: string; from: string; seq: number; entries?: number };
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
 export type SyncRecord = {

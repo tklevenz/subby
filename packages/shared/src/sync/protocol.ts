@@ -128,6 +128,33 @@ export const InviteStatusSchema = z.object({ claimKey: b64 });
 
 export const MAX_RECORD_DATA = 256 * 1024;
 export const MAX_PUSH = 500;
+/**
+ * The server's request body limit. MAX_PUSH records of MAX_RECORD_DATA each wouldn't fit, so clients also split a
+ * push by size (`pushChunks`).
+ */
+export const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Splits records into pushes whose ciphertext stays well under MAX_REQUEST_BYTES (half, leaving room for the
+ * metadata and JSON). Every record fits on its own, since it's at most MAX_RECORD_DATA.
+ */
+export function pushChunks<T extends { data?: string | null }>(records: T[], budget = MAX_REQUEST_BYTES / 2): T[][] {
+  const chunks: T[][] = [];
+  let chunk: T[] = [];
+  let size = 0;
+  for (const r of records) {
+    const n = r.data?.length ?? 0;
+    if (chunk.length && (size + n > budget || chunk.length >= MAX_PUSH)) {
+      chunks.push(chunk);
+      chunk = [];
+      size = 0;
+    }
+    chunk.push(r);
+    size += n;
+  }
+  if (chunk.length) chunks.push(chunk);
+  return chunks;
+}
 export const MAX_RECORD_BLOBS = 4;
 
 // --- blobs (encrypted files: PUT/GET/DELETE /v1/blobs/:id, application/octet-stream) -------------------

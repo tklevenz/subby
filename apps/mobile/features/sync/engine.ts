@@ -18,7 +18,7 @@ import {
   type DeviceLogEntry,
   type DeviceLogState,
 } from '@subby/shared/crypto';
-import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
+import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, pushChunks, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
@@ -410,29 +410,32 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       return false;
     });
     if (!records.length) continue;
-    const res = await api.push(records);
-
-    // The winning versions the server sent back for stale ones, of any epoch we hold, unless the log closed that
-    // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
-    // (an older epoch's version this phone pulled long ago, or a server that withholds it) it stays pending.
-    // Only versions that actually open and are well-formed count: the metadata alone is the server's word.
-    const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
-    const openedNewer = openAll(candidates, keys);
-    const genuine = new Set<SyncRecord>(openedNewer.map((o) => o.record));
-    const { settled, held: kept, newer } = settlePush(records, res, (r) => genuine.has(r));
-    for (const id of kept) held.add(id);
     const version = new Map([...children, ...logs].map((r) => [r.id, r.updatedAt]));
-    db.transaction((tx) => {
-      for (const id of settled) {
-        // Only if unchanged since it was read; an edit made meanwhile stays pending for the next round.
-        const at = version.get(id)!;
-        tx.update(schema.childrenTable).set({ syncStatus: 'synced' }).where(and(eq(schema.childrenTable.id, id), eq(schema.childrenTable.updatedAt, at))).run();
-        tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
-      }
-    });
-    if (newer.length) applied = applyOpened(openedNewer.filter((o) => (newer as SyncRecord[]).includes(o.record)), settings.deviceId) || applied;
-    done += records.length;
-    useSyncStore.setState({ progress: { label: 'Uploading', done } });
+    // The server takes at most MAX_REQUEST_BYTES per request: a batch of large notes goes up in several.
+    for (const chunk of pushChunks(records)) {
+      const res = await api.push(chunk);
+
+      // The winning versions the server sent back for stale ones, of any epoch we hold, unless the log closed that
+      // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
+      // (an older epoch's version this phone pulled long ago, or a server that withholds it) it stays pending.
+      // Only versions that actually open and are well-formed count: the metadata alone is the server's word.
+      const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
+      const openedNewer = openAll(candidates, keys);
+      const genuine = new Set<SyncRecord>(openedNewer.map((o) => o.record));
+      const { settled, held: kept, newer } = settlePush(chunk, res, (r) => genuine.has(r));
+      for (const id of kept) held.add(id);
+      db.transaction((tx) => {
+        for (const id of settled) {
+          // Only if unchanged since it was read; an edit made meanwhile stays pending for the next round.
+          const at = version.get(id)!;
+          tx.update(schema.childrenTable).set({ syncStatus: 'synced' }).where(and(eq(schema.childrenTable.id, id), eq(schema.childrenTable.updatedAt, at))).run();
+          tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
+        }
+      });
+      if (newer.length) applied = applyOpened(openedNewer.filter((o) => (newer as SyncRecord[]).includes(o.record)), settings.deviceId) || applied;
+      done += chunk.length;
+      useSyncStore.setState({ progress: { label: 'Uploading', done } });
+    }
   }
 }
 
@@ -595,7 +598,7 @@ function noteMove(records: Opened[], ownDeviceId: string) {
   const current = syncSettings();
   for (const { record, body } of records) {
     const moved = body as MovedBody | null;
-    if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.familyId === current.familyId) continue;
+    if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.from !== record.deviceId || moved.familyId === current.familyId) continue;
     saveSync({ move: moved });
   }
 }

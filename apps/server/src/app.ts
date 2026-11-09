@@ -23,7 +23,7 @@ import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
 import { PurchasesController, PurchasesService } from './purchases/purchases';
 import { installRateLimits } from './common/rateLimit';
-import { MAX_BLOB_BYTES } from '@subby/shared/sync';
+import { MAX_BLOB_BYTES, MAX_REQUEST_BYTES } from '@subby/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -106,8 +106,8 @@ export async function createApp(config: Config) {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.with(config, db),
     new FastifyAdapter({
-      // Records are small, but a first upload of a long history comes in 500-record batches.
-      bodyLimit: 16 * 1024 * 1024,
+      // Records are small, but a first upload of a long history comes in 500-record batches (split by size).
+      bodyLimit: MAX_REQUEST_BYTES,
       // On shutdown, cut every connection, not only idle ones: one that opened but hasn't sent a request yet
       // would otherwise hold the restart for the 60 s header timeout. Sync requests are safe to retry.
       forceCloseConnections: true,

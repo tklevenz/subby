@@ -85,7 +85,7 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
     await uploadPhotosAsTheyAre(api, (done) => onStep(`Copying photos · ${done}`));
 
     // The old family learns where it went. Sealed with its key, so its server can't point the phones elsewhere.
-    const moved: MovedBody = { server, familyId, from: me.id, seq: settings.lastSeq };
+    const moved: MovedBody = { server, familyId, from: me.id, seq: settings.lastSeq, entries: log.length };
     await oldApi.push([sealRecord(oldKeys.get(oldEpoch)!, oldEpoch, { id: familyId, kind: 'moved', updatedAt: Date.now(), deviceId: me.id, deleted: false }, moved)]);
   } catch (e) {
     // Nothing points at the new family yet: take it down again, so a retry starts clean.
@@ -120,7 +120,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     const login = await api.login();
     if (login.familyId !== move.familyId) throw new Error('This phone is in another family on the new server');
     const { entries } = await api.log();
-    const state = verifyMovedLog(oldEntries, entries, move.from, me.id);
+    const state = verifyMovedLog(oldEntries, entries, move.from, me.id, move.entries);
     const res = await api.keys();
     const sealed = res.keys.find((k) => k.epoch === state.epoch);
     if (!sealed) throw new Error("The new server hasn't got this phone's key yet");
