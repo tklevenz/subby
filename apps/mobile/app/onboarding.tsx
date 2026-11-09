@@ -23,7 +23,7 @@ export default function Onboarding() {
       <SubTile size={64} />
       <Text className="text-3xl font-bold text-ink mt-4">Welcome to Subby</Text>
       <Text className="text-ink-muted mt-2 leading-6">
-        Private, offline baby tracking. Everything stays on this device. Let's start with your little one.
+        Private baby tracking that works offline. Your log lives on this phone, and if you share it with family, it's encrypted so only your phones can read it. Let's start with your little one.
       </Text>
       <ChildForm
         submitLabel="Get started"

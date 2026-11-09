@@ -52,6 +52,7 @@ export default function SettingsScreen() {
   const activeChild = useActiveChild();
   const units = useSettingsStore((s) => s.units);
   const clock = useSettingsStore((s) => s.clock);
+  const syncing = useSettingsStore((s) => s.sync !== null);
   const reminders = useSettingsStore((s) => s.reminders);
   const reminderCount = activeReminderCount(reminders);
   const familyAlerts = useSettingsStore((s) => s.familyAlerts);
@@ -162,7 +163,7 @@ export default function SettingsScreen() {
           </Wordmark>
         </View>
         <Text className="text-ink-ghost text-xs mt-1">
-          Data stays on this device{Constants.expoConfig?.version ? ` · ${Constants.expoConfig.version}` : ''}
+          {syncing ? 'Synced end-to-end encrypted' : 'Everything stays on this phone'}{Constants.expoConfig?.version ? ` · ${Constants.expoConfig.version}` : ''}
         </Text>
         {/* Required by the Font Awesome Free license (CC BY 4.0). */}
         <Text className="text-ink-ghost text-xs mt-1">Icons by Font Awesome (CC BY 4.0)</Text>
