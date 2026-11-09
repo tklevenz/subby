@@ -35,6 +35,8 @@ function SetUp() {
     setError(null);
     try {
       await setUpSync(server, defaultDeviceName());
+      // The family now lives on one phone only: offer the recovery key right away (it can be skipped).
+      router.push({ pathname: '/sync/recovery', params: { after: 'setup' } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

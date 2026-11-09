@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
 import { useSyncStore } from '../../features/sync/engine';
@@ -17,6 +17,8 @@ type Step = { kind: 'intro' } | { kind: 'words'; words: string[] } | { kind: 'ch
  */
 export default function RecoveryKeyScreen() {
   const hasRecovery = useSyncStore((s) => s.hasRecovery);
+  // Opened right after setting up sync: the same screen, framed as the last step, with a way to skip it.
+  const afterSetup = useLocalSearchParams<{ after?: string }>().after === 'setup';
   const [step, setStep] = useState<Step>({ kind: 'intro' });
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +38,7 @@ export default function RecoveryKeyScreen() {
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'intro' ? (
         <>
+          {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">Sync is on. One more step:</Text> : null}
           <Text className="text-ink text-xl font-bold">{hasRecovery ? 'Make a new recovery key' : 'A way back in if every phone is lost'}</Text>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
             24 words that get your family's data back on a new phone if every phone in the family is lost. Write them on paper and keep
@@ -54,6 +57,12 @@ export default function RecoveryKeyScreen() {
             label={hasRecovery ? 'Make new words' : 'Show my recovery key'}
             onPress={() => setStep({ kind: 'words', words: newRecoveryWords().split(' ') })}
           />
+          {afterSetup ? (
+            <>
+              <Button label="Later" variant="ghost" onPress={() => router.back()} />
+              <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">You'll find it under Settings → Sync.</Text>
+            </>
+          ) : null}
         </>
       ) : null}
 

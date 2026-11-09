@@ -7,8 +7,13 @@ import { Button, FieldLabel, TextField } from '../components/ui';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
 import { SubLoader, SubProgress } from '../components/brand/loaders';
 import { ScreenScroll } from '../components/ScreenScroll';
+import { useChildStore } from '../store/useChildStore';
 
 const MIN_PASSPHRASE = 8;
+
+// Lets React draw the busy screen first: making, reading and restoring a backup start with synchronous work
+// (zip, SQLite transaction) that would otherwise hold the JS thread before the loader ever shows.
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 
 type Step =
   | { kind: 'home' }
@@ -27,6 +32,8 @@ export default function BackupScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   // Passphrase key derivation takes a moment on a phone; scrypt reports how far it is.
   const [progress, setProgress] = useState(0);
+  // A fresh install (or a phone without children) has nothing to back up: only Restore is offered.
+  const hasData = useChildStore((s) => s.children.length > 0);
 
   const run = async (label: string, work: () => Promise<void>) => {
     setBusy(label);
@@ -34,6 +41,7 @@ export default function BackupScreen() {
     setError(null);
     setNotice(null);
     try {
+      await nextFrame();
       await work();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -59,15 +67,20 @@ export default function BackupScreen() {
 
       {!busy && step.kind === 'home' ? (
         <>
-          <BackUp run={run} onProgress={setProgress} onDone={setNotice} />
-          {notice ? <Text className="text-green-soft text-sm mt-3">{notice}</Text> : null}
+          {hasData ? (
+            <>
+              <BackUp run={run} onProgress={setProgress} onDone={setNotice} />
+              {notice ? <Text className="text-green-soft text-sm mt-3">{notice}</Text> : null}
+            </>
+          ) : null}
 
-          <Text className="text-ink text-xl font-bold mt-10">Restore</Text>
+          <Text className={`text-ink text-xl font-bold ${hasData ? 'mt-10' : ''}`}>Restore</Text>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
-            Adds a backup's children, entries and photos to this phone. Where both have the same entry, the newer edit wins, so nothing newer
-            is overwritten. Restoring the same file twice changes nothing.
+            {hasData
+              ? "Adds a backup's children, entries and photos to this phone. Where both have the same entry, the newer edit wins, so nothing newer is overwritten. Restoring the same file twice changes nothing."
+              : "Brings a backup's children, entries and photos onto this phone. Choose the file you saved from Subby on your old phone."}
           </Text>
-          <Button label="Choose a backup file" variant="ghost" onPress={choose} />
+          <Button label="Choose a backup file" variant={hasData ? 'ghost' : 'primary'} onPress={choose} />
           {error ? <Text className="text-red-soft text-sm mt-3">{error}</Text> : null}
         </>
       ) : null}
