@@ -1,0 +1,298 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, concatBytes, equalBytes, fromBase64, toBase64, u64, utf8ToBytes } from './bytes';
+import { openSealed, sign, verify, type IdentityKeys } from './keys';
+
+/** Signer id used by entries the recovery key signs (enrolling a device after every phone was lost). */
+export const RECOVERY_SIGNER = 'recovery';
+
+export type DeviceLogType =
+  /** First entry: the device that created the family, signed by itself. */
+  | 'create'
+  | 'add'
+  | 'remove'
+  /** Sets (or with null keys, clears) the recovery key. Only a device may do this. */
+  | 'setRecovery'
+  /** Starts the next family key epoch (after a removal). Only a device may do this. */
+  | 'epoch';
+
+export type DeviceLogEntry = {
+  index: number;
+  /** sha256 (hex) of the previous entry; '' for the first. */
+  prev: string;
+  type: DeviceLogType;
+  /** The device added or removed (UUID). `RECOVERY_SIGNER` for setRecovery. */
+  deviceId: string;
+  /** base64url public keys, for create, add and setRecovery. */
+  signKey: string | null;
+  boxKey: string | null;
+  /**
+   * For `create` (always 1) and `epoch`: the family key epoch this entry starts, and the key's commitment
+   * (`epochKeyHash`). A phone accepts a family key only if it matches, so the server can't hand out its own.
+   */
+  epoch: number | null;
+  keyHash: string | null;
+  /**
+   * For `epoch` entries: the sync seq the signing phone had pulled up to, which the server confirms is the
+   * family's latest. Records of the epochs before end there, so later ones (a removed phone writing with a
+   * key it still has) are refused. Left out of older entries, which then close nothing.
+   */
+  closedSeq?: number | null;
+  /** deviceId of the signer, or `RECOVERY_SIGNER`. */
+  signer: string;
+  at: number;
+  sig: string;
+};
+
+export type Member = { signKey: Uint8Array; boxKey: Uint8Array };
+export type DeviceLogState = {
+  members: Map<string, Member>;
+  recovery: Member | null;
+  /** The current key epoch (the latest one the log started) and every epoch's key commitment. */
+  epoch: number;
+  keyHashes: Map<number, string>;
+  /** Epoch → the last sync seq its records may have, for epochs a later `epoch` entry closed. */
+  closedAt: Map<number, number>;
+  /**
+   * A new epoch is owed: a device was removed, or the recovery key was replaced or cleared, since the last one.
+   * Whoever holds the old key (the removed phone, the old words) must not read what comes next.
+   */
+  rotationDue: boolean;
+  /** Hash of the last entry: the `prev` of the next one. */
+  head: string;
+};
+
+type Unsigned = Omit<DeviceLogEntry, 'sig'>;
+
+// Fixed key order, so every platform signs and hashes the same bytes. `closedSeq` is appended only when set,
+// so entries from before it existed keep their signatures.
+const canonical = (e: Unsigned) =>
+  utf8ToBytes(
+    JSON.stringify([
+      'subby/devicelog/v1', e.index, e.prev, e.type, e.deviceId, e.signKey, e.boxKey, e.epoch, e.keyHash, e.signer, e.at,
+      ...(typeof e.closedSeq === 'number' ? [e.closedSeq] : []),
+    ]),
+  );
+
+export const entryHash = (e: DeviceLogEntry) => bytesToHex(sha256(concatBytes(canonical(e), fromBase64(e.sig))));
+
+/** Commitment to a family key, published in the signed log. Reveals nothing about the 256-bit random key. */
+export const epochKeyHash = (epoch: number, key: Uint8Array) =>
+  toBase64(sha256(concatBytes(utf8ToBytes('subby/epoch/v1'), u64(epoch), key)));
+
+/**
+ * Whether a record of `epoch` at sync `seq` can be genuine: an epoch's records end where the log closed it.
+ * Anything later was written with an old key after the rotation (by a removed phone, served by a server).
+ */
+export const withinEpoch = (state: Pick<DeviceLogState, 'closedAt'>, epoch: number, seq: number) => {
+  const closed = state.closedAt.get(epoch);
+  return closed === undefined || seq <= closed;
+};
+
+/**
+ * Opens a family key sealed to this phone and checks it against the log's commitment for that epoch.
+ * Sealed boxes are anonymous (anyone, the server too, can seal to a public key), so this check is what makes
+ * a key trustworthy.
+ */
+export function openFamilyKey(identity: IdentityKeys, state: DeviceLogState, epoch: number, sealed: Uint8Array): Uint8Array {
+  const expected = state.keyHashes.get(epoch);
+  if (!expected) throw new Error(`The family's phone list has no key for epoch ${epoch}`);
+  const key = openSealed(identity, sealed);
+  if (!equalBytes(fromBase64(epochKeyHash(epoch, key)), fromBase64(expected))) throw new Error(`The family key for epoch ${epoch} is not the one the family made`);
+  return key;
+}
+
+/** How much of the log a phone has already verified: its length and the hash of its last entry. */
+export type LogSeen = { length: number; head: string };
+
+/**
+ * Throws if the log doesn't continue the one seen before. Each entry is signed, but a server could still serve
+ * an older prefix (hiding a removal or a newer epoch); remembering how far the log went catches that.
+ */
+export function assertLogContinues(entries: DeviceLogEntry[], seen: LogSeen | null | undefined) {
+  if (!seen) return;
+  if (entries.length < seen.length || entryHash(entries[seen.length - 1]) !== seen.head) {
+    throw new Error("The family's phone list is older than the one this phone already saw");
+  }
+}
+export function signEntry(signerKeys: IdentityKeys, entry: Unsigned): DeviceLogEntry {
+  return { ...entry, sig: toBase64(sign(signerKeys, canonical(entry))) };
+}
+
+const keysOf = (e: DeviceLogEntry): Member => {
+  if (!e.signKey || !e.boxKey) throw new Error(`Device log entry ${e.index} is missing keys`);
+  const keys = { signKey: fromBase64(e.signKey), boxKey: fromBase64(e.boxKey) };
+  // A malformed key in the (immutable) log would make every later seal to it throw, and so every rotation.
+  if (keys.signKey.length !== 32 || keys.boxKey.length !== 32) throw new Error(`Device log entry ${e.index} has malformed keys`);
+  return keys;
+};
+
+/**
+ * Replays the log and returns the current members. Throws on any broken link, bad signature or rule
+ * violation, so a server can't insert, drop or reorder entries without every client noticing.
+ */
+export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
+  const members = new Map<string, Member>();
+  const removed = new Set<string>();
+  let recovery: Member | null = null;
+  let epoch = 0;
+  const keyHashes = new Map<number, string>();
+  const closedAt = new Map<number, number>();
+  let lastClosed = 0;
+  let rotationDue = false;
+  let head = '';
+
+  entries.forEach((e, i) => {
+    const fail = (why: string) => {
+      throw new Error(`Device log entry ${i}: ${why}`);
+    };
+    if (e.index !== i) fail('wrong index');
+    if (e.prev !== head) fail('broken chain');
+
+    let signerKey: Uint8Array | undefined;
+    if (i === 0) {
+      if (e.type !== 'create' || e.signer !== e.deviceId) fail('must start with the creating device');
+      signerKey = keysOf(e).signKey;
+    } else if (e.type === 'create') {
+      fail('only the first entry can create');
+    } else if (e.signer === RECOVERY_SIGNER) {
+      if (e.type !== 'add') fail('the recovery key can only add devices');
+      signerKey = recovery?.signKey ?? fail('no recovery key is set');
+    } else {
+      signerKey = members.get(e.signer)?.signKey ?? fail('signer is not a member');
+    }
+    if (!verify(signerKey!, canonical(e), fromBase64(e.sig))) fail('bad signature');
+
+    const startsEpoch = e.type === 'create' || e.type === 'epoch';
+    if (startsEpoch) {
+      if (e.epoch !== epoch + 1) fail(`must start epoch ${epoch + 1}`);
+      if (!e.keyHash || fromBase64(e.keyHash).length !== 32) fail('missing key commitment');
+      epoch = e.epoch!;
+      keyHashes.set(epoch, e.keyHash!);
+      rotationDue = false;
+    } else if (e.epoch !== null || e.keyHash !== null) {
+      fail('only create and epoch entries carry a key');
+    }
+    if (e.closedSeq != null) {
+      if (e.type !== 'epoch') fail('only epoch entries close an epoch');
+      if (!Number.isSafeInteger(e.closedSeq) || e.closedSeq < lastClosed) fail('closedSeq must not go back');
+      // Closes every epoch before the new one that isn't closed yet.
+      for (let old = 1; old < e.epoch!; old++) if (!closedAt.has(old)) closedAt.set(old, e.closedSeq);
+      lastClosed = e.closedSeq;
+    }
+
+    switch (e.type) {
+      case 'epoch':
+        if (e.deviceId !== e.signer || e.signKey || e.boxKey) fail('an epoch is started by the signing device');
+        break;
+      case 'create':
+      case 'add':
+        if (members.has(e.deviceId) || removed.has(e.deviceId)) fail('device id already used');
+        members.set(e.deviceId, keysOf(e));
+        break;
+      case 'remove':
+        if (!members.delete(e.deviceId)) fail('device is not a member');
+        removed.add(e.deviceId);
+        rotationDue = true;
+        break;
+      case 'setRecovery':
+        if (e.deviceId !== RECOVERY_SIGNER) fail('setRecovery must target the recovery key');
+        if (recovery) rotationDue = true;
+        recovery = e.signKey || e.boxKey ? keysOf(e) : null;
+        break;
+      default:
+        fail('unknown entry type');
+    }
+    head = entryHash(e);
+  });
+
+  if (!entries.length) throw new Error('Device log is empty');
+  return { members, recovery, epoch, keyHashes, closedAt, rotationDue, head };
+}
+
+/** Builds the next entry on top of a verified state. */
+export function appendEntry(
+  state: DeviceLogState | null,
+  entriesSoFar: number,
+  signer: { id: string; keys: IdentityKeys },
+  change: {
+    type: DeviceLogType;
+    deviceId: string;
+    keys?: { sign: Uint8Array; box: Uint8Array } | null;
+    /** For create and epoch: the new family key (only its commitment goes into the log). */
+    familyKey?: { epoch: number; key: Uint8Array };
+    /** For epoch: see `DeviceLogEntry.closedSeq`. */
+    closedSeq?: number;
+  },
+  at: number,
+): DeviceLogEntry {
+  return signEntry(signer.keys, {
+    index: entriesSoFar,
+    prev: state?.head ?? '',
+    type: change.type,
+    deviceId: change.deviceId,
+    signKey: change.keys ? toBase64(change.keys.sign) : null,
+    boxKey: change.keys ? toBase64(change.keys.box) : null,
+    epoch: change.familyKey?.epoch ?? null,
+    keyHash: change.familyKey ? epochKeyHash(change.familyKey.epoch, change.familyKey.key) : null,
+    ...(change.closedSeq !== undefined ? { closedSeq: change.closedSeq } : {}),
+    signer: signer.id,
+    at,
+  });
+}
+
+// --- moving to another server -------------------------------------------------------------------------------
+
+/**
+ * The device log of a family moving to another server, made by the phone that moves it (`mover`): it creates the
+ * new family (committing to `familyKey` as epoch 1), adds every other phone of the old family with the keys it
+ * already has there, and keeps the same recovery key. Nobody pairs again; each phone checks the new log with
+ * `verifyMovedLog` against the old one it already trusts.
+ */
+export function movedFamilyLog(old: DeviceLogState, mover: { id: string; keys: IdentityKeys }, familyKey: Uint8Array, at: number): DeviceLogEntry[] {
+  if (!old.members.has(mover.id)) throw new Error('Only a phone in the family can move it');
+  const entries: DeviceLogEntry[] = [];
+  let state: DeviceLogState | null = null;
+  const add = (change: Parameters<typeof appendEntry>[3]) => {
+    entries.push(appendEntry(state, entries.length, mover, change, at));
+    state = verifyDeviceLog(entries);
+  };
+  const keys = { sign: mover.keys.sign.publicKey, box: mover.keys.box.publicKey };
+  add({ type: 'create', deviceId: mover.id, keys, familyKey: { epoch: 1, key: familyKey } });
+  for (const [id, m] of old.members) if (id !== mover.id) add({ type: 'add', deviceId: id, keys: { sign: m.signKey, box: m.boxKey } });
+  if (old.recovery) add({ type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys: { sign: old.recovery.signKey, box: old.recovery.boxKey } });
+  return entries;
+}
+
+/**
+ * A phone following its family to another server checks the new log against the old one (both verified here):
+ * - it was created by `from`, a phone of the old family, with the keys it has there;
+ * - every phone in it is one of the old family's, with the same keys, and none was removed by another phone (a
+ *   lost phone stays out; leaving by itself is fine, that's how a phone that already followed leaves the old one);
+ * - the recovery key is the same one;
+ * - it has `me`.
+ * Throws otherwise. Returns the new log's state.
+ */
+export function verifyMovedLog(oldEntries: DeviceLogEntry[], newEntries: DeviceLogEntry[], from: string, me: string): DeviceLogState {
+  const old = verifyDeviceLog(oldEntries);
+  const next = verifyDeviceLog(newEntries);
+  const fail = (why: string): never => {
+    throw new Error(`The family's new phone list ${why}`);
+  };
+  const added = new Map<string, Member>();
+  const removedByOthers = new Set<string>();
+  for (const e of oldEntries) {
+    if (e.type === 'create' || e.type === 'add') added.set(e.deviceId, keysOf(e));
+    if (e.type === 'remove' && e.signer !== e.deviceId) removedByOthers.add(e.deviceId);
+  }
+  const same = (a: Member | null | undefined, b: Member | null | undefined) =>
+    a === b || (!!a && !!b && equalBytes(a.signKey, b.signKey) && equalBytes(a.boxKey, b.boxKey));
+
+  if (newEntries[0]!.deviceId !== from || !added.has(from)) fail("wasn't made by a phone of this family");
+  for (const [id, m] of next.members) {
+    if (!same(added.get(id), m)) fail('has a phone that isn’t in this family');
+    if (removedByOthers.has(id)) fail('has a phone that was removed from this family');
+  }
+  if (!same(old.recovery, next.recovery)) fail('has another recovery key');
+  if (!next.members.has(me)) fail('doesn’t have this phone');
+  return next;
+}
