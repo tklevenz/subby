@@ -22,7 +22,7 @@ These block tickets further down.
 - [x] **D5 Inactivity** (decided 2026-11-05): a hosted family with no phone syncing for **12 months** is deleted from the server. The app warns from month 11 (30 days ahead). The phones keep everything. [S4]
 - [x] **D6 Platforms** (decided 2026-11-05): **Android and iOS together.** iOS hasn't been prebuilt, run on a device or given push yet, so A7–A9 and R3 are in scope. Needs the Apple developer account.
 - [x] **D7 Package id** (decided 2026-11-05): **`baby.subby.app`** (Android package and iOS bundle id). The Pixels reinstall once, then restore from a backup or re-join sync. A new Firebase app registration and `google-services.json` are needed. [R1]
-  - Done in code 2026-11-08: `app.json` uses `baby.subby.app`; `app.config.js` skips a `google-services.json` without a client for it (warns, builds without push). Left (user): register the Android app `baby.subby.app` in the Firebase project `subby-4a0d9` and download the new `google-services.json` (the server's service-account key stays valid); move the Pixels over.
+  - Done in code 2026-11-08: `app.json` uses `baby.subby.app`; `app.config.js` skips a `google-services.json` without a client for it (warns, builds without push). Firebase app `baby.subby.app` registered and the new `google-services.json` in place (2026-11-09); both Pixels run it, and an FCM push from `sync.subby.baby` reached the Pixel 10. Left: a visible family alert from a closed phone (sleep test).
 - [x] **D8 Hosting** (decided 2026-11-05): **Hetzner, Germany**. A Cloud VPS running the existing Docker compose (Postgres self-run), Hetzner Object Storage for photo blobs (`BLOB_STORE=s3`), nightly encrypted Postgres dumps to a separate bucket. [O1, O2]
 - [x] **D9 Crash reporting** (decided 2026-11-05): **store consoles only** (Play Console, App Store Connect). No SDK. A10 is dropped.
 - [x] **D10 Android ↔ iPhone** (decided 2026-11-05): an own unlock stays with its store (switching means buying again); gifted slots work on both.
@@ -85,6 +85,7 @@ These block tickets further down.
   - It then writes an encrypted `moved` record (new server, family id, the old seq it had pulled to) to the old family.
   - The other phones follow on their next sync: they check the new log against the members they already trust, switch, and re-send what they wrote after that seq. The old family is deleted once everyone has moved; a phone that missed it joins with a code.
   - Moving to the official server starts the trial; unlocks are restored from the store account.
+- [ ] **A14 Localization.** Seven languages at launch: English, German, Spanish, French, Dutch, Italian, Portuguese (Brazil). Polish next. No right-to-left (needs a mirrored layout) or Chinese/Japanese/Korean (line breaks, picker widths) at launch. Safety texts (recovery key warnings, medication, deleting a child, medical disclaimer: ~30 strings) get a native speaker's review per language. Legal texts: German binding, English alongside, the rest translations marked as such or the English version. `expo-localization` for the phone's language, with a choice in Settings; one string catalog per language, English as the fallback. Covers every screen, notifications (reminders, family alerts; scheduled in the language at the time), dates and times (day names, "Today"/"Yesterday", the wheel picker, 12/24 h stays a setting), numbers and units, pluralization, the milestone checklist and other bundled text in shared, CSV headers (keep them stable or per language: decide), and the store listings (R2, R3) and website (O5) in every language. Error messages from the server stay in English (shown rarely). A test fails on a key missing from a catalog.
 - [ ] **A12 Accessibility pass**: screen-reader labels on tiles, icon buttons and the wheel picker; font scaling; reduced motion (the brand subs already respect it).
 
 ## Payments
@@ -101,7 +102,7 @@ These block tickets further down.
 
 ## Operations
 
-- [ ] **O1 Production host.** Running since 2026-11-06 at `https://sync.subby.baby` (Hetzner CPX02, Ubuntu 26.04, 2 GB swap, ufw 22/80/443, SSH keys only; Object Storage for photos; `apps/server/deploy/production`). Left: the Firebase key (push is off until then).
+- [ ] **O1 Production host.** Running since 2026-11-06 at `https://sync.subby.baby` (Hetzner CPX02, Ubuntu 26.04, 2 GB swap, ufw 22/80/443, SSH keys only; Object Storage for photos; `apps/server/deploy/production`). Firebase key in place, push on (2026-11-09).
   - Server + Postgres + blob storage at `sync.subby.baby`, Caddy with HTTPS and HSTS, `HTTP_BIND=127.0.0.1`.
   - The production Firebase service-account key in `./secrets`. [D8]
 - [ ] **O2 Backups.** Nightly Postgres dumps and blob storage versioning, kept off the host, encrypted. **Do a test restore before launch.**
@@ -150,7 +151,7 @@ These block tickets further down.
 1. ~~Decisions~~ (all made 2026-11-05).
 2. Small and independent: S1, S2, S5, A1, A2, O7.
 3. Payments: P1, S6, A3, P3, then S3, S4, A4.
-4. iOS, if launching on it: A7, A8, A9.
+4. iOS, if launching on it: A7, A8, A9. Localization (A14) before the store listings.
 5. Operations O1–O4 and legal L1–L4, then the website (O5).
 6. Dogfood (O9) on the production server with release builds.
 7. Store release R1–R6.
