@@ -5,7 +5,7 @@ import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
 import { useSyncStore } from '../../features/sync/engine';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { Button, FieldLabel, TextField } from '../../components/ui';
+import { Button, FieldLabel, SECRET_INPUT, TextField } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
@@ -156,9 +156,7 @@ function Check({ words, error, onBack, onOk }: { words: string[]; error: string 
           <TextField
             value={answers[i]}
             onChangeText={(t) => setAnswers((a) => a.map((v, j) => (j === i ? t : v)))}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="off"
+            {...SECRET_INPUT}
           />
         </View>
       ))}

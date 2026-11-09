@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, TextInput, type TextInputProps } from 'react-native';
+import { View, Text, Pressable, TextInput, Platform, type TextInputProps } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 
@@ -49,6 +49,19 @@ export function Segmented<T extends string>({
 export function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text className="text-xs text-ink-muted font-medium mb-2 mt-4">{children}</Text>;
 }
+
+/**
+ * For secrets typed in the clear (recovery words): no suggestions, corrections or autofill, and the keyboard
+ * doesn't learn them. On Android only a password type stops Gboard's learning; `visible-password` keeps the text readable.
+ */
+export const SECRET_INPUT: TextInputProps = {
+  autoCapitalize: 'none',
+  autoCorrect: false,
+  spellCheck: false,
+  autoComplete: 'off',
+  importantForAutofill: 'no',
+  keyboardType: Platform.OS === 'android' ? 'visible-password' : 'default',
+};
 
 export function TextField(props: TextInputProps) {
   return (

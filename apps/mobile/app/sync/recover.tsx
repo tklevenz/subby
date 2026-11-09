@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { isValidRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { defaultDeviceName, hasLocalData, recoverFamily, removeDevices } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
-import { Button, FieldLabel, TextField } from '../../components/ui';
+import { Button, FieldLabel, SECRET_INPUT, TextField } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubLoader } from '../../components/brand/loaders';
 import { ScreenScroll } from '../../components/ScreenScroll';
@@ -56,9 +56,7 @@ export default function RecoverScreen() {
               value={words}
               onChangeText={setWords}
               multiline
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
+              {...SECRET_INPUT}
               style={{ minHeight: 120, textAlignVertical: 'top' }}
             />
             <Text className="text-ink-faint text-xs mt-2 ml-1">
