@@ -1,5 +1,5 @@
-import type { ComponentType } from 'react';
-import { Baby, BottleWater, ChildReaching, Flag, Moon, PenToSquare, Pills, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent } from './icons';
+import React, { type ComponentType } from 'react';
+import { Baby, BottleWater, ChildReaching, Droplet, Flag, Moon, PenToSquare, Pills, Poop, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent, type IconProps } from './icons';
 import { LOG_TYPES, type LogPayload, type LogType } from '@subby/shared';
 import type { SheetRequest } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
@@ -65,4 +65,21 @@ export function defaultPayload(type: LogType): LogPayload {
 
 export function activityLabel(kind: string): string {
   return kind === 'tummy_time' ? 'Tummy time' : kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+/**
+ * A diaper's own icon and color, as on the diaper sheet: wet is a blue drop, dirty a brown poop, both the two
+ * together. Anything else (dry) keeps the generic diaper icon.
+ */
+export function diaperLook(condition: Extract<LogPayload, { type: 'diaper' }>['condition']): { Icon: (p: IconProps) => React.ReactNode; color: string } {
+  switch (condition) {
+    case 'wet':
+      return { Icon: (p) => <Droplet {...p} color={colors.blueSoft} />, color: colors.blueSoft };
+    case 'dirty':
+      return { Icon: (p) => <Poop {...p} color={colors.brownStrong} />, color: colors.brownStrong };
+    case 'both':
+      return { Icon: (p) => <PoopDroplet {...p} color={colors.brownStrong} dropColor={colors.blueSoft} />, color: colors.amberStrong };
+    default:
+      return { Icon: (p) => <PoopDroplet {...p} color={colors.amberStrong} />, color: colors.amberStrong };
+  }
 }

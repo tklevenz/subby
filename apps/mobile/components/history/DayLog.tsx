@@ -15,7 +15,6 @@ import {
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime } from '../../store/timeHelpers';
 import { logDisplay } from '../logDisplay';
-import { TYPE_META } from '../logTypes';
 import { Moon } from '../icons';
 import { colors } from '../../theme/colors';
 import { EmptyState } from '../brand/EmptyState';
@@ -195,7 +194,7 @@ function EntryRow({ entry, day }: { entry: LogEntry; day: number }) {
         ) : (
           <View
             className="w-7 h-7 rounded-full bg-ground border items-center justify-center"
-            style={{ borderColor: TYPE_META[entry.logType].color }}
+            style={{ borderColor: display.color }}
           >
             <View style={{ transform: [{ scale: 0.8 }] }}>{display.icon}</View>
           </View>

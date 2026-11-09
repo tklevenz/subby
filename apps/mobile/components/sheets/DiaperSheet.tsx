@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Check, Droplet, Poop, PoopDroplet, type IconProps } from '../icons';
+import { Check, type IconProps } from '../icons';
+import { diaperLook } from '../logTypes';
 import type { DIAPER_COLORS, LogEntry } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSheetStore } from '../../store/useSheetStore';
@@ -16,13 +17,13 @@ type DiaperColor = (typeof DIAPER_COLORS)[number];
 
 // Wet is blue, dirty brown; both is neutral and lets its two colored icons say it.
 const KINDS: { condition: Condition; label: string; className: string; Icon: (p: IconProps) => React.ReactNode }[] = [
-  { condition: 'wet', label: 'Wet', className: 'bg-blue/20 border-blue/40', Icon: (p) => <Droplet {...p} color={colors.blueSoft} /> },
-  { condition: 'dirty', label: 'Dirty', className: 'bg-brown/30 border-brown-strong/50', Icon: (p) => <Poop {...p} color={colors.brownStrong} /> },
+  { condition: 'wet', label: 'Wet', className: 'bg-blue/20 border-blue/40', Icon: diaperLook('wet').Icon },
+  { condition: 'dirty', label: 'Dirty', className: 'bg-brown/30 border-brown-strong/50', Icon: diaperLook('dirty').Icon },
   {
     condition: 'both',
     label: 'Both',
     className: 'bg-raised border-line-strong',
-    Icon: (p) => <PoopDroplet {...p} color={colors.brownStrong} dropColor={colors.blueSoft} />,
+    Icon: diaperLook('both').Icon,
   },
 ];
 // Most common first.

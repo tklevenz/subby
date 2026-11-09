@@ -11,13 +11,15 @@ import {
   type LogEntry,
   type UnitSystem,
 } from '@subby/shared';
-import { TYPE_META, activityLabel } from './logTypes';
+import { TYPE_META, activityLabel, diaperLook } from './logTypes';
 import { ChildReaching } from './icons';
 
 export { activityLabel };
 
 export type LogDisplay = {
   icon: React.ReactNode;
+  /** The icon's color (History's ring around it). */
+  color: string;
   /** Tailwind border/background classes for the row. */
   bg: string;
   label: string;
@@ -31,9 +33,12 @@ export function logDisplay(
   formatTime: (ms: number) => string,
 ): LogDisplay {
   const p = entry.payload;
-  const { color, bg } = TYPE_META[p.type];
-  // Tummy time keeps its own icon (as on Home); other activities use the generic one.
-  const Icon = p.type === 'activity' && p.kind === 'tummy_time' ? ChildReaching : TYPE_META[p.type].Icon;
+  const { bg } = TYPE_META[p.type];
+  // Diapers look like the diaper sheet's buttons; tummy time keeps its own icon (as on Home), other activities the generic one.
+  const { Icon, color } =
+    p.type === 'diaper'
+      ? diaperLook(p.condition)
+      : { Icon: p.type === 'activity' && p.kind === 'tummy_time' ? ChildReaching : TYPE_META[p.type].Icon, color: TYPE_META[p.type].color };
   const running = entry.endedAt === null;
   const span = entry.endedAt !== null && entry.endedAt > entry.startedAt
     ? `${formatTime(entry.startedAt)} → ${formatTime(entry.endedAt)}`
@@ -95,5 +100,5 @@ export function logDisplay(
     }
   })();
 
-  return { icon: <Icon color={color} size={18} />, bg, ...text };
+  return { icon: <Icon color={color} size={18} />, color, bg, ...text };
 }
