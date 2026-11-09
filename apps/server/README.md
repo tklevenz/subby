@@ -6,15 +6,13 @@ It can't read names, entries or photos.
 
 License: AGPL-3.0 (the app and the shared package are MIT).
 
-The repository keeps the project's old name, `kindred-log`; everything else is called Subby.
-
 ## Self-hosting with Docker
 
 You need a Linux machine with Docker (Compose v2) and this repository on it.
 
 ```sh
-git clone <this repository> kindred-log    # or copy it over, e.g. with rsync
-cd kindred-log/apps/server
+git clone https://github.com/tklevenz/subby.git    # or copy it over, e.g. with rsync
+cd subby/apps/server
 cp docker.env.example .env
 # Set POSTGRES_PASSWORD in .env, e.g. to the output of: openssl rand -hex 24
 ```
