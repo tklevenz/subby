@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
@@ -12,16 +13,17 @@ import { toIsoDate } from '../store/timeHelpers';
 import { EmptyState } from '../components/brand/EmptyState';
 import { ScreenScroll } from '../components/ScreenScroll';
 
-const RANGES = [
-  { value: 'all', label: 'All time' },
-  { value: '30', label: '30 days' },
-  { value: '90', label: '90 days' },
-  { value: '365', label: '1 year' },
-] as const;
+const ranges = () =>
+  [
+    { value: 'all', label: t('export.allTime') },
+    { value: '30', label: t('export.days', { count: 30 }) },
+    { value: '90', label: t('export.days', { count: 90 }) },
+    { value: '365', label: t('export.year') },
+  ] as const;
 
 export default function ExportScreen() {
   const child = useActiveChild();
-  const [range, setRange] = useState<(typeof RANGES)[number]['value']>('all');
+  const [range, setRange] = useState<ReturnType<typeof ranges>[number]['value']>('all');
   const [counts, setCounts] = useState<Partial<Record<LogType, number>>>({});
   const [selected, setSelected] = useState<Set<LogType> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,18 +32,18 @@ export default function ExportScreen() {
     if (!child) return;
     countChildLogs(child.id).then((c) => {
       setCounts(c);
-      setSelected((s) => s ?? new Set(LOG_TYPES.filter((t) => c[t])));
+      setSelected((s) => s ?? new Set(LOG_TYPES.filter((type) => c[type])));
     });
   }, [child?.id]);
 
   if (!child) return null;
 
-  const types = LOG_TYPES.filter((t) => counts[t]);
-  const toggle = (t: LogType) =>
+  const types = LOG_TYPES.filter((type) => counts[type]);
+  const toggle = (type: LogType) =>
     setSelected((s) => {
       const next = new Set(s);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
       return next;
     });
 
@@ -54,15 +56,15 @@ export default function ExportScreen() {
       const from = range === 'all' ? undefined : Date.now() - Number(range) * 86_400_000;
       const logs = await fetchLogs(child.id, { from, types: [...selected] });
       if (logs.length === 0) {
-        Alert.alert('Nothing to export', 'No entries match this range and selection.');
+        Alert.alert(t('export.nothingTitle'), t('export.nothingText'));
         return;
       }
       if (file.exists) file.delete();
       file.create();
       file.write(logsToCsv(logs, child.name));
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: 'Export CSV' });
+      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: t('export.dialog') });
     } catch (e) {
-      Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('export.failed'), e instanceof Error ? e.message : String(e));
     } finally {
       // The share sheet has its own copy by now; don't leave plaintext data in the cache.
       try {
@@ -75,23 +77,23 @@ export default function ExportScreen() {
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <Lead>
-        One CSV with {child.name}'s entries, oldest first. Values are in ml, g, cm and °C; times are local.
+        {t('export.lead', { name: child.name })}
       </Lead>
 
-      <FieldLabel>Range</FieldLabel>
-      <Segmented options={RANGES} value={range} onChange={setRange} />
+      <FieldLabel>{t('export.range')}</FieldLabel>
+      <Segmented options={ranges()} value={range} onChange={setRange} />
 
-      <FieldLabel>Include</FieldLabel>
+      <FieldLabel>{t('export.include')}</FieldLabel>
       <View className="flex-row flex-wrap gap-2">
-        {types.map((t) => (
-          <Chip key={t} label={`${TYPE_META[t].label} · ${counts[t]!.toLocaleString()}`} selected={selected?.has(t) ?? false} onPress={() => toggle(t)} />
+        {types.map((type) => (
+          <Chip key={type} label={t('export.chip', { type: TYPE_META[type].label, count: counts[type]! })} selected={selected?.has(type) ?? false} onPress={() => toggle(type)} />
         ))}
       </View>
-      {types.length === 0 ? <EmptyState small text="Nothing logged yet." /> : null}
+      {types.length === 0 ? <EmptyState small text={t('export.empty')} /> : null}
 
-      <Button label={busy ? 'Exporting…' : 'Export CSV'} disabled={busy || !selected?.size} onPress={exportCsv} />
+      <Button label={t(busy ? 'export.exporting' : 'export.button')} disabled={busy || !selected?.size} onPress={exportCsv} />
       <Text className="text-ink-ghost text-xs mt-3 leading-5">
-        The file isn't encrypted. Whoever you share it with can read it.
+        {t('export.notEncrypted')}
       </Text>
     </ScreenScroll>
   );

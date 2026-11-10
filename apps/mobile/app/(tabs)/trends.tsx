@@ -1,3 +1,4 @@
+import { formatDate, formatNumber, t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -26,11 +27,10 @@ import { useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
 import { EmptyState } from '../../components/brand/EmptyState';
 
-const RANGES = [
-  { value: '7', label: '7 days' },
-  { value: '14', label: '14 days' },
-  { value: '30', label: '30 days' },
-] as const;
+const RANGE_VALUES = ['7', '14', '30'] as const;
+const ranges = () => RANGE_VALUES.map((value) => ({ value, label: t('trends.days', { count: Number(value) }) }));
+/** An average with one decimal, in the app's language ("1.5", "1,5"). */
+const one = (n: number) => formatNumber(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 const H = 3_600_000;
 
@@ -38,7 +38,7 @@ export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
   const now = useNow(60_000);
   const units = useSettingsStore((s) => s.units);
-  const [range, setRange] = useState<(typeof RANGES)[number]['value']>('7');
+  const [range, setRange] = useState<(typeof RANGE_VALUES)[number]>('7');
   const count = Number(range);
   const today = startOfDay(now);
   const days = useMemo(() => dayRange(today, count), [today, count]);
@@ -54,14 +54,14 @@ export default function TrendsScreen() {
 
   const bars = (values: (s: DayStats) => number[]): Bar[] =>
     (stats ?? []).map((s) => ({
-      label: count <= 7 ? new Date(s.day).toLocaleDateString([], { weekday: 'narrow' }) : String(new Date(s.day).getDate()),
+      label: count <= 7 ? formatDate(s.day, { weekday: 'narrow' }) : String(new Date(s.day).getDate()),
       values: values(s),
       dim: s.day === today,
     }));
 
   const nightBars = (value: (n: NonNullable<NonNullable<typeof nights>[number]>) => number): Bar[] =>
     days.map((day, i) => ({
-      label: count <= 7 ? new Date(day).toLocaleDateString([], { weekday: 'narrow' }) : String(new Date(day).getDate()),
+      label: count <= 7 ? formatDate(day, { weekday: 'narrow' }) : String(new Date(day).getDate()),
       values: [nights?.[i] ? value(nights[i]!) : 0],
     }));
 
@@ -70,23 +70,23 @@ export default function TrendsScreen() {
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">Trends</Text>
+      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">{t('tabs.trends')}</Text>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 }}>
-      <Segmented options={RANGES} value={range} onChange={setRange} />
+      <Segmented options={ranges()} value={range} onChange={setRange} />
 
       {stats && avg ? (
         avg.days === 0 && !stats[stats.length - 1].tracked ? (
-          <EmptyState small text="Nothing logged in this period yet." />
+          <EmptyState small text={t('trends.empty')} />
         ) : (
           <>
             {any('sleepMs') ? (
               <Section
-                title="Sleep"
+                title={t('trends.sleep')}
                 color={TYPE_META.sleep.color}
                 stats={[
-                  ['Per day', formatHoursMinutes(avg.sleepMs)],
-                  ['Night', formatHoursMinutes(avg.nightMs), colors.violetDeep],
-                  ['Naps', `${avg.naps.toFixed(1)} · ${formatHoursMinutes(avg.napMs)}`, colors.violetSoft],
+                  [t('trends.perDay'), formatHoursMinutes(avg.sleepMs)],
+                  [t('trends.night'), formatHoursMinutes(avg.nightMs), colors.violetDeep],
+                  [t('trends.naps'), t('trends.napsValue', { count: one(avg.naps), span: formatHoursMinutes(avg.napMs) }), colors.violetSoft],
                 ]}
               >
                 <BarChart
@@ -101,19 +101,19 @@ export default function TrendsScreen() {
             {/* Only once wakings are logged: without them, a night's longest stretch is just the night. */}
             {avgNight && nights?.some((n) => n && n.wakings > 0) ? (
               <Section
-                title="Nights"
+                title={t('trends.nights')}
                 color={colors.violetDeep}
                 stats={[
-                  ['Asleep', formatHoursMinutes(avgNight.asleepMs)],
-                  ['Wakings', avgNight.wakings.toFixed(1)],
-                  ['Longest stretch', formatHoursMinutes(avgNight.longestMs)],
-                  ['Awake', formatHoursMinutes(avgNight.awakeMs)],
+                  [t('trends.asleep'), formatHoursMinutes(avgNight.asleepMs)],
+                  [t('trends.wakings'), one(avgNight.wakings)],
+                  [t('trends.longest'), formatHoursMinutes(avgNight.longestMs)],
+                  [t('trends.awake'), formatHoursMinutes(avgNight.awakeMs)],
                 ]}
               >
-                <Text className="text-ink-muted text-xs mb-1">Wakings</Text>
+                <Text className="text-ink-muted text-xs mb-1">{t('trends.wakings')}</Text>
                 <BarChart bars={nightBars((n) => n.wakings)} colors={[colors.amberPale]} average={avgNight.wakings} />
                 <View className="mt-4">
-                  <Text className="text-ink-muted text-xs mb-1">Longest stretch</Text>
+                  <Text className="text-ink-muted text-xs mb-1">{t('trends.longest')}</Text>
                   <BarChart
                     bars={nightBars((n) => n.longestMs / H)}
                     colors={[colors.violetDeep]}
@@ -126,24 +126,24 @@ export default function TrendsScreen() {
 
             {any('feeds') || any('solids') ? (
               <Section
-                title="Feeding"
+                title={t('trends.feeding')}
                 color={TYPE_META.feed.color}
                 stats={[
-                  ['Feeds / day', avg.feeds.toFixed(1), any('solids') ? TYPE_META.feed.color : undefined],
-                  ...(any('bottleMl') ? [['Bottle / day', formatVolume(avg.bottleMl, units)] as Stat] : []),
-                  ...(any('breastSec') ? [['Breast / day', formatHoursMinutes(avg.breastSec * 1000)] as Stat] : []),
-                  ...(any('solids') ? [['Solids / day', avg.solids.toFixed(1), colors.amberPale] as Stat] : []),
+                  [t('trends.feedsPerDay'), one(avg.feeds), any('solids') ? TYPE_META.feed.color : undefined],
+                  ...(any('bottleMl') ? [[t('trends.bottlePerDay'), formatVolume(avg.bottleMl, units)] as Stat] : []),
+                  ...(any('breastSec') ? [[t('trends.breastPerDay'), formatHoursMinutes(avg.breastSec * 1000)] as Stat] : []),
+                  ...(any('solids') ? [[t('trends.solidsPerDay'), one(avg.solids), colors.amberPale] as Stat] : []),
                 ]}
               >
                 <BarChart bars={bars((s) => [s.feeds, s.solids])} colors={[TYPE_META.feed.color, colors.amberPale]} average={avg.feeds} />
                 {any('bottleMl') ? (
                   <View className="mt-4">
-                    <Text className="text-ink-muted text-xs mb-1">Bottle volume</Text>
+                    <Text className="text-ink-muted text-xs mb-1">{t('trends.bottleVolume')}</Text>
                     <BarChart
                       bars={bars((s) => [volume(s.bottleMl)])}
                       colors={[colors.cyanStrong]}
                       average={volume(avg.bottleMl)}
-                      formatValue={(v) => (units === 'metric' ? `${v} ml` : `${v} oz`)}
+                      formatValue={(v) => `${formatNumber(v)} ${units === 'metric' ? 'ml' : 'oz'}`}
                     />
                   </View>
                 ) : null}
@@ -152,12 +152,12 @@ export default function TrendsScreen() {
 
             {any('diapers') ? (
               <Section
-                title="Diapers"
+                title={t('trends.diapers')}
                 color={TYPE_META.diaper.color}
                 stats={[
-                  ['Per day', avg.diapers.toFixed(1)],
-                  ['Wet', avg.wet.toFixed(1)],
-                  ['Dirty', avg.dirty.toFixed(1)],
+                  [t('trends.perDay'), one(avg.diapers)],
+                  [t('trends.wet'), one(avg.wet)],
+                  [t('trends.dirty'), one(avg.dirty)],
                 ]}
               >
                 <BarChart bars={bars((s) => [s.diapers])} colors={[TYPE_META.diaper.color]} average={avg.diapers} />
@@ -165,24 +165,24 @@ export default function TrendsScreen() {
             ) : null}
 
             {any('pumpedMl') ? (
-              <Section title="Pumping" color={TYPE_META.pumping.color} stats={[['Per day', formatVolume(avg.pumpedMl, units)]]}>
+              <Section title={t('trends.pumping')} color={TYPE_META.pumping.color} stats={[[t('trends.perDay'), formatVolume(avg.pumpedMl, units)]]}>
                 <BarChart
                   bars={bars((s) => [volume(s.pumpedMl)])}
                   colors={[TYPE_META.pumping.color]}
                   average={volume(avg.pumpedMl)}
-                  formatValue={(v) => (units === 'metric' ? `${v} ml` : `${v} oz`)}
+                  formatValue={(v) => `${formatNumber(v)} ${units === 'metric' ? 'ml' : 'oz'}`}
                 />
               </Section>
             ) : null}
 
             {any('tummyMs') ? (
-              <Section title="Tummy time" color={TYPE_META.activity.color} stats={[['Per day', formatHoursMinutes(avg.tummyMs)]]}>
-                <BarChart bars={bars((s) => [s.tummyMs / 60_000])} colors={[TYPE_META.activity.color]} formatValue={(v) => `${v}m`} />
+              <Section title={t('trends.tummy')} color={TYPE_META.activity.color} stats={[[t('trends.perDay'), formatHoursMinutes(avg.tummyMs)]]}>
+                <BarChart bars={bars((s) => [s.tummyMs / 60_000])} colors={[TYPE_META.activity.color]} formatValue={(v) => t('time.m', { m: v })} />
               </Section>
             ) : null}
 
             <Text className="text-ink-ghost text-xs mt-3">
-              Averages over {avg.days} logged day{avg.days === 1 ? '' : 's'}, not counting today.
+              {t('trends.averages', { count: avg.days })}
             </Text>
           </>
         )
@@ -190,10 +190,10 @@ export default function TrendsScreen() {
 
       <View className="mt-6">
         <Card>
-          <Row label="Sleep schedule" value="Predicted" onPress={() => router.push('/schedule')} right={chevron} />
-          <Row label="Growth charts" value="WHO" onPress={() => router.push('/growth')} right={chevron} />
-          <Row label="Solids report" onPress={() => router.push('/solids')} right={chevron} />
-          <Row label="Export CSV" onPress={() => router.push('/export')} right={chevron} />
+          <Row label={t('trends.schedule')} value={t('trends.predicted')} onPress={() => router.push('/schedule')} right={chevron} />
+          <Row label={t('trends.growth')} value={t('trends.who')} onPress={() => router.push('/growth')} right={chevron} />
+          <Row label={t('trends.solids')} onPress={() => router.push('/solids')} right={chevron} />
+          <Row label={t('trends.export')} onPress={() => router.push('/export')} right={chevron} />
         </Card>
       </View>
       </ScrollView>

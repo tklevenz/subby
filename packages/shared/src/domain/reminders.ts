@@ -1,6 +1,8 @@
+import { t } from '../i18n';
 import type { LogType } from '../schemas/log.schema';
 import type { MedicationDue } from './recent';
 import type { SleepPrediction } from './prediction';
+import { formatHoursMinutes } from './time';
 
 /** Device-local reminder preferences (each caregiver chooses their own). */
 export type ReminderSettings = {
@@ -71,11 +73,7 @@ export type PlannedNotification = {
 
 export const REMINDER_ID_PREFIX = 'kl:';
 
-const hm = (min: number) => {
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
-  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
-};
+const hm = (min: number) => formatHoursMinutes(min * 60_000);
 
 /** Local notifications to have scheduled right now. Anything already due is left out. */
 export function planReminders(input: {
@@ -101,8 +99,8 @@ export function planReminders(input: {
       add({
         id: `${REMINDER_ID_PREFIX}feed:${c.id}`,
         at: c.lastFeedAt + settings.feed.intervalMin * 60_000,
-        title: `Feed ${c.name}?`,
-        body: `It's been ${hm(settings.feed.intervalMin)} since the last feed started (${formatTime(c.lastFeedAt)}).`,
+        title: t('reminder.feed.title', { name: c.name }),
+        body: t('reminder.feed.body', { span: hm(settings.feed.intervalMin), time: formatTime(c.lastFeedAt) }),
         childId: c.id,
       });
     }
@@ -111,8 +109,8 @@ export function planReminders(input: {
       add({
         id: `${REMINDER_ID_PREFIX}diaper:${c.id}`,
         at: c.lastDiaperAt + settings.diaper.intervalMin * 60_000,
-        title: `Check ${c.name}'s diaper?`,
-        body: `Last change ${hm(settings.diaper.intervalMin)} ago (${formatTime(c.lastDiaperAt)}).`,
+        title: t('reminder.diaper.title', { name: c.name }),
+        body: t('reminder.diaper.body', { span: hm(settings.diaper.intervalMin), time: formatTime(c.lastDiaperAt) }),
         childId: c.id,
       });
     }
@@ -122,24 +120,24 @@ export function planReminders(input: {
       add({
         id: `${REMINDER_ID_PREFIX}pumping:${c.id}`,
         at: c.lastPumpAt + settings.pumping.intervalMin * 60_000,
-        title: 'Time to pump?',
-        body: `It's been ${hm(settings.pumping.intervalMin)} since the last session started (${formatTime(c.lastPumpAt)}).`,
+        title: t('reminder.pumping.title'),
+        body: t('reminder.pumping.body', { span: hm(settings.pumping.intervalMin), time: formatTime(c.lastPumpAt) }),
         childId: c.id,
       });
     }
 
     if (settings.timers.enabled) {
-      for (const t of c.timers) {
-        const limit = t.type === 'sleep' ? (t.nap ? FORGOTTEN_TIMER_MIN.nap : FORGOTTEN_TIMER_MIN.night) : FORGOTTEN_TIMER_MIN[t.type];
+      for (const timer of c.timers) {
+        const limit = timer.type === 'sleep' ? (timer.nap ? FORGOTTEN_TIMER_MIN.nap : FORGOTTEN_TIMER_MIN.night) : FORGOTTEN_TIMER_MIN[timer.type];
         if (limit === undefined) continue;
-        const what = t.type === 'sleep' ? (t.nap ? 'nap' : 'sleep') : t.type === 'feed' ? 'feed' : t.type === 'pumping' ? 'pumping' : 'activity';
+        const what = timer.type === 'sleep' ? (timer.nap ? 'nap' : 'sleep') : timer.type === 'feed' ? 'feed' : timer.type === 'pumping' ? 'pumping' : 'activity';
         add({
-          id: `${REMINDER_ID_PREFIX}timer:${t.id}`,
-          at: t.startedAt + limit * 60_000,
-          title: `Is ${c.name}'s ${what} still going?`,
-          body: `The timer has been running for ${hm(limit)} (since ${formatTime(t.startedAt)}). Tap to stop or fix it.`,
+          id: `${REMINDER_ID_PREFIX}timer:${timer.id}`,
+          at: timer.startedAt + limit * 60_000,
+          title: t(`reminder.timer.title.${what}`, { name: c.name }),
+          body: t('reminder.timer.body', { span: hm(limit), time: formatTime(timer.startedAt) }),
           childId: c.id,
-          entryId: t.id,
+          entryId: timer.id,
         });
       }
     }
@@ -151,10 +149,8 @@ export function planReminders(input: {
         add({
           id: `${REMINDER_ID_PREFIX}med:${c.id}:${m.name.trim().toLowerCase()}`,
           at: m.dueAt,
-          title: `${m.name} due for ${c.name}`,
-          body: checkBeforeDosing
-            ? `Last dose at ${formatTime(m.lastAt)}. Open the app first to check nobody else has given it.`
-            : `Last dose at ${formatTime(m.lastAt)}.`,
+          title: t('reminder.med.title', { medication: m.name, name: c.name }),
+          body: t(checkBeforeDosing ? 'reminder.med.bodyCheck' : 'reminder.med.body', { time: formatTime(m.lastAt) }),
           childId: c.id,
         });
       }
@@ -162,12 +158,14 @@ export function planReminders(input: {
 
     if (settings.nap.enabled && c.nextSleep) {
       const s = c.nextSleep;
-      const what = s.kind === 'bedtime' ? 'Bedtime' : s.kind === 'sleep' ? 'Sleep window' : 'Nap window';
+      const what = t(s.kind === 'bedtime' ? 'reminder.sleep.bedtime' : s.kind === 'sleep' ? 'reminder.sleep.sleep' : 'reminder.sleep.nap');
       add({
         id: `${REMINDER_ID_PREFIX}nap:${c.id}`,
         at: s.earliest - settings.nap.leadMin * 60_000,
-        title: `${what} for ${c.name} ${settings.nap.leadMin ? `in ${settings.nap.leadMin} min` : 'now'}`,
-        body: `${what}: ${formatTime(s.earliest)}–${formatTime(s.latest)}.`,
+        title: settings.nap.leadMin
+          ? t('reminder.sleep.titleIn', { what, name: c.name, count: settings.nap.leadMin })
+          : t('reminder.sleep.titleNow', { what, name: c.name }),
+        body: t('reminder.sleep.body', { what, from: formatTime(s.earliest), to: formatTime(s.latest) }),
         childId: c.id,
       });
     }

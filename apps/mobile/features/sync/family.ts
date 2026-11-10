@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { uuidv7 } from 'uuidv7';
 import {
   RECOVERY_SIGNER,
@@ -37,7 +38,7 @@ export { defaultDeviceName } from './engine';
 
 const member = () => {
   const settings = syncSettings();
-  if (!settings) throw new Error('Sync is not set up on this phone');
+  if (!settings) throw new Error(t('sync.error.notSetUp'));
   return { settings, api: sessionFor(settings), me: { id: settings.deviceId, keys: deviceIdentity() } };
 };
 
@@ -211,9 +212,9 @@ export async function claimInvite(text: string): Promise<Join> {
       mac: claimMac(secret, deviceId, sign, box),
     }),
   });
-  if (res.status === 404) throw new Error('This code is not valid');
-  if (res.status === 409) throw new Error('This code was already used or has expired. Ask for a new one.');
-  if (!res.ok) throw new Error(`The server refused the code (${res.status})`);
+  if (res.status === 404) throw new Error(t('sync.error.codeInvalid'));
+  if (res.status === 409) throw new Error(t('sync.error.codeUsed'));
+  if (!res.ok) throw new Error(t('sync.error.codeRefused', { status: String(res.status) }));
   return { qr, deviceId, code: pairingCode(fromBase64(qr.p), sign, secret) };
 }
 
@@ -223,7 +224,7 @@ export async function joinStatus(join: Join): Promise<InviteResponse['status']> 
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ claimKey: toBase64(claimKeyOf(fromBase64(join.qr.k))) }),
   });
-  if (!res.ok) throw new Error('Lost the connection to the server');
+  if (!res.ok) throw new Error(t('sync.error.connectionLost'));
   return ((await res.json()) as InviteResponse).status;
 }
 
@@ -264,7 +265,7 @@ async function completeJoin(
   const { entries } = await session.log();
   const state = verifyDeviceLog(entries);
   check(state);
-  if (!state.members.has(deviceId)) throw new Error('This phone was not added to the family');
+  if (!state.members.has(deviceId)) throw new Error(t('sync.error.notAdded'));
 
   const identity = deviceIdentity();
   // Each key must match the family's commitment in the log; the server can't slip in its own. If the inviting

@@ -1,9 +1,11 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
   ACTIVITY_KINDS,
   DIAPER_COLORS,
   MEDICATION_UNITS,
+  medicationUnit,
   MILESTONES,
   cToF,
   cmToIn,
@@ -49,9 +51,13 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
 
   return (
     <View>
-      <FieldLabel>Method</FieldLabel>
+      <FieldLabel>{t('editor.method')}</FieldLabel>
       <Segmented
-        options={[{ value: 'breast', label: 'Breast' }, { value: 'bottle', label: 'Bottle' }, { value: 'solids', label: 'Solids' }]}
+        options={[
+          { value: 'breast', label: t('feed.breast') },
+          { value: 'bottle', label: t('feed.bottle') },
+          { value: 'solids', label: t('feed.solids') },
+        ]}
         value={p.method}
         onChange={(method) =>
           // Drop fields that belong to the other methods.
@@ -65,25 +71,29 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
       />
       {p.method === 'bottle' ? (
         <>
-          <FieldLabel>Milk</FieldLabel>
+          <FieldLabel>{t('feedSheet.milk')}</FieldLabel>
           <Segmented
-            options={[{ value: 'breast_milk', label: 'Breast milk' }, { value: 'formula', label: 'Formula' }, { value: 'fortified', label: 'Fortified' }]}
+            options={[
+              { value: 'breast_milk', label: t('feed.breastMilk') },
+              { value: 'formula', label: t('feed.formula') },
+              { value: 'fortified', label: t('feedSheet.fortified') },
+            ]}
             value={p.milkType}
             onChange={(milkType) => onChange({ milkType })}
           />
-          <FieldLabel>Amount</FieldLabel>
+          <FieldLabel>{t('feedSheet.amount')}</FieldLabel>
           <VolumeField value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
         </>
       ) : null}
       {p.method === 'breast' ? (
         <>
-          <FieldLabel>Left (minutes)</FieldLabel>
-          <NumberField value={toMin(p.leftSeconds)} onChange={(v) => onChange({ leftSeconds: toSec(v) })} suffix="min" />
-          <FieldLabel>Right (minutes)</FieldLabel>
-          <NumberField value={toMin(p.rightSeconds)} onChange={(v) => onChange({ rightSeconds: toSec(v) })} suffix="min" />
-          <FieldLabel>Finished on</FieldLabel>
+          <FieldLabel>{t('editor.leftMinutes')}</FieldLabel>
+          <NumberField value={toMin(p.leftSeconds)} onChange={(v) => onChange({ leftSeconds: toSec(v) })} suffix={t('editor.min')} />
+          <FieldLabel>{t('editor.rightMinutes')}</FieldLabel>
+          <NumberField value={toMin(p.rightSeconds)} onChange={(v) => onChange({ rightSeconds: toSec(v) })} suffix={t('editor.min')} />
+          <FieldLabel>{t('editor.finishedOn')}</FieldLabel>
           <Segmented
-            options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]}
+            options={[{ value: 'left', label: t('editor.left') }, { value: 'right', label: t('editor.right') }]}
             value={p.lastSide}
             onChange={(lastSide) => onChange({ lastSide })}
           />
@@ -92,9 +102,9 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
       {p.method === 'solids' ? (
         <>
           <FoodPicker value={p} onChange={onChange} />
-          <FieldLabel>Fed by</FieldLabel>
+          <FieldLabel>{t('editor.fedBy')}</FieldLabel>
           <Segmented
-            options={[{ value: 'parent', label: 'Parent' }, { value: 'self', label: 'Self-fed' }]}
+            options={[{ value: 'parent', label: t('editor.parent') }, { value: 'self', label: t('editor.selfFed') }]}
             value={p.feeder}
             onChange={(feeder) => onChange({ feeder })}
           />
@@ -112,15 +122,20 @@ export const COLOR_SWATCH: Record<(typeof DIAPER_COLORS)[number], string> = {
 function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
   return (
     <View>
-      <FieldLabel>Condition</FieldLabel>
+      <FieldLabel>{t('editor.condition')}</FieldLabel>
       <Segmented
-        options={[{ value: 'wet', label: 'Wet' }, { value: 'dirty', label: 'Dirty' }, { value: 'both', label: 'Both' }, { value: 'dry', label: 'Dry' }]}
+        options={[
+          { value: 'wet', label: t('diaper.wet') },
+          { value: 'dirty', label: t('diaper.dirty') },
+          { value: 'both', label: t('diaper.both') },
+          { value: 'dry', label: t('diaper.dry') },
+        ]}
         value={p.condition}
         onChange={(condition) => onChange({ condition })}
       />
       {p.condition === 'dirty' || p.condition === 'both' ? (
         <>
-          <FieldLabel>Color</FieldLabel>
+          <FieldLabel>{t('editor.color')}</FieldLabel>
           <View className="flex-row flex-wrap gap-3">
             {DIAPER_COLORS.map((c) => (
               <Pressable
@@ -129,7 +144,7 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
                 className={`items-center rounded-xl p-1.5 border ${p.color === c ? 'border-violet-strong' : 'border-transparent'}`}
               >
                 <View style={{ backgroundColor: COLOR_SWATCH[c] }} className="w-8 h-8 rounded-full border border-line-heavy" />
-                <Text className="text-ink-muted text-[10px] mt-1">{c}</Text>
+                <Text className="text-ink-muted text-[10px] mt-1">{t(`diaperColor.${c}`)}</Text>
               </Pressable>
             ))}
           </View>
@@ -139,16 +154,17 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
   );
 }
 
-const SLEEP_KINDS = [
-  { value: 'nap', label: 'Nap' },
-  { value: 'night', label: 'Night sleep' },
-] as const;
+const sleepKinds = () =>
+  [
+    { value: 'nap', label: t('row.nap') },
+    { value: 'night', label: t('row.nightSleep') },
+  ] as const;
 
 function SleepEditor({ payload: p, onChange }: EditorProps<'sleep'>) {
   return (
     <View>
-      <FieldLabel>Kind</FieldLabel>
-      <Segmented options={SLEEP_KINDS} value={p.nap !== false ? 'nap' : 'night'} onChange={(kind) => onChange({ nap: kind === 'nap' })} />
+      <FieldLabel>{t('editor.kind')}</FieldLabel>
+      <Segmented options={sleepKinds()} value={p.nap !== false ? 'nap' : 'night'} onChange={(kind) => onChange({ nap: kind === 'nap' })} />
     </View>
   );
 }
@@ -162,11 +178,11 @@ function PumpingEditor({ payload: p, onChange }: EditorProps<'pumping'>) {
   };
   return (
     <View>
-      <FieldLabel>Left</FieldLabel>
+      <FieldLabel>{t('editor.left')}</FieldLabel>
       <VolumeField value={p.leftMl} onChange={(v) => setSide('leftMl', v)} />
-      <FieldLabel>Right</FieldLabel>
+      <FieldLabel>{t('editor.right')}</FieldLabel>
       <VolumeField value={p.rightMl} onChange={(v) => setSide('rightMl', v)} />
-      <FieldLabel>Total</FieldLabel>
+      <FieldLabel>{t('editor.total')}</FieldLabel>
       <VolumeField value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
     </View>
   );
@@ -176,19 +192,19 @@ function GrowthEditor({ payload: p, onChange }: EditorProps<'growth'>) {
   const metric = useSettingsStore((s) => s.units) === 'metric';
   return (
     <View>
-      <FieldLabel>Weight</FieldLabel>
+      <FieldLabel>{t('editor.weight')}</FieldLabel>
       {metric ? (
         <UnitNumberField value={p.weightG} onChange={(weightG) => onChange({ weightG })} toDisplay={(g) => g / 1000} fromDisplay={(kg) => kg * 1000} suffix="kg" decimals={3} />
       ) : (
         <UnitNumberField value={p.weightG} onChange={(weightG) => onChange({ weightG })} toDisplay={gToLb} fromDisplay={lbToG} suffix="lb" decimals={2} />
       )}
-      <FieldLabel>Height / length</FieldLabel>
+      <FieldLabel>{t('editor.height')}</FieldLabel>
       {metric ? (
         <UnitNumberField value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} toDisplay={id} fromDisplay={id} suffix="cm" />
       ) : (
         <UnitNumberField value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} toDisplay={cmToIn} fromDisplay={inToCm} suffix="in" />
       )}
-      <FieldLabel>Head circumference</FieldLabel>
+      <FieldLabel>{t('editor.head')}</FieldLabel>
       {metric ? (
         <UnitNumberField value={p.headCm} onChange={(headCm) => onChange({ headCm })} toDisplay={id} fromDisplay={id} suffix="cm" />
       ) : (
@@ -203,7 +219,7 @@ function TemperatureEditor({ payload: p, onChange }: EditorProps<'temperature'>)
   const set = (celsius?: number) => celsius !== undefined && onChange({ celsius });
   return (
     <View>
-      <FieldLabel>Temperature</FieldLabel>
+      <FieldLabel>{t('editor.temperature')}</FieldLabel>
       {metric ? (
         <UnitNumberField value={p.celsius} onChange={set} toDisplay={id} fromDisplay={id} suffix="°C" />
       ) : (
@@ -213,10 +229,9 @@ function TemperatureEditor({ payload: p, onChange }: EditorProps<'temperature'>)
   );
 }
 
-const INTERVALS = [
-  { value: '0', label: 'None' }, { value: '240', label: '4 h' }, { value: '360', label: '6 h' },
-  { value: '480', label: '8 h' }, { value: '720', label: '12 h' }, { value: '1440', label: '24 h' },
-] as const;
+const INTERVAL_VALUES = ['0', '240', '360', '480', '720', '1440'] as const;
+const intervals = () =>
+  INTERVAL_VALUES.map((value) => ({ value, label: value === '0' ? t('editor.none') : t('editor.hours', { count: Number(value) / 60 }) }));
 
 function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
   const logs = useLogStore((s) => s.logs);
@@ -225,12 +240,12 @@ function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
     <View>
       {recent.length ? (
         <>
-          <FieldLabel>Recent</FieldLabel>
+          <FieldLabel>{t('editor.recent')}</FieldLabel>
           <View className="flex-row flex-wrap gap-2">
             {recent.map((m) => (
               <Chip
                 key={m.name}
-                label={m.dose !== undefined ? `${m.name} · ${formatDose(m.dose, m.unit)}` : m.name}
+                label={m.dose !== undefined ? t('summary.pair', { a: m.name, b: formatDose(m.dose, m.unit) }) : m.name}
                 selected={p.name.toLowerCase() === m.name.toLowerCase()}
                 onPress={() => onChange({ name: m.name, dose: m.dose, unit: m.unit, nextDoseIntervalMin: m.nextDoseIntervalMin })}
               />
@@ -238,17 +253,17 @@ function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
           </View>
         </>
       ) : null}
-      <FieldLabel>Name</FieldLabel>
-      <TextField value={p.name} onChangeText={(name) => onChange({ name })} placeholder="e.g. Vitamin D" />
-      <FieldLabel>Dose</FieldLabel>
+      <FieldLabel>{t('editor.name')}</FieldLabel>
+      <TextField value={p.name} onChangeText={(name) => onChange({ name })} placeholder={t('editor.medicationPlaceholder')} />
+      <FieldLabel>{t('editor.dose')}</FieldLabel>
       <NumberField value={p.dose} onChange={(dose) => onChange({ dose })} />
       <View className="mt-2">
-        <Segmented options={MEDICATION_UNITS.map((u) => ({ value: u, label: u }))} value={p.unit} onChange={(unit) => onChange({ unit })} />
+        <Segmented options={MEDICATION_UNITS.map((u) => ({ value: u, label: medicationUnit(u, p.dose ?? 2) }))} value={p.unit} onChange={(unit) => onChange({ unit })} />
       </View>
-      <FieldLabel>Next dose after</FieldLabel>
+      <FieldLabel>{t('editor.nextDose')}</FieldLabel>
       <Segmented
-        options={INTERVALS}
-        value={String(p.nextDoseIntervalMin ?? 0) as (typeof INTERVALS)[number]['value']}
+        options={intervals()}
+        value={String(p.nextDoseIntervalMin ?? 0) as (typeof INTERVAL_VALUES)[number]}
         onChange={(v) => onChange({ nextDoseIntervalMin: Number(v) || undefined })}
       />
     </View>
@@ -258,20 +273,29 @@ function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
 function PottyEditor({ payload: p, onChange }: EditorProps<'potty'>) {
   return (
     <View>
-      <FieldLabel>Result</FieldLabel>
+      <FieldLabel>{t('editor.result')}</FieldLabel>
       <Segmented
-        options={[{ value: 'pee', label: 'Pee' }, { value: 'poo', label: 'Poo' }, { value: 'both', label: 'Both' }, { value: 'none', label: 'Nothing' }]}
+        options={[
+          { value: 'pee', label: t('editor.pee') },
+          { value: 'poo', label: t('editor.poo') },
+          { value: 'both', label: t('editor.both') },
+          { value: 'none', label: t('editor.nothing') },
+        ]}
         value={p.result}
         onChange={(result) => onChange({ result })}
       />
-      <FieldLabel>Where</FieldLabel>
+      <FieldLabel>{t('editor.where')}</FieldLabel>
       <Segmented
-        options={[{ value: 'potty', label: 'Potty' }, { value: 'toilet', label: 'Toilet' }, { value: 'other', label: 'Other' }]}
+        options={[
+          { value: 'potty', label: t('editor.potty') },
+          { value: 'toilet', label: t('editor.toilet') },
+          { value: 'other', label: t('editor.other') },
+        ]}
         value={p.location}
         onChange={(location) => onChange({ location })}
       />
       <View className="flex-row items-center justify-between mt-4">
-        <Text className="text-ink-soft text-base">Accident</Text>
+        <Text className="text-ink-soft text-base">{t('editor.accident')}</Text>
         <Toggle value={p.accident ?? false} onValueChange={(accident) => onChange({ accident: accident || undefined })} />
       </View>
     </View>
@@ -281,10 +305,10 @@ function PottyEditor({ payload: p, onChange }: EditorProps<'potty'>) {
 function ActivityEditor({ payload: p, onChange }: EditorProps<'activity'>) {
   return (
     <View>
-      <FieldLabel>Activity</FieldLabel>
+      <FieldLabel>{t('editor.activity')}</FieldLabel>
       <Segmented options={ACTIVITY_KINDS.map((k) => ({ value: k, label: activityLabel(k) }))} value={p.kind} onChange={(kind) => onChange({ kind })} />
-      <FieldLabel>Highlight (optional)</FieldLabel>
-      <TextField value={p.milestone ?? ''} onChangeText={(m) => onChange({ milestone: m || undefined })} placeholder="e.g. lifted head for 30 s" />
+      <FieldLabel>{t('editor.highlight')}</FieldLabel>
+      <TextField value={p.milestone ?? ''} onChangeText={(m) => onChange({ milestone: m || undefined })} placeholder={t('editor.highlightPlaceholder')} />
     </View>
   );
 }
@@ -297,7 +321,7 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
   const achieved = new Set(logs.flatMap((l) => (l.payload.type === 'milestone' && l.payload.key ? [l.payload.key] : [])));
   return (
     <View>
-      <FieldLabel>Milestone</FieldLabel>
+      <FieldLabel>{t('editor.milestone')}</FieldLabel>
       <View className="gap-1.5">
         {MILESTONES.map((m) => {
           const selected = p.key === m.key;
@@ -314,11 +338,11 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
           );
         })}
       </View>
-      <FieldLabel>Or something else</FieldLabel>
+      <FieldLabel>{t('editor.somethingElse')}</FieldLabel>
       <TextField
         value={p.custom ?? ''}
         onChangeText={(custom) => onChange({ custom: custom || undefined, key: custom ? undefined : p.key })}
-        placeholder="e.g. First swim"
+        placeholder={t('editor.somethingElsePlaceholder')}
       />
     </View>
   );
@@ -327,15 +351,15 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
 function NoteEditor({ payload: p, onChange }: EditorProps<'note'>) {
   return (
     <View>
-      <FieldLabel>Note</FieldLabel>
+      <FieldLabel>{t('editor.note')}</FieldLabel>
       <TextField
         value={p.text}
         onChangeText={(text) => onChange({ text })}
-        placeholder="What happened?"
+        placeholder={t('editor.notePlaceholder')}
         multiline
         style={{ minHeight: 96, textAlignVertical: 'top' }}
       />
-      <FieldLabel>Photo</FieldLabel>
+      <FieldLabel>{t('editor.photo')}</FieldLabel>
       <PhotoField value={p.photoUri} onChange={(photoUri) => onChange({ photoUri })} />
     </View>
   );

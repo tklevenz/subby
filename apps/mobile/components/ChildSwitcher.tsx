@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { View, Text, Pressable, Modal } from 'react-native';
 import { router } from 'expo-router';
@@ -31,12 +32,12 @@ export default function ChildSwitcher() {
             onPress={() => router.push(`/child/${active.id}`)}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={`${active.name}'s profile`}
+            accessibilityLabel={t('switcher.profileOf', { name: active.name })}
           >
             <ChildAvatar child={active} size={40} />
           </Pressable>
         ) : null}
-        <Pressable onPress={() => setOpen(true)} hitSlop={8} className="ml-3" accessibilityRole="button" accessibilityLabel="Switch child">
+        <Pressable onPress={() => setOpen(true)} hitSlop={8} className="ml-3" accessibilityRole="button" accessibilityLabel={t('switcher.switch')}>
           <View className="flex-row items-center">
             <Text className="text-xl font-bold text-ink">{active?.name ?? 'Subby'}</Text>
             <AngleDown color={colors.inkFaint} size={16} style={{ marginLeft: 4 }} />
@@ -67,7 +68,7 @@ export default function ChildSwitcher() {
                   hitSlop={6}
                   className="flex-row items-center px-4 py-3"
                 >
-                  <Text className="text-ink-muted text-xs mr-0.5">Profile</Text>
+                  <Text className="text-ink-muted text-xs mr-0.5">{t('switcher.profile')}</Text>
                   <AngleRight color={colors.inkFaint} size={14} />
                 </Pressable>
               </View>
@@ -80,7 +81,7 @@ export default function ChildSwitcher() {
               className="flex-row items-center px-4 py-3.5"
             >
               <Plus color={colors.inkMuted} size={18} />
-              <Text className="flex-1 text-ink-soft text-base ml-2">Add child</Text>
+              <Text className="flex-1 text-ink-soft text-base ml-2">{t('switcher.add')}</Text>
             </Pressable>
           </View>
         </Pressable>

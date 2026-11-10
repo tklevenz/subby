@@ -98,7 +98,7 @@ export default function GrowthChart({
             </G>
           ))}
           {curves.map((c) => {
-            const d = c.points.map((p, i) => `${i ? 'L' : 'M'}${x(p.months).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
+            const d = c.points.map((p, i) => `${i ? 'L' : 'M'}${x(p.months).toFixed(1)},${y(p.value).toFixed(1)}`).join('');  // i18n-ignore
             const last = c.points[c.points.length - 1];
             const median = c.percentile === 50;
             return (

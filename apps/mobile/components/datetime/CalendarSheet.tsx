@@ -1,3 +1,4 @@
+import { formatDate, t } from '@subby/shared/i18n';
 import React, { useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +8,8 @@ import { AngleLeft, AngleRight } from '../icons';
 import { colors } from '../../theme/colors';
 import { monthGrid } from './parts';
 
-const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0].map((d) => new Date(2026, 1, d + 1).toLocaleDateString([], { weekday: 'narrow' }));
+// Monday first; 2026-02-02 was a Monday. A function, so it follows the app's language.
+const weekdays = () => [0, 1, 2, 3, 4, 5, 6].map((d) => formatDate(new Date(2026, 1, 2 + d).getTime(), { weekday: 'narrow' }));
 
 /**
  * Pick a day from a month calendar (Monday first). Days with entries get a dot (whether anything was logged,
@@ -35,7 +37,7 @@ export default function CalendarSheet({
   const shift = (by: number) =>
     setMonth((m) => {
       const d = new Date(m.year, m.month + by, 1);
-      return d.getTime() > today ? m : { year: d.getFullYear(), month: d.getMonth() };
+      return d.getTime() > today ? m : { year: d.getFullYear(), month: d.getMonth() }; // i18n-ignore
     });
 
   const weeks = useMemo(() => monthGrid(month.year, month.month), [month]);
@@ -63,12 +65,12 @@ export default function CalendarSheet({
       <Pressable onPress={onClose} className="absolute inset-0 bg-scrim/50" />
       <View className="bg-surface border-t border-line-strong/50 rounded-t-2xl px-4 pt-4" style={{ paddingBottom: insets.bottom + 12 }}>
         <View className="flex-row items-center justify-between">
-          <MonthButton label="Previous month" onPress={() => shift(-1)} icon={<AngleLeft color={colors.inkSoft} size={16} />} />
+          <MonthButton label={t('picker.prevMonth')} onPress={() => shift(-1)} icon={<AngleLeft color={colors.inkSoft} size={16} />} />
           <Text className="text-ink text-lg font-bold">
-            {new Date(first).toLocaleDateString([], { month: 'long', year: 'numeric' })}
+            {formatDate(first, { month: 'long', year: 'numeric' })}
           </Text>
           <MonthButton
-            label="Next month"
+            label={t('picker.nextMonth')}
             onPress={() => shift(1)}
             disabled={atLatest}
             icon={<AngleRight color={atLatest ? colors.lineStrong : colors.inkSoft} size={16} />}
@@ -76,7 +78,7 @@ export default function CalendarSheet({
         </View>
 
         <View className="flex-row mt-4">
-          {WEEKDAYS.map((d, i) => (
+          {weekdays().map((d, i) => (
             <Text key={i} className="flex-1 text-center text-ink-faint text-xs font-semibold">
               {d}
             </Text>
@@ -97,7 +99,7 @@ export default function CalendarSheet({
                     disabled={future}
                     onPress={() => onPick(day)}
                     accessibilityRole="button"
-                    accessibilityLabel={new Date(day).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
+                    accessibilityLabel={formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}
                     accessibilityState={{ selected: isSelected, disabled: future }}
                     className="flex-1 h-12 items-center justify-center"
                   >
@@ -124,11 +126,11 @@ export default function CalendarSheet({
 
         <View className="flex-row justify-between mt-2">
           <Pressable onPress={onClose} className="py-3 px-2">
-            <Text className="text-ink text-base font-semibold">Cancel</Text>
+            <Text className="text-ink text-base font-semibold">{t('common.cancel')}</Text>
           </Pressable>
           {selected !== today ? (
             <Pressable onPress={() => onPick(today)} className="py-3 px-2">
-              <Text className="text-violet-soft text-base font-semibold">Today</Text>
+              <Text className="text-violet-soft text-base font-semibold">{t('day.today')}</Text>
             </Pressable>
           ) : null}
         </View>

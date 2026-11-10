@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { Alert, Text, View } from 'react-native';
@@ -38,7 +39,7 @@ export default function EntryScreen() {
   }, [id]);
 
   if (entry === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
-  if (!entry) return <Stack.Screen options={{ title: 'Entry not found' }} />;
+  if (!entry) return <Stack.Screen options={{ title: t('entry.notFound') }} />;
   // A finished night sleep opens as its whole night (with its wakings); anything else as itself.
   return isSleepEntry(entry) && entry.endedAt !== null && !isNap(entry) ? <NightLoader key={entry.id} entry={entry} /> : <EntryForm key={entry.id} entry={entry} />;
 }
@@ -83,10 +84,10 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   });
 
   const confirmDelete = () =>
-    Alert.alert('Delete Log', 'Are you sure you want to delete this log entry?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('entry.deleteTitle'), t('entry.deleteText'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await softDeleteLog(entry.id);
@@ -101,7 +102,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title }} />
 
-      <FieldLabel>{timed ? 'Started' : 'Time'}</FieldLabel>
+      <FieldLabel>{t(timed ? 'entry.started' : 'logSheet.time')}</FieldLabel>
       <DateTimeField
         value={startedAt}
         onChange={(t) => {
@@ -109,22 +110,22 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           if (instant) setEndedAt(t);
         }}
         maximumDate={new Date()}
-        title="Start time"
+        title={t('logSheet.startTime')}
       />
 
       {timed ? (
         <>
-          <FieldLabel>Ended</FieldLabel>
+          <FieldLabel>{t('entry.ended')}</FieldLabel>
           {running ? (
             <View className="flex-row items-center gap-3">
               {/* mt-4 matches the Button's own top margin, so both sit on one line. */}
-              <Text className="text-violet-soft mt-4">Still running</Text>
-              <Button label="Stop now" variant="ghost" onPress={() => setEndedAt(Date.now())} />
+              <Text className="text-violet-soft mt-4">{t('entry.stillRunning')}</Text>
+              <Button label={t('entry.stopNow')} variant="ghost" onPress={() => setEndedAt(Date.now())} />
             </View>
           ) : (
-            <DateTimeField value={endedAt!} onChange={setEndedAt} maximumDate={new Date()} title="End time" />
+            <DateTimeField value={endedAt!} onChange={setEndedAt} maximumDate={new Date()} title={t('logSheet.endTime')} />
           )}
-          {invalid ? <ErrorText className="mt-2">End must be after start.</ErrorText> : null}
+          {invalid ? <ErrorText className="mt-2">{t('logSheet.endAfterStart')}</ErrorText> : null}
           {!invalid && overlap ? <ErrorText className="mt-2">{overlap}</ErrorText> : null}
         </>
       ) : null}
@@ -133,8 +134,8 @@ function EntryForm({ entry }: { entry: LogEntry }) {
 
       <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={!changed || invalid || overlap !== null || !isCompletePayload(payload)} />
-      <Button label="Delete" variant="dangerQuiet" onPress={confirmDelete} />
+      <Button label={t('common.save')} onPress={save} disabled={!changed || invalid || overlap !== null || !isCompletePayload(payload)} />
+      <Button label={t('common.delete')} variant="dangerQuiet" onPress={confirmDelete} />
     </ScreenScroll>
   );
 }

@@ -1,3 +1,4 @@
+import { formatDate, t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,12 +28,12 @@ export default function HistoryScreen() {
   // Under "Today" or "Yesterday", the date itself.
   const subtitle =
     anchor >= addDays(today, -1)
-      ? new Date(anchor).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })
+      ? formatDate(anchor, { weekday: 'long', month: 'short', day: 'numeric' })
       : null;
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">History</Text>
+      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">{t('tabs.history')}</Text>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
         <View className="flex-row items-center justify-between my-2">
           <NavButton icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -1))} />
@@ -42,7 +43,7 @@ export default function HistoryScreen() {
               onPress={() => setPicking(true)}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`${title}, pick a day`}
+              accessibilityLabel={t('history.pickDay', { day: title })}
               className="flex-row items-center"
             >
               <Text className="text-ink font-semibold text-base">{title}</Text>
@@ -52,7 +53,7 @@ export default function HistoryScreen() {
               subtitle ? <Text className="text-ink-muted text-xs">{subtitle}</Text> : null
             ) : (
               <Pressable onPress={() => setAnchor(today)} hitSlop={8}>
-                <Text className="text-violet-soft text-xs font-semibold">Back to today</Text>
+                <Text className="text-violet-soft text-xs font-semibold">{t('history.backToToday')}</Text>
               </Pressable>
             )}
           </View>

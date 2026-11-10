@@ -1,3 +1,4 @@
+import { formatNumber, getLocale, t } from '../i18n';
 import type { Child } from '../schemas/child.schema';
 import type { LogEntry } from '../schemas/log.schema';
 import { WHO_LMS, type LmsRow } from './who/lms';
@@ -60,14 +61,19 @@ export function growthPercentile(
   return lms ? normalCdf(zScore(value, lms)) * 100 : null;
 }
 
-export function formatPercentile(p: number): string {
-  if (p < 0.1) return '<0.1st';
-  if (p > 99.9) return '>99.9th';
-  const n = p < 1 || p > 99 ? Math.round(p * 10) / 10 : Math.round(p);
+/** "50th" in English; elsewhere the number, which the catalog's `percentile.*` wraps in its ordinal. */
+function ordinal(n: number): string {
+  if (getLocale() !== 'en') return formatNumber(n);
   const lastDigit = Math.floor(n) % 10;
   const teen = Math.floor(n) % 100 >= 11 && Math.floor(n) % 100 <= 13;
   const suffix = !Number.isInteger(n) || teen ? 'th' : ['th', 'st', 'nd', 'rd'][lastDigit] ?? 'th';
   return `${n}${suffix}`;
+}
+
+export function formatPercentile(p: number): string {
+  if (p < 0.1) return t('percentile.below', { n: ordinal(0.1) });
+  if (p > 99.9) return t('percentile.above', { n: ordinal(99.9) });
+  return t('percentile.short', { n: ordinal(p < 1 || p > 99 ? Math.round(p * 10) / 10 : Math.round(p)) });
 }
 
 /** Percentiles drawn on growth charts, as in the WHO/CDC charts. */

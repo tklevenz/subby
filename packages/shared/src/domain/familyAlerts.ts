@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { LogEntry } from '../schemas/log.schema';
 import { groupNights, isSleepEntry, nightOf } from './nights';
 import { isNightWaking } from './prediction';
@@ -72,8 +73,8 @@ export function familyAlerts(input: {
       out.push({
         kind: 'show',
         id,
-        title: nap ? `${name} fell asleep` : `${name} is down for the night`,
-        body: `${nap ? 'Nap' : 'Asleep'} since ${formatTime(after.startedAt)} · logged on ${by}`,
+        title: t(nap ? 'family.fellAsleep' : 'family.downForNight', { name }),
+        body: t(nap ? 'family.napSince' : 'family.asleepSince', { time: formatTime(after.startedAt), phone: by }),
         childId: after.childId,
       });
     } else if (was && !isRunning(after)) {
@@ -88,8 +89,8 @@ export function familyAlerts(input: {
         out.push({
           kind: 'show',
           id: nightId,
-          title: `${name} woke up`,
-          body: `${nap ? 'Napped' : 'Slept'} ${formatHoursMinutes(night?.asleepMs ?? after.endedAt! - after.startedAt)} · logged on ${by}`,
+          title: t('family.wokeUp', { name }),
+          body: t(nap ? 'family.napped' : 'family.slept', { span: formatHoursMinutes(night?.asleepMs ?? after.endedAt! - after.startedAt), phone: by }),
           childId: after.childId,
         });
       } else out.push({ kind: 'dismiss', id: nightId });

@@ -104,7 +104,7 @@ const TOO_LARGE = 'tooLarge';
  */
 async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null | typeof TOO_LARGE> {
   const size = photoSize(uri);
-  if (size !== null && encryptedFileSize(size) > MAX_BLOB_BYTES) {
+  if (size !== null && encryptedFileSize(size) > MAX_BLOB_BYTES) { // i18n-ignore
     console.warn('[sync] a photo is too large to sync; it stays on this phone');
     return TOO_LARGE;
   }

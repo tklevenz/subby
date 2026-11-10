@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import {
@@ -47,21 +48,21 @@ import {
  */
 export async function moveToServer(serverInput: string, onStep: (label: string) => void = () => {}) {
   const old = syncSettings();
-  if (!old) throw new Error('Sync is not set up on this phone');
+  if (!old) throw new Error(t('sync.error.notSetUp'));
   const server = normalizeServerUrl(serverInput);
-  if (server === normalizeServerUrl(old.server)) throw new Error('Your family already syncs through this server');
+  if (server === normalizeServerUrl(old.server)) throw new Error(t('sync.error.sameServer'));
   await checkServer(server);
 
   // Everything of the old family is here first: this phone's copy is what moves.
-  onStep('Syncing with the current server');
+  onStep(t('sync.move.syncing'));
   await syncNow();
-  if (useSyncStore.getState().phase === 'error') throw new Error(useSyncStore.getState().error ?? "Couldn't sync with the current server");
+  if (useSyncStore.getState().phase === 'error') throw new Error(useSyncStore.getState().error ?? t('sync.error.currentServer'));
   const settings = syncSettings()!;
   const oldApi = sessionFor(settings);
   const { entries: oldEntries, state: oldState } = await refreshMembers(oldApi, settings);
   const { keys: oldKeys, epoch: oldEpoch } = await refreshKeys(oldApi, oldState);
 
-  onStep('Setting up your family there');
+  onStep(t('sync.move.setUp'));
   const me = { id: settings.deviceId, keys: deviceIdentity() };
   const familyId = uuidv7();
   const familyKey = newSymmetricKey();
@@ -69,7 +70,7 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
   try {
     await createFamily(server, { familyId, entry: log[0]!, sealedKey: toBase64(seal(me.keys.box.publicKey, familyKey)) });
   } catch (e) {
-    if (e instanceof SyncHttpError && e.status === 409) throw new Error('This phone is already in a family on that server. Turn sync off there first, or finish the earlier move.');
+    if (e instanceof SyncHttpError && e.status === 409) throw new Error(t('sync.error.alreadyThere'));
     throw e;
   }
   const api = new SyncSession(server, me.id, me.keys);
@@ -82,7 +83,7 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
     if (newState.recovery) {
       await api.request('POST', '/v1/keys/grant', { recipient: RECOVERY_SIGNER, keys: [{ epoch: 1, sealed: toBase64(seal(newState.recovery.boxKey, familyKey)) }] });
     }
-    await uploadPhotosAsTheyAre(api, (done) => onStep(`Copying photos · ${done}`));
+    await uploadPhotosAsTheyAre(api, (done) => onStep(t('sync.move.photos', { count: done })));
 
     // The old family learns where it went. Sealed with its key, so its server can't point the phones elsewhere.
     const moved: MovedBody = { server, familyId, from: me.id, seq: settings.lastSeq, entries: log.length };
@@ -93,7 +94,7 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
     throw e;
   }
 
-  onStep('Copying your entries');
+  onStep(t('sync.move.entries'));
   await switchTo(settings, { server, familyId, entries: log, key: familyKey, members: [...verifyDeviceLog(log).members.keys()] });
   // Names stay as they were (each phone's own record, written here for them).
   for (const [id, name] of Object.entries(settings.names ?? {})) {
@@ -118,7 +119,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     // The old server can't hide a removal behind an older list than this phone already saw.
     assertLogContinues(oldEntries, settings.logSeen);
     const login = await api.login();
-    if (login.familyId !== move.familyId) throw new Error('This phone is in another family on the new server');
+    if (login.familyId !== move.familyId) throw new Error(t('sync.error.otherFamily'));
     const { entries } = await api.log();
     const state = verifyMovedLog(oldEntries, entries, move.from, me.id, move.entries);
     const res = await api.keys();

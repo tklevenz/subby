@@ -4,10 +4,13 @@ import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, typ
 import type { DeviceLogEntry, LogSeen, RestoreFloor } from '@subby/shared/crypto';
 import type { MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../db/client';
+import { applyLanguage, type LanguageChoice } from '../features/i18n';
 
 export type Settings = {
   units: UnitSystem;
   clock: '12h' | '24h';
+  /** Device-local: the app's language, or the phone's. */
+  language: LanguageChoice;
   activeChildId: string | null;
   /** Device-local: each caregiver picks their own notifications. */
   reminders: ReminderSettings;
@@ -59,6 +62,7 @@ export type HomeTile = 'sleep' | 'feed' | 'diaper';
 const DEFAULTS: Settings = {
   units: 'metric',
   clock: '24h',
+  language: 'system',
   activeChildId: null,
   reminders: DEFAULT_REMINDERS,
   familyAlerts: DEFAULT_FAMILY_ALERTS,
@@ -83,6 +87,7 @@ export const useSettingsStore = create<SettingsState>((setState) => ({
     // Nested defaults, so reminder kinds added later get their defaults too.
     const reminders = { ...DEFAULTS.reminders, ...stored.reminders };
     const familyAlerts = { ...DEFAULTS.familyAlerts, ...stored.familyAlerts };
+    applyLanguage(stored.language ?? DEFAULTS.language);
     setState({ ...DEFAULTS, ...stored, reminders, familyAlerts, hydrated: true });
   },
 
@@ -90,6 +95,7 @@ export const useSettingsStore = create<SettingsState>((setState) => ({
     // Memory first: a read-modify-write that starts before this write finishes (e.g. two quick saveSync
     // calls) must already see the new value, or it writes the old one back.
     setState({ [key]: value } as Partial<Settings>);
+    if (key === 'language') applyLanguage((value ?? DEFAULTS.language) as LanguageChoice);
     if (value === null) {
       // The column is NOT NULL: a cleared setting is a missing row, which hydrates back to its default.
       await db.delete(schema.settingsTable).where(eq(schema.settingsTable.key, key));

@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useMemo } from 'react';
 import { SectionLabel } from '../components/ui';
 import { Text, View } from 'react-native';
@@ -39,32 +40,34 @@ export default function ScheduleScreen() {
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <View className="bg-violet/10 border border-violet/40 rounded-2xl p-4">
         <Text className="text-violet-pale text-xs font-medium">
-          {next?.kind === 'bedtime' ? 'Bedtime' : next?.kind === 'nap' ? 'Next nap' : 'Next sleep'}
+          {t(next?.kind === 'bedtime' ? 'schedule.bedtime' : next?.kind === 'nap' ? 'schedule.nextNap' : 'schedule.nextSleep')}
         </Text>
         {next ? (
           <>
             {/* The likely time, then the window to put down in; the suggested day below shows the nap itself. */}
-            <Text className="text-ink text-2xl font-semibold mt-1">around {formatTime((next.earliest + next.latest) / 2)}</Text>
+            <Text className="text-ink text-2xl font-semibold mt-1">{t('schedule.around', { time: formatTime((next.earliest + next.latest) / 2) })}</Text>
             <Text className="text-ink-soft text-sm mt-0.5">
               between {formatTime(next.earliest)} and {formatTime(next.latest)}
             </Text>
             <Text className="text-ink-muted text-xs mt-1">
-              Awake since {formatTime(next.wakeAt)} ·{' '}
-              {next.basis === 'personal' ? `based on ${child.name}'s last 7 days` : 'based on typical wake windows for this age'}
+              {t('schedule.awakeSince', {
+                time: formatTime(next.wakeAt),
+                basis: next.basis === 'personal' ? t('schedule.basisPersonal', { name: child.name }) : t('schedule.basisAge'),
+              })}
             </Text>
           </>
         ) : (
           <Text className="text-ink-soft mt-1">
             {asleep
-              ? `${child.name} is asleep.`
+              ? t('schedule.asleep', { name: child.name })
               : logs?.length
-                ? 'Log the latest sleep to see when the next one is likely.'
-                : 'Log a sleep to get a prediction for the next one.'}
+                ? t('schedule.logLatest')
+                : t('schedule.logSleep')}
           </Text>
         )}
       </View>
 
-      <SectionLabel>Suggested day</SectionLabel>
+      <SectionLabel>{t('schedule.suggested')}</SectionLabel>
       {schedule.planned ? (
         <View className="bg-surface border border-line rounded-2xl px-4 py-1">
           {schedule.items.map((item, i) => (
@@ -75,26 +78,26 @@ export default function ScheduleScreen() {
         // Under 3 months, until nights are logged: no planned day (it would end in a mid-afternoon "bedtime").
         <View className="bg-surface border border-line rounded-2xl p-4">
           <Text className="text-ink-soft leading-5">
-            Newborns don't keep a schedule yet: days and nights sort themselves out over the first months. Offer sleep
-            after {wakeRange} awake, or sooner when {child.name} looks sleepy.
+            {t('schedule.newborn', { range: wakeRange, name: child.name })}
           </Text>
           <Text className="text-ink-muted text-sm mt-2 leading-5">
-            Once a few nights are logged, a suggested day appears here, planned around {child.name}'s own bedtime.
+            {t('schedule.newbornLater', { name: child.name })}
           </Text>
         </View>
       )}
 
       <Text className="text-ink-faint text-xs mt-4 leading-5">
-        Typical at this age: {schedule.planned && norms.bedtime !== null ? `${norms.naps} nap${norms.naps === 1 ? '' : 's'} a day, awake` : 'awake'}{' '}
-        {wakeRange} between sleeps.{' '}
+        {schedule.planned && norms.bedtime !== null
+          ? t('schedule.typicalNaps', { count: norms.naps, range: wakeRange })
+          : t('schedule.typical', { range: wakeRange })}{' '}
         {schedule.basis === 'personal'
-          ? `Adjusted towards ${child.name}'s own rhythm from the last 7 days.`
+          ? t('schedule.adjusted', { name: child.name })
           : schedule.planned
-            ? 'Log a few days of sleep to personalize this.'
+            ? t('schedule.personalize')
             : ''}
       </Text>
       <Text className="text-ink-ghost text-xs mt-2 leading-5">
-        Estimates only. Follow your baby's sleepy cues, and talk to your pediatrician about sleep concerns.
+        {t('schedule.disclaimer')}
       </Text>
     </ScreenScroll>
   );
@@ -103,9 +106,7 @@ export default function ScheduleScreen() {
 /** A nap length to the nearest 5 minutes: "1h", "1h 25m", "45m". */
 function roughLength(ms: number) {
   const min = Math.round(ms / 300_000) * 5;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return formatHoursMinutes(min * 60_000);
 }
 
 function ItemRow({ item, now, formatTime }: { item: ScheduleItem; now: number; formatTime: (ms: number) => string }) {
@@ -114,24 +115,28 @@ function ItemRow({ item, now, formatTime }: { item: ScheduleItem; now: number; f
   const past = !item.logged && end < now;
   const [icon, label, time] =
     item.kind === 'wake'
-      ? [<Sun key="i" color={colors.amberSoft} size={16} />, 'Wake up', formatTime(item.at)]
+      ? [<Sun key="i" color={colors.amberSoft} size={16} />, t('schedule.wakeUp'), formatTime(item.at)]
       : item.kind === 'nap'
         ? [
             <CloudSun key="i" color={colors.violetSoft} size={16} />,
-            `Nap ${item.index + 1}`,
+            t('schedule.nap', { n: item.index + 1 }),
             // A predicted nap shows its start (its length goes below); a logged one, its actual times.
-            item.running ? `since ${formatTime(item.start)}` : item.logged ? `${formatTime(item.start)} – ${formatTime(item.end)}` : formatTime(item.start),
+            item.running
+              ? t('schedule.since', { time: formatTime(item.start) })
+              : item.logged
+                ? t('schedule.fromTo', { from: formatTime(item.start), to: formatTime(item.end) })
+                : formatTime(item.start),
           ]
-        : [<Moon key="i" color={colors.violetDeep} size={16} />, 'Bedtime', formatTime(item.at)];
+        : [<Moon key="i" color={colors.violetDeep} size={16} />, t('schedule.bedtime'), formatTime(item.at)];
   return (
     <View className={`flex-row items-center py-3 border-b border-line ${past ? 'opacity-40' : ''}`}>
       {icon}
       <View className="flex-1 ml-3">
         <Text className="text-ink">{label}</Text>
         {item.logged ? (
-          <Text className="text-ink-faint text-xs">{item.kind === 'nap' && item.running ? 'Napping now' : 'Logged'}</Text>
+          <Text className="text-ink-faint text-xs">{t(item.kind === 'nap' && item.running ? 'schedule.nappingNow' : 'schedule.logged')}</Text>
         ) : item.kind === 'nap' ? (
-          <Text className="text-ink-faint text-xs">about {roughLength(item.end - item.start)}</Text>
+          <Text className="text-ink-faint text-xs">{t('schedule.about', { span: roughLength(item.end - item.start) })}</Text>
         ) : null}
       </View>
       <Text className="text-ink-soft">{time}</Text>

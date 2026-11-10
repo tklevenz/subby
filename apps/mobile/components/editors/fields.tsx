@@ -1,3 +1,5 @@
+// `tr`: tags are called `t` in here.
+import { t as tr } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -100,11 +102,11 @@ export function TagsField({ value, onChange }: { value: string[] | undefined; on
           </Pressable>
         ))}
         {suggestions.map((t) => (
-          <Chip key={t} label={`+ ${t}`} selected={false} onPress={() => set([...tags, t])} />
+          <Chip key={t} label={tr('fields.newTag', { tag: t })} selected={false} onPress={() => set([...tags, t])} />
         ))}
       </View>
       <View className="flex-row items-center mt-2">
-        <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder="Add tag" onSubmitEditing={add} returnKeyType="done" />
+        <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder={tr('fields.addTag')} onSubmitEditing={add} returnKeyType="done" />
         <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-raised" hitSlop={6}>
           <Plus color={colors.inkSoft} size={18} />
         </Pressable>
@@ -135,7 +137,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
     return (
       <View>
         {/* Shown at its own shape, up to square for portrait photos; tap for the whole photo. */}
-        <Pressable onPress={() => setViewing(true)} accessibilityRole="imagebutton" accessibilityLabel="View photo">
+        <Pressable onPress={() => setViewing(true)} accessibilityRole="imagebutton" accessibilityLabel={tr('fields.viewPhoto')}>
           <Image source={{ uri: value }} className="w-full rounded-xl" style={{ aspectRatio: Math.max(ratio ?? 4 / 3, 1) }} resizeMode="cover" />
         </Pressable>
         <Pressable
@@ -144,7 +146,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
             onChange(undefined);
           }}
           hitSlop={8}
-          accessibilityLabel="Remove photo"
+          accessibilityLabel={tr('fields.removePhoto')}
           className="absolute top-2 right-2 bg-scrim/60 rounded-full p-1.5"
         >
           <Xmark color={colors.ink} size={16} />
@@ -157,7 +159,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
     <View>
       {removed ? (
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-ink-muted">Photo removed when you save</Text>
+          <Text className="text-ink-muted">{tr('fields.photoRemoved')}</Text>
           <Pressable
             onPress={() => {
               onChange(removed);
@@ -165,18 +167,18 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
             }}
             hitSlop={8}
           >
-            <Text className="text-violet-soft font-semibold">Undo</Text>
+            <Text className="text-violet-soft font-semibold">{tr('common.undo')}</Text>
           </Pressable>
         </View>
       ) : null}
       <View className="flex-row gap-2">
         <Pressable onPress={() => pick(false)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
           <ImageIcon color={colors.inkSoft} size={18} />
-          <Text className="text-ink-soft ml-2">Library</Text>
+          <Text className="text-ink-soft ml-2">{tr('fields.library')}</Text>
         </Pressable>
         <Pressable onPress={() => pick(true)} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
           <Camera color={colors.inkSoft} size={18} />
-          <Text className="text-ink-soft ml-2">Camera</Text>
+          <Text className="text-ink-soft ml-2">{tr('fields.camera')}</Text>
         </Pressable>
       </View>
     </View>
@@ -189,40 +191,40 @@ function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () =>
   const [saved, setSaved] = useState<string>();
   useEffect(() => setSaved(undefined), [uri]);
 
-  const share = () => uri && sharePhoto(uri).catch(() => Alert.alert("Couldn't share the photo"));
+  const share = () => uri && sharePhoto(uri).catch(() => Alert.alert(tr('fields.shareFailed')));
   const save = () =>
     uri &&
     savePhoto(uri)
       .then((name) => setSaved(name))
-      .catch(() => Alert.alert("Couldn't save the photo"));
+      .catch(() => Alert.alert(tr('fields.saveFailed')));
 
   // The buttons sit beside the photo's Pressable, not inside it: nested Pressables don't reliably get their own taps on Android.
   return (
     <Modal transparent animationType="fade" visible={!!uri} statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1 bg-scrim">
-        <Pressable onPress={onClose} accessibilityLabel="Close photo" className="flex-1">
+        <Pressable onPress={onClose} accessibilityLabel={tr('fields.closePhoto')} className="flex-1">
           {uri ? <Image source={{ uri }} style={{ flex: 1 }} resizeMode="contain" /> : null}
         </Pressable>
         <Pressable
           onPress={onClose}
           hitSlop={8}
-          accessibilityLabel="Close photo"
+          accessibilityLabel={tr('fields.closePhoto')}
           style={{ top: insets.top + 12 }}
           className="absolute right-4 bg-ground/60 rounded-full p-2"
         >
           <Xmark color={colors.ink} size={18} />
         </Pressable>
         <View style={{ bottom: insets.bottom + 20 }} className="absolute left-0 right-0 items-center">
-          {saved ? <Text className="text-ink text-sm mb-3">Saved to Downloads as {saved}</Text> : null}
+          {saved ? <Text className="text-ink text-sm mb-3">{tr('fields.savedAs', { name: saved })}</Text> : null}
           <View className="flex-row gap-3">
             <Pressable onPress={share} className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
               {Platform.OS === 'ios' ? <ArrowUpFromBracket color={colors.ink} size={16} /> : <ShareNodes color={colors.ink} size={16} />}
-              <Text className="text-ink font-medium ml-2">Share</Text>
+              <Text className="text-ink font-medium ml-2">{tr('fields.share')}</Text>
             </Pressable>
             {canSavePhoto ? (
               <Pressable onPress={save} className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
                 <Download color={colors.ink} size={16} />
-                <Text className="text-ink font-medium ml-2">Save</Text>
+                <Text className="text-ink font-medium ml-2">{tr('common.save')}</Text>
               </Pressable>
             ) : null}
           </View>

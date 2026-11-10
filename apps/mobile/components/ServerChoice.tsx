@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { FieldLabel, TextField } from './ui';
@@ -13,14 +14,14 @@ export function useServerChoice({ customOnly = false } = {}) {
 
   const field = custom ? (
     <View className="mt-2">
-      <FieldLabel>Your server</FieldLabel>
+      <FieldLabel>{t('server.yours')}</FieldLabel>
       <TextField value={address} onChangeText={setAddress} placeholder="https://sync.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
     </View>
   ) : null;
 
   const toggle = customOnly ? null : (
     <Pressable onPress={() => setCustom(!custom)} hitSlop={8} className="items-center mt-4">
-      <Text className="text-violet-soft text-sm">{custom ? 'Use Subby Sync instead' : 'Use your own server'}</Text>
+      <Text className="text-violet-soft text-sm">{t(custom ? 'server.useOfficial' : 'server.useOwn')}</Text>
     </Pressable>
   );
 

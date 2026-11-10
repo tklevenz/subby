@@ -71,7 +71,32 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "de",
+              "es",
+              "fr",
+              "nl",
+              "it",
+              "pt-BR"
+            ],
+            "android": [
+              "en",
+              "de",
+              "es",
+              "fr",
+              "nl",
+              "it",
+              "pt-BR"
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

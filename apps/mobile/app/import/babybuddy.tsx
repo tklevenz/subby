@@ -1,3 +1,4 @@
+import { formatNumber, t, type MessageKey } from '@subby/shared/i18n';
 import React, { useMemo, useRef, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { Text, View } from 'react-native';
@@ -23,11 +24,12 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { SubLoader, SubProgress, SubSpinner } from '../../components/brand/loaders';
 
-const LABELS: Record<BBEndpoint, string> = {
-  feedings: 'Feedings', changes: 'Diaper changes', sleep: 'Sleep', 'tummy-times': 'Tummy time',
-  pumping: 'Pumping', temperature: 'Temperature', weight: 'Weight', height: 'Height',
-  'head-circumference': 'Head circumference', medication: 'Medication', notes: 'Notes',
-};
+const LABEL_KEYS = {
+  feedings: 'bb.feedings', changes: 'bb.changes', sleep: 'bb.sleep', 'tummy-times': 'bb.tummy',
+  pumping: 'bb.pumping', temperature: 'bb.temperature', weight: 'bb.weight', height: 'bb.height',
+  'head-circumference': 'bb.head', medication: 'bb.medication', notes: 'bb.notes',
+} as const satisfies Record<BBEndpoint, MessageKey>;
+const label = (e: BBEndpoint) => t(LABEL_KEYS[e]);
 
 const NEW = 'new';
 const SKIP = 'skip';
@@ -40,25 +42,25 @@ type Step =
 
 /** Show what a raw sample value becomes under the chosen unit, e.g. "14260 → 14.26 kg". */
 function unitExample(measure: keyof ImportUnits, raw: number | undefined, units: ImportUnits, display: 'metric' | 'imperial') {
-  if (raw === undefined) return 'no data';
+  if (raw === undefined) return t('bb.noData');
   const host = 'preview';
   const map = (e: BBEndpoint, r: object) => mapRecord(e, { id: 0, child: null, ...r } as never, host, units).payload;
   switch (measure) {
     case 'volume': {
       const p = map('pumping', { start: '2000-01-01T00:00:00Z', end: '2000-01-01T00:00:00Z', amount: raw });
-      return p.type === 'pumping' && p.amountMl !== undefined ? `${raw} → ${formatVolume(p.amountMl, display)}` : '';
+      return p.type === 'pumping' && p.amountMl !== undefined ? t('bb.example', { raw: String(raw), value: formatVolume(p.amountMl, display) }) : '';
     }
     case 'weight': {
       const p = map('weight', { date: '2000-01-01', weight: raw });
-      return p.type === 'growth' && p.weightG !== undefined ? `${raw} → ${formatWeight(p.weightG, display)}` : '';
+      return p.type === 'growth' && p.weightG !== undefined ? t('bb.example', { raw: String(raw), value: formatWeight(p.weightG, display) }) : '';
     }
     case 'length': {
       const p = map('height', { date: '2000-01-01', height: raw });
-      return p.type === 'growth' && p.heightCm !== undefined ? `${raw} → ${formatLength(p.heightCm, display)}` : '';
+      return p.type === 'growth' && p.heightCm !== undefined ? t('bb.example', { raw: String(raw), value: formatLength(p.heightCm, display) }) : '';
     }
     case 'temperature': {
       const p = map('temperature', { time: '2000-01-01T00:00:00Z', temperature: raw });
-      return p.type === 'temperature' ? `${raw} → ${formatTemperature(p.celsius, display)}` : '';
+      return p.type === 'temperature' ? t('bb.example', { raw: String(raw), value: formatTemperature(p.celsius, display) }) : '';
     }
   }
 }
@@ -88,7 +90,7 @@ export default function BabyBuddyImport() {
       await settings.set('bbUrl', client.baseUrl);
       setStep({ kind: 'review', client, preview });
     } catch (e) {
-      setError(e instanceof BBError ? e.message : `Unexpected error: ${String(e)}`);
+      setError(e instanceof BBError ? e.message : t('bb.unexpected', { error: String(e) }));
     } finally {
       setBusy(false);
     }
@@ -96,25 +98,24 @@ export default function BabyBuddyImport() {
 
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: 'Import from Baby Buddy', headerShown: true, gestureEnabled: step.kind !== 'running' }} />
+      <Stack.Screen options={{ title: t('bb.title'), headerShown: true, gestureEnabled: step.kind !== 'running' }} />
 
       {step.kind === 'connect' ? (
         <View>
           <Lead>
-            Copies your history from a Baby Buddy server onto this device. It only reads from Baby Buddy, and you can run
-            it again later to pick up new entries without creating duplicates.
+            {t('bb.lead')}
           </Lead>
-          <FieldLabel>Server address</FieldLabel>
+          <FieldLabel>{t('bb.server')}</FieldLabel>
           <TextField value={url} onChangeText={setUrl} placeholder="https://babybuddy.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-          <FieldLabel>API key (Baby Buddy → User Settings)</FieldLabel>
-          <TextField value={token} onChangeText={setToken} placeholder="API key" autoCapitalize="none" autoCorrect={false} secureTextEntry />
-          <Text className="text-ink-faint text-xs mt-2">The key is used for this import only and is not saved.</Text>
+          <FieldLabel>{t('bb.apiKey')}</FieldLabel>
+          <TextField value={token} onChangeText={setToken} placeholder={t('bb.apiKeyPlaceholder')} autoCapitalize="none" autoCorrect={false} secureTextEntry />
+          <Text className="text-ink-faint text-xs mt-2">{t('bb.notSaved')}</Text>
           {url.trim().toLowerCase().startsWith('http://') ? (
-            <Text className="text-amber-soft text-xs mt-2">This address isn't encrypted (http). Your key and data travel in plain text.</Text>
+            <Text className="text-amber-soft text-xs mt-2">{t('bb.http')}</Text>
           ) : null}
           {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
           {busy ? <View className="items-center mt-4"><SubSpinner size={36} /></View> : (
-            <Button label="Connect" onPress={connect} disabled={!url.trim() || !token.trim()} />
+            <Button label={t('bb.connect')} onPress={connect} disabled={!url.trim() || !token.trim()} />
           )}
         </View>
       ) : null}
@@ -153,44 +154,44 @@ export default function BabyBuddyImport() {
         <View className="items-center mt-8">
           {step.progress ? (
             <>
-              <Text className="text-ink text-base mt-4">{LABELS[step.progress.endpoint]}</Text>
-              <Text className="text-ink-muted mt-1">{step.progress.done} / {step.progress.total}</Text>
+              <Text className="text-ink text-base mt-4">{label(step.progress.endpoint)}</Text>
+              <Text className="text-ink-muted mt-1">{t('bb.progress', { done: step.progress.done, total: step.progress.total })}</Text>
               <View className="w-full mt-3">
                 <SubProgress progress={step.progress.done / Math.max(1, step.progress.total)} />
               </View>
               <Text className="text-ink-faint text-xs mt-2">
-                Step {BB_ENDPOINTS.indexOf(step.progress.endpoint) + 1} of {BB_ENDPOINTS.length}
+                {t('bb.step', { n: BB_ENDPOINTS.indexOf(step.progress.endpoint) + 1, total: BB_ENDPOINTS.length })}
               </Text>
             </>
           ) : (
             <>
               <SubLoader />
-              <Text className="text-ink-muted mt-4">Starting…</Text>
+              <Text className="text-ink-muted mt-4">{t('bb.starting')}</Text>
             </>
           )}
           <View className="w-full">
-            <Button label="Cancel" variant="ghost" onPress={() => (cancelled.current = true)} />
+            <Button label={t('common.cancel')} variant="ghost" onPress={() => (cancelled.current = true)} />
           </View>
-          <Text className="text-ink-faint text-xs mt-2 text-center">Already imported entries stay; run the import again to continue.</Text>
+          <Text className="text-ink-faint text-xs mt-2 text-center">{t('bb.keepGoing')}</Text>
         </View>
       ) : null}
 
       {step.kind === 'done' ? (
         <View>
-          <Text className="text-xl font-bold text-ink">{step.result.cancelled ? 'Import cancelled' : 'Import finished'}</Text>
+          <Text className="text-xl font-bold text-ink">{t(step.result.cancelled ? 'bb.cancelled' : 'bb.finished')}</Text>
           <Card>
-            <Row label="Imported" value={String(step.result.imported)} />
-            <Row label="Already imported (skipped)" value={String(step.result.skipped)} />
-            {step.result.excluded ? <Row label="Left out (children not imported)" value={String(step.result.excluded)} /> : null}
-            <Row label="Couldn't import" value={String(step.result.failed.length)} />
+            <Row label={t('bb.imported')} value={formatNumber(step.result.imported)} />
+            <Row label={t('bb.skipped')} value={formatNumber(step.result.skipped)} />
+            {step.result.excluded ? <Row label={t('bb.excluded')} value={formatNumber(step.result.excluded)} /> : null}
+            <Row label={t('bb.failed')} value={formatNumber(step.result.failed.length)} />
           </Card>
           {step.result.failed.slice(0, 5).map((f) => (
-            <Text key={f.ref} className="text-red-soft text-xs mt-2">{f.ref}: {f.reason}</Text>
+            <Text key={f.ref} className="text-red-soft text-xs mt-2">{t('bb.failure', { ref: f.ref, reason: f.reason })}</Text>
           ))}
           <Text className="text-ink-muted mt-4 leading-5">
-            Done with Baby Buddy? Regenerate your API key there (User Settings) so the copied key stops working.
+            {t('bb.regenerate')}
           </Text>
-          <Button label="Done" onPress={() => router.replace('/')} />
+          <Button label={t('common.done')} onPress={() => router.replace('/')} />
         </View>
       ) : null}
     </ScreenScroll>
@@ -227,9 +228,9 @@ function Review({
 
   const childOptions = useMemo(
     () => [
-      { value: NEW, label: 'New child' },
+      { value: NEW, label: t('bb.newChild') },
       ...localChildren.map((k) => ({ value: k.id, label: k.name })),
-      { value: SKIP, label: "Don't import" },
+      { value: SKIP, label: t('bb.dontImport') },
     ],
     [localChildren],
   );
@@ -259,14 +260,14 @@ function Review({
 
   return (
     <View>
-      <Text className="text-ink text-lg font-semibold">Found {total.toLocaleString()} entries</Text>
+      <Text className="text-ink text-lg font-semibold">{t('bb.found', { count: total })}</Text>
       <Card>
         {BB_ENDPOINTS.filter((e) => preview.counts[e] > 0).map((e) => (
-          <Row key={e} label={LABELS[e]} value={preview.counts[e].toLocaleString()} />
+          <Row key={e} label={label(e)} value={formatNumber(preview.counts[e])} />
         ))}
       </Card>
 
-      <FieldLabel>Children</FieldLabel>
+      <FieldLabel>{t('bb.children')}</FieldLabel>
       {preview.children.map((bb) => (
         <View key={bb.id} className="mb-3">
           <Text className="text-ink-light mb-2">{bb.first_name} {bb.last_name} · born {bb.birth_date} → import into</Text>
@@ -274,11 +275,11 @@ function Review({
         </View>
       ))}
 
-      <FieldLabel>Units in Baby Buddy (detected — check the examples)</FieldLabel>
+      <FieldLabel>{t('bb.units')}</FieldLabel>
       {(Object.keys(UNIT_OPTIONS) as (keyof ImportUnits)[]).map((measure) => (
         <View key={measure} className="mb-3">
-          <Text className="text-ink-soft mb-1.5 capitalize">
-            {measure} <Text className="text-ink-faint">· {unitExample(measure, preview.examples[measure], units, settings.units)}</Text>
+          <Text className="text-ink-soft mb-1.5">
+            {t(`bb.measure.${measure}`)} <Text className="text-ink-faint">· {unitExample(measure, preview.examples[measure], units, settings.units)}</Text>
           </Text>
           <Segmented
             options={UNIT_OPTIONS[measure] as { value: string; label: string }[]}
@@ -288,15 +289,15 @@ function Review({
         </View>
       ))}
 
-      <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0 || allSkipped} />
-      {preview.children.length === 0 ? <WarningText className="mt-2">No children found on this server.</WarningText> : null}
+      <Button label={t('bb.importN', { count: total })} onPress={start} disabled={preview.children.length === 0 || allSkipped} />
+      {preview.children.length === 0 ? <WarningText className="mt-2">{t('bb.noChildren')}</WarningText> : null}
     </View>
   );
 }
 
 function bbChildInput(bb: BBChild, importRef: string) {
   return {
-    name: [bb.first_name, bb.last_name].filter(Boolean).join(' ').trim() || 'Baby',
+    name: [bb.first_name, bb.last_name].filter(Boolean).join(' ').trim() || t('bb.baby'),
     birthDate: bb.birth_date,
     birthTime: bb.birth_time ? bb.birth_time.slice(0, 5) : null,
     dueDate: bb.due_date ?? null,

@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -27,14 +28,12 @@ export default function MoveScreen() {
   const from = host(sync.server);
 
   const run = async () => {
-    setStep({ kind: 'working', label: 'Getting ready' });
+    setStep({ kind: 'working', label: t('move.ready') });
     try {
       await moveToServer(server, (label) => setStep({ kind: 'working', label }));
       Alert.alert(
-        'Moved',
-        members > 1
-          ? `Your family now syncs through ${host(server)}. The other phones follow the next time they sync.`
-          : `Your family now syncs through ${host(server)}.`,
+        t('move.moved'),
+        t(members > 1 ? 'move.movedOthers' : 'move.movedAlone', { server: host(server) }),
       );
       router.back();
     } catch (e) {
@@ -43,9 +42,9 @@ export default function MoveScreen() {
   };
 
   const confirm = () =>
-    Alert.alert(`Move to ${host(server)}?`, `Everything is copied there, then your family is deleted from ${from}. Keep the app open until it's done.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Move', onPress: run },
+    Alert.alert(t('move.confirmTitle', { server: host(server) }), t('move.confirmText', { from }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('move.move'), onPress: run },
     ]);
 
   return (
@@ -54,22 +53,21 @@ export default function MoveScreen() {
         <View className="items-center mt-24">
           <SubLoader />
           <Text className="text-ink-muted mt-4 text-center">{step.label}</Text>
-          <Text className="text-ink-faint text-xs mt-2 text-center">Keep the app open.</Text>
+          <Text className="text-ink-faint text-xs mt-2 text-center">{t('move.keepOpen')}</Text>
         </View>
       ) : (
         <>
           <Lead>
-            Your family syncs through {from} now. Moving copies every entry and photo to the new server, encrypted on this phone like
-            always.
-            {members > 1 ? ' The other phones follow by themselves the next time they sync; nobody needs a new code.' : ''} Your recovery
-            words keep working. Afterwards, your family is deleted from {from}.
+            {t('move.lead', { from })}
+            {members > 1 ? t('move.leadOthers') : ''}
+            {t('move.leadEnd', { from })}
           </Lead>
 
           {field}
           {step.kind === 'error' ? <ErrorText className="mt-4">{step.message}</ErrorText> : null}
-          <Button label={`Move to ${custom ? 'this server' : 'Subby Sync'}`} onPress={confirm} disabled={!ready} />
+          <Button label={t(custom ? 'move.toThis' : 'move.toOfficial')} onPress={confirm} disabled={!ready} />
           <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
-            {custom ? 'Syncing through your own server is free.' : `14 days free for every phone, then ${PRICE} per phone, once.`}
+            {custom ? t('move.ownFree') : t('move.trial', { price: PRICE })}
           </Text>
           {toggle}
         </>

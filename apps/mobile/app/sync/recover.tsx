@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -48,13 +49,13 @@ export default function RecoverScreen() {
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'enter' ? (
         <>
-          <Text className="text-ink text-xl font-bold">Use a recovery key</Text>
+          <Text className="text-ink text-xl font-bold">{t('recover.title')}</Text>
           <Lead className="mt-2">
-            For when no phone in the family is left. If another phone still syncs, join with a code from it instead.
+            {t('recover.lead')}
           </Lead>
 
           <View className="mt-6">
-            <FieldLabel>The 24 words, in order</FieldLabel>
+            <FieldLabel>{t('recover.words')}</FieldLabel>
             <TextField
               value={words}
               onChangeText={setWords}
@@ -63,26 +64,25 @@ export default function RecoverScreen() {
               style={{ minHeight: 120, textAlignVertical: 'top' }}
             />
             <Text className="text-ink-faint text-xs mt-2 ml-1">
-              {count === 24 && !valid ? "One of the words isn't right. Check the spelling and order." : `${count} of 24 words`}
+              {count === 24 && !valid ? t('recover.wrongWord') : t('recover.count', { count })}
             </Text>
           </View>
 
           {field ? <View className="mt-3">{field}</View> : null}
-          <Button label="Recover" onPress={start} disabled={!valid || !ready} />
+          <Button label={t('recover.recover')} onPress={start} disabled={!valid || !ready} />
           {toggle}
         </>
       ) : null}
 
       {step.kind === 'choose' ? (
         <>
-          <Text className="text-ink text-xl font-bold">This phone already has entries</Text>
+          <Text className="text-ink text-xl font-bold">{t('join.hasEntries')}</Text>
           <Lead className="mt-2">
-            Add them to the family, or replace them with the family's data. If they came from the same Baby Buddy import, replace, or every
-            entry shows up twice.
+            {t('recover.hasEntriesText')}
           </Lead>
-          <Button label="Replace with the family's data" onPress={() => run('replace')} />
-          <Text className="text-ink-faint text-xs text-center mt-2">Deletes this phone's own entries and photos.</Text>
-          <Button label="Add my entries to the family" variant="ghost" onPress={() => run('merge')} />
+          <Button label={t('join.replace')} onPress={() => run('replace')} />
+          <Text className="text-ink-faint text-xs text-center mt-2">{t('join.replaceNote')}</Text>
+          <Button label={t('join.merge')} variant="ghost" onPress={() => run('merge')} />
         </>
       ) : null}
 
@@ -92,9 +92,9 @@ export default function RecoverScreen() {
 
       {step.kind === 'error' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">Couldn't recover</Text>
+          <Text className="text-ink text-xl font-bold mt-4">{t('recover.failed')}</Text>
           <ErrorText className="mt-2">{step.message}</ErrorText>
-          <Button label="Try again" onPress={() => setStep({ kind: 'enter' })} />
+          <Button label={t('common.retry')} onPress={() => setStep({ kind: 'enter' })} />
         </>
       ) : null}
     </ScreenScroll>
@@ -106,7 +106,7 @@ function Busy() {
   return (
     <View className="items-center mt-24">
       <SubLoader />
-      <Text className="text-ink-muted mt-4">{progress ? `${progress.label} · ${progress.done.toLocaleString()}` : 'Recovering…'}</Text>
+      <Text className="text-ink-muted mt-4">{progress ? t('syncScreen.progress', { label: progress.label, count: progress.done }) : t('recover.recovering')}</Text>
     </View>
   );
 }
@@ -141,17 +141,15 @@ function LostPhones({ ids }: { ids: string[] }) {
     return (
       <View className="items-center mt-24">
         <SubLoader />
-        <Text className="text-ink-muted mt-4">Removing {chosen.size === 1 ? 'the phone' : 'the phones'}…</Text>
+        <Text className="text-ink-muted mt-4">{t('recover.removing', { count: chosen.size })}</Text>
       </View>
     );
   }
   return (
     <>
-      <Text className="text-ink text-xl font-bold">Your data is back</Text>
+      <Text className="text-ink text-xl font-bold">{t('recover.back')}</Text>
       <Lead className="mt-2">
-        {ids.length === 1 ? 'The lost phone is still in your family.' : 'The lost phones are still in your family.'} Remove{' '}
-        {ids.length === 1 ? 'it' : 'them'}, so nobody who finds {ids.length === 1 ? 'it' : 'one'} can read what you log from now on. Untick
-        a phone that's still in use.
+        {t(ids.length === 1 ? 'recover.lostOne' : 'recover.lostMany')}
       </Lead>
       <View className="bg-surface rounded-2xl border border-line mt-4">
         {ids.map((id, i) => (
@@ -162,7 +160,7 @@ function LostPhones({ ids }: { ids: string[] }) {
             accessibilityState={{ checked: chosen.has(id) }}
             className={`flex-row items-center px-4 py-3.5 ${i ? 'border-t border-line' : ''}`}
           >
-            <Text className="flex-1 text-ink text-[15px]">{names[id] ?? 'Phone'}</Text>
+            <Text className="flex-1 text-ink text-[15px]">{names[id] ?? t('syncScreen.phone')}</Text>
             <View className={`w-6 h-6 rounded-md items-center justify-center border ${chosen.has(id) ? 'bg-violet border-violet' : 'border-line'}`}>
               {chosen.has(id) ? <Check size={14} color={colors.ground} /> : null}
             </View>
@@ -171,12 +169,12 @@ function LostPhones({ ids }: { ids: string[] }) {
       </View>
       {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
       <Button
-        label={chosen.size ? `Remove ${chosen.size === 1 ? '1 phone' : `${chosen.size} phones`}` : 'Remove phones'}
+        label={chosen.size ? t('recover.removeN', { count: chosen.size }) : t('recover.removePhones')}
         onPress={remove}
         disabled={!chosen.size}
       />
-      <Button label="Keep them for now" variant="ghost" onPress={() => router.replace('/')} />
-      <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">You can remove phones later under Settings → Sync.</Text>
+      <Button label={t('recover.keep')} variant="ghost" onPress={() => router.replace('/')} />
+      <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">{t('recover.later')}</Text>
     </>
   );
 }

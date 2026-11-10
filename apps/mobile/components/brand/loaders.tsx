@@ -1,3 +1,5 @@
+// `tr`: `t` is the animation's progress in here.
+import { t as tr } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -64,7 +66,7 @@ export function SubLoader({ width = 112 }: { width?: number }) {
   }));
   const s = width / 100;
   return (
-    <View style={{ width, height: width * 0.9 }} accessibilityRole="progressbar" accessibilityLabel="Loading">
+    <View style={{ width, height: width * 0.9 }} accessibilityRole="progressbar" accessibilityLabel={tr('loader.loading')}>
       <Bubble x={84 * s} y={30 * s} r={3 * s} delay={0} />
       <Bubble x={91 * s} y={36 * s} r={2.2 * s} delay={800} />
       <Bubble x={80 * s} y={38 * s} r={1.8 * s} delay={1600} />
@@ -119,7 +121,7 @@ export function PeriscopeLoader({ width = 112 }: { width?: number }) {
   const look = useAnimatedStyle(() => ({ transform: [{ scaleX: interpolate(t.value, [0, 0.35, 0.45, 0.65, 0.75, 1], [1, 1, -1, -1, 1, 1]) }] }));
   // The periscope's box is centered on its pole (x 54), so flipping it turns it around the pole.
   return (
-    <View style={{ width, height: SUB_VIEWBOX.h * s }} accessibilityRole="progressbar" accessibilityLabel="Waiting">
+    <View style={{ width, height: SUB_VIEWBOX.h * s }} accessibilityRole="progressbar" accessibilityLabel={tr('loader.waiting')}>
       <Animated.View style={[{ position: 'absolute', left: (46 - SUB_VIEWBOX.x) * s, top: 0 }, up]}>
         <Animated.View style={look}>
           <Svg width={16 * s} height={26 * s} viewBox="46 16 16 26">
@@ -140,7 +142,7 @@ export function SubSpinner({ size = 24 }: { size?: number }) {
   const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${360 * t.value}deg` }] }));
   const sub = size * 0.5;
   return (
-    <Animated.View style={[{ width: size, height: size }, style]} accessibilityRole="progressbar" accessibilityLabel="Loading">
+    <Animated.View style={[{ width: size, height: size }, style]} accessibilityRole="progressbar" accessibilityLabel={tr('loader.loading')}>
       <View style={{ position: 'absolute', top: 0, left: (size - sub) / 2 }}>
         <Sub width={sub} />
       </View>

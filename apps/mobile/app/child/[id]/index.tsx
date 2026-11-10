@@ -1,3 +1,4 @@
+import { formatDate, t } from '@subby/shared/i18n';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -30,14 +31,14 @@ import { colors } from '../../../theme/colors';
 import { ScreenScroll } from '../../../components/ScreenScroll';
 
 const MEASURES = [
-  { value: 'weightKg', label: 'Weight' },
-  { value: 'lengthCm', label: 'Length' },
-  { value: 'headCm', label: 'Head' },
+  { value: 'weightKg', get label() { return t('growth.weight'); } },
+  { value: 'lengthCm', get label() { return t('growth.length'); } },
+  { value: 'headCm', get label() { return t('growth.head'); } },
 ] as const;
 const STORY_PAGE = 12;
 
 const fmtDate = (ms: number, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) =>
-  new Date(ms).toLocaleDateString([], opts);
+  formatDate(ms, opts);
 const isoToMs = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).getTime();
@@ -98,20 +99,20 @@ function Profile({ child }: { child: Child }) {
 
       <View className="px-4">
         {!isActive ? (
-          <Button label={`Switch to ${child.name}`} variant="ghost" onPress={() => useSettingsStore.getState().set('activeChildId', child.id)} />
+          <Button label={t('profile.switchTo', { name: child.name })} variant="ghost" onPress={() => useSettingsStore.getState().set('activeChildId', child.id)} />
         ) : null}
 
         <Growth child={child} logs={logs} isActive={isActive} />
 
-        <SectionLabel className="mt-6 mb-3">{child.name}'s story</SectionLabel>
+        <SectionLabel className="mt-6 mb-3">{t('profile.story', { name: child.name })}</SectionLabel>
         {story.slice(0, shown).map((item, i) => (
           <StoryRow key={item.id} item={item} child={child} last={i === Math.min(shown, story.length) - 1} />
         ))}
         {story.length > shown ? (
-          <Button label="Show more" variant="ghost" onPress={() => setShown((n) => n + STORY_PAGE)} />
+          <Button label={t('profile.showMore')} variant="ghost" onPress={() => setShown((n) => n + STORY_PAGE)} />
         ) : null}
         {story.length === 1 ? (
-          <Text className="text-ink-faint text-sm mt-1 ml-10">Milestones, measurements and first foods you log appear here.</Text>
+          <Text className="text-ink-faint text-sm mt-1 ml-10">{t('profile.storyEmpty')}</Text>
         ) : null}
       </View>
     </ScreenScroll>
@@ -141,23 +142,23 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
           <Text style={{ color: fg, fontSize: 120, fontWeight: '700', opacity: 0.5 }}>{child.name.trim().charAt(0).toUpperCase() || '?'}</Text>
           <View className="flex-row items-center mt-2 px-3.5 py-2 rounded-full bg-ground/50">
             <Camera color={colors.ink} size={16} />
-            <Text className="text-ink text-sm font-medium ml-2">Add a photo</Text>
+            <Text className="text-ink text-sm font-medium ml-2">{t('profile.addPhoto')}</Text>
           </View>
         </Pressable>
       )}
 
       <View style={{ top: insets.top + 8 }} className="absolute left-4 right-4 flex-row justify-between">
-        <Pressable onPress={() => router.back()} accessibilityLabel="Back" hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
+        <Pressable onPress={() => router.back()} accessibilityLabel={t('common.back')} hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
           <AngleLeft color={colors.ink} size={22} />
         </Pressable>
         <View className="flex-row gap-2">
           {showPhoto ? (
-            <Pressable onPress={onPhoto} accessibilityLabel="Change photo" hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
+            <Pressable onPress={onPhoto} accessibilityLabel={t('childForm.changePhoto')} hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
               <Camera color={colors.ink} size={18} />
             </Pressable>
           ) : null}
           <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} hitSlop={8} className="h-10 px-4 rounded-full bg-ground/55 items-center justify-center">
-            <Text className="text-ink text-[15px] font-medium">Edit</Text>
+            <Text className="text-ink text-[15px] font-medium">{t('profile.edit')}</Text>
           </Pressable>
         </View>
       </View>
@@ -177,12 +178,12 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
         <View className="flex-1">
           <Text style={textOnPhoto} className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1}>{child.name}</Text>
           <Text style={textOnPhoto} className="text-violet-pale text-[15px] mt-0.5">
-            {formatAgeLong(child.birthDate, Date.now())} · born {fmtDate(isoToMs(child.birthDate), { day: 'numeric', month: 'short' })}
+            {t('profile.ageBorn', { age: formatAgeLong(child.birthDate, Date.now()), date: fmtDate(isoToMs(child.birthDate), { day: 'numeric', month: 'short' }) })}
           </Text>
         </View>
         {isActive ? (
           <View className="px-2.5 py-1.5 rounded-full bg-violet/30 border border-violet-strong/60 ml-3">
-            <Text className="text-violet-faint text-xs font-semibold">Active</Text>
+            <Text className="text-violet-faint text-xs font-semibold">{t('profile.active')}</Text>
           </View>
         ) : null}
       </View>
@@ -207,9 +208,9 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
   return (
     <>
       <View className="flex-row items-center justify-between mt-6 mb-2 mr-1">
-        <SectionLabel className="">Growth</SectionLabel>
+        <SectionLabel className="">{t('profile.growth')}</SectionLabel>
         <Pressable onPress={openGrowth} hitSlop={8} className="flex-row items-center">
-          <Text className="text-violet-soft text-[13px] mr-1">All charts</Text>
+          <Text className="text-violet-soft text-[13px] mr-1">{t('profile.allCharts')}</Text>
           <AngleRight color={colors.violetSoft} size={10} />
         </Pressable>
       </View>
@@ -219,23 +220,22 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
           <>
             <View className="flex-row items-baseline justify-between mt-3">
               <Text className="text-ink text-[28px] leading-[34px] font-bold">{format(last.value)}</Text>
-              {pct !== null ? <Text className="text-violet-soft text-sm font-semibold">{formatPercentile(pct)} percentile</Text> : null}
+              {pct !== null ? <Text className="text-violet-soft text-sm font-semibold">{t('percentile.long', { value: formatPercentile(pct) })}</Text> : null}
             </View>
             <View className="mt-2">
               <GrowthChart measure={measure} sex={sex} points={points} units={units} height={180} />
             </View>
             <Text className="text-ink-muted text-xs mt-2">
-              Last measured {fmtDate(last.at)}
-              {sex ? ` · WHO ${sex === 'female' ? 'girls' : 'boys'}, 3rd–97th percentile` : ''}
+              {t(sex === 'female' ? 'profile.lastMeasuredGirls' : sex ? 'profile.lastMeasuredBoys' : 'profile.lastMeasured', { date: fmtDate(last.at) })}
             </Text>
           </>
         ) : (
-          <Text className="text-ink-faint text-sm mt-3">No measurements yet. Log one with + on Home.</Text>
+          <Text className="text-ink-faint text-sm mt-3">{t('profile.noMeasurements')}</Text>
         )}
       </View>
       {!sex ? (
         <Pressable onPress={() => router.push(`/child/${child.id}/edit`)}>
-          <Text className="text-ink-faint text-xs mt-2 ml-1">Set girl or boy under Edit to see WHO percentiles.</Text>
+          <Text className="text-ink-faint text-xs mt-2 ml-1">{t('profile.setSex')}</Text>
         </Pressable>
       ) : null}
     </>
@@ -254,7 +254,7 @@ function StoryRow({ item, child, last }: { item: StoryItem; child: Child; last: 
   const when =
     item.kind === 'birth'
       ? fmtDate(item.at, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-      : `${fmtDate(item.at)} · ${formatAgeLong(child.birthDate, item.at)}`;
+      : t('profile.storyWhen', { date: fmtDate(item.at), age: formatAgeLong(child.birthDate, item.at) });
   return (
     <Pressable disabled={!item.logId} onPress={() => item.logId && router.push(`/entry/${item.logId}`)} className="flex-row" style={{ minHeight: 62 }}>
       <View className="w-7 items-center">

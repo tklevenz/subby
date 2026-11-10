@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { eq, inArray } from 'drizzle-orm';
@@ -42,7 +43,7 @@ export async function saveBackup(passphrase: string | null, onProgress?: (p: num
     file.create();
     file.write(bytes);
     if (downloads) return { ...counts, savedAs: await downloads.saveToDownloads(file.uri, name, mimeType) };
-    await Sharing.shareAsync(file.uri, { mimeType, UTI: passphrase ? 'public.data' : 'public.zip-archive', dialogTitle: 'Save backup' });
+    await Sharing.shareAsync(file.uri, { mimeType, UTI: passphrase ? 'public.data' : 'public.zip-archive', dialogTitle: t('backup.dialog') });
     return { ...counts, savedAs: null };
   } finally {
     // The share target has its own copy by now; don't leave the data in the cache.

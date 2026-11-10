@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -9,7 +10,7 @@ import {
   describeFeed,
   formatDuration,
   formatHoursMinutes,
-  formatRelative,
+  formatElapsed,
   groupNights,
   defaultNap,
   isNightWaking,
@@ -34,7 +35,8 @@ import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
 
 const TILES: HomeTile[] = ['sleep', 'feed', 'diaper'];
-const LABEL: Record<HomeTile, string> = { sleep: 'Sleep', feed: 'Feed', diaper: 'Diaper' };
+const label = (tile: HomeTile) => TYPE_META[tile].label;
+const OPEN_A11Y = { sleep: 'home.openSleepA11y', feed: 'home.openFeedA11y', diaper: 'home.openDiaperA11y' } as const;
 
 type TileContent = {
   /** Small line above the value ("Awake for"). */
@@ -78,12 +80,12 @@ export default function HomeTiles({ child }: { child: Child }) {
   const longPress = (tile: HomeTile) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     if (tile === top) {
-      Alert.alert(`${LABEL[tile]} is the top tile`, 'Long-press another tile to move it to the top.');
+      Alert.alert(t('home.topTile', { tile: label(tile) }), t('home.topTileHint'));
       return;
     }
-    Alert.alert(LABEL[tile], undefined, [
-      { text: 'Make this the top tile', onPress: () => setSetting('homeTop', { ...homeTop, [child.id]: tile }) },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(label(tile), undefined, [
+      { text: t('home.makeTop'), onPress: () => setSetting('homeTop', { ...homeTop, [child.id]: tile }) },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -116,7 +118,7 @@ export default function HomeTiles({ child }: { child: Child }) {
             }}
             className="px-4 py-2.5 rounded-lg"
           >
-            <Text className="text-violet-soft text-sm font-semibold">Undo</Text>
+            <Text className="text-violet-soft text-sm font-semibold">{t('common.undo')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -141,8 +143,8 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
 
   // "2h 15m ago" → value "2h 15m", first line "ago · <detail>".
   const since = (at: number, detail: string) => {
-    const rel = formatRelative(now - at);
-    return rel.endsWith(' ago') ? { value: rel.slice(0, -4), first: `ago · ${detail}` } : { value: rel, first: detail };
+    const span = formatElapsed(now - at);
+    return span ? { value: span, first: t('home.ago', { detail }) } : { value: t('time.justNow'), first: detail };
   };
 
   const sleeping = activeSleep(logs);
@@ -151,44 +153,44 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   if (sleeping) {
     sleep = {
       value: formatDuration(now - sleeping.startedAt),
-      lines: [`${sleeping.payload.nap ? 'napping' : 'asleep'} · since ${formatTime(sleeping.startedAt)}`],
-      hint: 'Tap to wake up',
+      lines: [t(sleeping.payload.nap ? 'home.napping' : 'home.asleep', { time: formatTime(sleeping.startedAt) })],
+      hint: t('home.tapWake'),
       active: true,
       entryId: sleeping.id,
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const slept = formatHoursMinutes(Date.now() - sleeping.startedAt);
         await stopTimer(sleeping.id);
-        offerUndo({ label: `Woke up after ${slept}`, undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
+        offerUndo({ label: t('home.wokeUpAfter', { span: slept }), undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
       },
       onDiscard: () =>
-        Alert.alert('Discard this sleep?', "It's deleted, as if it never started.", [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => softDeleteLog(sleeping.id) },
+        Alert.alert(t('home.discardTitle'), t('home.discardText'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('home.discard'), style: 'destructive', onPress: () => softDeleteLog(sleeping.id) },
         ]),
     };
   } else {
     const lines: string[] = [];
     if (tonight) {
-      lines.push(`slept ${formatHoursMinutes(tonight.asleepMs)} tonight, since ${formatTime(tonight.start)}`);
+      lines.push(t('home.sleptTonight', { span: formatHoursMinutes(tonight.asleepMs), time: formatTime(tonight.start) }));
     } else if (prediction?.kind === 'nap') {
-      lines.push(`Down for nap ${prediction.napIndex + 1} around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
-      if (prediction.napMinutes) lines.push(`Naps usually ~${formatHoursMinutes(prediction.napMinutes * 60_000)}`);
+      lines.push(t('home.napAround', { n: prediction.napIndex + 1, from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
+      if (prediction.napMinutes) lines.push(t('home.napsUsually', { span: formatHoursMinutes(prediction.napMinutes * 60_000) }));
     } else if (prediction?.kind === 'sleep') {
-      lines.push(`Next sleep around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
+      lines.push(t('home.sleepAround', { from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
     } else if (prediction) {
-      lines.push(`Bedtime around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
+      lines.push(t('home.bedtimeAround', { from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
     }
     sleep = {
       value: wakeAt !== null ? formatHoursMinutes(now - wakeAt) : '–',
-      lines: wakeAt !== null ? [`awake · since ${formatTime(wakeAt)}`, ...lines] : ['No sleep logged yet'],
-      hint: 'Tap to start sleep',
+      lines: wakeAt !== null ? [t('home.awakeSince', { time: formatTime(wakeAt) }), ...lines] : [t('home.noSleep')],
+      hint: t('home.tapSleep'),
       entryId: logs.find((l) => l.logType === 'sleep' && l.endedAt !== null)?.id,
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Nap or night from the usual bedtime (else the clock); editable afterwards.
         const entry = await startTimer({ type: 'sleep', nap: defaultNap(logs, Date.now()) });
-        offerUndo({ label: 'Sleep started', undo: () => softDeleteLog(entry.id), sub: true });
+        offerUndo({ label: t('home.sleepStarted'), undo: () => softDeleteLog(entry.id), sub: true });
       },
     };
   }
@@ -199,10 +201,10 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   let feed: TileContent;
   if (runningFeed?.payload.type === 'feed') {
     feed = {
-      eyebrow: 'Feeding',
+      eyebrow: t('home.feeding'),
       value: formatDuration(now - runningFeed.startedAt),
       lines: [describeFeed(runningFeed.payload)],
-      hint: 'Tap for sides',
+      hint: t('home.tapSides'),
       active: true,
       entryId: runningFeed.id,
       onPress: () => open({ kind: 'feed', tab: 'breast' }),
@@ -211,13 +213,13 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
     const s = since(lastFeed.startedAt, describeFeed(lastFeed.payload));
     feed = {
       value: s.value,
-      lines: [s.first, ...(side ? [`Breast next: ${side === 'left' ? 'Left' : 'Right'}`] : [])],
-      hint: 'Tap to log a feed',
+      lines: [s.first, ...(side ? [t(side === 'left' ? 'home.breastNextLeft' : 'home.breastNextRight')] : [])],
+      hint: t('home.tapFeed'),
       entryId: lastFeed.id,
       onPress: () => open({ kind: 'feed' }),
     };
   } else {
-    feed = { value: '–', lines: ['No feeds yet'], hint: 'Tap to log a feed', onPress: () => open({ kind: 'feed' }) };
+    feed = { value: '–', lines: [t('home.noFeeds')], hint: t('home.tapFeed'), onPress: () => open({ kind: 'feed' }) };
   }
 
   const lastDiaper = lastOfType(logs, 'diaper');
@@ -226,9 +228,9 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   let diaper: TileContent;
   if (lastDiaper) {
     const s = since(lastDiaper.startedAt, describeDiaper(lastDiaper.payload));
-    diaper = { value: s.value, lines: [s.first, `${today} today`], hint: 'Tap to log a change', entryId: lastDiaper.id, onPress: diaperPress };
+    diaper = { value: s.value, lines: [s.first, t('home.diapersToday', { count: today })], hint: t('home.tapDiaper'), entryId: lastDiaper.id, onPress: diaperPress };
   } else {
-    diaper = { value: '–', lines: ['No changes yet'], hint: 'Tap to log a change', onPress: diaperPress };
+    diaper = { value: '–', lines: [t('home.noDiapers')], hint: t('home.tapDiaper'), onPress: diaperPress };
   }
 
   return { sleep, feed, diaper };
@@ -250,11 +252,11 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
       onPress={content.onDiscard}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel={`Discard this ${LABEL[tile].toLowerCase()}`}
+      accessibilityLabel={t('home.discardSleepA11y')}
       className={`absolute right-4 bottom-4 rounded-full border border-line-strong bg-ground/40 ${large ? 'flex-row items-center px-3 py-1.5' : 'w-8 h-8 items-center justify-center'}`}
     >
       <Xmark color={colors.inkMuted} size={12} />
-      {large ? <Text className="text-ink-muted text-xs ml-1.5">Discard</Text> : null}
+      {large ? <Text className="text-ink-muted text-xs ml-1.5">{t('home.discard')}</Text> : null}
     </Pressable>
   ) : null;
   // The tile's action is a full-size button underneath; the content on top lets taps through to it, except for
@@ -270,14 +272,14 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
         onLongPress={onLongPress}
         delayLongPress={400}
         accessibilityRole="button"
-        accessibilityLabel={`${LABEL[tile]}: ${[content.eyebrow, content.value, ...content.lines].filter(Boolean).join(', ')}`}
-        accessibilityHint={`${content.hint}. Long-press to make this the top tile.`}
+        accessibilityLabel={t('home.tileA11y', { tile: label(tile), content: [content.eyebrow, content.value, ...content.lines].filter(Boolean).join(t('list.join')) })}
+        accessibilityHint={t('home.tileHintA11y', { hint: content.hint })}
         className="absolute inset-0 rounded-3xl"
       />
       <View pointerEvents="none" className="flex-row items-center justify-between">
         <View className="flex-row items-center">
           <s.Icon color={s.icon()} size={20} />
-          <Text className={`text-sm font-semibold ml-2 ${s.label}`}>{LABEL[tile]}</Text>
+          <Text className={`text-sm font-semibold ml-2 ${s.label}`}>{label(tile)}</Text>
         </View>
         {large ? <Text className="text-ink-muted text-xs">{content.hint}</Text> : null}
       </View>
@@ -289,7 +291,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           pointerEvents={content.entryId ? 'auto' : 'none'}
           hitSlop={8}
           accessibilityRole={content.entryId ? 'link' : undefined}
-          accessibilityLabel={content.entryId ? `Open this ${LABEL[tile].toLowerCase()} entry` : undefined}
+          accessibilityLabel={content.entryId ? t(OPEN_A11Y[tile]) : undefined}
           className="self-start"
         >
           {content.eyebrow ? (
@@ -363,7 +365,7 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
       key: `med:${m.name}`,
       label: m.name,
       dueAt: m.dueAt,
-      action: 'Log',
+      action: t('home.log'),
       onPress: () => open({ kind: 'log', type: 'medication', payload: { name, dose, unit, nextDoseIntervalMin } }),
     };
   });
@@ -373,11 +375,11 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
       ...TYPE_META.pumping,
       key: 'pumping',
       dueAt: pump.dueAt,
-      action: 'Start',
+      action: t('home.start'),
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const entry = await startTimer({ type: 'pumping' });
-        offerUndo({ label: 'Pumping started', undo: () => softDeleteLog(entry.id) });
+        offerUndo({ label: t('home.pumpingStarted'), undo: () => softDeleteLog(entry.id) });
       },
     });
   }
@@ -390,7 +392,11 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
           <Icon color={color} size={16} />
           <Text className="flex-1 text-ink text-sm ml-2.5" numberOfLines={1}>{label}</Text>
           <Text className={`text-xs ${dueAt <= now ? 'text-red-soft' : 'text-ink-muted'}`}>
-            {dueAt <= now ? `Overdue by ${formatDuration(now - dueAt)}` : startOfDay(dueAt) > startOfDay(now) ? `Due tomorrow ${formatTime(dueAt)}` : `Due at ${formatTime(dueAt)}`}
+            {dueAt <= now
+              ? t('home.overdue', { span: formatDuration(now - dueAt) })
+              : startOfDay(dueAt) > startOfDay(now)
+                ? t('home.dueTomorrow', { time: formatTime(dueAt) })
+                : t('home.dueAt', { time: formatTime(dueAt) })}
           </Text>
           <Pressable onPress={onPress} accessibilityLabel={`${action} ${label.toLowerCase()}`} className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}>
             <Text className="text-ink text-[13px] font-semibold">{action}</Text>
@@ -399,13 +405,13 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
       ))}
       <Pressable onPress={() => router.push('/schedule')} className="flex-row items-center px-3.5 py-3 border-b border-line">
         <CalendarDays color={colors.violetSoft} size={16} />
-        <Text className="flex-1 text-ink text-sm ml-2.5">Sleep schedule</Text>
+        <Text className="flex-1 text-ink text-sm ml-2.5">{t('home.schedule')}</Text>
         <AngleRight color={colors.inkGhost} size={16} />
       </Pressable>
       <Pressable onPress={() => router.push('/history')} className="flex-row items-center px-3.5 py-3">
         <ClockRotateLeft color={colors.inkSoft} size={16} />
-        <Text className="flex-1 text-ink text-sm ml-2.5">Today's log</Text>
-        <Text className="text-ink-muted text-xs mr-1">{today === 1 ? '1 entry' : `${today} entries`}</Text>
+        <Text className="flex-1 text-ink text-sm ml-2.5">{t('home.todaysLog')}</Text>
+        <Text className="text-ink-muted text-xs mr-1">{t('home.entries', { count: today })}</Text>
         <AngleRight color={colors.inkGhost} size={16} />
       </Pressable>
     </View>

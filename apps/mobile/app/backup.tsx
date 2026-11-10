@@ -1,3 +1,4 @@
+import { formatNumber, t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -54,7 +55,7 @@ export default function BackupScreen() {
     setStep({ kind: 'preview', contents, plan: await previewRestore(contents), name });
 
   const choose = () =>
-    run('Reading the backup…', async () => {
+    run(t('backup.reading'), async () => {
       const picked = await pickBackup();
       if (!picked) return;
       if (picked.kind === 'locked') setStep({ kind: 'locked', bytes: picked.bytes, name: picked.name });
@@ -74,13 +75,13 @@ export default function BackupScreen() {
             </>
           ) : null}
 
-          <Text className={`text-ink text-xl font-bold ${hasData ? 'mt-10' : ''}`}>Restore</Text>
+          <Text className={`text-ink text-xl font-bold ${hasData ? 'mt-10' : ''}`}>{t('backup.restoreTitle')}</Text>
           <Lead className="mt-2">
             {hasData
-              ? "Adds a backup's children, entries and photos to this phone. Where both have the same entry, the newer edit wins, so nothing newer is overwritten. Restoring the same file twice changes nothing."
-              : "Brings a backup's children, entries and photos onto this phone. Choose the file you saved from Subby on your old phone."}
+              ? t('backup.restoreMerge')
+              : t('backup.restoreFresh')}
           </Lead>
-          <Button label="Choose a backup file" variant={hasData ? 'ghost' : 'primary'} onPress={choose} />
+          <Button label={t('backup.choose')} variant={hasData ? 'ghost' : 'primary'} onPress={choose} />
           {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
         </>
       ) : null}
@@ -93,7 +94,7 @@ export default function BackupScreen() {
             setError(null);
             setStep({ kind: 'home' });
           }}
-          onUnlock={(passphrase) => run('Unlocking…', async () => open(await unlockBackup(step.bytes, passphrase, setProgress), step.name))}
+          onUnlock={(passphrase) => run(t('backup.unlocking'), async () => open(await unlockBackup(step.bytes, passphrase, setProgress), step.name))}
         />
       ) : null}
 
@@ -103,13 +104,11 @@ export default function BackupScreen() {
           error={error}
           onCancel={() => setStep({ kind: 'home' })}
           onRestore={() =>
-            run('Restoring…', async () => {
+            run(t('backup.restoring'), async () => {
               const r = await restoreBackup(step.contents, step.plan);
               setStep({
                 kind: 'done',
-                message: `Restored ${count(r.children, 'child', 'children')} and ${count(r.logs, 'entry', 'entries')}` +
-                  (r.photos ? `, with ${count(r.photos, 'photo', 'photos')}` : '') +
-                  (r.deletions ? `. ${count(r.deletions, 'deletion', 'deletions')} applied.` : '.'),
+                message: restoredMessage(r),
               });
             })
           }
@@ -118,16 +117,22 @@ export default function BackupScreen() {
 
       {!busy && step.kind === 'done' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">Restore complete</Text>
+          <Text className="text-ink text-xl font-bold mt-4">{t('backup.complete')}</Text>
           <Lead className="mt-2">{step.message}</Lead>
-          <Button label="Done" onPress={() => router.replace('/')} />
+          <Button label={t('common.done')} onPress={() => router.replace('/')} />
         </>
       ) : null}
     </ScreenScroll>
   );
 }
 
-const count = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+const count = (n: number, what: 'children' | 'entries' | 'photos' | 'deletions' | 'items') => t(`count.${what}`, { count: n });
+
+function restoredMessage(r: { children: number; logs: number; photos: number; deletions: number }) {
+  const what = { children: count(r.children, 'children'), entries: count(r.logs, 'entries'), photos: count(r.photos, 'photos') };
+  const text = t(r.photos ? 'backup.restoredPhotos' : 'backup.restored', what);
+  return r.deletions ? t('backup.deletionsApplied', { text, deletions: count(r.deletions, 'deletions') }) : text;
+}
 
 function BackUp({
   run,
@@ -145,22 +150,22 @@ function BackUp({
   const ready = passphrase.length === 0 || (!tooShort && confirm === passphrase);
 
   const backUp = () =>
-    run(passphrase ? 'Encrypting the backup…' : 'Making the backup…', async () => {
+    run(t(passphrase ? 'backup.encrypting' : 'backup.making'), async () => {
       const r = await saveBackup(passphrase || null, onProgress);
-      const where = r.savedAs ? ` Saved in Downloads as ${r.savedAs}.` : '';
-      onDone(`Backup made: ${count(r.children, 'child', 'children')}, ${count(r.logs, 'entry', 'entries')}, ${count(r.photos, 'photo', 'photos')}.${where}`);
+      const made = t('backup.made', { children: count(r.children, 'children'), entries: count(r.logs, 'entries'), photos: count(r.photos, 'photos') });
+      onDone(r.savedAs ? t('backup.savedAs', { text: made, name: r.savedAs }) : made);
     });
 
   return (
     <>
-      <Text className="text-ink text-xl font-bold">Back up</Text>
+      <Text className="text-ink text-xl font-bold">{t('backup.backUp')}</Text>
       <Lead className="mt-2">
-        One file with every child, entry and photo on this phone.{' '}
-        {savesToDownloads ? 'It goes to Downloads; copy it somewhere safe, like a computer or cloud storage.' : 'Save it to Files, a computer or cloud storage.'}
+        {t('backup.lead')}{' '}
+        {t(savesToDownloads ? 'backup.whereDownloads' : 'backup.whereFiles')}
       </Lead>
 
-      <FieldLabel>Passphrase (optional)</FieldLabel>
-      <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Encrypt the file" />
+      <FieldLabel>{t('backup.passphraseOptional')}</FieldLabel>
+      <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder={t('backup.encryptPlaceholder')} />
       {passphrase ? (
         <TextField
           value={confirm}
@@ -168,21 +173,21 @@ function BackUp({
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder="Type it again"
+          placeholder={t('backup.again')}
           className="mt-2"
         />
       ) : null}
       <Text className={`text-xs mt-2 ml-1 leading-5 ${tooShort || mismatch ? 'text-red-soft' : 'text-ink-faint'}`}>
         {tooShort
-          ? `Use at least ${MIN_PASSPHRASE} characters.`
+          ? t('backup.tooShort', { count: MIN_PASSPHRASE })
           : mismatch
-            ? "The passphrases don't match."
+            ? t('backup.mismatch')
             : passphrase
-              ? "If you forget the passphrase, the backup can't be opened. Nobody can recover it."
-              : 'Without a passphrase, anyone with the file can read everything in it, photos included.'}
+              ? t('backup.forget')
+              : t('backup.noPassphrase')}
       </Text>
 
-      <Button label={savesToDownloads ? 'Save to Downloads' : 'Save backup…'} onPress={backUp} disabled={!ready} />
+      <Button label={t(savesToDownloads ? 'backup.saveDownloads' : 'backup.save')} onPress={backUp} disabled={!ready} />
     </>
   );
 }
@@ -201,13 +206,13 @@ function Unlock({
   const [passphrase, setPassphrase] = useState('');
   return (
     <>
-      <Text className="text-ink text-xl font-bold">This backup is encrypted</Text>
+      <Text className="text-ink text-xl font-bold">{t('backup.encrypted')}</Text>
       <Lead className="mt-2">{name}</Lead>
-      <FieldLabel>Passphrase</FieldLabel>
+      <FieldLabel>{t('backup.passphrase')}</FieldLabel>
       <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} autoFocus />
       {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
-      <Button label="Unlock" onPress={() => onUnlock(passphrase)} disabled={!passphrase} />
-      <Button label="Cancel" variant="ghost" onPress={onCancel} />
+      <Button label={t('backup.unlock')} onPress={() => onUnlock(passphrase)} disabled={!passphrase} />
+      <Button label={t('common.cancel')} variant="ghost" onPress={onCancel} />
     </>
   );
 }
@@ -229,25 +234,30 @@ function Preview({
   const changes = plan.children.length + plan.logs.length + plan.deletions.length;
   return (
     <>
-      <Text className="text-ink text-xl font-bold">Restore this backup?</Text>
+      <Text className="text-ink text-xl font-bold">{t('backup.restoreThis')}</Text>
       <Lead className="mt-2">
-        Made {formatDayLabel(backup.createdAt).toLowerCase()} at {formatTime(backup.createdAt)}: {count(backup.children.length, 'child', 'children')},{' '}
-        {count(backup.logs.length, 'entry', 'entries')}, {count(photos.size, 'photo', 'photos')}.
+        {t('backup.madeAt', {
+          day: formatDayLabel(backup.createdAt).toLowerCase(),
+          time: formatTime(backup.createdAt),
+          children: count(backup.children.length, 'children'),
+          entries: count(backup.logs.length, 'entries'),
+          photos: count(photos.size, 'photos'),
+        })}
       </Lead>
 
       <View className="bg-surface rounded-2xl border border-line px-4 py-3 mt-4">
-        <Line label="Children to add or update" value={plan.children.length} />
-        <Line label="Entries to add or update" value={plan.logs.length} />
-        {plan.deletions.length ? <Line label="Deleted since, to delete here" value={plan.deletions.length} /> : null}
-        <Line label="Already up to date" value={plan.unchanged} />
+        <Line label={t('backup.addChildren')} value={plan.children.length} />
+        <Line label={t('backup.addEntries')} value={plan.logs.length} />
+        {plan.deletions.length ? <Line label={t('backup.deletions')} value={plan.deletions.length} /> : null}
+        <Line label={t('backup.unchanged')} value={plan.unchanged} />
       </View>
       {invalid ? (
-        <Text className="text-amber-soft text-xs mt-2 ml-1">{count(invalid, 'item', 'items')} in the file couldn't be read and will be skipped.</Text>
+        <Text className="text-amber-soft text-xs mt-2 ml-1">{t('backup.invalid', { items: count(invalid, 'items') })}</Text>
       ) : null}
       {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
 
-      {changes ? <Button label="Restore" onPress={onRestore} /> : <Text className="text-ink-muted mt-4">This phone already has everything in this backup.</Text>}
-      <Button label={changes ? 'Cancel' : 'Back'} variant="ghost" onPress={onCancel} />
+      {changes ? <Button label={t('backup.restore')} onPress={onRestore} /> : <Text className="text-ink-muted mt-4">{t('backup.nothingNew')}</Text>}
+      <Button label={t(changes ? 'common.cancel' : 'common.back')} variant="ghost" onPress={onCancel} />
     </>
   );
 }
@@ -256,7 +266,7 @@ function Line({ label, value }: { label: string; value: number }) {
   return (
     <View className="flex-row py-1">
       <Text className="flex-1 text-ink-soft">{label}</Text>
-      <Text className="text-ink font-semibold">{value.toLocaleString()}</Text>
+      <Text className="text-ink font-semibold">{formatNumber(value)}</Text>
     </View>
   );
 }
@@ -265,7 +275,7 @@ function Busy({ label, progress }: { label: string; progress: number }) {
   return (
     <View className="items-center mt-24">
       {progress > 0 && progress < 1 ? <SubProgress progress={progress} /> : <SubLoader />}
-      <Text className="text-ink-muted mt-4">{progress > 0 && progress < 1 ? `${label} ${Math.round(progress * 100)}%` : label}</Text>
+      <Text className="text-ink-muted mt-4">{progress > 0 && progress < 1 ? t('backup.percent', { label, percent: Math.round(progress * 100) }) : label}</Text>
     </View>
   );
 }

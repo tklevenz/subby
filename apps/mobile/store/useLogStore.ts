@@ -92,7 +92,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   addLog: async (payload, times = {}) => {
     const childId = get().activeChildId;
-    if (!childId) throw new Error('No active child');
+    if (!childId) throw new Error('No active child'); // i18n-ignore
     const now = Date.now();
     const startedAt = times.startedAt ?? now;
     const timed = TIMED_LOG_TYPES.includes(payload.type);

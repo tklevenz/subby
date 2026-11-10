@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -18,12 +19,12 @@ export default function EditChildScreen() {
 
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: child ? `Edit ${child.name}` : 'Child' }} />
+      <Stack.Screen options={{ title: child ? t('childEdit.title', { name: child.name }) : t('childEdit.child') }} />
       {child ? (
         <>
           <ChildForm
             initial={child}
-            submitLabel="Save"
+            submitLabel={t('common.save')}
             onSubmit={async (input) => {
               await updateChild(id, input);
               router.back();
@@ -50,7 +51,7 @@ function DeleteChild({ child }: { child: Child }) {
   if (!open) {
     return (
       <View className="mt-10 pt-6 border-t border-line">
-        <Button label="Delete child…" variant="ghost" onPress={() => setOpen(true)} />
+        <Button label={t('childEdit.deleteButton')} variant="ghost" onPress={() => setOpen(true)} />
       </View>
     );
   }
@@ -59,7 +60,7 @@ function DeleteChild({ child }: { child: Child }) {
   const breakdown = counts
     ? (Object.entries(counts) as [LogType, number][])
         .sort((a, b) => b[1] - a[1])
-        .map(([type, n]) => `${n.toLocaleString()} ${TYPE_META[type].label.toLowerCase()}`)
+        .map(([type, n]) => t('childEdit.count', { count: n, type: TYPE_META[type].label }))
         .join(' · ')
     : '';
   const matches = confirm.trim().toLowerCase() === child.name.trim().toLowerCase();
@@ -82,25 +83,25 @@ function DeleteChild({ child }: { child: Child }) {
 
   return (
     <View className="mt-10 rounded-2xl border border-red/40 bg-red/10 p-4">
-      <Text className="text-red-soft font-semibold text-base">Delete {child.name} permanently?</Text>
+      <Text className="text-red-soft font-semibold text-base">{t('childEdit.deleteTitle', { name: child.name })}</Text>
       <Text className="text-ink-soft mt-2 leading-5">
         {counts === null
-          ? 'Counting entries…'
+          ? t('childEdit.counting')
           : total === 0
-            ? `${child.name}'s profile will be deleted.`
-            : `${child.name}'s profile and all ${total.toLocaleString()} entries will be deleted from this device, including photos.`}
+            ? t('childEdit.profileOnly', { name: child.name })
+            : t('childEdit.profileAndEntries', { name: child.name, count: total })}
       </Text>
       {breakdown ? <Text className="text-ink-muted text-xs mt-2 leading-4">{breakdown}</Text> : null}
-      <Text className="text-ink-soft mt-2 leading-5">This can't be undone.</Text>
+      <Text className="text-ink-soft mt-2 leading-5">{t('childEdit.cantUndo')}</Text>
       {child.importRef ? (
-        <Text className="text-ink-muted text-xs mt-2 leading-4">Imported data can be imported again from Baby Buddy.</Text>
+        <Text className="text-ink-muted text-xs mt-2 leading-4">{t('childEdit.reimport')}</Text>
       ) : null}
 
-      <FieldLabel>Type "{child.name}" to confirm</FieldLabel>
+      <FieldLabel>{t('childEdit.typeName', { name: child.name })}</FieldLabel>
       <TextField value={confirm} onChangeText={setConfirm} placeholder={child.name} autoCapitalize="none" autoCorrect={false} />
-      <Button label={deleting ? 'Deleting…' : 'Delete forever'} variant="danger" disabled={!matches || deleting || counts === null} onPress={onDelete} />
+      <Button label={t(deleting ? 'childEdit.deleting' : 'childEdit.deleteForever')} variant="danger" disabled={!matches || deleting || counts === null} onPress={onDelete} />
       <Button
-        label="Cancel"
+        label={t('common.cancel')}
         variant="ghost"
         onPress={() => {
           setOpen(false);

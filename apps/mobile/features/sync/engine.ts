@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { create } from 'zustand';
 import * as Device from 'expo-device';
 import { and, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
@@ -210,7 +211,7 @@ async function runOnce() {
   try {
     // Another phone moved the family: follow it before anything else touches the old one.
     if (settings.move) {
-      useSyncStore.setState({ progress: { label: 'Moving to the new server', done: 0 } });
+      useSyncStore.setState({ progress: { label: t('sync.progress.moving'), done: 0 } });
       await followMove(settings, settings.move);
       again = true;
       return;
@@ -235,7 +236,7 @@ async function runOnce() {
     await refreshEntitlement(api);
     const pushed = canWrite() ? await pushUnlessLocked(api, settings, keys) : { applied: false, tooLarge: 0 };
     const applied = (await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq)) || pushed.applied;
-    const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: 'Downloading photos', done } }));
+    const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: t('sync.progress.photos'), done } }));
     // Phones set up before names existed (or whose name record was lost) name themselves once.
     if (!syncSettings()?.names?.[settings.deviceId] && canWrite()) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
@@ -245,12 +246,12 @@ async function runOnce() {
     const pulled = quiet ? [] : pulledLogs;
     pulledLogs = [];
     quiet = false;
-    await notifyFamily(pulled).catch((e) => console.warn('Family notifications failed', e));
-    await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e));
+    await notifyFamily(pulled).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
+    await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e)); // i18n-ignore
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
   } catch (e) {
     const removed = isRemoved(e);
-    const message = removed ? 'This phone is no longer in the family' : e instanceof Error ? e.message : String(e);
+    const message = removed ? t('sync.error.removed') : e instanceof Error ? e.message : String(e);
     useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, progress: null, pending: await pendingCount() });
     throw e;
   }
@@ -291,7 +292,7 @@ export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
   if (syncSettings()?.logSeen?.length !== entries.length || syncSettings()?.log?.length !== entries.length) {
     await saveSync({ logSeen: { length: entries.length, head: state.head }, log: entries });
   }
-  if (!state.members.has(settings.deviceId)) throw new SyncHttpError(401, 'Removed');
+  if (!state.members.has(settings.deviceId)) throw new SyncHttpError(401, 'Removed'); // i18n-ignore
   const ids = [...state.members.keys()];
   const known = new Set(settings.knownDevices ?? [settings.deviceId]);
   const added = ids.filter((id) => !known.has(id));
@@ -319,7 +320,7 @@ export async function refreshKeys(api: SyncSession, state?: DeviceLogState) {
     changed = true;
   }
   if (changed) saveFamilyKeys(keys);
-  if (!keys.has(log.epoch)) throw new Error('Missing the current family key');
+  if (!keys.has(log.epoch)) throw new Error(t('sync.error.noKey'));
   return { keys, epoch: log.epoch, missing: res.missing ?? [], closedAt: log.closedAt };
 }
 
@@ -457,7 +458,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       });
       if (newer.length) applied = applyOpened(openedNewer.filter((o) => (newer as SyncRecord[]).includes(o.record)), settings.deviceId) || applied;
       done += chunk.length;
-      useSyncStore.setState({ progress: { label: 'Uploading', done } });
+      useSyncStore.setState({ progress: { label: t('sync.progress.uploading'), done } });
     }
   }
 }
@@ -489,14 +490,14 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     if (gen !== seenGen) await saveSync({ restoreGen: gen });
     if (!pageContinues(seq, page)) throw new Error(`The server sent a page that doesn't continue from ${seq}`);
     const genuine = page.records.filter((r) => {
-      if (r.seq > seq && r.seq <= page.seq && genuineAt(closedAt, r.epoch, r.seq)) return true;
+      if (r.seq > seq && r.seq <= page.seq && genuineAt(closedAt, r.epoch, r.seq)) return true; // i18n-ignore
       console.warn(`[sync] refused ${r.kind} record ${r.id}: seq ${r.seq} isn't valid for epoch ${r.epoch}`);
       return false;
     });
     if (page.records.length) {
       applied = applyPage(genuine, keys, settings.deviceId) || applied;
       done += page.records.length;
-      if (since === 0 || page.more) useSyncStore.setState({ progress: { label: 'Downloading', done } });
+      if (since === 0 || page.more) useSyncStore.setState({ progress: { label: t('sync.progress.downloading'), done } });
     }
     seq = page.seq;
     await saveSync({ lastSeq: seq });
@@ -517,8 +518,8 @@ const genuineAt = (closedAt: DeviceLogState['closedAt'], epoch: number, seq: num
  */
 async function resyncAfterRestore(api: SyncSession, floor: RestoreFloor, gen: number) {
   console.warn(`[sync] the server was restored from a backup (count ${gen}, seq ${floor.seq}); syncing everything again`);
-  useSyncStore.setState({ progress: { label: 'Restoring the server', done: 0 } });
-  await uploadPhotosAsTheyAre(api, (done) => useSyncStore.setState({ progress: { label: 'Restoring the server', done } }), true);
+  useSyncStore.setState({ progress: { label: t('sync.progress.restoring'), done: 0 } });
+  await uploadPhotosAsTheyAre(api, (done) => useSyncStore.setState({ progress: { label: t('sync.progress.restoring'), done } }), true);
   await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
   await db.update(schema.logsTable).set({ syncStatus: 'pending' });
   const settings = syncSettings()!;
@@ -637,7 +638,7 @@ function applyOpened(opened: Opened[], ownDeviceId: string): boolean {
 }
 
 /** A sensible default name for this phone in the family's list, e.g. "Pixel 10". */
-export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? 'Phone';
+export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? t('sync.phone');
 
 /** A phone's display name, as its encrypted `device` record (id = that phone's device id). */
 export type DeviceBody = { name: string };

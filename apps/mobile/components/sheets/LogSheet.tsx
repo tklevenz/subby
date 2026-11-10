@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -20,17 +21,17 @@ export function CommonFields({ payload, onChange }: { payload: LogPayload; onCha
     <View>
       {payload.type !== 'note' ? (
         <>
-          <FieldLabel>Notes</FieldLabel>
+          <FieldLabel>{t('logSheet.notes')}</FieldLabel>
           <TextField
             value={payload.notes ?? ''}
             onChangeText={(notes) => onChange({ notes: notes || undefined })}
-            placeholder="Optional"
+            placeholder={t('logSheet.optional')}
             multiline
             style={{ minHeight: 56, textAlignVertical: 'top' }}
           />
         </>
       ) : null}
-      <FieldLabel>Tags</FieldLabel>
+      <FieldLabel>{t('logSheet.tags')}</FieldLabel>
       <TagsField value={payload.tags} onChange={(tags) => onChange({ tags })} />
     </View>
   );
@@ -103,27 +104,27 @@ export default function LogSheet({
 
   return (
     <>
-      <FieldLabel>{timed ? 'Start' : pastBreastfeed ? 'Started' : 'Time'}</FieldLabel>
-      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} title={timed ? 'Start time' : 'Time'} />
+      <FieldLabel>{t(timed ? 'logSheet.start' : pastBreastfeed ? 'logSheet.started' : 'logSheet.time')}</FieldLabel>
+      <DateTimeField value={startedAt} onChange={setStartedAt} maximumDate={new Date()} title={t(timed ? 'logSheet.startTime' : 'logSheet.time')} />
 
       {timed ? (
         <>
-          <FieldLabel>End</FieldLabel>
+          <FieldLabel>{t('logSheet.end')}</FieldLabel>
           <View className="flex-row items-center gap-3">
-            <DateTimeField value={end} onChange={setEnd} maximumDate={new Date()} title="End time" placeholder="Set end time" />
+            <DateTimeField value={end} onChange={setEnd} maximumDate={new Date()} title={t('logSheet.endTime')} placeholder={t('logSheet.setEnd')} />
             {end !== null ? (
               <Pressable onPress={() => setEnd(null)} className="rounded-full border border-line-strong px-3 py-2" hitSlop={6}>
-                <Text className="text-ink-muted text-sm">Clear</Text>
+                <Text className="text-ink-muted text-sm">{t('logSheet.clear')}</Text>
               </Pressable>
             ) : null}
           </View>
           {invalidEnd ? (
-            <ErrorText className="mt-2">End must be after start.</ErrorText>
+            <ErrorText className="mt-2">{t('logSheet.endAfterStart')}</ErrorText>
           ) : (end !== null ? saveOverlap : timerOverlap) ? (
             <ErrorText className="mt-2">{end !== null ? saveOverlap : timerOverlap}</ErrorText>
           ) : (
             <Text className="text-ink-muted text-sm mt-2">
-              {end === null ? 'Set an end time to log a past one, or start a timer.' : formatHoursMinutes(end - startedAt)}
+              {end === null ? t('logSheet.needEnd') : formatHoursMinutes(end - startedAt)}
             </Text>
           )}
         </>
@@ -132,9 +133,9 @@ export default function LogSheet({
       <PayloadEditor payload={payload} onChange={patch} />
       <CommonFields payload={payload} onChange={patch} />
 
-      <Button label="Save" onPress={save} disabled={!complete || (timed && (end === null || invalidEnd || saveOverlap !== null))} />
+      <Button label={t('common.save')} onPress={save} disabled={!complete || (timed && (end === null || invalidEnd || saveOverlap !== null))} />
       {timed ? (
-        <Button label="Start timer" variant="ghost" onPress={start} disabled={!complete || timerOverlap !== null} />
+        <Button label={t('logSheet.startTimer')} variant="ghost" onPress={start} disabled={!complete || timerOverlap !== null} />
       ) : null}
     </>
   );

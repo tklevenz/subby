@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Plus, TriangleExclamation } from '../icons';
@@ -31,7 +32,7 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
 
   return (
     <View>
-      <FieldLabel>Foods</FieldLabel>
+      <FieldLabel>{t('foods.title')}</FieldLabel>
       <View className="flex-row flex-wrap gap-2">
         {options.map((f) => (
           <Chip
@@ -44,7 +45,7 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
         ))}
       </View>
       <View className="flex-row items-center mt-2">
-        <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder="New food" onSubmitEditing={add} returnKeyType="done" />
+        <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder={t('foods.new')} onSubmitEditing={add} returnKeyType="done" />
         <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-raised" hitSlop={6}>
           <Plus color={colors.inkSoft} size={18} />
         </Pressable>
@@ -53,16 +54,16 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
       <View className="flex-row items-center justify-between mt-4">
         <View className="flex-row items-center">
           <TriangleExclamation color={colors.amberStrong} size={16} />
-          <Text className="text-ink-soft ml-2">Possible allergen / first try</Text>
+          <Text className="text-ink-soft ml-2">{t('foods.allergen')}</Text>
         </View>
         <Toggle value={value.allergen ?? false} onValueChange={(allergen) => onChange({ allergen: allergen || undefined })} />
       </View>
 
-      <FieldLabel>Reaction</FieldLabel>
+      <FieldLabel>{t('foods.reaction')}</FieldLabel>
       <TextField
         value={value.reaction ?? ''}
         onChangeText={(reaction) => onChange({ reaction: reaction || undefined })}
-        placeholder="e.g. loved it, rash, refused"
+        placeholder={t('foods.reactionPlaceholder')}
       />
     </View>
   );

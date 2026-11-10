@@ -1,11 +1,13 @@
 import React, { type ComponentType } from 'react';
 import { Baby, BottleWater, ChildReaching, Droplet, Flag, Moon, PenToSquare, Pills, Poop, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent, type IconProps } from './icons';
-import { LOG_TYPES, type LogPayload, type LogType } from '@subby/shared';
+import { ACTIVITY_KINDS, LOG_TYPES, type LogPayload, type LogType } from '@subby/shared';
+import { t } from '@subby/shared/i18n';
 import type { SheetRequest } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
 
 export type LogTypeMeta = {
-  label: string;
+  /** In the app's language (a getter: read when shown). */
+  readonly label: string;
   Icon: IconComponent;
   color: string;
   /** Tailwind border/background classes for rows and tiles. */
@@ -13,17 +15,17 @@ export type LogTypeMeta = {
 };
 
 export const TYPE_META: Record<LogType, LogTypeMeta> = {
-  feed: { label: 'Feed', Icon: Baby, get color() { return colors.cyanSoft; }, bg: 'border-cyan/40 bg-cyan/10' },
-  diaper: { label: 'Diaper', Icon: PoopDroplet, get color() { return colors.amberStrong; }, bg: 'border-amber/40 bg-amber/10' },
-  sleep: { label: 'Sleep', Icon: Moon, get color() { return colors.violetStrong; }, bg: 'border-violet/40 bg-violet/10' },
-  pumping: { label: 'Pumping', Icon: BottleWater, get color() { return colors.fuchsiaSoft; }, bg: 'border-fuchsia/40 bg-fuchsia/10' },
-  growth: { label: 'Growth', Icon: RulerVertical, get color() { return colors.greenSoft; }, bg: 'border-green/40 bg-green/10' },
-  temperature: { label: 'Temperature', Icon: TemperatureHalf, get color() { return colors.redSoft; }, bg: 'border-red/40 bg-red/10' },
-  medication: { label: 'Medication', Icon: Pills, get color() { return colors.blueSoft; }, bg: 'border-blue/40 bg-blue/10' },
-  potty: { label: 'Potty', Icon: Toilet, get color() { return colors.amberPale; }, bg: 'border-yellow/40 bg-yellow/10' },
-  activity: { label: 'Activity', Icon: Shapes, get color() { return colors.tealSoft; }, bg: 'border-teal/40 bg-teal/10' },
-  milestone: { label: 'Milestone', Icon: Flag, get color() { return colors.orangeSoft; }, bg: 'border-orange/40 bg-orange/10' },
-  note: { label: 'Note', Icon: PenToSquare, get color() { return colors.inkSoft; }, bg: 'border-gray/40 bg-gray/10' },
+  feed: { get label() { return t('type.feed'); }, Icon: Baby, get color() { return colors.cyanSoft; }, bg: 'border-cyan/40 bg-cyan/10' },
+  diaper: { get label() { return t('type.diaper'); }, Icon: PoopDroplet, get color() { return colors.amberStrong; }, bg: 'border-amber/40 bg-amber/10' },
+  sleep: { get label() { return t('type.sleep'); }, Icon: Moon, get color() { return colors.violetStrong; }, bg: 'border-violet/40 bg-violet/10' },
+  pumping: { get label() { return t('type.pumping'); }, Icon: BottleWater, get color() { return colors.fuchsiaSoft; }, bg: 'border-fuchsia/40 bg-fuchsia/10' },
+  growth: { get label() { return t('type.growth'); }, Icon: RulerVertical, get color() { return colors.greenSoft; }, bg: 'border-green/40 bg-green/10' },
+  temperature: { get label() { return t('type.temperature'); }, Icon: TemperatureHalf, get color() { return colors.redSoft; }, bg: 'border-red/40 bg-red/10' },
+  medication: { get label() { return t('type.medication'); }, Icon: Pills, get color() { return colors.blueSoft; }, bg: 'border-blue/40 bg-blue/10' },
+  potty: { get label() { return t('type.potty'); }, Icon: Toilet, get color() { return colors.amberPale; }, bg: 'border-yellow/40 bg-yellow/10' },
+  activity: { get label() { return t('type.activity'); }, Icon: Shapes, get color() { return colors.tealSoft; }, bg: 'border-teal/40 bg-teal/10' },
+  milestone: { get label() { return t('type.milestone'); }, Icon: Flag, get color() { return colors.orangeSoft; }, bg: 'border-orange/40 bg-orange/10' },
+  note: { get label() { return t('type.note'); }, Icon: PenToSquare, get color() { return colors.inkSoft; }, bg: 'border-gray/40 bg-gray/10' },
 };
 
 /**
@@ -38,12 +40,12 @@ export const LOG_TILE_KEYS: readonly LogTileKey[] = LOG_TYPES.flatMap((t): LogTi
 export function logTile(key: LogTileKey): LogTile {
   if (key === 'tummy') {
     const { color, bg } = TYPE_META.activity;
-    return { key, label: 'Tummy time', Icon: ChildReaching, color, bg, request: { kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } } };
+    return { key, get label() { return t('activity.tummy_time'); }, Icon: ChildReaching, color, bg, request: { kind: 'log', type: 'activity', payload: { kind: 'tummy_time' } } };
   }
   const meta = TYPE_META[key];
   const request: SheetRequest =
     key === 'feed' ? { kind: 'feed' } : key === 'activity' ? { kind: 'log', type: key, payload: { kind: 'play' } } : { kind: 'log', type: key };
-  return { key, label: meta.label, Icon: meta.Icon, get color() { return meta.color; }, bg: meta.bg, request };
+  return { key, get label() { return meta.label; }, Icon: meta.Icon, get color() { return meta.color; }, bg: meta.bg, request };
 }
 
 /** Starting payload for a new entry of each type. */
@@ -64,7 +66,7 @@ export function defaultPayload(type: LogType): LogPayload {
 }
 
 export function activityLabel(kind: string): string {
-  return kind === 'tummy_time' ? 'Tummy time' : kind.charAt(0).toUpperCase() + kind.slice(1);
+  return (ACTIVITY_KINDS as readonly string[]).includes(kind) ? t(`activity.${kind as (typeof ACTIVITY_KINDS)[number]}`) : kind;
 }
 
 /**

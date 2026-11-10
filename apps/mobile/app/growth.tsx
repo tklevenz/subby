@@ -1,3 +1,4 @@
+import { formatDate, t } from '@subby/shared/i18n';
 import React, { useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -22,17 +23,16 @@ import { SubMono } from '../components/brand/Sub';
 import { colors } from '../theme/colors';
 import { ScreenScroll } from '../components/ScreenScroll';
 
-const MEASURES = [
-  { value: 'weightKg', label: 'Weight' },
-  { value: 'lengthCm', label: 'Length' },
-  { value: 'headCm', label: 'Head' },
-] as const;
+const measures = () =>
+  [
+    { value: 'weightKg', label: t('growth.weight') },
+    { value: 'lengthCm', label: t('growth.length') },
+    { value: 'headCm', label: t('growth.head') },
+  ] as const;
 
-const TITLES: Record<GrowthMeasure, string> = {
-  weightKg: 'Weight-for-age',
-  lengthCm: 'Length-for-age',
-  headCm: 'Head circumference-for-age',
-};
+const TITLE_KEYS = { weightKg: 'growth.weightTitle', lengthCm: 'growth.lengthTitle', headCm: 'growth.headTitle' } as const;
+const NONE_KEYS = { weightKg: 'growth.noWeight', lengthCm: 'growth.noLength', headCm: 'growth.noHead' } as const;
+const title = (measure: GrowthMeasure) => t(TITLE_KEYS[measure]);
 
 const GROWTH = ['growth'] as const;
 
@@ -55,9 +55,9 @@ export default function GrowthScreen() {
     setSharing(true);
     try {
       const uri = await captureRef(chartRef, { format: 'png', quality: 1, result: 'tmpfile' });
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `${child.name} – ${TITLES[measure]}` });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: t('growth.shareTitle', { name: child.name, chart: title(measure) }) });
     } catch (e) {
-      Alert.alert('Could not share chart', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('growth.shareFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSharing(false);
     }
@@ -65,39 +65,38 @@ export default function GrowthScreen() {
 
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      <Segmented options={MEASURES} value={measure} onChange={setMeasure} />
+      <Segmented options={measures()} value={measure} onChange={setMeasure} />
 
       {!sex ? (
         <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} className="mt-4 rounded-xl border border-amber/40 bg-amber/10 p-3">
           <Text className="text-amber-pale text-sm leading-5">
-            WHO percentiles differ for girls and boys. Set it in {child.name}'s profile to see them. Tap to edit.
+            {t('growth.setSex', { name: child.name })}
           </Text>
         </Pressable>
       ) : null}
 
       {/* Captured as the shared image, so it carries its own title. */}
       <View ref={chartRef} collapsable={false} className="mt-4 bg-ground py-3">
-        <Text className="text-ink font-semibold text-base">{child.name} · {TITLES[measure]}</Text>
+        <Text className="text-ink font-semibold text-base">{t('growth.chartTitle', { name: child.name, chart: title(measure) })}</Text>
         <Text className="text-ink-faint text-xs mb-3">
-          {chartUnitLabel(measure, units)} by age in months
-          {sex ? ` · WHO ${sex === 'female' ? 'girls' : 'boys'} 3rd–97th percentile` : ''}
+          {t(sex === 'female' ? 'growth.byAgeGirls' : sex ? 'growth.byAgeBoys' : 'growth.byAge', { unit: chartUnitLabel(measure, units) })}
         </Text>
         <GrowthChart measure={measure} sex={sex} points={points} units={units} />
         <View className="flex-row items-center mt-2">
-          <Text className="text-ink-ghost text-[10px]">Source: WHO Child Growth Standards · </Text>
+          <Text className="text-ink-ghost text-[10px]">{t('growth.source')}</Text>
           <SubMono width={14} color={colors.inkFaint} />
           <Text className="text-ink-faint text-[10px] ml-1">Subby</Text>
         </View>
       </View>
 
       {points.length === 0 && logs ? (
-        <Text className="text-ink-faint text-center mt-4">No {MEASURES.find((m) => m.value === measure)!.label.toLowerCase()} measurements yet. Log one with + on Home.</Text>
+        <Text className="text-ink-faint text-center mt-4">{t(NONE_KEYS[measure])}</Text>
       ) : null}
-      {beyondWho ? <Text className="text-ink-faint text-xs mt-2">WHO percentiles here cover 0–24 months.</Text> : null}
+      {beyondWho ? <Text className="text-ink-faint text-xs mt-2">{t('growth.beyondWho')}</Text> : null}
 
       {points.length > 0 ? (
         <>
-          <Button label={sharing ? 'Preparing…' : 'Share chart'} variant="ghost" disabled={sharing} onPress={share} />
+          <Button label={t(sharing ? 'growth.preparing' : 'growth.share')} variant="ghost" disabled={sharing} onPress={share} />
           <View className="mt-6 bg-surface border border-line rounded-2xl">
             {[...points].reverse().map((p) => {
               const pct = growthPercentile(measure, child.sex, p.months, p.value);
@@ -106,7 +105,7 @@ export default function GrowthScreen() {
                   <View className="flex-1">
                     <Text className="text-ink">{format(p.value)}</Text>
                     <Text className="text-ink-faint text-xs">
-                      {new Date(p.at).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} · {formatAge(child.birthDate, p.at)}
+                      {t('growth.pointDate', { date: formatDate(p.at, { day: 'numeric', month: 'short', year: 'numeric' }), age: formatAge(child.birthDate, p.at) })}
                     </Text>
                   </View>
                   {pct !== null ? <Text className="text-violet-pale text-sm">{formatPercentile(pct)}</Text> : null}

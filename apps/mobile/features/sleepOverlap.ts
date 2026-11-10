@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { overlappingSleep, startOfDay } from '@subby/shared';
 import { useLogQuery } from '../store/queries';
 import { useLogStore } from '../store/useLogStore';
@@ -17,8 +18,8 @@ export function useSleepOverlap(check: boolean, start: number, end: number | nul
   if (!check) return null;
   const other = overlappingSleep([...(nearby ?? []), ...loaded], start, end, exclude);
   if (!other) return null;
-  const at = (ms: number) => (startOfDay(ms) === startOfDay(Date.now()) ? formatTime(ms) : `${formatDayLabel(ms)} ${formatTime(ms)}`);
+  const at = (ms: number) => (startOfDay(ms) === startOfDay(Date.now()) ? formatTime(ms) : t('overlap.dayTime', { day: formatDayLabel(ms), time: formatTime(ms) }));
   return other.endedAt === null
-    ? `Overlaps the sleep that's still going (since ${at(other.startedAt)}).`
-    : `Overlaps another sleep (${at(other.startedAt)}–${at(other.endedAt)}).`;
+    ? t('overlap.running', { time: at(other.startedAt) })
+    : t('overlap.other', { from: at(other.startedAt), to: at(other.endedAt) });
 }

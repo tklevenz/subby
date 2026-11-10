@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -16,12 +17,14 @@ type Condition = 'wet' | 'dirty' | 'both';
 type DiaperColor = (typeof DIAPER_COLORS)[number];
 
 // Wet is blue, dirty brown; both is neutral and lets its two colored icons say it.
-const KINDS: { condition: Condition; label: string; className: string; Icon: (p: IconProps) => React.ReactNode }[] = [
-  { condition: 'wet', label: 'Wet', className: 'bg-blue/20 border-blue/40', Icon: diaperLook('wet').Icon },
-  { condition: 'dirty', label: 'Dirty', className: 'bg-brown/30 border-brown-strong/50', Icon: diaperLook('dirty').Icon },
+const KINDS: { condition: Condition; readonly label: string; className: string; Icon: (p: IconProps) => React.ReactNode }[] = [
+  { condition: 'wet', get label() { return t('diaper.wet'); }, className: 'bg-blue/20 border-blue/40', Icon: diaperLook('wet').Icon },
+  { condition: 'dirty', get label() { return t('diaper.dirty'); }, className: 'bg-brown/30 border-brown-strong/50', Icon: diaperLook('dirty').Icon },
   {
     condition: 'both',
-    label: 'Both',
+    get label() {
+      return t('diaper.both');
+    },
     className: 'bg-raised border-line-strong',
     Icon: diaperLook('both').Icon,
   },
@@ -57,9 +60,9 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
     return (
       <View className="pt-1 pb-2">
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-ink-muted text-sm">Now, {formatTime(now)}</Text>
+          <Text className="text-ink-muted text-sm">{t('diaperSheet.now', { time: formatTime(now) })}</Text>
           <Pressable hitSlop={10} onPress={() => open({ kind: 'log', type: 'diaper' })}>
-            <Text className="text-violet-soft text-sm">Earlier or details…</Text>
+            <Text className="text-violet-soft text-sm">{t('diaperSheet.earlier')}</Text>
           </Pressable>
         </View>
         <View className="flex-row gap-2.5">
@@ -74,13 +77,13 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
             </Pressable>
           ))}
         </View>
-        <Text className="text-ink-muted text-xs text-center mt-3">One tap logs it. Add a color after if you like.</Text>
+        <Text className="text-ink-muted text-xs text-center mt-3">{t('diaperSheet.oneTap')}</Text>
       </View>
     );
   }
 
   const p = logged.payload;
-  const label = KINDS.find((k) => k.condition === p.condition)?.label ?? 'Diaper';
+  const label = KINDS.find((k) => k.condition === p.condition)?.label ?? t('type.diaper');
   const setColor = async (color: DiaperColor) => {
     Haptics.selectionAsync();
     const payload = { ...p, color: p.color === color ? undefined : color };
@@ -108,13 +111,13 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
           }}
           className="h-9 px-4 rounded-full border border-line-strong bg-raised items-center justify-center"
         >
-          <Text className="text-ink text-sm">Undo</Text>
+          <Text className="text-ink text-sm">{t('common.undo')}</Text>
         </Pressable>
       </View>
 
       {p.condition === 'dirty' || p.condition === 'both' ? (
         <>
-          <Text className="text-ink-muted text-xs font-medium mt-5 mb-2">Color (optional)</Text>
+          <Text className="text-ink-muted text-xs font-medium mt-5 mb-2">{t('diaperSheet.color')}</Text>
           <View className="flex-row flex-wrap gap-2">
             {COLOR_ORDER.map((c) => (
               <Pressable
@@ -124,15 +127,15 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
                 className={`h-14 rounded-xl items-center justify-center bg-raised border-2 ${p.color === c ? 'border-violet-strong' : 'border-transparent'}`}
               >
                 <View style={{ backgroundColor: COLOR_SWATCH[c] }} className="w-5 h-5 rounded-full border border-line-heavy" />
-                <Text className="text-ink-soft text-[11px] mt-1 capitalize">{c}</Text>
+                <Text className="text-ink-soft text-[11px] mt-1 capitalize">{t(`diaperColor.${c}`)}</Text>
               </Pressable>
             ))}
           </View>
         </>
       ) : null}
 
-      <Button label="Done" onPress={onClose} />
-      <Text className="text-ink-faint text-xs text-center mt-2">Closes by itself after a few seconds</Text>
+      <Button label={t('common.done')} onPress={onClose} />
+      <Text className="text-ink-faint text-xs text-center mt-2">{t('diaperSheet.closes')}</Text>
     </View>
   );
 }

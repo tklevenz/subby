@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { Baby, Plus, PoopDroplet } from '../icons';
 import { useSheetStore, type SheetRequest } from '../../store/useSheetStore';
@@ -12,14 +13,14 @@ import { colors } from '../../theme/colors';
 function header(sheet: SheetRequest): { title: string; icon: React.ReactNode } {
   switch (sheet.kind) {
     case 'feed':
-      return { title: 'Log feed', icon: <Baby color={colors.cyanSoft} size={20} /> };
+      return { title: t('sheet.log.feed'), icon: <Baby color={colors.cyanSoft} size={20} /> };
     case 'add':
-      return { title: 'Log something', icon: <Plus color={colors.violetSoft} size={20} /> };
+      return { title: t('sheet.logSomething'), icon: <Plus color={colors.violetSoft} size={20} /> };
     case 'diaper':
-      return { title: 'Diaper', icon: <PoopDroplet color={colors.amberStrong} size={20} /> };
+      return { title: t('type.diaper'), icon: <PoopDroplet color={colors.amberStrong} size={20} /> };
     case 'log': {
-      const { label, Icon, color } = TYPE_META[sheet.type];
-      return { title: `Log ${label.toLowerCase()}`, icon: <Icon color={color} size={20} /> };
+      const { Icon, color } = TYPE_META[sheet.type];
+      return { title: t(`sheet.log.${sheet.type}`), icon: <Icon color={color} size={20} /> };
     }
   }
 }

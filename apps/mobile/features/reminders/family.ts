@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { Platform } from 'react-native';
 import { familyAlerts, type LogEntry } from '@subby/shared';
 import { fetchLogs } from '../../store/queries';
@@ -25,7 +26,7 @@ export async function notifyFamily(pulled: PulledLog[]) {
   const sleeps = new Map(await Promise.all(ids.map(async (id) => [id, await fetchLogs(id, { from: now - 8 * DAY, types: ['sleep'] })] as const)));
 
   const alerts = familyAlerts({
-    changes: pulled.map((p) => ({ before: p.before, after: p.after, by: sync?.names?.[p.deviceId] ?? 'another phone' })),
+    changes: pulled.map((p) => ({ before: p.before, after: p.after, by: sync?.names?.[p.deviceId] ?? t('family.anotherPhone') })),
     settings,
     allowed: await notificationsAllowed(),
     sleeps: (id) => sleeps.get(id) ?? [],
@@ -35,7 +36,7 @@ export async function notifyFamily(pulled: PulledLog[]) {
   });
 
   if (alerts.some((a) => a.kind === 'show') && Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL, { name: 'From other phones', importance: Notifications.AndroidImportance.HIGH });
+    await Notifications.setNotificationChannelAsync(CHANNEL, { name: t('channel.family'), importance: Notifications.AndroidImportance.HIGH });
   }
   for (const a of alerts) {
     // Showing under the same id replaces "asleep" with "woke up".

@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -31,11 +32,11 @@ export function RecoveryNudge() {
     <View className="mx-4 mb-2 rounded-xl bg-violet/10 border border-violet/40 flex-row">
       <Pressable onPress={() => router.push('/sync/recovery')} className="flex-1 px-4 py-3" accessibilityRole="button">
         <Text className="text-ink text-sm leading-5">
-          Only this phone has {child?.name ? `${child.name}'s` : 'your'} log. A recovery key gets it back if the phone is ever lost.
+          {child?.name ? t('nudge.onlyPhoneChild', { name: child.name }) : t('nudge.onlyPhone')}
         </Text>
-        <Text className="text-violet-soft text-sm font-semibold mt-1">Create a recovery key</Text>
+        <Text className="text-violet-soft text-sm font-semibold mt-1">{t('nudge.create')}</Text>
       </Pressable>
-      <Pressable onPress={dismiss} hitSlop={8} className="px-3 pt-3" accessibilityRole="button" accessibilityLabel="Dismiss">
+      <Pressable onPress={dismiss} hitSlop={8} className="px-3 pt-3" accessibilityRole="button" accessibilityLabel={t('nudge.dismiss')}>
         <Xmark size={14} color={colors.inkFaint} />
       </Pressable>
     </View>

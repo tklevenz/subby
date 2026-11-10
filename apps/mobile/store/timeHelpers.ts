@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { addDays, startOfDay } from '@subby/shared';
+import { formatClock, formatDate, t } from '@subby/shared/i18n';
 import { useSettingsStore } from './useSettingsStore';
 
 export { formatDuration, formatRelative, formatAge } from '@subby/shared';
@@ -15,21 +16,17 @@ export function useNow(intervalMs = 1000) {
 }
 
 export function formatTimeShort(epochMs: number, clock: '12h' | '24h' = '24h'): string {
-  return new Date(epochMs).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: clock === '12h',
-  });
+  return formatClock(epochMs, clock);
 }
 
 export function formatDayLabel(epochMs: number, now = Date.now()): string {
   const d = new Date(epochMs);
   const today = new Date(now);
   const day = startOfDay(epochMs);
-  if (day === startOfDay(now)) return 'Today';
+  if (day === startOfDay(now)) return t('day.today');
   // Calendar day before, not 24 h before (DST days are 23/25 h).
-  if (day === addDays(startOfDay(now), -1)) return 'Yesterday';
-  return d.toLocaleDateString([], {
+  if (day === addDays(startOfDay(now), -1)) return t('day.yesterday');
+  return formatDate(epochMs, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

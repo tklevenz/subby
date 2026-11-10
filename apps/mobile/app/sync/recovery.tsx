@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -38,29 +39,27 @@ export default function RecoveryKeyScreen() {
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       {step.kind === 'intro' ? (
         <>
-          {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">Sync is on. One more step:</Text> : null}
-          <Text className="text-ink text-xl font-bold">{hasRecovery ? 'Make a new recovery key' : 'A way back in if every phone is lost'}</Text>
+          {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">{t('recovery.syncOn')}</Text> : null}
+          <Text className="text-ink text-xl font-bold">{t(hasRecovery ? 'recovery.makeNew' : 'recovery.wayBack')}</Text>
           <Lead className="mt-2">
-            24 words that get your family's data back on a new phone if every phone in the family is lost. Write them on paper and keep
-            them somewhere safe. Anyone with the words can read your family's data.
+            {t('recovery.lead')}
           </Lead>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-3">
-            Nobody else can recover your data, not even us: the server only stores data it can't read. If every phone is lost and there
-            is no recovery key, the data is gone.
+            {t('recovery.nobodyElse')}
           </Text>
           {hasRecovery ? (
             <Text className="text-ink-soft text-[15px] leading-[22px] mt-3">
-              Your family already has a recovery key. A new one replaces it, and the old words stop working.
+              {t('recovery.replaces')}
             </Text>
           ) : null}
           <Button
-            label={hasRecovery ? 'Make new words' : 'Show my recovery key'}
+            label={t(hasRecovery ? 'recovery.makeWords' : 'recovery.show')}
             onPress={() => setStep({ kind: 'words', words: newRecoveryWords().split(' ') })}
           />
           {afterSetup ? (
             <>
-              <Button label="Later" variant="ghost" onPress={() => router.back()} />
-              <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">You'll find it under Settings → Sync.</Text>
+              <Button label={t('common.later')} variant="ghost" onPress={() => router.back()} />
+              <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">{t('recovery.later')}</Text>
             </>
           ) : null}
         </>
@@ -68,13 +67,13 @@ export default function RecoveryKeyScreen() {
 
       {step.kind === 'words' ? (
         <>
-          <Text className="text-ink text-xl font-bold">Write these words down</Text>
+          <Text className="text-ink text-xl font-bold">{t('recovery.writeDown')}</Text>
           <Lead className="mt-2">
-            In this order, on paper. Don't take a screenshot: photos often end up in the cloud.
+            {t('recovery.inOrder')}
           </Lead>
           <Words words={step.words} />
           <ServerNote />
-          <Button label="I've written them down" onPress={() => setStep({ kind: 'check', words: step.words })} />
+          <Button label={t('recovery.written')} onPress={() => setStep({ kind: 'check', words: step.words })} />
         </>
       ) : null}
 
@@ -83,18 +82,17 @@ export default function RecoveryKeyScreen() {
       {step.kind === 'saving' ? (
         <View className="items-center mt-24">
           <SubLoader />
-          <Text className="text-ink-muted mt-4">Saving the recovery key…</Text>
+          <Text className="text-ink-muted mt-4">{t('recovery.saving')}</Text>
         </View>
       ) : null}
 
       {step.kind === 'done' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">Recovery key saved</Text>
+          <Text className="text-ink text-xl font-bold mt-4">{t('recovery.saved')}</Text>
           <Lead className="mt-2">
-            To use it on a new phone, choose "Join a family", then "Use a recovery key". Keep the paper safe; this app won't show the
-            words again.
+            {t('recovery.savedText')}
           </Lead>
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label={t('common.done')} onPress={() => router.back()} />
         </>
       ) : null}
     </ScreenScroll>
@@ -126,7 +124,8 @@ function ServerNote() {
   if (!server) return null;
   return (
     <Text className="text-ink-soft text-sm leading-5 mt-4">
-      Also note the sync server: <Text className="text-ink font-semibold">{server.replace(/^https?:\/\//, '')}</Text>
+      {t('recovery.serverNote')}
+      <Text className="text-ink font-semibold">{server.replace(/^https?:\/\//, '')}</Text>
     </Text>
   );
 }
@@ -148,22 +147,22 @@ function Check({ words, error, onBack, onOk }: { words: string[]; error: string 
 
   return (
     <>
-      <Text className="text-ink text-xl font-bold">Check your paper</Text>
-      <Lead className="mt-2">Type these two words from what you wrote down.</Lead>
+      <Text className="text-ink text-xl font-bold">{t('recovery.check')}</Text>
+      <Lead className="mt-2">{t('recovery.checkText')}</Lead>
       {picks.map((n, i) => (
         <View key={n} className="mt-5">
-          <FieldLabel>Word {n + 1}</FieldLabel>
+          <FieldLabel>{t('recovery.word', { n: n + 1 })}</FieldLabel>
           <TextField
             value={answers[i]}
-            onChangeText={(t) => setAnswers((a) => a.map((v, j) => (j === i ? t : v)))}
+            onChangeText={(text) => setAnswers((a) => a.map((v, j) => (j === i ? text : v)))}
             {...SECRET_INPUT}
           />
         </View>
       ))}
-      {wrong ? <ErrorText className="mt-4">That doesn't match. Check the paper against the words.</ErrorText> : null}
+      {wrong ? <ErrorText className="mt-4">{t('recovery.mismatch')}</ErrorText> : null}
       {error ? <ErrorText className="mt-4">{error}</ErrorText> : null}
-      <Button label="Save the recovery key" onPress={check} disabled={answers.some((a) => !a.trim())} />
-      <Button label="Show the words again" variant="ghost" onPress={onBack} />
+      <Button label={t('recovery.saveKey')} onPress={check} disabled={answers.some((a) => !a.trim())} />
+      <Button label={t('recovery.showAgain')} variant="ghost" onPress={onBack} />
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { ScreenScroll } from './ScreenScroll';
 import { Alert, Pressable, Text, View } from 'react-native';
@@ -46,11 +47,11 @@ export default function NightForm({ night }: { night: Night }) {
   const nap = payload.nap !== false;
   const error =
     wakeUp <= bedtime
-      ? 'Wake-up must be after bedtime.'
+      ? t('night.wakeAfterBed')
       : !pieces
-        ? 'Each waking must fit inside the night, without overlapping another.'
+        ? t('night.wakingInside')
         : nap && wakings.length
-          ? "A nap can't have wakings: remove them, or keep it a night."
+          ? t('night.napNoWakings')
           : overlap;
   const changed =
     bedtime !== night.start ||
@@ -85,10 +86,10 @@ export default function NightForm({ night }: { night: Night }) {
   });
 
   const confirmDelete = () =>
-    Alert.alert('Delete night', night.pieces.length > 1 ? 'This deletes the whole night, wakings included.' : 'Delete this sleep?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('night.deleteTitle'), night.pieces.length > 1 ? t('night.deleteWhole') : t('night.deleteSleep'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           for (const p of night.pieces) await softDeleteLog(p.id);
@@ -102,7 +103,7 @@ export default function NightForm({ night }: { night: Night }) {
 
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: nap ? 'Sleep' : 'Night' }} />
+      <Stack.Screen options={{ title: t(nap ? 'night.titleSleep' : 'night.titleNight') }} />
 
       {pieces ? (
         <View className="bg-violet/10 border border-violet/40 rounded-2xl p-4">
@@ -117,7 +118,7 @@ export default function NightForm({ night }: { night: Night }) {
           <View className="flex-row justify-between mt-1.5">
             <Text className="text-ink-muted text-xs">{formatTime(bedtime)}</Text>
             <Text className="text-ink-muted text-xs">
-              {wakings.length ? `${wakings.length} waking${wakings.length === 1 ? '' : 's'} · longest ${formatHoursMinutes(longest)}` : 'no wakings'}
+              {wakings.length ? t('night.wakingsLongest', { count: wakings.length, span: formatHoursMinutes(longest) }) : t('night.noWakings')}
             </Text>
             <Text className="text-ink-muted text-xs">{formatTime(wakeUp)}</Text>
           </View>
@@ -126,31 +127,31 @@ export default function NightForm({ night }: { night: Night }) {
 
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <FieldLabel>Bedtime</FieldLabel>
-          <DateTimeField value={bedtime} onChange={setBedtime} maximumDate={new Date()} title="Bedtime" />
+          <FieldLabel>{t('night.bedtime')}</FieldLabel>
+          <DateTimeField value={bedtime} onChange={setBedtime} maximumDate={new Date()} title={t('night.bedtime')} />
         </View>
         <View className="flex-1">
-          <FieldLabel>Woke up</FieldLabel>
-          <DateTimeField value={wakeUp} onChange={setWakeUp} maximumDate={new Date()} title="Woke up" />
+          <FieldLabel>{t('night.wokeUp')}</FieldLabel>
+          <DateTimeField value={wakeUp} onChange={setWakeUp} maximumDate={new Date()} title={t('night.wokeUp')} />
         </View>
       </View>
 
       {!nap ? (
         <>
-          <FieldLabel>Night wakings</FieldLabel>
+          <FieldLabel>{t('night.wakings')}</FieldLabel>
           <View className="bg-surface border border-line rounded-2xl">
             {wakings.map((w, i) => (
               <View key={i} className="flex-row items-center gap-2 px-3 py-2.5 border-b border-line">
-                <DateTimeField value={w.start} onChange={(start) => setWaking(i, { start })} title="Awake from" timeOnly />
+                <DateTimeField value={w.start} onChange={(start) => setWaking(i, { start })} title={t('night.awakeFrom')} timeOnly />
                 <Text className="text-ink-muted">–</Text>
-                <DateTimeField value={w.end} onChange={(end) => setWaking(i, { end })} title="Back asleep" timeOnly />
+                <DateTimeField value={w.end} onChange={(end) => setWaking(i, { end })} title={t('night.backAsleep')} timeOnly />
                 <Text className="flex-1 text-ink-muted text-xs ml-1" numberOfLines={1}>
                   {w.end > w.start ? formatHoursMinutes(w.end - w.start) : ''}
                 </Text>
                 <Pressable
                   onPress={() => setWakings((cur) => cur.filter((_, j) => j !== i))}
                   hitSlop={8}
-                  accessibilityLabel="Remove this waking"
+                  accessibilityLabel={t('night.removeWaking')}
                   className="w-8 h-8 rounded-full border border-line-strong items-center justify-center"
                 >
                   <Xmark color={colors.inkMuted} size={12} />
@@ -159,7 +160,7 @@ export default function NightForm({ night }: { night: Night }) {
             ))}
             <Pressable onPress={addWaking} accessibilityRole="button" className="flex-row items-center px-3.5 py-3.5">
               <Plus color={colors.violetSoft} size={14} />
-              <Text className="text-violet-soft font-medium ml-2.5">Add a waking</Text>
+              <Text className="text-violet-soft font-medium ml-2.5">{t('night.addWaking')}</Text>
             </Pressable>
           </View>
         </>
@@ -169,8 +170,8 @@ export default function NightForm({ night }: { night: Night }) {
       <CommonFields payload={payload} onChange={patch} />
 
       {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
-      <Button label="Save" onPress={save} disabled={!changed || !!error} />
-      <Button label={night.pieces.length > 1 ? 'Delete night' : 'Delete'} variant="dangerQuiet" onPress={confirmDelete} />
+      <Button label={t('common.save')} onPress={save} disabled={!changed || !!error} />
+      <Button label={night.pieces.length > 1 ? t('night.deleteTitle') : t('common.delete')} variant="dangerQuiet" onPress={confirmDelete} />
     </ScreenScroll>
   );
 }

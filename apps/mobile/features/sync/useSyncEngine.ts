@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { useEffect } from 'react';
 import { Alert, AppState } from 'react-native';
 import { router } from 'expo-router';
@@ -21,7 +22,7 @@ export function useSyncEngine(ready: boolean) {
       pendingCount().then((pending) => useSyncStore.setState({ pending }));
       requestSync(0);
       openLive();
-      setUpBackgroundSync().catch((e: unknown) => console.warn('Background sync setup failed', e));
+      setUpBackgroundSync().catch((e: unknown) => console.warn('Background sync setup failed', e)); // i18n-ignore
     };
     start();
     const unsubs = [
@@ -42,11 +43,11 @@ export function useSyncEngine(ready: boolean) {
       useSyncStore.subscribe((s) => {
         if (s.phase !== 'idle' || !s.newDevices.length) return;
         const names = useSettingsStore.getState().sync?.names ?? {};
-        const list = s.newDevices.map((id) => names[id] ?? 'a new phone').join(', ');
+        const list = s.newDevices.map((id) => names[id] ?? t('sync.newPhone.unnamed')).join(t('list.join'));
         useSyncStore.setState({ newDevices: [] });
-        Alert.alert('New phone in your family', `${list} can now see and add entries. If nobody in your family added it, remove it.`, [
-          { text: 'OK' },
-          { text: 'Review phones', onPress: () => router.push('/sync') },
+        Alert.alert(t('sync.newPhone.title'), t('sync.newPhone.body', { phones: list }), [
+          { text: t('common.ok') },
+          { text: t('sync.newPhone.review'), onPress: () => router.push('/sync') },
         ]);
       }),
     );
@@ -56,7 +57,7 @@ export function useSyncEngine(ready: boolean) {
         if (s.phase !== 'idle' || !s.movedTo) return;
         const to = isOfficialServer(s.movedTo) ? 'Subby Sync' : s.movedTo.replace(/^https?:\/\//, '');
         useSyncStore.setState({ movedTo: null });
-        Alert.alert('Your family moved', `Another phone moved your family to ${to}. This phone followed and syncs there now.`);
+        Alert.alert(t('sync.moved.title'), t('sync.moved.body', { server: to }));
       }),
     );
     const appState = AppState.addEventListener('change', (state) => (state === 'active' ? start() : closeLive()));

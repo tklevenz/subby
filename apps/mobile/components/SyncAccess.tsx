@@ -1,3 +1,4 @@
+import { formatNumber, t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -11,14 +12,7 @@ import { useFormatTime, useNow } from '../store/timeHelpers';
 const DAY = 24 * 60 * 60 * 1000;
 
 /** A phone's access in the phone list (hosted only). */
-export const ACCESS_LABEL: Record<SyncAccess, string | undefined> = {
-  free: undefined,
-  trial: 'Trial',
-  unlock: 'Unlocked',
-  slot: 'Gifted',
-  grace: 'Trial over',
-  readOnly: 'Not unlocked',
-};
+export const accessLabel = (access: SyncAccess): string | undefined => (access === 'free' ? undefined : t(`access.${access}`));
 
 /** Runs a purchase-like call, then syncs, so what waited goes up right away. */
 function useStoreAction() {
@@ -31,7 +25,7 @@ function useStoreAction() {
       await action(sessionFor(settings));
       syncNow().catch(() => {});
     } catch (e) {
-      Alert.alert("That didn't work", e instanceof Error ? e.message : String(e));
+      Alert.alert(t('access.failed'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -51,14 +45,14 @@ export function PhotoStorage() {
   const share = used / limit;
   return (
     <>
-      <Row label="Photos on the server" value={`${formatBytes(used)} of ${formatBytes(limit)}`} />
+      <Row label={t('access.photos')} value={t('access.photosValue', { used: formatBytes(used), limit: formatBytes(limit) })} />
       {share >= 1 ? (
         <Text className="text-amber-soft text-sm mx-4 mb-3 leading-5">
-          Full: new photos stay on the phone they were taken on. Entries still sync. Removing photos from entries makes room.
+          {t('access.photosFull')}
         </Text>
       ) : share >= 0.9 ? (
         <Text className="text-amber-soft text-sm mx-4 mb-3 leading-5">
-          Nearly full. Once it is, new photos stay on the phone they were taken on.
+          {t('access.photosNearly')}
         </Text>
       ) : null}
     </>
@@ -66,7 +60,9 @@ export function PhotoStorage() {
 }
 
 const formatBytes = (n: number) =>
-  n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1).replace(/\.0$/, '')} GB` : `${Math.max(n > 0 ? 1 : 0, Math.round(n / 1024 ** 2))} MB`;
+  n >= 1024 ** 3
+    ? t('access.gb', { n: formatNumber(n / 1024 ** 3, { maximumFractionDigits: 1 }) })
+    : t('access.mb', { n: Math.max(n > 0 ? 1 : 0, Math.round(n / 1024 ** 2)) });
 
 export function AccessCard() {
   const access = useAccess();
@@ -79,25 +75,25 @@ export function AccessCard() {
 
   const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now) / DAY)) : null;
   const graceEnd = entitlement?.graceEndsAt ?? now;
-  const until = `${new Date(graceEnd).toDateString() === new Date(now).toDateString() ? 'today' : 'tomorrow'} at ${formatTime(graceEnd)}`;
+  const until = t(new Date(graceEnd).toDateString() === new Date(now).toDateString() ? 'access.untilToday' : 'access.untilTomorrow', { time: formatTime(graceEnd) });
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {
     trial: {
-      title: daysLeft ? `Free trial · ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left` : 'Free trial',
-      body: `Every phone in your family syncs during the trial. After it, each phone needs Subby Sync unlocked: ${PRICE}, once. No subscription.`,
+      title: daysLeft ? t('access.trialLeft', { count: daysLeft }) : t('access.trialTitle'),
+      body: t('access.trialBody', { price: PRICE }),
       tone: 'calm',
     },
     grace: {
-      title: `Trial over · syncing until ${until}`,
-      body: `Unlock this phone to keep sharing what you log, or ask someone in your family to gift it an unlock. Everything stays on the phone either way.`,
+      title: t('access.graceTitle', { until }),
+      body: t('access.graceBody'),
       tone: 'warn',
     },
     readOnly: {
-      title: 'Not sharing what you log',
-      body: `This phone still gets your family's entries, but what you log here stays on it${pending ? ` (${pending.toLocaleString()} waiting)` : ''} until it's unlocked. Nothing is lost.`,
+      title: t('access.readOnlyTitle'),
+      body: pending ? t('access.readOnlyBodyWaiting', { count: pending }) : t('access.readOnlyBody'),
       tone: 'warn',
     },
-    unlock: { title: 'Unlocked', body: 'This phone syncs for good. Restoring on a new phone moves the unlock there.', tone: 'calm' },
-    slot: { title: 'Unlocked by your family', body: 'Someone in your family gifted this phone its unlock.', tone: 'calm' },
+    unlock: { title: t('access.unlockTitle'), body: t('access.unlockBody'), tone: 'calm' },
+    slot: { title: t('access.slotTitle'), body: t('access.slotBody'), tone: 'calm' },
   };
   const { title, body, tone } = copy[access];
   const needsUnlock = access === 'trial' || access === 'grace' || access === 'readOnly';
@@ -108,12 +104,12 @@ export function AccessCard() {
       <Text className="text-ink-soft text-[15px] leading-[22px] mt-1">{body}</Text>
       {needsUnlock ? (
         <>
-          <Button label={`Unlock this phone · ${PRICE}`} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy()} />
+          <Button label={t('access.unlockButton', { price: PRICE })} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy()} />
           <Pressable onPress={() => run(restore)} disabled={busy || !canBuy()} className="items-center mt-3" hitSlop={8}>
-            <Text className={`text-violet-soft text-sm ${canBuy() ? '' : 'opacity-40'}`}>Restore a purchase</Text>
+            <Text className={`text-violet-soft text-sm ${canBuy() ? '' : 'opacity-40'}`}>{t('access.restore')}</Text>
           </Pressable>
           <Text className="text-ink-faint text-xs text-center mt-2">
-            {canBuy() ? 'Test store: nothing is charged.' : 'Buying comes with the store release.'}
+            {t(canBuy() ? 'access.testStore' : 'access.storeLater')}
           </Text>
         </>
       ) : null}
@@ -133,12 +129,12 @@ export function GiftSlot() {
     <>
       <Text className="text-ink-faint text-xs mt-2 ml-1 leading-4">
         {free
-          ? `${free} unused ${free === 1 ? 'gift' : 'gifts'}: the next phone that joins is unlocked.`
+          ? t('access.unusedGifts', { count: free })
           : waiting
-            ? 'You can unlock a phone in your family for them. A gift goes to the phone without an unlock that joined first.'
-            : 'A gift unlocks the next phone that joins, like a grandparent’s.'}
+            ? t('access.giftWaiting')
+            : t('access.giftNext')}
       </Text>
-      <Button label={`Gift an unlock · ${PRICE}`} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy()} />
+      <Button label={t('access.giftButton', { price: PRICE })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy()} />
     </>
   );
 }
@@ -151,14 +147,21 @@ export function AccessBanner() {
   if (access !== 'readOnly' && access !== 'grace') return null;
   const text =
     access === 'readOnly'
-      ? 'What you log here isn’t shared with your family. Unlock this phone to sync it.'
-      : `Your trial is over. This phone syncs until ${formatTime(entitlement?.graceEndsAt ?? Date.now())}, then needs an unlock.`;
+      ? t('access.bannerReadOnly')
+      : t('access.bannerGrace', { time: formatTime(entitlement?.graceEndsAt ?? Date.now()) });
   return (
     <Pressable onPress={() => router.push('/sync')} className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
       <Text className="text-ink text-sm leading-5">{text}</Text>
     </Pressable>
   );
 }
+
+const DEV = {
+  title: 'Developer · sync access', // i18n-ignore
+  pretends: 'Pretends only on this screen and Home; the server decides what syncs.', // i18n-ignore
+  testStore: ' This server has the test store: buying here costs nothing.', // i18n-ignore
+  refund: 'Refund the last test purchase', // i18n-ignore
+};
 
 /** Dev builds and test-store servers: pretend to be in any state, and refund test purchases. */
 export function AccessDevTools() {
@@ -168,25 +171,26 @@ export function AccessDevTools() {
   const hasTest = useAccessStore((s) => s.testTokens.length > 0);
   const { busy, run } = useStoreAction();
   if (!show) return null;
+  // Developer tools stay in English (dev builds and test-store servers only).
   const options: { value: SyncAccess | 'real'; label: string }[] = [
-    { value: 'real', label: 'Real' },
-    { value: 'trial', label: 'Trial' },
-    { value: 'grace', label: 'Grace' },
-    { value: 'readOnly', label: 'Locked' },
-    { value: 'unlock', label: 'Own' },
-    { value: 'slot', label: 'Gift' },
+    { value: 'real', label: 'Real' }, // i18n-ignore
+    { value: 'trial', label: 'Trial' }, // i18n-ignore
+    { value: 'grace', label: 'Grace' }, // i18n-ignore
+    { value: 'readOnly', label: 'Locked' }, // i18n-ignore
+    { value: 'unlock', label: 'Own' }, // i18n-ignore
+    { value: 'slot', label: 'Gift' }, // i18n-ignore
   ];
   return (
     <>
-      <SectionLabel>Developer · sync access</SectionLabel>
+      <SectionLabel>{DEV.title}</SectionLabel>
       <Segmented options={options} value={pretend ?? 'real'} onChange={(v) => useAccessStore.setState({ pretend: v === 'real' ? null : (v as SyncAccess) })} />
       <Text className="text-ink-faint text-xs mt-2 ml-1">
-        Pretends only on this screen and Home; the server decides what syncs.
-        {testStore ? ' This server has the test store: buying here costs nothing.' : ''}
+        {DEV.pretends}
+        {testStore ? DEV.testStore : ''}
       </Text>
       {hasTest ? (
         <Card>
-          <Row label="Refund the last test purchase" onPress={busy ? undefined : () => run(refundLastTest)} />
+          <Row label={DEV.refund} onPress={busy ? undefined : () => run(refundLastTest)} />
         </Card>
       ) : null}
     </>

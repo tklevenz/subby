@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useRef } from 'react';
 import { Modal, Platform, Pressable, Text, View } from 'react-native';
 import { Camera, ImageIcon, TrashCan } from './icons';
@@ -42,10 +43,10 @@ export default function PhotoMenu({
     });
 
   const items = [
-    { label: 'Take photo', icon: <Camera color={colors.inkSoft} size={18} />, onPress: () => pick('camera') },
-    { label: 'Choose from library', icon: <ImageIcon color={colors.inkSoft} size={18} />, onPress: () => pick('library') },
+    { label: t('photoMenu.take'), icon: <Camera color={colors.inkSoft} size={18} />, onPress: () => pick('camera') },
+    { label: t('photoMenu.choose'), icon: <ImageIcon color={colors.inkSoft} size={18} />, onPress: () => pick('library') },
     ...(hasPhoto
-      ? [{ label: 'Remove photo', icon: <TrashCan color={colors.redStrong} size={18} />, onPress: () => after(() => onChange(null)), danger: true }]
+      ? [{ label: t('photoMenu.remove'), icon: <TrashCan color={colors.redStrong} size={18} />, onPress: () => after(() => onChange(null)), danger: true }]
       : []),
   ];
 
@@ -60,7 +61,7 @@ export default function PhotoMenu({
             </Pressable>
           ))}
           <Pressable onPress={onClose} className="px-4 py-4 items-center">
-            <Text className="text-ink-muted text-base">Cancel</Text>
+            <Text className="text-ink-muted text-base">{t('common.cancel')}</Text>
           </Pressable>
         </View>
       </Pressable>

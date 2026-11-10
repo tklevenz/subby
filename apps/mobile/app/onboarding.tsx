@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { Text } from 'react-native';
 import { router } from 'expo-router';
@@ -21,12 +22,12 @@ export default function Onboarding() {
       keyboardShouldPersistTaps="handled"
     >
       <SubTile size={64} />
-      <Text className="text-3xl font-bold text-ink mt-4">Welcome to Subby</Text>
+      <Text className="text-3xl font-bold text-ink mt-4">{t('onboarding.welcome')}</Text>
       <Lead className="mt-2">
-        Private baby tracking that works offline. Your log lives on this phone, and if you share it with family, it's encrypted so only your phones can read it. Let's start with your little one.
+        {t('onboarding.lead')}
       </Lead>
       <ChildForm
-        submitLabel="Get started"
+        submitLabel={t('onboarding.start')}
         autoFocus={false}
         onSubmit={async (input) => {
           const child = await addChild(input);
@@ -34,14 +35,14 @@ export default function Onboarding() {
           // The protected route guard swaps to the tabs once a child exists.
         }}
       />
-      <Text className="text-ink-faint text-center mt-8">Another phone in your family already uses Subby?</Text>
-      <Button label="Join a family" variant="ghost" onPress={() => router.push('/sync/join')} />
+      <Text className="text-ink-faint text-center mt-8">{t('onboarding.otherPhone')}</Text>
+      <Button label={t('onboarding.join')} variant="ghost" onPress={() => router.push('/sync/join')} />
 
-      <Text className="text-ink-faint text-center mt-6">Coming from Baby Buddy?</Text>
-      <Button label="Import from Baby Buddy" variant="ghost" onPress={() => router.push('/import/babybuddy')} />
+      <Text className="text-ink-faint text-center mt-6">{t('onboarding.babyBuddy')}</Text>
+      <Button label={t('onboarding.import')} variant="ghost" onPress={() => router.push('/import/babybuddy')} />
 
-      <Text className="text-ink-faint text-center mt-6">Have a Subby backup?</Text>
-      <Button label="Restore a backup" variant="ghost" onPress={() => router.push('/backup')} />
+      <Text className="text-ink-faint text-center mt-6">{t('onboarding.backup')}</Text>
+      <Button label={t('onboarding.restore')} variant="ghost" onPress={() => router.push('/backup')} />
     </ScreenScroll>
   );
 }

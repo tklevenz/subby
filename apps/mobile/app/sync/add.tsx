@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Share, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -76,15 +77,15 @@ export default function AddPhoneScreen() {
       {step.kind === 'loading' || step.kind === 'approving' ? (
         <View className="items-center mt-24">
           <PeriscopeLoader />
-          <Text className="text-ink-muted mt-4">{step.kind === 'approving' ? 'Adding the phone…' : 'Creating a code…'}</Text>
+          <Text className="text-ink-muted mt-4">{t(step.kind === 'approving' ? 'add.adding' : 'add.creating')}</Text>
         </View>
       ) : null}
 
       {step.kind === 'showing' ? (
         <>
-          <Text className="text-ink text-xl font-bold">Scan this on the other phone</Text>
+          <Text className="text-ink text-xl font-bold">{t('add.scanThis')}</Text>
           <Lead className="mt-2">
-            On the new phone, open Subby and choose "Join a family" (or Settings → Sync → Join), then scan this code.
+            {t('add.howTo')}
           </Lead>
           <View className="items-center mt-6">
             <View className="rounded-2xl overflow-hidden">
@@ -92,46 +93,46 @@ export default function AddPhoneScreen() {
             </View>
             <Text className="text-ink-muted text-sm mt-4">
               {now < step.invite.expiresAt
-                ? `Works once, for ${Math.ceil((step.invite.expiresAt - now) / 60_000)} more min`
-                : 'This code expired'}
+                ? t('add.worksFor', { count: Math.ceil((step.invite.expiresAt - now) / 60_000) })
+                : t('add.expired')}
             </Text>
           </View>
-          {now >= step.invite.expiresAt ? <Button label="Make a new code" onPress={start} /> : null}
-          <Button label="Send the code instead" variant="ghost" onPress={() => Share.share({ message: step.invite.code })} />
-          <Text className="text-ink-faint text-xs text-center mt-2">For when the camera can't scan. Anyone with it can ask to join, but you still confirm below.</Text>
+          {now >= step.invite.expiresAt ? <Button label={t('add.newCode')} onPress={start} /> : null}
+          <Button label={t('add.send')} variant="ghost" onPress={() => Share.share({ message: step.invite.code })} />
+          <Text className="text-ink-faint text-xs text-center mt-2">{t('add.sendNote')}</Text>
         </>
       ) : null}
 
       {step.kind === 'confirm' ? (
         <>
-          <Text className="text-ink text-xl font-bold">Does the other phone show this code?</Text>
+          <Text className="text-ink text-xl font-bold">{t('add.sameCode')}</Text>
           <Text className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-8">
             {step.code.slice(0, 3)} {step.code.slice(3)}
           </Text>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-6">
-            Only add it if both phones show the same six digits. If they differ, someone else used the code: cancel.
+            {t('add.onlyIfSame')}
           </Text>
-          <Button label="Same code, add the phone" onPress={() => approve(step.claimant)} />
-          <Button label="Different, cancel" variant="ghost" onPress={() => router.back()} />
+          <Button label={t('add.approve')} onPress={() => approve(step.claimant)} />
+          <Button label={t('add.different')} variant="ghost" onPress={() => router.back()} />
         </>
       ) : null}
 
       {step.kind === 'done' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">Phone added</Text>
-          <Lead className="mt-2">It's downloading everything now. New entries show up on both phones within seconds.</Lead>
-          <Button label="Done" onPress={() => router.back()} />
+          <Text className="text-ink text-xl font-bold mt-4">{t('add.added')}</Text>
+          <Lead className="mt-2">{t('add.addedText')}</Lead>
+          <Button label={t('common.done')} onPress={() => router.back()} />
         </>
       ) : null}
 
       {step.kind === 'error' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">Something went wrong</Text>
+          <Text className="text-ink text-xl font-bold mt-4">{t('add.wrong')}</Text>
           <ErrorText className="mt-2">{step.message}</ErrorText>
           {step.retry ? (
-            <Button label="Try adding it again" onPress={() => approve(step.retry!)} />
+            <Button label={t('add.retryAdd')} onPress={() => approve(step.retry!)} />
           ) : (
-            <Button label="Try again" onPress={start} />
+            <Button label={t('common.retry')} onPress={start} />
           )}
         </>
       ) : null}

@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import {} from 'react-native';
 import { router } from 'expo-router';
@@ -13,7 +14,7 @@ export default function NewChildScreen() {
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <ChildForm
-        submitLabel="Add child"
+        submitLabel={t('childForm.add')}
         onSubmit={async (input) => {
           const created = await addChild(input);
           await setSetting('activeChildId', created.id);

@@ -1,3 +1,4 @@
+import { formatDate, formatNumber, t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -22,17 +23,17 @@ import NightBar, { stretchesOf } from '../NightBar';
 
 /** The day's sleep, feeds and diapers as plain figures in one row. */
 export function DayTotals({ stats, units }: { stats: DayStats; units: UnitSystem }) {
-  const naps = stats.naps ? `${stats.naps} nap${stats.naps === 1 ? '' : 's'}` : '';
-  const sleepSub = stats.nightMs && naps ? `night + ${naps}` : stats.nightMs ? 'night' : naps;
+  const naps = stats.naps ? t('day.naps', { count: stats.naps }) : '';
+  const sleepSub = stats.nightMs && naps ? t('day.nightAndNaps', { naps }) : stats.nightMs ? t('day.night') : naps;
   const items = [
-    { label: 'Sleep', className: 'text-violet-soft', value: stats.sleepMs ? formatHoursMinutes(stats.sleepMs) : '–', sub: sleepSub },
+    { label: t('day.sleep'), className: 'text-violet-soft', value: stats.sleepMs ? formatHoursMinutes(stats.sleepMs) : '–', sub: sleepSub },
     {
-      label: 'Feeds',
+      label: t('day.feeds'),
       className: 'text-cyan-soft',
       value: String(stats.feeds),
-      sub: stats.bottleMl ? `${formatVolume(stats.bottleMl, units)} bottle` : stats.breastSec ? `${formatHoursMinutes(stats.breastSec * 1000)} breast` : '',
+      sub: stats.bottleMl ? t('day.bottle', { amount: formatVolume(stats.bottleMl, units) }) : stats.breastSec ? t('day.breast', { span: formatHoursMinutes(stats.breastSec * 1000) }) : '',
     },
-    { label: 'Diapers', className: 'text-amber-strong', value: String(stats.diapers), sub: stats.diapers ? `${stats.wet} wet · ${stats.dirty} dirty` : '' },
+    { label: t('day.diapers'), className: 'text-amber-strong', value: formatNumber(stats.diapers), sub: stats.diapers ? t('day.wetDirty', { wet: stats.wet, dirty: stats.dirty }) : '' },
   ];
   return (
     <View className="flex-row gap-3.5 py-3 border-t border-b border-line">
@@ -60,7 +61,7 @@ export function DayTotals({ stats, units }: { stats: DayStats; units: UnitSystem
  */
 export function DayLog({ logs, day, now }: { logs: LogEntry[]; day: number; now: number }) {
   const items = dayTimeline(logs, day, now);
-  if (!items.length) return <EmptyState title="All quiet down here" text="Nothing logged on this day." />;
+  if (!items.length) return <EmptyState title={t('day.emptyTitle')} text={t('day.emptyText')} />;
   return (
     <View>
       {items.map((item) =>
@@ -87,7 +88,7 @@ function AwakeRow({ item }: { item: Extract<TimelineItem, { kind: 'awake' }> }) 
           <View key={i} className="w-0.5 h-0.5 rounded-full bg-amber-pale/60" />
         ))}
       </View>
-      <Text className="ml-2.5 text-xs font-medium text-amber-pale">{item.ongoing ? `Awake ${length} so far` : `Awake ${length}`}</Text>
+      <Text className="ml-2.5 text-xs font-medium text-amber-pale">{t(item.ongoing ? 'day.awakeSoFar' : 'day.awake', { span: length })}</Text>
     </View>
   );
 }
@@ -110,7 +111,7 @@ function NightRow({ night, day, now }: { night: Night; day: number; now: number 
           {formatTime(night.start)}
         </Text>
         {night.start < day ? (
-          <Text className="text-[11px] text-ink-faint">{new Date(startOfDay(night.start)).toLocaleDateString([], { weekday: 'short' })}</Text>
+          <Text className="text-[11px] text-ink-faint">{formatDate(startOfDay(night.start), { weekday: 'short' })}</Text>
         ) : null}
       </View>
       <View className="w-7 self-stretch items-center pt-3">
@@ -124,18 +125,18 @@ function NightRow({ night, day, now }: { night: Night; day: number; now: number 
           <View className="flex-row items-center">
             <Pressable onPress={edit} accessibilityRole="button" className="flex-1 pl-3.5 pt-3 pb-2">
               <Text className="text-[15px] font-semibold text-ink" numberOfLines={1}>
-                Night · {formatHoursMinutes(night.asleepMs)} asleep{running ? ' so far' : ''}
+                {t(running ? 'day.nightAsleepSoFar' : 'day.nightAsleep', { span: formatHoursMinutes(night.asleepMs) })}
               </Text>
             </Pressable>
             <Pressable onPress={() => setOpen(!open)} hitSlop={8} accessibilityRole="button" className="px-3.5 pt-3 pb-2">
-              <Text className="text-violet-soft text-[13px]">{open ? 'Hide' : `${n} waking${n === 1 ? '' : 's'}`}</Text>
+              <Text className="text-violet-soft text-[13px]">{open ? t('day.hide') : t('day.wakings', { count: n })}</Text>
             </Pressable>
           </View>
           <Pressable onPress={edit} className="px-3.5 pb-3">
             <NightBar stretches={stretchesOf(night.pieces, now)} />
             <View className="flex-row justify-between mt-1.5">
               <Text className="text-ink-muted text-xs">{formatTime(night.start)}</Text>
-              <Text className="text-ink-muted text-xs">{running ? 'asleep now' : formatTime(night.end!)}</Text>
+              <Text className="text-ink-muted text-xs">{running ? t('day.asleepNow') : formatTime(night.end!)}</Text>
             </View>
             {open ? (
               <View className="mt-1">
@@ -143,12 +144,12 @@ function NightRow({ night, day, now }: { night: Night; day: number; now: number 
                   <View key={w.start} className="flex-row items-center pt-2 mt-2 border-t border-violet/20">
                     <View className="w-2 h-2 rounded-full bg-amber-pale" />
                     <Text className="flex-1 text-ink text-sm ml-2.5">
-                      Awake {formatTime(w.start)} – {formatTime(w.end)}
+                      {t('day.awakeFromTo', { from: formatTime(w.start), to: formatTime(w.end) })}
                     </Text>
                     <Text className="text-ink-muted text-xs">{formatHoursMinutes(w.end - w.start)}</Text>
                   </View>
                 ))}
-                <Text className="text-ink-faint text-xs mt-2.5">Longest stretch {formatHoursMinutes(night.longestMs)}</Text>
+                <Text className="text-ink-faint text-xs mt-2.5">{t('day.longest', { span: formatHoursMinutes(night.longestMs) })}</Text>
               </View>
             ) : null}
           </Pressable>
@@ -169,7 +170,7 @@ function EntryRow({ entry, day }: { entry: LogEntry; day: number }) {
     <Pressable
       onPress={() => router.push(`/entry/${entry.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${formatTime(entry.startedAt)}, ${display.label}${display.detail ? `, ${display.detail}` : ''}`}
+      accessibilityLabel={t(display.detail ? 'day.rowA11yDetail' : 'day.rowA11y', { time: formatTime(entry.startedAt), label: display.label, detail: display.detail })}
       className="flex-row items-center"
       style={{ minHeight: sleep ? 64 : 52 }}
     >
@@ -178,7 +179,7 @@ function EntryRow({ entry, day }: { entry: LogEntry; day: number }) {
           {formatTime(entry.startedAt)}
         </Text>
         {earlier ? (
-          <Text className="text-[11px] text-ink-faint">{new Date(startOfDay(entry.startedAt)).toLocaleDateString([], { weekday: 'short' })}</Text>
+          <Text className="text-[11px] text-ink-faint">{formatDate(startOfDay(entry.startedAt), { weekday: 'short' })}</Text>
         ) : null}
       </View>
       <View className="w-7 self-stretch items-center justify-center">

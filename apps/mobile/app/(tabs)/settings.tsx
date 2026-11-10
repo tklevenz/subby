@@ -1,4 +1,5 @@
-import React from 'react';
+import { t } from '@subby/shared/i18n';
+import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
@@ -15,6 +16,7 @@ import { diagnostics } from '../../features/diagnostics';
 import { Card, Row, Segmented, Toggle, SectionLabel } from '../../components/ui';
 import { colors } from '../../theme/colors';
 import { SubMono, Wordmark } from '../../components/brand/Sub';
+import LanguagePicker, { languageLabel } from '../../components/LanguagePicker';
 
 /** Card in the children strip. Same slots for every card, so they line up. */
 function ChildCard({
@@ -45,10 +47,10 @@ function ChildCard({
 
 /** Shows the report first; it only leaves the phone if the person shares it (to support, by email). */
 async function showDiagnostics() {
-  const text = await diagnostics().catch((e: unknown) => `Couldn't make the report: ${e instanceof Error ? e.message : String(e)}`);
-  Alert.alert('Diagnostics', `${text}\n\nNo names, entries or ids. Only shared if you share it.`, [
-    { text: 'Close', style: 'cancel' },
-    { text: 'Share', onPress: () => void Share.share({ message: text }) },
+  const text = await diagnostics().catch((e: unknown) => t('settings.diagFailed', { error: e instanceof Error ? e.message : String(e) }));
+  Alert.alert(t('settings.diagTitle'), t('settings.diagNote', { report: text }), [
+    { text: t('common.close'), style: 'cancel' },
+    { text: t('settings.share'), onPress: () => void Share.share({ message: text }) },
   ]);
 }
 
@@ -70,15 +72,17 @@ export default function SettingsScreen() {
   const chevron = <AngleRight color={colors.inkGhost} size={16} />;
   const sync = useSettingsStore((s) => s.sync);
   const syncPhase = useSyncStore((s) => s.phase);
-  const syncLabel = !sync ? 'Off' : syncPhase === 'error' ? "Couldn't sync" : syncPhase === 'syncing' ? 'Syncing…' : 'On';
+  const syncLabel = t(!sync ? 'settings.syncOff' : syncPhase === 'error' ? 'settings.syncError' : syncPhase === 'syncing' ? 'settings.syncing' : 'settings.syncOn');
+  const language = useSettingsStore((s) => s.language);
+  const [pickingLanguage, setPickingLanguage] = useState(false);
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">Settings</Text>
+      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">{t('tabs.settings')}</Text>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
 
       {/* Each child has their own profile page; this screen is for app-wide settings. */}
-      <SectionLabel className="mt-2 mb-2">Children</SectionLabel>
+      <SectionLabel className="mt-2 mb-2">{t('settings.children')}</SectionLabel>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
         {children.map((c) => (
           <ChildCard
@@ -97,25 +101,33 @@ export default function SettingsScreen() {
               <Plus color={colors.inkMuted} size={24} />
             </View>
           }
-          title="Add child"
+          title={t('settings.addChild')}
           subtitle=""
         />
       </ScrollView>
 
-      <SectionLabel>Sync</SectionLabel>
+      <SectionLabel>{t('settings.sync')}</SectionLabel>
       <Card>
-        <Row label="Sync between phones" value={syncLabel} onPress={() => router.push('/sync')} right={chevron} />
+        <Row label={t('settings.syncRow')} value={syncLabel} onPress={() => router.push('/sync')} right={chevron} />
       </Card>
 
-      <SectionLabel>Notifications</SectionLabel>
+      <SectionLabel>{t('settings.notifications')}</SectionLabel>
       <Card>
         <Row
-          label="Reminders"
+          label={t('settings.reminders')}
           right={<Toggle value={reminders.enabled} onValueChange={setRemindersEnabled} disabled={!remindersAvailable} />}
         />
         <Row
-          label="Choose reminders"
-          value={!remindersAvailable ? 'Needs dev build' : !reminders.enabled ? 'Paused' : reminderCount ? `${reminderCount} on` : 'None'}
+          label={t('settings.chooseReminders')}
+          value={
+            !remindersAvailable
+              ? t('settings.needsDevBuild')
+              : !reminders.enabled
+                ? t('settings.paused')
+                : reminderCount
+                  ? t('settings.remindersOn', { count: reminderCount })
+                  : t('settings.none')
+          }
           onPress={() => router.push('/reminders')}
           right={chevron}
         />
@@ -124,47 +136,61 @@ export default function SettingsScreen() {
         <View className="mt-3">
           <Card>
             <Row
-              label="When another phone logs a sleep"
+              label={t('settings.familySleep')}
               right={<Toggle value={familyAlerts.enabled} onValueChange={(enabled) => setFamilyAlerts({ enabled })} disabled={!remindersAvailable} />}
             />
             {familyAlerts.enabled ? (
               <>
-                <Row label="And when they wake up" right={<Toggle value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />} />
-                <Row label="Bedtime and morning too" right={<Toggle value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
+                <Row label={t('settings.familyWake')} right={<Toggle value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />} />
+                <Row label={t('settings.familyNights')} right={<Toggle value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
               </>
             ) : null}
           </Card>
           <Text className="text-ink-ghost text-xs mt-2 mx-1 leading-5">
-            Naps{familyAlerts.nights ? ', bedtime and the morning' : ''}, never night wakings. Each phone chooses for itself, so a grandparent's
-            can stay quiet.{sync.push ? '' : " This server doesn't send pushes, so they only arrive while Subby is open."}
+            {t(familyAlerts.nights ? 'settings.familyNoteNights' : 'settings.familyNoteNaps')}
+            {sync.push ? '' : t('settings.familyNoPush')}
           </Text>
         </View>
       ) : null}
 
-      <SectionLabel>Data</SectionLabel>
+      <SectionLabel>{t('settings.data')}</SectionLabel>
       <Card>
-        <Row label="Backup & restore" onPress={() => router.push('/backup')} right={chevron} />
-        <Row label="Export CSV" onPress={() => router.push('/export')} right={chevron} />
-        <Row label="Import from Baby Buddy" onPress={() => router.push('/import/babybuddy')} right={chevron} />
+        <Row label={t('settings.backup')} onPress={() => router.push('/backup')} right={chevron} />
+        <Row label={t('settings.export')} onPress={() => router.push('/export')} right={chevron} />
+        <Row label={t('settings.import')} onPress={() => router.push('/import/babybuddy')} right={chevron} />
       </Card>
 
-      <SectionLabel>Units</SectionLabel>
+      <SectionLabel>{t('language.title')}</SectionLabel>
+      <Card>
+        <Row label={languageLabel(language)} onPress={() => setPickingLanguage(true)} right={chevron} />
+      </Card>
+      <LanguagePicker
+        visible={pickingLanguage}
+        value={language}
+        onClose={() => setPickingLanguage(false)}
+        onPick={(choice) => {
+          setPickingLanguage(false);
+          void setSetting('language', choice);
+        }}
+      />
+
+      <SectionLabel>{t('settings.units')}</SectionLabel>
       <Segmented
-        options={[{ value: 'metric', label: 'Metric (ml, kg, °C)' }, { value: 'imperial', label: 'Imperial (oz, lb, °F)' }]}
+        options={[{ value: 'metric', label: t('settings.metric') }, { value: 'imperial', label: t('settings.imperial') }]}
         value={units}
         onChange={(v) => setSetting('units', v)}
       />
 
-      <SectionLabel>Clock</SectionLabel>
+      <SectionLabel>{t('settings.clock')}</SectionLabel>
       <Segmented
-        options={[{ value: '24h', label: '24-hour' }, { value: '12h', label: '12-hour' }]}
+        options={[{ value: '24h', label: t('settings.24h') }, { value: '12h', label: t('settings.12h') }]}
         value={clock}
         onChange={(v) => setSetting('clock', v)}
       />
 
-      <SectionLabel>Help</SectionLabel>
+      <SectionLabel>{t('settings.help')}</SectionLabel>
       <Card>
-        <Row label="Share diagnostics" onPress={showDiagnostics} right={chevron} />
+        <Row label={t('settings.diagnostics')} onPress={showDiagnostics} right={chevron} />
       </Card>
 
       <View className="mt-10 items-center">
@@ -175,10 +201,12 @@ export default function SettingsScreen() {
           </Wordmark>
         </View>
         <Text className="text-ink-ghost text-xs mt-1">
-          {syncing ? 'Synced end-to-end encrypted' : 'Everything stays on this phone'}{Constants.expoConfig?.version ? ` · ${Constants.expoConfig.version}` : ''}
+          {Constants.expoConfig?.version
+            ? t('settings.version', { text: t(syncing ? 'settings.e2ee' : 'settings.local'), version: Constants.expoConfig.version })
+            : t(syncing ? 'settings.e2ee' : 'settings.local')}
         </Text>
         {/* Required by the Font Awesome Free license (CC BY 4.0). */}
-        <Text className="text-ink-ghost text-xs mt-1">Icons by Font Awesome (CC BY 4.0)</Text>
+        <Text className="text-ink-ghost text-xs mt-1">{t('settings.icons')}</Text>
       </View>
       </ScrollView>
     </View>

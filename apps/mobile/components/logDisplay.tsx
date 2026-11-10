@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import {
   describeDiaper,
@@ -42,42 +43,44 @@ export function logDisplay(
       : { Icon: p.type === 'activity' && p.kind === 'tummy_time' ? ChildReaching : TYPE_META[p.type].Icon, color: TYPE_META[p.type].color };
   const running = entry.endedAt === null;
   const span = entry.endedAt !== null && entry.endedAt > entry.startedAt
-    ? `${formatTime(entry.startedAt)} → ${formatTime(entry.endedAt)}`
+    ? t('row.span', { from: formatTime(entry.startedAt), to: formatTime(entry.endedAt) })
     : '';
-  const withNotes = (detail: string) => [detail, p.notes].filter(Boolean).join(' · ');
+  const dot = (...parts: (string | false | undefined | null)[]) => parts.filter(Boolean).join(' · ');
+  const withNotes = (detail: string) => dot(detail, p.notes);
+  const ongoing = t('row.ongoing');
 
   const text = ((): { label: string; detail: string } => {
     switch (p.type) {
       case 'diaper':
-        return { label: `Diaper · ${describeDiaper(p)}`, detail: withNotes('') };
+        return { label: t('row.diaper', { detail: describeDiaper(p) }), detail: withNotes('') };
       case 'feed':
-        if (running) return { label: 'Feeding…', detail: '(ongoing)' };
+        if (running) return { label: t('row.feeding'), detail: ongoing };
         return {
           label: p.method === 'bottle' && p.amountMl !== undefined
-            ? `${describeFeed({ ...p, amountMl: undefined })} · ${formatVolume(p.amountMl, units)}`
+            ? dot(describeFeed({ ...p, amountMl: undefined }), formatVolume(p.amountMl, units))
             : describeFeed(p),
-          detail: withNotes([span, p.allergen ? 'allergen' : '', p.reaction ?? ''].filter(Boolean).join(' · ')),
+          detail: withNotes(dot(span, p.allergen && t('row.allergen'), p.reaction)),
         };
       case 'sleep':
-        if (running) return { label: 'Sleeping…', detail: '(ongoing)' };
+        if (running) return { label: t('row.sleeping'), detail: ongoing };
         return {
-          label: p.nap === false ? 'Night sleep' : 'Nap',
-          detail: withNotes(`${formatSpan(entry.endedAt! - entry.startedAt)} · ${span}`),
+          label: t(p.nap === false ? 'row.nightSleep' : 'row.nap'),
+          detail: withNotes(dot(formatSpan(entry.endedAt! - entry.startedAt), span)),
         };
       case 'pumping':
-        if (running) return { label: 'Pumping…', detail: '(ongoing)' };
+        if (running) return { label: t('row.pumpingRunning'), detail: ongoing };
         return {
-          label: p.amountMl !== undefined ? `Pumped ${formatVolume(p.amountMl, units)}` : 'Pumped',
+          label: p.amountMl !== undefined ? t('row.pumpedAmount', { amount: formatVolume(p.amountMl, units) }) : t('row.pumped'),
           detail: withNotes(span),
         };
       case 'growth':
         return {
-          label: 'Growth',
-          detail: withNotes([
+          label: t('type.growth'),
+          detail: withNotes(dot(
             p.weightG !== undefined && formatWeight(p.weightG, units),
             p.heightCm !== undefined && formatLength(p.heightCm, units),
-            p.headCm !== undefined && `head ${formatLength(p.headCm, units)}`,
-          ].filter(Boolean).join(' · ')),
+            p.headCm !== undefined && t('story.head', { length: formatLength(p.headCm, units) }),
+          )),
         };
       case 'temperature':
         return { label: formatTemperature(p.celsius, units), detail: withNotes('') };
@@ -85,19 +88,19 @@ export function logDisplay(
         return { label: p.name, detail: withNotes(p.dose !== undefined ? formatDose(p.dose, p.unit) : '') };
       case 'potty':
         return {
-          label: `Potty · ${p.result}${p.accident ? ' (accident)' : ''}`,
-          detail: withNotes(p.location ?? ''),
+          label: t(p.accident ? 'row.pottyAccident' : 'row.potty', { result: t(`potty.${p.result}`) }),
+          detail: withNotes(p.location ? t(`potty.${p.location}`) : ''),
         };
       case 'activity':
-        if (running) return { label: `${activityLabel(p.kind)}…`, detail: '(ongoing)' };
+        if (running) return { label: t('row.running', { what: activityLabel(p.kind) }), detail: ongoing };
         return {
           label: activityLabel(p.kind),
-          detail: withNotes([span && formatSpan(entry.endedAt! - entry.startedAt), p.milestone].filter(Boolean).join(' · ')),
+          detail: withNotes(dot(span && formatSpan(entry.endedAt! - entry.startedAt), p.milestone)),
         };
       case 'milestone':
-        return { label: p.custom ?? (p.key ? milestoneLabel(p.key) : 'Milestone'), detail: withNotes('') };
+        return { label: p.custom ?? (p.key ? milestoneLabel(p.key) : t('type.milestone')), detail: withNotes('') };
       case 'note':
-        return { label: p.text.split('\n')[0], detail: p.photoUri ? '📷 photo' : '' };
+        return { label: p.text.split('\n')[0], detail: p.photoUri ? t('row.photo') : '' };
     }
   })();
 

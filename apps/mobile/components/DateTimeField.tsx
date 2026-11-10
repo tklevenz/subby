@@ -1,3 +1,4 @@
+import { formatDate, t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +9,8 @@ import { dayOptions, daysInMonth, from12, joinTime, splitTime, to12 } from './da
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
-const MONTHS = range(0, 11).map((m) => new Date(2000, m, 1).toLocaleDateString([], { month: 'short' }));
+/** Month names in the app's language (a function, so a language change is picked up). */
+const months = () => range(0, 11).map((m) => formatDate(new Date(2000, m, 1).getTime(), { month: 'short' }));
 
 /**
  * A date + time field for epoch ms. Tapping it opens a sheet of wheels: day ("Today", "Sun 25 Oct"…), hour and
@@ -41,20 +43,20 @@ export default function DateTimeField({
     <>
       <Pressable onPress={() => setOpen(true)} className="bg-raised border border-line-strong rounded-xl px-4 py-3 self-start">
         {value === null ? (
-          <Text className="text-ink-muted text-base">{placeholder ?? 'Set time'}</Text>
+          <Text className="text-ink-muted text-base">{placeholder ?? t('picker.setTime')}</Text>
         ) : (
           <Text className="text-ink text-base">
             {mode === 'date'
-              ? new Date(value).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
+              ? formatDate(value, { day: 'numeric', month: 'long', year: 'numeric' })
               : timeOnly
                 ? formatTime(value)
-                : `${formatDayLabel(value)} · ${formatTime(value)}`}
+                : t('picker.dayTime', { day: formatDayLabel(value), time: formatTime(value) })}
           </Text>
         )}
       </Pressable>
       {open ? (
         <WheelSheet
-          title={title ?? (mode === 'date' ? 'Date' : 'Time')}
+          title={title ?? t(mode === 'date' ? 'picker.date' : 'picker.time')}
           value={value ?? Math.min(Date.now(), maximumDate?.getTime() ?? Infinity)}
           mode={mode}
           max={maximumDate?.getTime()}
@@ -107,10 +109,10 @@ function WheelSheet({
         </View>
         <View className="flex-row mt-4">
           <Pressable onPress={onCancel} className="flex-1 items-center py-4">
-            <Text className="text-ink text-base font-semibold">Cancel</Text>
+            <Text className="text-ink text-base font-semibold">{t('common.cancel')}</Text>
           </Pressable>
           <Pressable onPress={save} className="flex-1 items-center py-4">
-            <Text className="text-violet-soft text-base font-semibold">Save</Text>
+            <Text className="text-violet-soft text-base font-semibold">{t('common.save')}</Text>
           </Pressable>
         </View>
       </View>
@@ -139,7 +141,7 @@ function DateTimeWheels({ value, max, onChange }: { value: number; max?: number;
         <WheelColumn labels={dayLabels} index={dayIndex} onChange={(i) => set({ day: days[i]! })} />
         <WheelColumn labels={range(1, 12).map(String)} index={hour12 - 1} onChange={(i) => set({ hour: from12(i + 1, pm) })} width={56} />
         <WheelColumn labels={minutes} index={minute} onChange={(i) => set({ minute: i })} width={56} />
-        <WheelColumn labels={['AM', 'PM']} index={pm ? 1 : 0} onChange={(i) => set({ hour: from12(hour12, i === 1) })} width={56} />
+        <WheelColumn labels={[t('picker.am'), t('picker.pm')]} index={pm ? 1 : 0} onChange={(i) => set({ hour: from12(hour12, i === 1) })} width={56} />
       </View>
     );
   }
@@ -165,7 +167,7 @@ function DateWheels({ value, onChange }: { value: number; onChange: (ms: number)
   return (
     <View className="flex-row">
       <WheelColumn labels={range(1, 31).map(String)} index={d.getDate() - 1} onChange={(i) => set({ day: i + 1 })} width={64} />
-      <WheelColumn labels={MONTHS} index={d.getMonth()} onChange={(i) => set({ month: i })} />
+      <WheelColumn labels={months()} index={d.getMonth()} onChange={(i) => set({ month: i })} />
       <WheelColumn labels={years.map(String)} index={Math.max(0, years.indexOf(d.getFullYear()))} onChange={(i) => set({ year: years[i]! })} width={84} />
     </View>
   );

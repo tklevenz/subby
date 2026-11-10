@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { Child } from '../schemas/child.schema';
 import type { LogEntry } from '../schemas/log.schema';
 import { milestoneLabel } from './milestones';
@@ -38,19 +39,19 @@ export function childStory(logs: LogEntry[], child: Pick<Child, 'birthDate'>, un
       const parts = [
         p.weightG ? formatWeight(p.weightG, units) : null,
         p.heightCm ? formatLength(p.heightCm, units) : null,
-        p.headCm ? `head ${formatLength(p.headCm, units)}` : null,
+        p.headCm ? t('story.head', { length: formatLength(p.headCm, units) }) : null,
       ].filter(Boolean);
-      if (parts.length) items.push({ id: l.id, logId: l.id, at: l.startedAt, kind: 'growth', title: `Measured ${parts.join(', ')}` });
+      if (parts.length) items.push({ id: l.id, logId: l.id, at: l.startedAt, kind: 'growth', title: t('story.measured', { parts: parts.join(t('list.join')) }) });
     } else if (p.type === 'feed' && p.foods?.length && (!firstSolids || l.startedAt < firstSolids.startedAt)) {
       firstSolids = l;
     }
   }
 
   if (firstSolids?.payload.type === 'feed') {
-    const foods = firstSolids.payload.foods!.join(', ');
-    items.push({ id: firstSolids.id, logId: firstSolids.id, at: firstSolids.startedAt, kind: 'solids', title: `First solid food: ${foods}` });
+    const foods = firstSolids.payload.foods!.join(t('list.join'));
+    items.push({ id: firstSolids.id, logId: firstSolids.id, at: firstSolids.startedAt, kind: 'solids', title: t('story.firstSolids', { foods }) });
   }
-  items.push({ id: 'birth', logId: null, at: isoDateMs(child.birthDate), kind: 'birth', title: 'Born' });
+  items.push({ id: 'birth', logId: null, at: isoDateMs(child.birthDate), kind: 'birth', title: t('story.born') });
 
   return items.sort((a, b) => b.at - a.at);
 }

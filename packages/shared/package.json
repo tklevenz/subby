@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./crypto": "./src/crypto/index.ts",
     "./sync": "./src/sync/index.ts",
+    "./i18n": "./src/i18n/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {

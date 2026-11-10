@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { fetch as expoFetch } from 'expo/fetch';
 import { sign, toBase64, type DeviceLogEntry, type IdentityKeys } from '@subby/shared/crypto';
 import {
@@ -41,18 +42,18 @@ async function call<T>(server: string, method: string, path: string, body?: unkn
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new SyncHttpError(0, `Can't reach ${server}`);
+    throw new SyncHttpError(0, t('sync.error.unreachable', { server }));
   }
   const json = (await res.json().catch(() => ({}))) as { message?: string };
-  if (!res.ok) throw new SyncHttpError(res.status, json.message ?? `Server error ${res.status}`);
+  if (!res.ok) throw new SyncHttpError(res.status, json.message ?? t('sync.error.server', { status: String(res.status) }));
   return json as T;
 }
 
 /** Checks that a URL is a Subby Sync server this app can talk to. */
 export async function checkServer(server: string) {
   const info = await call<{ service?: string; protocol?: number; mode?: string; push?: boolean; testPurchases?: boolean }>(server, 'GET', '/v1/info');
-  if (info.service !== 'subby-sync') throw new Error('That address is not a Subby Sync server');
-  if (info.protocol !== 1) throw new Error('This server needs a newer version of the app');
+  if (info.service !== 'subby-sync') throw new Error(t('sync.error.notSubby'));
+  if (info.protocol !== 1) throw new Error(t('sync.error.newerApp'));
   return info;
 }
 
@@ -131,9 +132,9 @@ export class SyncSession {
       try {
         res = await send();
       } catch {
-        throw new SyncHttpError(0, `Can't reach ${this.server}`);
+        throw new SyncHttpError(0, t('sync.error.unreachable', { server: this.server }));
       }
-      if (!res.ok) throw new SyncHttpError(res.status, `Server error ${res.status}`);
+      if (!res.ok) throw new SyncHttpError(res.status, t('sync.error.server', { status: String(res.status) }));
       return res;
     };
     try {

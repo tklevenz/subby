@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Linking, Text, View } from 'react-native';
 import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@subby/shared';
@@ -15,29 +16,30 @@ import { ScreenScroll } from '../components/ScreenScroll';
 
 type Interval = { value: string; label: string };
 const FEED_INTERVALS: Interval[] = [
-  { value: '120', label: '2h' },
-  { value: '150', label: '2.5h' },
-  { value: '180', label: '3h' },
-  { value: '210', label: '3.5h' },
-  { value: '240', label: '4h' },
+  { value: '120', get label() { return t('reminders.hours', { h: 2 }); } },
+  { value: '150', get label() { return t('reminders.hours', { h: 2.5 }); } },
+  { value: '180', get label() { return t('reminders.hours', { h: 3 }); } },
+  { value: '210', get label() { return t('reminders.hours', { h: 3.5 }); } },
+  { value: '240', get label() { return t('reminders.hours', { h: 4 }); } },
 ];
 const DIAPER_INTERVALS: Interval[] = [
-  { value: '120', label: '2h' },
-  { value: '180', label: '3h' },
-  { value: '240', label: '4h' },
+  { value: '120', get label() { return t('reminders.hours', { h: 2 }); } },
+  { value: '180', get label() { return t('reminders.hours', { h: 3 }); } },
+  { value: '240', get label() { return t('reminders.hours', { h: 4 }); } },
 ];
 const PUMP_INTERVALS: Interval[] = [
-  { value: '120', label: '2h' },
-  { value: '180', label: '3h' },
-  { value: '240', label: '4h' },
-  { value: '300', label: '5h' },
+  { value: '120', get label() { return t('reminders.hours', { h: 2 }); } },
+  { value: '180', get label() { return t('reminders.hours', { h: 3 }); } },
+  { value: '240', get label() { return t('reminders.hours', { h: 4 }); } },
+  { value: '300', get label() { return t('reminders.hours', { h: 5 }); } },
 ];
 
-const NAP_LEADS = [
-  { value: '0', label: 'At window start' },
-  { value: '10', label: '10 min before' },
-  { value: '20', label: '20 min before' },
-] as const;
+const napLeads = () =>
+  [
+    { value: '0', label: t('reminders.atStart') },
+    { value: '10', label: t('reminders.before', { count: 10 }) },
+    { value: '20', label: t('reminders.before', { count: 20 }) },
+  ] as const;
 
 export default function RemindersScreen() {
   const reminders = useSettingsStore((s) => s.reminders);
@@ -71,92 +73,100 @@ export default function RemindersScreen() {
       {!remindersAvailable ? (
         <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
           <Text className="text-amber-pale text-sm leading-5">
-            Reminders can't run in Expo Go on Android. They work in the iOS Expo Go app and in development builds.
+            {t('reminders.expoGo')}
           </Text>
         </View>
       ) : allowed === false ? (
         <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
           <Text className="text-amber-pale text-sm leading-5">
-            Notifications are turned off for Subby.{' '}
-            <Text className="underline" onPress={() => Linking.openSettings()}>Open Settings</Text> to allow them.
+            {t('reminders.off')}{' '}
+            <Text className="underline" onPress={() => Linking.openSettings()}>
+              {t('reminders.openSettings')}
+            </Text>
+            {t('reminders.toAllow')}
           </Text>
         </View>
       ) : null}
 
       <View className="bg-surface border border-line rounded-2xl p-4 mb-5 flex-row items-center">
         <View className="flex-1 pr-3">
-          <Text className="text-ink text-base font-semibold">Allow reminders</Text>
-          <Text className="text-ink-muted text-xs mt-1 leading-4">Turn off to pause them all; your choices below are kept.</Text>
+          <Text className="text-ink text-base font-semibold">{t('reminders.allow')}</Text>
+          <Text className="text-ink-muted text-xs mt-1 leading-4">{t('reminders.allowHint')}</Text>
         </View>
         <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(refresh)} disabled={!remindersAvailable} />
       </View>
 
       <View style={{ opacity: reminders.enabled ? 1 : 0.5 }}>
         <IntervalSection
-          title="Feeding"
-          description="When it's been this long since the last feed started."
+          title={t('reminders.feeding')}
+          description={t('reminders.feedingText')}
           value={reminders.feed}
           options={FEED_INTERVALS}
           onChange={(feed, enabling) => update({ feed }, enabling)}
         />
         <IntervalSection
-          title="Diaper"
-          description="When it's been this long since the last diaper change."
+          title={t('reminders.diaper')}
+          description={t('reminders.diaperText')}
           value={reminders.diaper}
           options={DIAPER_INTERVALS}
           onChange={(diaper, enabling) => update({ diaper }, enabling)}
         />
         <IntervalSection
-          title="Pumping"
-          description="When it's been this long since the last pumping session started."
+          title={t('reminders.pumping')}
+          description={t('reminders.pumpingText')}
           value={reminders.pumping}
           options={PUMP_INTERVALS}
           onChange={(pumping, enabling) => update({ pumping }, enabling)}
         />
 
         <Section
-          title="Medication"
-          description="When the next dose is due, for medications logged with a dosing interval."
+          title={t('reminders.medication')}
+          description={t('reminders.medicationText')}
           enabled={reminders.medication.enabled}
           onToggle={(on) => update({ medication: { enabled: on } }, on)}
         />
 
         <Section
-          title="Nap & bedtime"
-          description="Before the predicted sleep window, from the baby's age and last 7 days."
+          title={t('reminders.nap')}
+          description={t('reminders.napText')}
           enabled={reminders.nap.enabled}
           onToggle={(on) => update({ nap: { ...reminders.nap, enabled: on } }, on)}
         >
           <Segmented
-            options={NAP_LEADS}
-            value={String(reminders.nap.leadMin) as (typeof NAP_LEADS)[number]['value']}
+            options={napLeads()}
+            value={String(reminders.nap.leadMin) as ReturnType<typeof napLeads>[number]['value']}
             onChange={(v) => update({ nap: { ...reminders.nap, leadMin: Number(v) } }, false)}
           />
         </Section>
 
         <Section
-          title="Forgotten timers"
-          description={`Asks whether a timer is still going: feeds after ${FORGOTTEN_TIMER_MIN.feed} min, pumping after ${FORGOTTEN_TIMER_MIN.pumping} min, naps after ${FORGOTTEN_TIMER_MIN.nap / 60} h, night sleep after ${FORGOTTEN_TIMER_MIN.night / 60} h.`}
+          title={t('reminders.timers')}
+          description={t('reminders.timersText', {
+            feed: FORGOTTEN_TIMER_MIN.feed!,
+            pumping: FORGOTTEN_TIMER_MIN.pumping!,
+            nap: FORGOTTEN_TIMER_MIN.nap / 60,
+            night: FORGOTTEN_TIMER_MIN.night / 60,
+          })}
           enabled={reminders.timers.enabled}
           onToggle={(on) => update({ timers: { enabled: on } }, on)}
         />
       </View>
 
-      <SectionLabel>Coming up</SectionLabel>
+      <SectionLabel>{t('reminders.comingUp')}</SectionLabel>
       <Card>
         {upcoming.length === 0 ? (
-          <Text className="text-ink-faint px-4 py-3.5">No reminders scheduled.</Text>
+          <Text className="text-ink-faint px-4 py-3.5">{t('reminders.none')}</Text>
         ) : (
           upcoming.map((u) => (
             <View key={u.id} className="flex-row px-4 py-3 border-b border-line">
               <Text className="flex-1 text-ink">{u.title}</Text>
-              {u.at ? <Text className="text-ink-muted">{formatDayLabel(u.at)} {formatTime(u.at)}</Text> : null}
+              {u.at ? <Text className="text-ink-muted">{t('reminders.when', { day: formatDayLabel(u.at), time: formatTime(u.at) })}</Text> : null}
             </View>
           ))
         )}
       </Card>
       <Text className="text-ink-ghost text-xs mt-3 leading-5">
-        Reminders are set on this phone only and move automatically as you log.
+        {t('reminders.footer')}
       </Text>
     </ScreenScroll>
   );

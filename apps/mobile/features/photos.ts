@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
@@ -65,7 +66,7 @@ async function shrinkPhoto(asset: { uri: string; width: number; height: number }
       image.release();
     }
   } catch (e) {
-    console.warn("Couldn't shrink the photo, keeping the original", e);
+    console.warn("Couldn't shrink the photo, keeping the original", e); // i18n-ignore
     return asset.uri;
   } finally {
     context.release();
@@ -75,18 +76,18 @@ async function shrinkPhoto(asset: { uri: string; width: number; height: number }
 const imageType = (uri: string) => (/\.png$/i.test(uri) ? 'image/png' : 'image/jpeg');
 
 /** Opens the share sheet for a photo (iOS's has "Save Image"). */
-export const sharePhoto = (uri: string) => Sharing.shareAsync(uri, { mimeType: imageType(uri), dialogTitle: 'Share photo' });
+export const sharePhoto = (uri: string) => Sharing.shareAsync(uri, { mimeType: imageType(uri), dialogTitle: t('photo.shareTitle') });
 
 /** Whether `savePhoto` can save straight to the phone (Android's Downloads folder). */
 export const canSavePhoto = downloads !== null;
 
 /** Saves a copy to the public Downloads folder (Android); returns the saved name. */
 export async function savePhoto(uri: string): Promise<string> {
-  if (!downloads) throw new Error('Saving is not available here');
+  if (!downloads) throw new Error(t('photo.notAvailable'));
   const ext = /\.png$/i.test(uri) ? 'png' : 'jpg';
   const d = new Date();
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  return downloads.saveToDownloads(uri, `Subby photo ${day}.${ext}`, imageType(uri));
+  return downloads.saveToDownloads(uri, `${t('photo.fileName', { day })}.${ext}`, imageType(uri));
 }
 
 /** A photo's size in bytes; null when the file is gone. */

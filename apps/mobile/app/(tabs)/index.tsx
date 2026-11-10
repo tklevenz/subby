@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -24,7 +25,7 @@ function LogButton() {
       }}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel="Log something"
+      accessibilityLabel={t('home.logSomething')}
       // The avatar's size, so the header lines up; hitSlop keeps the target large enough.
       style={{ width: 40, height: 40 }}
       className="rounded-full bg-violet/15 border border-violet/50 items-center justify-center"

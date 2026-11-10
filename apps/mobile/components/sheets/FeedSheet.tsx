@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -40,7 +41,7 @@ function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: n
       onPress={onPress}
       className={`flex-1 items-center rounded-2xl border py-6 ${active ? 'bg-cyan/30 border-cyan-soft' : 'bg-raised border-line-strong'}`}
     >
-      <Text className="text-ink-soft text-sm font-medium">{side === 'left' ? 'Left' : 'Right'}</Text>
+      <Text className="text-ink-soft text-sm font-medium">{t(side === 'left' ? 'feed.left' : 'feed.right')}</Text>
       <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{mmss(secs)}</Text>
       <View className="flex-row items-center mt-1 h-4">
         {active ? <Pause color={colors.cyanPale} size={12} /> : null}
@@ -72,8 +73,8 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
     <View>
       <Text className="text-ink-muted text-sm mt-3 mb-3">
         {running
-          ? `Feeding for ${formatDuration(now - running.startedAt)}. Tap the other side to switch.`
-          : next ? `Last feed ended on the ${next === 'left' ? 'right' : 'left'}. Offer ${next} first.` : 'Tap a side to start the timer.'}
+          ? t('feedSheet.feedingFor', { span: formatDuration(now - running.startedAt) })
+          : next ? t(next === 'left' ? 'feedSheet.offerLeft' : 'feedSheet.offerRight') : t('feedSheet.tapSide')}
       </Text>
       <View className="flex-row gap-3">
         <SideButton side="left" secs={secs.left} active={active === 'left'} hint={!running && next === 'left'} onPress={() => tap('left')} />
@@ -83,7 +84,7 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
       {running ? (
         <>
           <Button
-            label="Done"
+            label={t('common.done')}
             onPress={once(async () => {
               await stopTimer(running.id);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -91,18 +92,18 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
             })}
           />
           <Button
-            label="Discard"
+            label={t('home.discard')}
             variant="ghost"
             onPress={() =>
-              Alert.alert('Discard this feed?', undefined, [
-                { text: 'Keep', style: 'cancel' },
-                { text: 'Discard', style: 'destructive', onPress: () => softDeleteLog(running.id) },
+              Alert.alert(t('feedSheet.discardTitle'), undefined, [
+                { text: t('feedSheet.keep'), style: 'cancel' },
+                { text: t('home.discard'), style: 'destructive', onPress: () => softDeleteLog(running.id) },
               ])
             }
           />
         </>
       ) : (
-        <Button label="Log a past feed instead" variant="ghost" onPress={() => open({ kind: 'log', type: 'feed', payload: { method: 'breast' } })} />
+        <Button label={t('feedSheet.pastFeed')} variant="ghost" onPress={() => open({ kind: 'log', type: 'feed', payload: { method: 'breast' } })} />
       )}
     </View>
   );
@@ -130,15 +131,19 @@ function BottleTab({ onDone }: { onDone: () => void }) {
 
   return (
     <View>
-      <FieldLabel>Time</FieldLabel>
-      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title="Time" />
-      <FieldLabel>Milk</FieldLabel>
+      <FieldLabel>{t('feedSheet.time')}</FieldLabel>
+      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title={t('feedSheet.time')} />
+      <FieldLabel>{t('feedSheet.milk')}</FieldLabel>
       <Segmented
-        options={[{ value: 'breast_milk', label: 'Breast milk' }, { value: 'formula', label: 'Formula' }, { value: 'fortified', label: 'Fortified' }]}
+        options={[
+          { value: 'breast_milk', label: t('feed.breastMilk') },
+          { value: 'formula', label: t('feed.formula') },
+          { value: 'fortified', label: t('feedSheet.fortified') },
+        ]}
         value={milkType}
         onChange={setMilkType}
       />
-      <FieldLabel>Amount</FieldLabel>
+      <FieldLabel>{t('feedSheet.amount')}</FieldLabel>
       <View className="flex-row flex-wrap gap-2">
         {presets.map((v) => (
           <Chip key={v} label={formatVolume(v, units)} selected={isPreset(v)} onPress={() => setAmountMl(v)} />
@@ -156,7 +161,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
         </Pressable>
       </View>
       <Button
-        label={`Log ${formatVolume(amountMl, units)} bottle`}
+        label={t('feedSheet.logBottle', { amount: formatVolume(amountMl, units) })}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'bottle', milkType, amountMl }, { startedAt: at });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -175,11 +180,11 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
 
   return (
     <View>
-      <FieldLabel>Time</FieldLabel>
-      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title="Time" />
+      <FieldLabel>{t('feedSheet.time')}</FieldLabel>
+      <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title={t('feedSheet.time')} />
       <FoodPicker value={solids} onChange={(p) => setSolids((s) => ({ ...s, ...p }))} />
       <Button
-        label="Log solids"
+        label={t('feedSheet.logSolids')}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'solids', ...solids }, { startedAt: at });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -204,7 +209,11 @@ export default function FeedSheet({ initialTab, onClose }: { initialTab?: Tab; o
   return (
     <>
       <Segmented
-        options={[{ value: 'breast', label: 'Breast' }, { value: 'bottle', label: 'Bottle' }, { value: 'solids', label: 'Solids' }]}
+        options={[
+          { value: 'breast', label: t('feed.breast') },
+          { value: 'bottle', label: t('feed.bottle') },
+          { value: 'solids', label: t('feed.solids') },
+        ]}
         value={tab}
         onChange={setTab}
       />

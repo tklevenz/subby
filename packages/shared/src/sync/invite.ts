@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -46,14 +47,14 @@ export const encodeInviteQr = (qr: InviteQr) => `subby:${toBase64(jsonToBytes(qr
 
 export function decodeInviteQr(input: string): InviteQr {
   const text = input.trim();
-  if (!text.startsWith('subby:')) throw new Error('Not a Subby code');
+  if (!text.startsWith('subby:')) throw new Error(t('invite.error.notCode'));
   let qr: InviteQr;
   try {
     qr = bytesToJson<InviteQr>(fromBase64(text.slice('subby:'.length)));
   } catch {
-    throw new Error('This code is damaged');
+    throw new Error(t('invite.error.damaged'));
   }
-  if (qr.v !== 1 || !qr.s || !qr.i || !qr.k || !qr.d || !qr.p) throw new Error('Unsupported or damaged code');
+  if (qr.v !== 1 || !qr.s || !qr.i || !qr.k || !qr.d || !qr.p) throw new Error(t('invite.error.unsupported'));
   return qr;
 }
 

@@ -68,6 +68,7 @@ export const TemperaturePayloadSchema = z.object({
 });
 
 export const MEDICATION_UNITS = ['mg', 'ml', 'tablets', 'drops'] as const;
+export type MedicationUnit = (typeof MEDICATION_UNITS)[number];
 
 export const MedicationPayloadSchema = z.object({
   type: z.literal('medication'),

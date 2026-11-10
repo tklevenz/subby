@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, View, Text } from 'react-native';
 import { Camera } from './icons';
@@ -10,11 +11,12 @@ import PhotoMenu from './PhotoMenu';
 import { Button, FieldLabel, Segmented, TextField } from './ui';
 import { colors } from '../theme/colors';
 
-const SEX_OPTIONS = [
-  { value: 'female', label: 'Girl' },
-  { value: 'male', label: 'Boy' },
-  { value: 'other', label: 'Other' },
-] as const;
+const sexOptions = () =>
+  [
+    { value: 'female', label: t('childForm.girl') },
+    { value: 'male', label: t('childForm.boy') },
+    { value: 'other', label: t('childForm.other') },
+  ] as const;
 
 /** Create/edit form for a child profile. */
 export default function ChildForm({
@@ -41,25 +43,25 @@ export default function ChildForm({
         <ChildAvatar child={{ id: initial?.id ?? 'new', name: name || '?', photoUri }} size={96} />
         <View className="flex-row items-center mt-2">
           <Camera color={colors.violetStrong} size={14} />
-          <Text className="text-violet-soft text-sm ml-1.5">{photoUri ? 'Change photo' : 'Add a photo'}</Text>
+          <Text className="text-violet-soft text-sm ml-1.5">{t(photoUri ? 'childForm.changePhoto' : 'childForm.addPhoto')}</Text>
         </View>
       </Pressable>
       <PhotoMenu visible={menu} hasPhoto={photoUri !== null} onClose={() => setMenu(false)} onChange={setPhotoUri} />
 
-      <FieldLabel>Name</FieldLabel>
-      <TextField value={name} onChangeText={setName} placeholder="Baby's name" autoFocus={autoFocus} />
+      <FieldLabel>{t('childForm.name')}</FieldLabel>
+      <TextField value={name} onChangeText={setName} placeholder={t('childForm.namePlaceholder')} autoFocus={autoFocus} />
 
-      <FieldLabel>Birth date</FieldLabel>
+      <FieldLabel>{t('childForm.birthDate')}</FieldLabel>
       <DateTimeField
         mode="date"
-        title="Birth date"
+        title={t('childForm.birthDate')}
         value={fromIsoDate(birthDate)}
         maximumDate={new Date()}
         onChange={(ms) => setBirthDate(toIsoDate(ms))}
       />
 
-      <FieldLabel>Sex (for growth percentiles)</FieldLabel>
-      <Segmented options={SEX_OPTIONS} value={sex} onChange={setSex} />
+      <FieldLabel>{t('childForm.sex')}</FieldLabel>
+      <Segmented options={sexOptions()} value={sex} onChange={setSex} />
 
       <Button
         label={submitLabel}

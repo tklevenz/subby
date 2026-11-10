@@ -1,24 +1,33 @@
+import { t } from '../i18n';
+
 export function formatDuration(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
 
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  if (h > 0) return t('time.hm', { h, m });
+  if (m > 0) return t('time.ms', { m, s });
+  return t('time.s', { s });
 }
 
-export function formatRelative(msAgo: number): string {
+/** Time since something, coarse: "2h 15m", "1d 3h", "5m"; null under a minute. */
+export function formatElapsed(msAgo: number): string | null {
   const totalSec = Math.max(0, Math.floor(msAgo / 1000));
   const d = Math.floor(totalSec / 86400);
   const h = Math.floor((totalSec % 86400) / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
 
-  if (d > 0) return `${d}d ${h}h ago`;
-  if (h > 0) return `${h}h ${m}m ago`;
-  if (m > 0) return `${m}m ago`;
-  return 'Just now';
+  if (d > 0) return t('time.dh', { d, h });
+  if (h > 0) return t('time.hm', { h, m });
+  if (m > 0) return t('time.m', { m });
+  return null;
+}
+
+/** "2h 15m ago", "Just now". */
+export function formatRelative(msAgo: number): string {
+  const span = formatElapsed(msAgo);
+  return span ? t('time.ago', { span }) : t('time.justNow');
 }
 
 /** Local-time start of day (00:00) for the given epoch ms. */
@@ -38,12 +47,12 @@ export function ageInDays(birthDate: string, now: number): number {
 
 export function formatAge(birthDate: string, now: number): string {
   const days = ageInDays(birthDate, now);
-  if (days < 0) return 'Not born yet';
-  if (days < 14) return `${days} day${days === 1 ? '' : 's'}`;
-  if (days < 7 * 13) return `${Math.floor(days / 7)} weeks`;
+  if (days < 0) return t('age.notBorn');
+  if (days < 14) return t('age.days', { count: days });
+  if (days < 7 * 13) return t('age.weeks', { count: Math.floor(days / 7) });
   const months = Math.floor(days / 30.4375);
-  if (months < 24) return `${months} months`;
-  return `${Math.floor(months / 12)} years`;
+  if (months < 24) return t('age.months', { count: months });
+  return t('age.years', { count: Math.floor(months / 12) });
 }
 
 /** Hours and minutes only ("13h 20m", "45m"), for totals where seconds are noise. */
@@ -51,14 +60,14 @@ export function formatHoursMinutes(ms: number): string {
   const totalMin = Math.max(0, Math.round(ms / 60_000));
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  return `${m}m`;
+  if (h > 0) return m > 0 ? t('time.hm', { h, m }) : t('time.h', { h });
+  return t('time.m', { m });
 }
 
 /** How long something finished took: "1h 29m", "2h", "55m"; seconds only under a minute. (Live timers use `formatDuration`.) */
 export function formatSpan(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
-  return totalSec < 60 ? `${totalSec}s` : formatHoursMinutes(Math.floor(totalSec / 60) * 60_000);
+  return totalSec < 60 ? t('time.s', { s: totalSec }) : formatHoursMinutes(Math.floor(totalSec / 60) * 60_000);
 }
 
 const fromIso = (iso: string) => {
@@ -86,21 +95,22 @@ export function ageParts(birthDate: string, now: number): { months: number; days
   return { months, days: daysBetween(addMonths(birth, months), today) };
 }
 
-const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+const plural = (count: number, unit: 'day' | 'week' | 'month' | 'year') => t(`age.${unit}s`, { count });
+const pair = (a: string, b: string) => t('age.pair', { a, b });
 
 /** "12 days", "5 weeks, 2 days", "8 months, 12 days", "2 years, 3 months". */
 export function formatAgeLong(birthDate: string, now: number): string {
   const totalDays = ageInDays(birthDate, now);
-  if (totalDays < 0) return 'Not born yet';
+  if (totalDays < 0) return t('age.notBorn');
   if (totalDays < 14) return plural(totalDays, 'day');
   const { months, days } = ageParts(birthDate, now);
   if (months < 3) {
     const rest = totalDays % 7;
-    return rest ? `${plural(Math.floor(totalDays / 7), 'week')}, ${plural(rest, 'day')}` : plural(totalDays / 7, 'week');
+    return rest ? pair(plural(Math.floor(totalDays / 7), 'week'), plural(rest, 'day')) : plural(totalDays / 7, 'week');
   }
-  if (months < 24) return days ? `${plural(months, 'month')}, ${plural(days, 'day')}` : plural(months, 'month');
+  if (months < 24) return days ? pair(plural(months, 'month'), plural(days, 'day')) : plural(months, 'month');
   const years = Math.floor(months / 12);
-  return months % 12 ? `${plural(years, 'year')}, ${plural(months % 12, 'month')}` : plural(years, 'year');
+  return months % 12 ? pair(plural(years, 'year'), plural(months % 12, 'month')) : plural(years, 'year');
 }
 
 /**

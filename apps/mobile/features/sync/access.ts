@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { create } from 'zustand';
 import * as Crypto from 'expo-crypto';
 import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess } from '@subby/shared/sync';
@@ -65,7 +66,7 @@ export const canBuy = () => useAccessStore.getState().testPurchases;
  * with the store and answers with the new access.
  */
 export async function buy(api: SyncSession, kind: ProductKind) {
-  if (!canBuy()) throw new Error('Buying comes with the store release of the app.');
+  if (!canBuy()) throw new Error(t('sync.error.buyLater'));
   const token = `test-${Crypto.randomUUID()}`;
   const entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: 'test', product: PRODUCTS[kind], token });
   useAccessStore.setState((s) => ({ entitlement, testTokens: [...s.testTokens, { kind, token }] }));
@@ -74,9 +75,9 @@ export async function buy(api: SyncSession, kind: ProductKind) {
 
 /** Sends this store account's unlock again, so it moves to this phone (a new phone, or after re-joining). */
 export async function restore(api: SyncSession) {
-  if (!canBuy()) throw new Error('Restoring comes with the store release of the app.');
+  if (!canBuy()) throw new Error(t('sync.error.restoreLater'));
   const unlock = useAccessStore.getState().testTokens.findLast((t) => t.kind === 'unlock');
-  if (!unlock) throw new Error('No unlock to restore on this account.');
+  if (!unlock) throw new Error(t('sync.error.noUnlock'));
   const entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: 'test', product: PRODUCTS.unlock, token: unlock.token });
   useAccessStore.setState({ entitlement });
   return entitlement;
@@ -85,7 +86,7 @@ export async function restore(api: SyncSession) {
 /** On a test-store server: refunds the last test purchase, to see what a refund does. */
 export async function refundLastTest(api: SyncSession) {
   const last = useAccessStore.getState().testTokens.at(-1);
-  if (!last) throw new Error('Nothing bought with the test store yet.');
+  if (!last) throw new Error(t('sync.error.noTestPurchase'));
   const entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases/test/refund', { token: last.token });
   useAccessStore.setState((s) => ({ entitlement, testTokens: s.testTokens.slice(0, -1) }));
   return entitlement;

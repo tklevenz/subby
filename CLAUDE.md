@@ -46,6 +46,12 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
       - `epoch` entries carry `closedSeq`: the sync seq the rotating phone had pulled to (the server checks it's the family's latest). Records of older epochs end there (`state.closedAt`, `withinEpoch`), so a removed phone writing with a key it still has, stored by a hostile server, is refused. Signed only when set, so older entries keep their signatures; an epoch without one closes nothing.
       - A phone that joins later can't tell such records from genuine history (the seq isn't signed per record); phones that were in sync can.
     - `files`: chunked photo encryption.
+- `src/i18n/` (`@subby/shared/i18n`, A14): our own small i18n, no library (shared needs it too, and Hermes' `Intl.PluralRules` isn't relied on).
+  - `en.ts` is the source catalog: flat dotted keys by area (`'home.tapSleep'`), `{name}` placeholders, `{ one, other }` plurals picked by `{count}` (`pluralCategory`: French and Portuguese count 0 as one). `t(key, params)` formats number params for the language, so pass years and ids as strings.
+  - Other languages go in `catalogs.ts` (`TRANSLATIONS`), typed `Translation` (every English key). `i18n.test.ts` checks keys, placeholders and plurals per language, and that `review.ts` (`REVIEW_KEYS`: safety texts a native speaker reviews per language) only names keys that exist. A missing key falls back to English at runtime.
+  - `formatNumber`, `formatDate(ms, Intl options)`, `formatClock(ms, clock)` use the current locale; never `toLocaleString([])` or `toLocaleDateString([])`.
+  - Shared domain text goes through `t()` too (durations, ages, reminders, family alerts, milestones (`label` is a getter), story, feed/diaper summaries, backup and invite errors). Percentile ordinals: English computes "50th", other catalogs wrap the number in `percentile.*`.
+  - Stays English: CSV headers (decided), the diagnostics report, server error messages, the dev tools in `SyncAccess`.
 - `src/sync/` (`@subby/shared/sync`):
   - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD.
     - Tombstones carry a sealed empty body: no content stays on the server, but a server can't delete on its own. `openRecord` throws `UnsealedRecordError` for one without data (older apps sent those); phones skip them.
@@ -208,6 +214,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Every write already sets `syncStatus: 'pending'`. Keep it that way for anything new.
   - `deleteChild` now leaves scrubbed log tombstones (`{type}` payload) instead of hard-deleting, so deletes reach other phones.
 - **Diagnostics** (`features/diagnostics.ts`, Settings → Help → Share diagnostics): a plain-text report for support (version, system, counts, reminders, background, sync status and `useSyncStore.lastError`, access), shown first and shared only through the share sheet. No names, ids or own-server address; no analytics or crash SDK.
+- **Language** (`features/i18n.ts`): `settings.language` (`'system'` or a locale, device-local) is applied at hydrate (headless runs too, so notifications are planned in it) and on change; `expo-localization` gives the phone's language (its plugin declares `supportedLocales`, so Android 13+ and iOS list Subby in per-app language settings). The root `Stack` is keyed by the locale, so a change re-renders every screen (navigation stays). Settings → Language uses `components/LanguagePicker.tsx` (names in their own language).
+  - UI text never sits in the code: `t('…')` everywhere, and module-level lists with labels are functions or getters (`ranges()`, `get label()`), so they follow a language change. `features/strings.test.ts` fails on English left in `app/`, `components/`, `features/`, `store/` (JSX text and capitalized quoted strings; `// i18n-ignore` at a line's end for non-UI strings; `ENGLISH` lists files that stay English).
 - **Utilities:** `store/timeHelpers.ts` (`useNow`, `useFormatTime`, `formatDayLabel`, ISO date helpers; re-exports the shared formatters).
 - **UX rule:** 2-tap maximum for common logs (sleep: 1 tap on its tile; diaper: tile + type; feed: tile + sheet).
 - **Product rule:** no gamification. No milestone counts, checklist progress, streaks or scores.

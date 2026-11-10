@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -58,7 +59,7 @@ export async function notificationsAllowed(): Promise<boolean> {
 async function ensureChannel() {
   if (!Notifications || Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL, {
-    name: 'Reminders',
+    name: t('channel.reminders'),
     importance: Notifications.AndroidImportance.HIGH,
   });
 }
@@ -151,7 +152,7 @@ let running: Promise<void> = Promise.resolve();
 /** Re-plans now and resolves when done (background tasks, which may be stopped right after). */
 export function replanReminders(): Promise<void> {
   clearTimeout(timer);
-  running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e));
+  running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e)); // i18n-ignore
   return running;
 }
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -160,7 +161,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 export function scheduleReminderSync(delayMs = 1000) {
   clearTimeout(timer);
   timer = setTimeout(() => {
-    running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e));
+    running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e)); // i18n-ignore
   }, delayMs);
 }
 

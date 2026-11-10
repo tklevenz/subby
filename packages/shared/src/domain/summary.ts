@@ -1,3 +1,4 @@
+import { formatNumber, t } from '../i18n';
 import { TIMED_LOG_TYPES, type LogEntry, type LogType, type PayloadOf } from '../schemas/log.schema';
 
 export type EntryOf<T extends LogType> = LogEntry & { logType: T; payload: PayloadOf<T> };
@@ -45,28 +46,29 @@ export function lastWakeAt(logs: LogEntry[]): number | null {
   return ended?.endedAt ?? null;
 }
 
-const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const pair = (a: string, b: string) => t('summary.pair', { a, b });
 
 export function describeFeed(p: PayloadOf<'feed'>): string {
   switch (p.method) {
     case 'bottle': {
-      const milk = p.milkType === 'formula' ? 'Formula' : p.milkType ? 'Breast milk' : 'Bottle';
-      return p.amountMl !== undefined ? `${milk} · ${Math.round(p.amountMl)} ml` : milk;
+      const milk = p.milkType === 'formula' ? t('feed.formula') : p.milkType ? t('feed.breastMilk') : t('feed.bottle');
+      return p.amountMl !== undefined ? pair(milk, `${formatNumber(Math.round(p.amountMl))} ml`) : milk;
     }
     case 'breast': {
       const l = p.leftSeconds ?? 0;
       const r = p.rightSeconds ?? 0;
-      const sides = l > 0 && r > 0 ? 'Both sides' : r > 0 ? 'Right' : l > 0 ? 'Left' : 'Breast';
+      const sides = l > 0 && r > 0 ? t('feed.bothSides') : r > 0 ? t('feed.right') : l > 0 ? t('feed.left') : t('feed.breast');
       const mins = Math.round((l + r) / 60);
-      return mins > 0 ? `${sides} · ${mins} min` : sides;
+      return mins > 0 ? pair(sides, t('feed.minutes', { count: mins })) : sides;
     }
     case 'solids':
-      return p.foods?.length ? `Solids · ${p.foods.join(', ')}` : 'Solids';
+      return p.foods?.length ? pair(t('feed.solids'), p.foods.join(t('list.join'))) : t('feed.solids');
   }
 }
 
 export function describeDiaper(p: PayloadOf<'diaper'>): string {
-  return p.color ? `${titleCase(p.condition)} · ${p.color}` : titleCase(p.condition);
+  const condition = t(`diaper.${p.condition}`);
+  return p.color ? pair(condition, t(`diaperColor.${p.color}`)) : condition;
 }
 
 /** Which breast to offer next, based on the last breastfeed. */

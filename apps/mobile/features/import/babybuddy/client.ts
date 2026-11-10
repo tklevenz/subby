@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import type { BBChild, BBEndpoint, BBRecords } from '@subby/shared';
 
 type Page<T> = { count: number; next: string | null; results: T[] };
@@ -27,17 +28,17 @@ export class BBClient {
     const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${this.baseUrl}/api/${pathOrUrl}`;
     let res: Response;
     try {
-      res = await fetch(url, { headers: { Authorization: `Token ${this.token.trim()}`, Accept: 'application/json' } });
+      res = await fetch(url, { headers: { Authorization: `Token ${this.token.trim()}`, Accept: 'application/json' } });  // i18n-ignore
     } catch {
-      throw new BBError(`Can't reach ${this.host}. Check the address and your connection.`);
+      throw new BBError(t('bb.error.unreachable', { host: this.host }));
     }
-    if (res.status === 401 || res.status === 403) throw new BBError('The API key was rejected. Copy it again from Baby Buddy → User Settings.');
-    if (res.status === 404) throw new BBError(`${this.host} doesn't look like a Baby Buddy server (no API found).`);
-    if (!res.ok) throw new BBError(`Baby Buddy returned an error (HTTP ${res.status}).`);
+    if (res.status === 401 || res.status === 403) throw new BBError(t('bb.error.rejected'));
+    if (res.status === 404) throw new BBError(t('bb.error.notBB', { host: this.host }));
+    if (!res.ok) throw new BBError(t('bb.error.http', { status: String(res.status) }));
     try {
       return (await res.json()) as T;
     } catch {
-      throw new BBError(`${this.host} returned something that isn't Baby Buddy API data.`);
+      throw new BBError(t('bb.error.notData', { host: this.host }));
     }
   }
 

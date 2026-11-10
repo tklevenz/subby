@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 import { unzipSync, zipSync, type Zippable } from 'fflate';
 import { z } from 'zod';
@@ -129,24 +130,24 @@ export function readBackup(zip: Uint8Array): BackupContents {
       filter: (f) => {
         if (f.name !== MANIFEST && !BACKUP_PHOTO.test(f.name)) return false;
         inflated += f.originalSize;
-        if (inflated > MAX_INFLATED + 4 * zip.length) throw new BackupError('This backup is damaged');
+        if (inflated > MAX_INFLATED + 4 * zip.length) throw new BackupError(t('backup.error.damaged'));
         return true;
       },
     });
   } catch (e) {
     if (e instanceof BackupError) throw e;
-    throw new BackupError('This file is damaged or not a Subby backup');
+    throw new BackupError(t('backup.error.damagedOrNot'));
   }
-  if (!files[MANIFEST]) throw new BackupError('This file is not a Subby backup');
+  if (!files[MANIFEST]) throw new BackupError(t('backup.error.notBackup'));
   let raw: unknown;
   try {
     raw = bytesToJson(files[MANIFEST]);
   } catch {
-    throw new BackupError('This backup is damaged');
+    throw new BackupError(t('backup.error.damaged'));
   }
   const manifest = ManifestSchema.safeParse(raw);
-  if (!manifest.success) throw new BackupError('This file is not a Subby backup');
-  if (manifest.data.version > BACKUP_VERSION) throw new BackupError('This backup was made by a newer version of the app. Update the app first.');
+  if (!manifest.success) throw new BackupError(t('backup.error.notBackup'));
+  if (manifest.data.version > BACKUP_VERSION) throw new BackupError(t('backup.error.newer'));
 
   let invalid = 0;
   const valid = <S extends z.ZodType>(schema: S, rows: unknown[]): z.output<S>[] =>
@@ -194,17 +195,17 @@ export async function encryptBackup(zip: Uint8Array, passphrase: string, onProgr
 
 /** The zip inside an encrypted backup. Throws BackupError on a wrong passphrase. */
 export async function decryptBackup(bytes: Uint8Array, passphrase: string, onProgress?: (p: number) => void): Promise<Uint8Array> {
-  if (!isEncryptedBackup(bytes)) throw new BackupError('This backup is not encrypted');
+  if (!isEncryptedBackup(bytes)) throw new BackupError(t('backup.error.notEncrypted'));
   const [version, logN, r, p] = bytes.subarray(MAGIC.length, MAGIC.length + 4);
   // Bounds keep a crafted header from asking for too much memory (128 · 2^logN · r bytes: at most 64 MiB here;
   // ours, BACKUP_KDF, takes 32 MiB).
-  if (version !== 1 || logN < 10 || logN > 16 || r < 1 || r > 8 || p !== 1) throw new BackupError('This backup is damaged or from a newer app');
+  if (version !== 1 || logN < 10 || logN > 16 || r < 1 || r > 8 || p !== 1) throw new BackupError(t('backup.error.damagedOrNewer'));
   const salt = bytes.subarray(MAGIC.length + 4, HEADER_BYTES);
   const key = await deriveKey(passphrase, salt, { logN, r, p }, onProgress);
   try {
     return decryptFile(key, bytes.subarray(HEADER_BYTES));
   } catch {
-    throw new BackupError('Wrong passphrase, or the file is damaged');
+    throw new BackupError(t('backup.error.passphrase'));
   }
 }
 
