@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, Linking, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Text, View } from 'react-native';
 import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@subby/shared';
-import { Card, Segmented } from '../components/ui';
+import { Card, Segmented, Toggle, SectionLabel } from '../components/ui';
 import {
   notificationsAllowed,
   remindersAvailable,
@@ -88,7 +88,7 @@ export default function RemindersScreen() {
           <Text className="text-ink text-base font-semibold">Allow reminders</Text>
           <Text className="text-ink-muted text-xs mt-1 leading-4">Turn off to pause them all; your choices below are kept.</Text>
         </View>
-        <Switch value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(refresh)} disabled={!remindersAvailable} />
+        <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(refresh)} disabled={!remindersAvailable} />
       </View>
 
       <View style={{ opacity: reminders.enabled ? 1 : 0.5 }}>
@@ -142,7 +142,7 @@ export default function RemindersScreen() {
         />
       </View>
 
-      <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-2 ml-1">Coming up</Text>
+      <SectionLabel>Coming up</SectionLabel>
       <Card>
         {upcoming.length === 0 ? (
           <Text className="text-ink-faint px-4 py-3.5">No reminders scheduled.</Text>
@@ -202,7 +202,7 @@ function Section({
           <Text className="text-ink text-base font-semibold">{title}</Text>
           <Text className="text-ink-muted text-xs mt-1 leading-4">{description}</Text>
         </View>
-        <Switch value={enabled} onValueChange={onToggle} disabled={!remindersAvailable} />
+        <Toggle value={enabled} onValueChange={onToggle} disabled={!remindersAvailable} />
       </View>
       {enabled && children ? <View className="mt-3">{children}</View> : null}
     </View>

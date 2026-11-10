@@ -6,7 +6,7 @@ import { useSyncStore } from '../../features/sync/engine';
 import { moveToServer } from '../../features/sync/move';
 import { isOfficialServer } from '../../features/sync/api';
 import { PRICE } from '../../features/sync/access';
-import { Button } from '../../components/ui';
+import { Button, ErrorText, Lead } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
 import { useServerChoice } from '../../components/ServerChoice';
 import { ScreenScroll } from '../../components/ScreenScroll';
@@ -58,16 +58,15 @@ export default function MoveScreen() {
         </View>
       ) : (
         <>
-          <Text className="text-ink text-xl font-bold">Move to another server</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead>
             Your family syncs through {from} now. Moving copies every entry and photo to the new server, encrypted on this phone like
             always.
             {members > 1 ? ' The other phones follow by themselves the next time they sync; nobody needs a new code.' : ''} Your recovery
             words keep working. Afterwards, your family is deleted from {from}.
-          </Text>
+          </Lead>
 
           {field}
-          {step.kind === 'error' ? <Text className="text-red-soft text-sm mt-4">{step.message}</Text> : null}
+          {step.kind === 'error' ? <ErrorText className="mt-4">{step.message}</ErrorText> : null}
           <Button label={`Move to ${custom ? 'this server' : 'Subby Sync'}`} onPress={confirm} disabled={!ready} />
           <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
             {custom ? 'Syncing through your own server is free.' : `14 days free for every phone, then ${PRICE} per phone, once.`}

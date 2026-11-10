@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, TextInput, Platform, type TextInputProps } from 'react-native';
+import { View, Text, Pressable, TextInput, Platform, Switch, type SwitchProps, type TextInputProps, type TextProps } from 'react-native';
+import { AngleRight } from './icons';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 
@@ -7,7 +8,10 @@ export function Chip({
   label,
   selected,
   onPress,
+  icon,
 }: {
+  /** Shown before the label. */
+  icon?: React.ReactNode;
   label: string;
   selected: boolean;
   onPress: () => void;
@@ -18,10 +22,11 @@ export function Chip({
         Haptics.selectionAsync();
         onPress();
       }}
-      className={`px-4 py-2 rounded-full border ${
+      className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full border ${
         selected ? 'bg-violet/30 border-violet-strong/60' : 'bg-raised border-line-strong'
       }`}
     >
+      {icon}
       <Text className={selected ? 'text-violet-faint font-medium' : 'text-ink-muted'}>{label}</Text>
     </Pressable>
   );
@@ -67,6 +72,8 @@ export function TextField(props: TextInputProps) {
   return (
     <TextInput
       placeholderTextColor={colors.inkFaint}
+      cursorColor={colors.violetSoft}
+      selectionColor={colors.violetStrong}
       {...props}
       className={`bg-raised border border-line-strong rounded-xl px-4 py-3 text-ink text-base ${props.className ?? ''}`}
     />
@@ -81,10 +88,16 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'danger' | 'ghost';
+  /** `dangerQuiet` for a destructive action that still asks first: it shouldn't shout next to Save. */
+  variant?: 'primary' | 'danger' | 'dangerQuiet' | 'ghost';
   disabled?: boolean;
 }) {
-  const bg = { primary: 'bg-violet-deep', danger: 'bg-red-deep/80', ghost: 'bg-raised' }[variant];
+  const bg = {
+    primary: 'bg-violet-deep',
+    danger: 'bg-red-deep/80',
+    dangerQuiet: 'bg-red/10 border border-red/30',
+    ghost: 'bg-raised',
+  }[variant];
   return (
     <Pressable
       disabled={disabled}
@@ -94,9 +107,46 @@ export function Button({
       }}
       className={`${bg} rounded-xl py-3.5 px-5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
     >
-      <Text className="text-ink font-semibold text-base">{label}</Text>
+      <Text className={`${variant === 'dangerQuiet' ? 'text-red-soft' : 'text-ink'} font-semibold text-base`}>{label}</Text>
     </Pressable>
   );
+}
+
+/** The switch in the accent color, instead of each platform's default. */
+export function Toggle(props: SwitchProps) {
+  return (
+    <Switch
+      trackColor={{ false: colors.lineStrong, true: colors.violetDeep }}
+      thumbColor={props.value ? colors.violetPale : colors.inkMuted}
+      ios_backgroundColor={colors.lineStrong}
+      {...props}
+    />
+  );
+}
+
+/** The uppercase label above a group of cards. */
+export function SectionLabel({ children, className = 'mt-6 mb-2' }: { children: React.ReactNode; className?: string }) {
+  return <Text className={`text-xs font-semibold text-ink-muted uppercase ml-1 ${className}`}>{children}</Text>;
+}
+
+/** A screen's opening paragraph. */
+export function Lead({ className = '', ...props }: TextProps & { className?: string }) {
+  return <Text {...props} className={`text-ink-soft text-[15px] leading-[22px] ${className}`} />;
+}
+
+/** Something went wrong. */
+export function ErrorText({ className = 'mt-3', ...props }: TextProps & { className?: string }) {
+  return <Text {...props} className={`text-red-soft text-sm leading-5 ${className}`} />;
+}
+
+/** Worth knowing before going on. */
+export function WarningText({ className = 'mt-3', ...props }: TextProps & { className?: string }) {
+  return <Text {...props} className={`text-amber-soft text-sm leading-5 ${className}`} />;
+}
+
+/** The arrow on a row that opens something. */
+export function Chevron() {
+  return <AngleRight color={colors.inkGhost} size={16} />;
 }
 
 export function Card({ children }: { children: React.ReactNode }) {

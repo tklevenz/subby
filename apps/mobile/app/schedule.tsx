@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { SectionLabel } from '../components/ui';
 import { Text, View } from 'react-native';
 import { CloudSun, Moon, Sun } from '../components/icons';
 import {
@@ -58,7 +59,7 @@ export default function ScheduleScreen() {
         )}
       </View>
 
-      <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-2 ml-1">Suggested day</Text>
+      <SectionLabel>Suggested day</SectionLabel>
       <View className="bg-surface border border-line rounded-2xl px-4 py-1">
         {schedule.items.map((item, i) => (
           <ItemRow key={i} item={item} now={now} formatTime={formatTime} />

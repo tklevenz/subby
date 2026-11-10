@@ -69,8 +69,9 @@ export default function TrendsScreen() {
   const any = (k: keyof DayStats) => stats?.some((s) => (s[k] as number) > 0) ?? false;
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
-      <Text className="text-xl font-bold text-ink mt-2 mb-3">Trends</Text>
+    <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
+      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">Trends</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 }}>
       <Segmented options={RANGES} value={range} onChange={setRange} />
 
       {stats && avg ? (
@@ -84,8 +85,8 @@ export default function TrendsScreen() {
                 color={TYPE_META.sleep.color}
                 stats={[
                   ['Per day', formatHoursMinutes(avg.sleepMs)],
-                  ['Night', formatHoursMinutes(avg.nightMs)],
-                  ['Naps', `${avg.naps.toFixed(1)} · ${formatHoursMinutes(avg.napMs)}`],
+                  ['Night', formatHoursMinutes(avg.nightMs), colors.violetDeep],
+                  ['Naps', `${avg.naps.toFixed(1)} · ${formatHoursMinutes(avg.napMs)}`, colors.violetSoft],
                 ]}
               >
                 <BarChart
@@ -128,10 +129,10 @@ export default function TrendsScreen() {
                 title="Feeding"
                 color={TYPE_META.feed.color}
                 stats={[
-                  ['Feeds / day', avg.feeds.toFixed(1)],
-                  ...(any('bottleMl') ? [['Bottle / day', formatVolume(avg.bottleMl, units)] as [string, string]] : []),
-                  ...(any('breastSec') ? [['Breast / day', formatHoursMinutes(avg.breastSec * 1000)] as [string, string]] : []),
-                  ...(any('solids') ? [['Solids / day', avg.solids.toFixed(1)] as [string, string]] : []),
+                  ['Feeds / day', avg.feeds.toFixed(1), any('solids') ? TYPE_META.feed.color : undefined],
+                  ...(any('bottleMl') ? [['Bottle / day', formatVolume(avg.bottleMl, units)] as Stat] : []),
+                  ...(any('breastSec') ? [['Breast / day', formatHoursMinutes(avg.breastSec * 1000)] as Stat] : []),
+                  ...(any('solids') ? [['Solids / day', avg.solids.toFixed(1), colors.amberPale] as Stat] : []),
                 ]}
               >
                 <BarChart bars={bars((s) => [s.feeds, s.solids])} colors={[TYPE_META.feed.color, colors.amberPale]} average={avg.feeds} />
@@ -195,9 +196,13 @@ export default function TrendsScreen() {
           <Row label="Export CSV" onPress={() => router.push('/export')} right={chevron} />
         </Card>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
+
+/** A number above a chart: label, value and, where the chart stacks colors, the color it's drawn in. */
+type Stat = [label: string, value: string, dot?: string];
 
 function Section({
   title,
@@ -207,7 +212,7 @@ function Section({
 }: {
   title: string;
   color: string;
-  stats: [string, string][];
+  stats: Stat[];
   children: React.ReactNode;
 }) {
   return (
@@ -217,9 +222,12 @@ function Section({
         <Text className="text-ink font-semibold text-base">{title}</Text>
       </View>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2 mb-4">
-        {stats.map(([label, value]) => (
+        {stats.map(([label, value, dot]) => (
           <View key={label}>
-            <Text className="text-ink-faint text-[11px]">{label}</Text>
+            <View className="flex-row items-center gap-1">
+              {dot ? <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dot }} /> : null}
+              <Text className="text-ink-faint text-[11px]">{label}</Text>
+            </View>
             <Text className="text-ink-bright text-base font-semibold">{value}</Text>
           </View>
         ))}

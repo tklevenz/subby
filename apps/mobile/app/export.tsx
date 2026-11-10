@@ -4,7 +4,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { LOG_TYPES, logsToCsv, type LogType } from '@subby/shared';
 import { TYPE_META } from '../components/logTypes';
-import { Button, Chip, FieldLabel, Segmented } from '../components/ui';
+import { Button, Chip, FieldLabel, Segmented, Lead } from '../components/ui';
 import { fetchLogs } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { countChildLogs } from '../store/useChildStore';
@@ -73,10 +73,10 @@ export default function ExportScreen() {
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-      <Text className="text-ink-muted leading-6">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <Lead>
         One CSV with {child.name}'s entries, oldest first. Values are in ml, g, cm and °C; times are local.
-      </Text>
+      </Lead>
 
       <FieldLabel>Range</FieldLabel>
       <Segmented options={RANGES} value={range} onChange={setRange} />

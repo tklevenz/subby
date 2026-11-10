@@ -20,7 +20,7 @@ import {
 import { avatarColors } from '../../../components/ChildAvatar';
 import GrowthChart from '../../../components/charts/GrowthChart';
 import PhotoMenu from '../../../components/PhotoMenu';
-import { Button, Segmented } from '../../../components/ui';
+import { Button, Segmented, SectionLabel } from '../../../components/ui';
 import { HAS_FOODS, fetchLogs } from '../../../store/queries';
 import { useActiveChild } from '../../../store/useActiveChild';
 import { useChildStore } from '../../../store/useChildStore';
@@ -56,6 +56,11 @@ function Profile({ child }: { child: Child }) {
   const isActive = useActiveChild()?.id === child.id;
   const revision = useLogStore((s) => s.revision);
   const [menu, setMenu] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // Once the cover has scrolled away, a strip keeps the page from running under the status bar.
+  const [pastCover, setPastCover] = useState(false);
+  const coverEnd = coverHeight(width) - insets.top;
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [shown, setShown] = useState(STORY_PAGE);
 
@@ -76,7 +81,13 @@ function Profile({ child }: { child: Child }) {
   const story = useMemo(() => childStory(logs, child, units), [logs, child, units]);
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ paddingBottom: 40 }}>
+    <View className="flex-1 bg-ground">
+    <ScreenScroll
+      className="flex-1"
+      contentContainerStyle={{ paddingBottom: 40 }}
+      scrollEventThrottle={32}
+      onScroll={(e) => setPastCover(e.nativeEvent.contentOffset.y > coverEnd)}
+    >
       <Cover child={child} isActive={isActive} onPhoto={() => setMenu(true)} />
       <PhotoMenu
         visible={menu}
@@ -92,7 +103,7 @@ function Profile({ child }: { child: Child }) {
 
         <Growth child={child} logs={logs} isActive={isActive} />
 
-        <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-3 ml-1">{child.name}'s story</Text>
+        <SectionLabel className="mt-6 mb-3">{child.name}'s story</SectionLabel>
         {story.slice(0, shown).map((item, i) => (
           <StoryRow key={item.id} item={item} child={child} last={i === Math.min(shown, story.length) - 1} />
         ))}
@@ -104,8 +115,12 @@ function Profile({ child }: { child: Child }) {
         ) : null}
       </View>
     </ScreenScroll>
+    {pastCover ? <View className="absolute top-0 left-0 right-0 bg-ground" style={{ height: insets.top }} /> : null}
+    </View>
   );
 }
+
+const coverHeight = (width: number) => Math.round(Math.min(width, 420) * 0.92);
 
 function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; onPhoto: () => void }) {
   const insets = useSafeAreaInsets();
@@ -113,7 +128,7 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
   const [failed, setFailed] = useState<string | null>(null);
   const { bg, fg } = avatarColors(child.id);
   const showPhoto = child.photoUri && failed !== child.photoUri;
-  const height = Math.round(Math.min(width, 420) * 0.92);
+  const height = coverHeight(width);
   // The name sits on the photo now; a soft shadow keeps it readable on light photos.
   const textOnPhoto = { textShadowColor: colors.ground, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 };
 
@@ -191,10 +206,11 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
 
   return (
     <>
-      <View className="flex-row items-baseline justify-between mt-6 mb-2 mx-1">
-        <Text className="text-xs font-semibold text-ink-muted uppercase">Growth</Text>
-        <Pressable onPress={openGrowth} hitSlop={8}>
-          <Text className="text-violet-soft text-[13px]">All charts ›</Text>
+      <View className="flex-row items-center justify-between mt-6 mb-2 mr-1">
+        <SectionLabel className="">Growth</SectionLabel>
+        <Pressable onPress={openGrowth} hitSlop={8} className="flex-row items-center">
+          <Text className="text-violet-soft text-[13px] mr-1">All charts</Text>
+          <AngleRight color={colors.violetSoft} size={10} />
         </Pressable>
       </View>
       <View className="bg-surface border border-line rounded-2xl p-3.5">
@@ -214,7 +230,7 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
             </Text>
           </>
         ) : (
-          <Text className="text-ink-faint text-sm mt-3">No measurements yet. Log one from Home → More → Growth.</Text>
+          <Text className="text-ink-faint text-sm mt-3">No measurements yet. Log one with + on Home.</Text>
         )}
       </View>
       {!sex ? (

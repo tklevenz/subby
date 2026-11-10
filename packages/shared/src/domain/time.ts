@@ -51,7 +51,14 @@ export function formatHoursMinutes(ms: number): string {
   const totalMin = Math.max(0, Math.round(ms / 60_000));
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
+}
+
+/** How long something finished took: "1h 29m", "2h", "55m"; seconds only under a minute. (Live timers use `formatDuration`.) */
+export function formatSpan(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  return totalSec < 60 ? `${totalSec}s` : formatHoursMinutes(Math.floor(totalSec / 60) * 60_000);
 }
 
 const fromIso = (iso: string) => {

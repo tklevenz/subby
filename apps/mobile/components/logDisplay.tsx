@@ -2,7 +2,8 @@ import React from 'react';
 import {
   describeDiaper,
   describeFeed,
-  formatDuration,
+  formatDose,
+  formatSpan,
   formatLength,
   formatTemperature,
   formatVolume,
@@ -48,20 +49,20 @@ export function logDisplay(
   const text = ((): { label: string; detail: string } => {
     switch (p.type) {
       case 'diaper':
-        return { label: `Diaper — ${describeDiaper(p)}`, detail: withNotes('') };
+        return { label: `Diaper · ${describeDiaper(p)}`, detail: withNotes('') };
       case 'feed':
         if (running) return { label: 'Feeding…', detail: '(ongoing)' };
         return {
           label: p.method === 'bottle' && p.amountMl !== undefined
             ? `${describeFeed({ ...p, amountMl: undefined })} · ${formatVolume(p.amountMl, units)}`
             : describeFeed(p),
-          detail: withNotes([span, p.allergen ? '⚠︎ allergen' : '', p.reaction ?? ''].filter(Boolean).join(' · ')),
+          detail: withNotes([span, p.allergen ? 'allergen' : '', p.reaction ?? ''].filter(Boolean).join(' · ')),
         };
       case 'sleep':
         if (running) return { label: 'Sleeping…', detail: '(ongoing)' };
         return {
           label: p.nap === false ? 'Night sleep' : 'Nap',
-          detail: withNotes(`${formatDuration(entry.endedAt! - entry.startedAt)} · ${span}`),
+          detail: withNotes(`${formatSpan(entry.endedAt! - entry.startedAt)} · ${span}`),
         };
       case 'pumping':
         if (running) return { label: 'Pumping…', detail: '(ongoing)' };
@@ -81,17 +82,17 @@ export function logDisplay(
       case 'temperature':
         return { label: formatTemperature(p.celsius, units), detail: withNotes('') };
       case 'medication':
-        return { label: p.name, detail: withNotes(p.dose !== undefined ? `${p.dose} ${p.unit ?? ''}`.trim() : '') };
+        return { label: p.name, detail: withNotes(p.dose !== undefined ? formatDose(p.dose, p.unit) : '') };
       case 'potty':
         return {
-          label: `Potty — ${p.result}${p.accident ? ' (accident)' : ''}`,
+          label: `Potty · ${p.result}${p.accident ? ' (accident)' : ''}`,
           detail: withNotes(p.location ?? ''),
         };
       case 'activity':
         if (running) return { label: `${activityLabel(p.kind)}…`, detail: '(ongoing)' };
         return {
           label: activityLabel(p.kind),
-          detail: withNotes([span && formatDuration(entry.endedAt! - entry.startedAt), p.milestone].filter(Boolean).join(' · ')),
+          detail: withNotes([span && formatSpan(entry.endedAt! - entry.startedAt), p.milestone].filter(Boolean).join(' · ')),
         };
       case 'milestone':
         return { label: p.custom ?? (p.key ? milestoneLabel(p.key) : 'Milestone'), detail: withNotes('') };

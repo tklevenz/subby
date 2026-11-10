@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { SyncAccess } from '@subby/shared/sync';
-import { Button, Card, Row, Segmented } from './ui';
+import { Button, Card, Row, Segmented, SectionLabel } from './ui';
 import { PRICE, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools } from '../features/sync/access';
 import { sessionFor, syncNow, useSyncStore } from '../features/sync/engine';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -178,7 +178,7 @@ export function AccessDevTools() {
   ];
   return (
     <>
-      <Text className="text-xs font-semibold text-ink-muted uppercase mt-8 mb-2 ml-1">Developer · sync access</Text>
+      <SectionLabel>Developer · sync access</SectionLabel>
       <Segmented options={options} value={pretend ?? 'real'} onChange={(v) => useAccessStore.setState({ pretend: v === 'real' ? null : (v as SyncAccess) })} />
       <Text className="text-ink-faint text-xs mt-2 ml-1">
         Pretends only on this screen and Home; the server decides what syncs.

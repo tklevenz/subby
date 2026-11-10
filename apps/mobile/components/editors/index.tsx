@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import {
   ACTIVITY_KINDS,
   DIAPER_COLORS,
@@ -16,12 +16,13 @@ import {
   recentMedications,
   type LogPayload,
   type PayloadOf,
+  formatDose,
 } from '@subby/shared';
 import { useLogQuery } from '../../store/queries';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { activityLabel } from '../logTypes';
-import { Chip, FieldLabel, Segmented, TextField } from '../ui';
+import { Chip, FieldLabel, Segmented, TextField, Toggle } from '../ui';
 import FoodPicker from './FoodPicker';
 import { NumberField, PhotoField, UnitNumberField } from './fields';
 
@@ -138,11 +139,16 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
   );
 }
 
+const SLEEP_KINDS = [
+  { value: 'nap', label: 'Nap' },
+  { value: 'night', label: 'Night sleep' },
+] as const;
+
 function SleepEditor({ payload: p, onChange }: EditorProps<'sleep'>) {
   return (
-    <View className="flex-row items-center justify-between mt-4">
-      <Text className="text-ink-soft text-base">Nap (off = night sleep)</Text>
-      <Switch value={p.nap !== false} onValueChange={(nap) => onChange({ nap })} />
+    <View>
+      <FieldLabel>Kind</FieldLabel>
+      <Segmented options={SLEEP_KINDS} value={p.nap !== false ? 'nap' : 'night'} onChange={(kind) => onChange({ nap: kind === 'nap' })} />
     </View>
   );
 }
@@ -224,7 +230,7 @@ function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
             {recent.map((m) => (
               <Chip
                 key={m.name}
-                label={m.dose !== undefined ? `${m.name} · ${m.dose} ${m.unit ?? ''}` : m.name}
+                label={m.dose !== undefined ? `${m.name} · ${formatDose(m.dose, m.unit)}` : m.name}
                 selected={p.name.toLowerCase() === m.name.toLowerCase()}
                 onPress={() => onChange({ name: m.name, dose: m.dose, unit: m.unit, nextDoseIntervalMin: m.nextDoseIntervalMin })}
               />
@@ -266,7 +272,7 @@ function PottyEditor({ payload: p, onChange }: EditorProps<'potty'>) {
       />
       <View className="flex-row items-center justify-between mt-4">
         <Text className="text-ink-soft text-base">Accident</Text>
-        <Switch value={p.accident ?? false} onValueChange={(accident) => onChange({ accident: accident || undefined })} />
+        <Toggle value={p.accident ?? false} onValueChange={(accident) => onChange({ accident: accident || undefined })} />
       </View>
     </View>
   );

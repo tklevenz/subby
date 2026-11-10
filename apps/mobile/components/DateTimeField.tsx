@@ -91,7 +91,9 @@ function WheelSheet({
 
   return (
     <Modal transparent animationType="slide" visible statusBarTranslucent onRequestClose={onCancel}>
-      <Pressable onPress={onCancel} className="flex-1 bg-scrim/50" />
+      {/* The scrim lies behind the sheet too, so its rounded corners show the dimmed screen. */}
+      <View className="flex-1 justify-end">
+      <Pressable onPress={onCancel} className="absolute inset-0 bg-scrim/50" />
       <View className="bg-surface border-t border-line-strong/50 rounded-t-2xl px-5 pt-5" style={{ paddingBottom: insets.bottom + 8 }}>
         <Text className="text-ink text-lg font-bold text-center">{title}</Text>
         <View className="mt-4" style={{ height: ITEM_HEIGHT * VISIBLE_ROWS }}>
@@ -111,6 +113,7 @@ function WheelSheet({
             <Text className="text-violet-soft text-base font-semibold">Save</Text>
           </Pressable>
         </View>
+      </View>
       </View>
     </Modal>
   );

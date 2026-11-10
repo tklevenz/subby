@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { isValidRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { defaultDeviceName, hasLocalData, recoverFamily, removeDevices } from '../../features/sync/family';
 import { syncNow, useSyncStore } from '../../features/sync/engine';
-import { Button, FieldLabel, SECRET_INPUT, TextField } from '../../components/ui';
+import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubLoader } from '../../components/brand/loaders';
 import { ScreenScroll } from '../../components/ScreenScroll';
@@ -49,9 +49,9 @@ export default function RecoverScreen() {
       {step.kind === 'enter' ? (
         <>
           <Text className="text-ink text-xl font-bold">Use a recovery key</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             For when no phone in the family is left. If another phone still syncs, join with a code from it instead.
-          </Text>
+          </Lead>
 
           <View className="mt-6">
             <FieldLabel>The 24 words, in order</FieldLabel>
@@ -76,10 +76,10 @@ export default function RecoverScreen() {
       {step.kind === 'choose' ? (
         <>
           <Text className="text-ink text-xl font-bold">This phone already has entries</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             Add them to the family, or replace them with the family's data. If they came from the same Baby Buddy import, replace, or every
             entry shows up twice.
-          </Text>
+          </Lead>
           <Button label="Replace with the family's data" onPress={() => run('replace')} />
           <Text className="text-ink-faint text-xs text-center mt-2">Deletes this phone's own entries and photos.</Text>
           <Button label="Add my entries to the family" variant="ghost" onPress={() => run('merge')} />
@@ -93,7 +93,7 @@ export default function RecoverScreen() {
       {step.kind === 'error' ? (
         <>
           <Text className="text-ink text-xl font-bold mt-4">Couldn't recover</Text>
-          <Text className="text-red-soft text-sm mt-2">{step.message}</Text>
+          <ErrorText className="mt-2">{step.message}</ErrorText>
           <Button label="Try again" onPress={() => setStep({ kind: 'enter' })} />
         </>
       ) : null}
@@ -148,11 +148,11 @@ function LostPhones({ ids }: { ids: string[] }) {
   return (
     <>
       <Text className="text-ink text-xl font-bold">Your data is back</Text>
-      <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+      <Lead className="mt-2">
         {ids.length === 1 ? 'The lost phone is still in your family.' : 'The lost phones are still in your family.'} Remove{' '}
         {ids.length === 1 ? 'it' : 'them'}, so nobody who finds {ids.length === 1 ? 'it' : 'one'} can read what you log from now on. Untick
         a phone that's still in use.
-      </Text>
+      </Lead>
       <View className="bg-surface rounded-2xl border border-line mt-4">
         {ids.map((id, i) => (
           <Pressable
@@ -169,7 +169,7 @@ function LostPhones({ ids }: { ids: string[] }) {
           </Pressable>
         ))}
       </View>
-      {error ? <Text className="text-red-soft text-sm mt-3">{error}</Text> : null}
+      {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
       <Button
         label={chosen.size ? `Remove ${chosen.size === 1 ? '1 phone' : `${chosen.size} phones`}` : 'Remove phones'}
         onPress={remove}

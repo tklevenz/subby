@@ -91,7 +91,7 @@ export default function GrowthScreen() {
       </View>
 
       {points.length === 0 && logs ? (
-        <Text className="text-ink-faint text-center mt-4">No {MEASURES.find((m) => m.value === measure)!.label.toLowerCase()} measurements yet. Log one from Home → More → Growth.</Text>
+        <Text className="text-ink-faint text-center mt-4">No {MEASURES.find((m) => m.value === measure)!.label.toLowerCase()} measurements yet. Log one with + on Home.</Text>
       ) : null}
       {beyondWho ? <Text className="text-ink-faint text-xs mt-2">WHO percentiles here cover 0–24 months.</Text> : null}
 

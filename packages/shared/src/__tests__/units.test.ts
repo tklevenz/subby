@@ -18,3 +18,13 @@ describe('units', () => {
     expect(formatTemperature(37, 'imperial')).toBe('98.6 °F');
   });
 });
+
+describe('formatDose', () => {
+  it('uses the singular for one drop or tablet', async () => {
+    const { formatDose } = await import('../domain/units');
+    expect(formatDose(1, 'drops')).toBe('1 drop');
+    expect(formatDose(2, 'tablets')).toBe('2 tablets');
+    expect(formatDose(2.5, 'ml')).toBe('2.5 ml');
+    expect(formatDose(1)).toBe('1');
+  });
+});

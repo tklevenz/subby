@@ -8,7 +8,7 @@ import DateTimeField from '../DateTimeField';
 import { PayloadEditor } from '../editors';
 import { TagsField } from '../editors/fields';
 import { defaultPayload } from '../logTypes';
-import { Button, FieldLabel, TextField } from '../ui';
+import { Button, FieldLabel, TextField, ErrorText } from '../ui';
 import { useSingleFlight } from '../useSingleFlight';
 
 /** Types logged with a start and an end here, or started as a live timer from the chosen start. */
@@ -118,9 +118,9 @@ export default function LogSheet({
             ) : null}
           </View>
           {invalidEnd ? (
-            <Text className="text-red-strong mt-2">End must be after start.</Text>
+            <ErrorText className="mt-2">End must be after start.</ErrorText>
           ) : (end !== null ? saveOverlap : timerOverlap) ? (
-            <Text className="text-red-strong mt-2">{end !== null ? saveOverlap : timerOverlap}</Text>
+            <ErrorText className="mt-2">{end !== null ? saveOverlap : timerOverlap}</ErrorText>
           ) : (
             <Text className="text-ink-muted text-sm mt-2">
               {end === null ? 'Set an end time to log a past one, or start a timer.' : formatHoursMinutes(end - startedAt)}

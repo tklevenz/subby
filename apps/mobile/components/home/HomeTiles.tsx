@@ -388,7 +388,7 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
           <Icon color={color} size={16} />
           <Text className="flex-1 text-ink text-sm ml-2.5" numberOfLines={1}>{label}</Text>
           <Text className={`text-xs ${dueAt <= now ? 'text-red-soft' : 'text-ink-muted'}`}>
-            {dueAt <= now ? `Overdue by ${formatDuration(now - dueAt)}` : `Due at ${formatTime(dueAt)}`}
+            {dueAt <= now ? `Overdue by ${formatDuration(now - dueAt)}` : startOfDay(dueAt) > startOfDay(now) ? `Due tomorrow ${formatTime(dueAt)}` : `Due at ${formatTime(dueAt)}`}
           </Text>
           <Pressable onPress={onPress} accessibilityLabel={`${action} ${label.toLowerCase()}`} className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}>
             <Text className="text-ink text-[13px] font-semibold">{action}</Text>

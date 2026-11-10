@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChildForm from '../components/ChildForm';
-import { Button } from '../components/ui';
+import { Button, Lead } from '../components/ui';
 import { SubTile } from '../components/brand/Sub';
 import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -17,16 +17,17 @@ export default function Onboarding() {
   return (
     <ScreenScroll
       className="flex-1 bg-ground"
-      contentContainerStyle={{ paddingTop: insets.top + 32, paddingHorizontal: 20, paddingBottom: 40 }}
+      contentContainerStyle={{ paddingTop: insets.top + 32, paddingHorizontal: 16, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
       <SubTile size={64} />
       <Text className="text-3xl font-bold text-ink mt-4">Welcome to Subby</Text>
-      <Text className="text-ink-muted mt-2 leading-6">
+      <Lead className="mt-2">
         Private baby tracking that works offline. Your log lives on this phone, and if you share it with family, it's encrypted so only your phones can read it. Let's start with your little one.
-      </Text>
+      </Lead>
       <ChildForm
         submitLabel="Get started"
+        autoFocus={false}
         onSubmit={async (input) => {
           const child = await addChild(input);
           await setSetting('activeChildId', child.id);

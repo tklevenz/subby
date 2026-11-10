@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ScreenScroll } from './ScreenScroll';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking } from '@subby/shared';
 import DateTimeField from './DateTimeField';
 import { PayloadEditor } from './editors';
 import { CommonFields } from './sheets/LogSheet';
-import { Button, FieldLabel } from './ui';
+import { Button, FieldLabel, ErrorText } from './ui';
 import NightBar from './NightBar';
 import { Moon, Plus, Xmark } from './icons';
 import { useLogStore } from '../store/useLogStore';
@@ -100,7 +101,7 @@ export default function NightForm({ night }: { night: Night }) {
   const longest = Math.max(0, ...(pieces ?? []).map((p) => p.end - p.start));
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: nap ? 'Sleep' : 'Night' }} />
 
       {pieces ? (
@@ -167,9 +168,9 @@ export default function NightForm({ night }: { night: Night }) {
       <PayloadEditor payload={payload} onChange={patch} />
       <CommonFields payload={payload} onChange={patch} />
 
-      {error ? <Text className="text-red-strong mt-3">{error}</Text> : null}
+      {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
       <Button label="Save" onPress={save} disabled={!changed || !!error} />
-      <Button label={night.pieces.length > 1 ? 'Delete night' : 'Delete'} variant="danger" onPress={confirmDelete} />
-    </ScrollView>
+      <Button label={night.pieces.length > 1 ? 'Delete night' : 'Delete'} variant="dangerQuiet" onPress={confirmDelete} />
+    </ScreenScroll>
   );
 }

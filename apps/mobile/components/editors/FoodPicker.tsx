@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Plus, TriangleExclamation } from '../icons';
 import { flaggedFoods, recentFoods, type PayloadOf } from '@subby/shared';
 import { HAS_FOODS, useLogQuery } from '../../store/queries';
-import { Chip, FieldLabel, TextField } from '../ui';
+import { Chip, FieldLabel, TextField, Toggle } from '../ui';
 import { colors } from '../../theme/colors';
 
 type Solids = Pick<PayloadOf<'feed'>, 'foods' | 'allergen' | 'reaction'>;
@@ -34,7 +34,13 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
       <FieldLabel>Foods</FieldLabel>
       <View className="flex-row flex-wrap gap-2">
         {options.map((f) => (
-          <Chip key={f} label={flagged.has(f.toLowerCase()) ? `⚠︎ ${f}` : f} selected={has(f)} onPress={() => toggle(f)} />
+          <Chip
+            key={f}
+            label={f}
+            icon={flagged.has(f.toLowerCase()) ? <TriangleExclamation color={colors.amberStrong} size={13} /> : undefined}
+            selected={has(f)}
+            onPress={() => toggle(f)}
+          />
         ))}
       </View>
       <View className="flex-row items-center mt-2">
@@ -49,7 +55,7 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
           <TriangleExclamation color={colors.amberStrong} size={16} />
           <Text className="text-ink-soft ml-2">Possible allergen / first try</Text>
         </View>
-        <Switch value={value.allergen ?? false} onValueChange={(allergen) => onChange({ allergen: allergen || undefined })} />
+        <Toggle value={value.allergen ?? false} onValueChange={(allergen) => onChange({ allergen: allergen || undefined })} />
       </View>
 
       <FieldLabel>Reaction</FieldLabel>

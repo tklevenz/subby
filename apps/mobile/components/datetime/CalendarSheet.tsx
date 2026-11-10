@@ -58,7 +58,9 @@ export default function CalendarSheet({
 
   return (
     <Modal transparent animationType="slide" visible statusBarTranslucent onRequestClose={onClose}>
-      <Pressable onPress={onClose} className="flex-1 bg-scrim/50" />
+      {/* The scrim lies behind the sheet too, so its rounded corners show the dimmed screen. */}
+      <View className="flex-1 justify-end">
+      <Pressable onPress={onClose} className="absolute inset-0 bg-scrim/50" />
       <View className="bg-surface border-t border-line-strong/50 rounded-t-2xl px-4 pt-4" style={{ paddingBottom: insets.bottom + 12 }}>
         <View className="flex-row items-center justify-between">
           <MonthButton label="Previous month" onPress={() => shift(-1)} icon={<AngleLeft color={colors.inkSoft} size={16} />} />
@@ -130,6 +132,7 @@ export default function CalendarSheet({
             </Pressable>
           ) : null}
         </View>
+      </View>
       </View>
     </Modal>
   );

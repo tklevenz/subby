@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScreenScroll } from '../../components/ScreenScroll';
+import { Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -14,7 +15,7 @@ import {
   type BBEndpoint,
   type ImportUnits,
 } from '@subby/shared';
-import { Button, Card, FieldLabel, Row, Segmented, TextField } from '../../components/ui';
+import { Button, Card, FieldLabel, Row, Segmented, TextField, ErrorText, WarningText, Lead } from '../../components/ui';
 import { BBClient, BBError } from '../../features/import/babybuddy/client';
 import { previewImport, runImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../features/import/babybuddy/importer';
 import { useChildStore } from '../../store/useChildStore';
@@ -94,15 +95,15 @@ export default function BabyBuddyImport() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Import from Baby Buddy', headerShown: true, gestureEnabled: step.kind !== 'running' }} />
 
       {step.kind === 'connect' ? (
         <View>
-          <Text className="text-ink-soft leading-6">
+          <Lead>
             Copies your history from a Baby Buddy server onto this device. It only reads from Baby Buddy, and you can run
             it again later to pick up new entries without creating duplicates.
-          </Text>
+          </Lead>
           <FieldLabel>Server address</FieldLabel>
           <TextField value={url} onChangeText={setUrl} placeholder="https://babybuddy.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
           <FieldLabel>API key (Baby Buddy → User Settings)</FieldLabel>
@@ -111,7 +112,7 @@ export default function BabyBuddyImport() {
           {url.trim().toLowerCase().startsWith('http://') ? (
             <Text className="text-amber-soft text-xs mt-2">This address isn't encrypted (http). Your key and data travel in plain text.</Text>
           ) : null}
-          {error ? <Text className="text-red-strong mt-3">{error}</Text> : null}
+          {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
           {busy ? <View className="items-center mt-4"><SubSpinner size={36} /></View> : (
             <Button label="Connect" onPress={connect} disabled={!url.trim() || !token.trim()} />
           )}
@@ -192,7 +193,7 @@ export default function BabyBuddyImport() {
           <Button label="Done" onPress={() => router.replace('/')} />
         </View>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
@@ -288,7 +289,7 @@ function Review({
       ))}
 
       <Button label={`Import ${total.toLocaleString()} entries`} onPress={start} disabled={preview.children.length === 0 || allSkipped} />
-      {preview.children.length === 0 ? <Text className="text-amber-soft mt-2">No children found on this server.</Text> : null}
+      {preview.children.length === 0 ? <WarningText className="mt-2">No children found on this server.</WarningText> : null}
     </View>
   );
 }

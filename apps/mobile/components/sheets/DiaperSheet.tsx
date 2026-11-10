@@ -97,7 +97,8 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
         <View className="flex-1 ml-3">
           <Text className="text-ink text-base font-semibold">{label} logged</Text>
           <Text className="text-ink-muted text-xs">
-            {formatTime(logged.startedAt)} · {p.color ? p.color.charAt(0).toUpperCase() + p.color.slice(1) : 'no color'}
+            {formatTime(logged.startedAt)}
+            {p.color ? ` · ${p.color.charAt(0).toUpperCase() + p.color.slice(1)}` : ''}
           </Text>
         </View>
         <Pressable

@@ -55,6 +55,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.ground },
           headerStyle: { backgroundColor: colors.ground },
           headerTintColor: colors.inkLight,
+          headerTitleStyle: { fontWeight: '700' },
         }}
       >
         <Stack.Protected guard={hasChild}>

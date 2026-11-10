@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/engine';
 import { diagnostics } from '../../features/diagnostics';
-import { Card, Row, Segmented } from '../../components/ui';
+import { Card, Row, Segmented, Toggle, SectionLabel } from '../../components/ui';
 import { colors } from '../../theme/colors';
 import { SubMono, Wordmark } from '../../components/brand/Sub';
 
@@ -52,10 +52,6 @@ async function showDiagnostics() {
   ]);
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <Text className="text-xs font-semibold text-ink-muted uppercase mt-6 mb-2 ml-1">{children}</Text>;
-}
-
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const children = useChildStore((s) => s.children);
@@ -77,11 +73,12 @@ export default function SettingsScreen() {
   const syncLabel = !sync ? 'Off' : syncPhase === 'error' ? "Couldn't sync" : syncPhase === 'syncing' ? 'Syncing…' : 'On';
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: 16, paddingBottom: 32 }}>
-      <Text className="text-xl font-bold text-ink mt-2">Settings</Text>
+    <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
+      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">Settings</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
 
       {/* Each child has their own profile page; this screen is for app-wide settings. */}
-      <SectionTitle>Children</SectionTitle>
+      <SectionLabel className="mt-2 mb-2">Children</SectionLabel>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
         {children.map((c) => (
           <ChildCard
@@ -105,16 +102,16 @@ export default function SettingsScreen() {
         />
       </ScrollView>
 
-      <SectionTitle>Sync</SectionTitle>
+      <SectionLabel>Sync</SectionLabel>
       <Card>
         <Row label="Sync between phones" value={syncLabel} onPress={() => router.push('/sync')} right={chevron} />
       </Card>
 
-      <SectionTitle>Notifications</SectionTitle>
+      <SectionLabel>Notifications</SectionLabel>
       <Card>
         <Row
           label="Reminders"
-          right={<Switch value={reminders.enabled} onValueChange={setRemindersEnabled} disabled={!remindersAvailable} />}
+          right={<Toggle value={reminders.enabled} onValueChange={setRemindersEnabled} disabled={!remindersAvailable} />}
         />
         <Row
           label="Choose reminders"
@@ -128,12 +125,12 @@ export default function SettingsScreen() {
           <Card>
             <Row
               label="When another phone logs a sleep"
-              right={<Switch value={familyAlerts.enabled} onValueChange={(enabled) => setFamilyAlerts({ enabled })} disabled={!remindersAvailable} />}
+              right={<Toggle value={familyAlerts.enabled} onValueChange={(enabled) => setFamilyAlerts({ enabled })} disabled={!remindersAvailable} />}
             />
             {familyAlerts.enabled ? (
               <>
-                <Row label="And when they wake up" right={<Switch value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />} />
-                <Row label="Bedtime and morning too" right={<Switch value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
+                <Row label="And when they wake up" right={<Toggle value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />} />
+                <Row label="Bedtime and morning too" right={<Toggle value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
               </>
             ) : null}
           </Card>
@@ -144,28 +141,28 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      <SectionTitle>Data</SectionTitle>
+      <SectionLabel>Data</SectionLabel>
       <Card>
         <Row label="Backup & restore" onPress={() => router.push('/backup')} right={chevron} />
         <Row label="Export CSV" onPress={() => router.push('/export')} right={chevron} />
         <Row label="Import from Baby Buddy" onPress={() => router.push('/import/babybuddy')} right={chevron} />
       </Card>
 
-      <SectionTitle>Units</SectionTitle>
+      <SectionLabel>Units</SectionLabel>
       <Segmented
         options={[{ value: 'metric', label: 'Metric (ml, kg, °C)' }, { value: 'imperial', label: 'Imperial (oz, lb, °F)' }]}
         value={units}
         onChange={(v) => setSetting('units', v)}
       />
 
-      <SectionTitle>Clock</SectionTitle>
+      <SectionLabel>Clock</SectionLabel>
       <Segmented
         options={[{ value: '24h', label: '24-hour' }, { value: '12h', label: '12-hour' }]}
         value={clock}
         onChange={(v) => setSetting('clock', v)}
       />
 
-      <SectionTitle>Help</SectionTitle>
+      <SectionLabel>Help</SectionLabel>
       <Card>
         <Row label="Share diagnostics" onPress={showDiagnostics} right={chevron} />
       </Card>
@@ -183,6 +180,7 @@ export default function SettingsScreen() {
         {/* Required by the Font Awesome Free license (CC BY 4.0). */}
         <Text className="text-ink-ghost text-xs mt-1">Icons by Font Awesome (CC BY 4.0)</Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

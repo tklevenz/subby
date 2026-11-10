@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { BackupContents, RestorePlan } from '@subby/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
-import { Button, FieldLabel, TextField } from '../components/ui';
+import { Button, FieldLabel, TextField, ErrorText, Lead } from '../components/ui';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
 import { SubLoader, SubProgress } from '../components/brand/loaders';
 import { ScreenScroll } from '../components/ScreenScroll';
@@ -75,13 +75,13 @@ export default function BackupScreen() {
           ) : null}
 
           <Text className={`text-ink text-xl font-bold ${hasData ? 'mt-10' : ''}`}>Restore</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             {hasData
               ? "Adds a backup's children, entries and photos to this phone. Where both have the same entry, the newer edit wins, so nothing newer is overwritten. Restoring the same file twice changes nothing."
               : "Brings a backup's children, entries and photos onto this phone. Choose the file you saved from Subby on your old phone."}
-          </Text>
+          </Lead>
           <Button label="Choose a backup file" variant={hasData ? 'ghost' : 'primary'} onPress={choose} />
-          {error ? <Text className="text-red-soft text-sm mt-3">{error}</Text> : null}
+          {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
         </>
       ) : null}
 
@@ -119,7 +119,7 @@ export default function BackupScreen() {
       {!busy && step.kind === 'done' ? (
         <>
           <Text className="text-ink text-xl font-bold mt-4">Restore complete</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">{step.message}</Text>
+          <Lead className="mt-2">{step.message}</Lead>
           <Button label="Done" onPress={() => router.replace('/')} />
         </>
       ) : null}
@@ -154,10 +154,10 @@ function BackUp({
   return (
     <>
       <Text className="text-ink text-xl font-bold">Back up</Text>
-      <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+      <Lead className="mt-2">
         One file with every child, entry and photo on this phone.{' '}
         {savesToDownloads ? 'It goes to Downloads; copy it somewhere safe, like a computer or cloud storage.' : 'Save it to Files, a computer or cloud storage.'}
-      </Text>
+      </Lead>
 
       <FieldLabel>Passphrase (optional)</FieldLabel>
       <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Encrypt the file" />
@@ -202,10 +202,10 @@ function Unlock({
   return (
     <>
       <Text className="text-ink text-xl font-bold">This backup is encrypted</Text>
-      <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">{name}</Text>
+      <Lead className="mt-2">{name}</Lead>
       <FieldLabel>Passphrase</FieldLabel>
       <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} autoFocus />
-      {error ? <Text className="text-red-soft text-sm mt-3">{error}</Text> : null}
+      {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
       <Button label="Unlock" onPress={() => onUnlock(passphrase)} disabled={!passphrase} />
       <Button label="Cancel" variant="ghost" onPress={onCancel} />
     </>
@@ -230,10 +230,10 @@ function Preview({
   return (
     <>
       <Text className="text-ink text-xl font-bold">Restore this backup?</Text>
-      <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+      <Lead className="mt-2">
         Made {formatDayLabel(backup.createdAt).toLowerCase()} at {formatTime(backup.createdAt)}: {count(backup.children.length, 'child', 'children')},{' '}
         {count(backup.logs.length, 'entry', 'entries')}, {count(photos.size, 'photo', 'photos')}.
-      </Text>
+      </Lead>
 
       <View className="bg-surface rounded-2xl border border-line px-4 py-3 mt-4">
         <Line label="Children to add or update" value={plan.children.length} />
@@ -244,7 +244,7 @@ function Preview({
       {invalid ? (
         <Text className="text-amber-soft text-xs mt-2 ml-1">{count(invalid, 'item', 'items')} in the file couldn't be read and will be skipped.</Text>
       ) : null}
-      {error ? <Text className="text-red-soft text-sm mt-3">{error}</Text> : null}
+      {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
 
       {changes ? <Button label="Restore" onPress={onRestore} /> : <Text className="text-ink-muted mt-4">This phone already has everything in this backup.</Text>}
       <Button label={changes ? 'Cancel' : 'Back'} variant="ghost" onPress={onCancel} />

@@ -39,3 +39,9 @@ export function formatLength(cm: number, system: UnitSystem): string {
 export function formatTemperature(c: number, system: UnitSystem): string {
   return system === 'metric' ? `${round(c, 1)} °C` : `${round(cToF(c), 1)} °F`;
 }
+
+/** A medication dose as text: "2.5 ml", "1 drop", "2 tablets". */
+export function formatDose(dose: number, unit?: string): string {
+  const one = dose === 1 && (unit === 'drops' || unit === 'tablets') ? unit.slice(0, -1) : unit;
+  return one ? `${dose} ${one}` : `${dose}`;
+}

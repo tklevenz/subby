@@ -21,8 +21,11 @@ export default function ChildForm({
   initial,
   submitLabel,
   onSubmit,
+  autoFocus = !initial,
 }: {
   initial?: Child;
+  /** Open with the keyboard up on the name (not where there's more to see below, like onboarding). */
+  autoFocus?: boolean;
   submitLabel: string;
   onSubmit: (input: ChildInput) => void;
 }) {
@@ -44,7 +47,7 @@ export default function ChildForm({
       <PhotoMenu visible={menu} hasPhoto={photoUri !== null} onClose={() => setMenu(false)} onChange={setPhotoUri} />
 
       <FieldLabel>Name</FieldLabel>
-      <TextField value={name} onChangeText={setName} placeholder="Baby's name" autoFocus={!initial} />
+      <TextField value={name} onChangeText={setName} placeholder="Baby's name" autoFocus={autoFocus} />
 
       <FieldLabel>Birth date</FieldLabel>
       <DateTimeField

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { ScreenScroll } from '../../components/ScreenScroll';
+import { Alert, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import {
   TIMED_LOG_TYPES,
@@ -17,7 +18,7 @@ import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
 import { CommonFields } from '../../components/sheets/LogSheet';
 import { TYPE_META, activityLabel } from '../../components/logTypes';
-import { Button, FieldLabel } from '../../components/ui';
+import { Button, FieldLabel, ErrorText } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import { SubSpinner } from '../../components/brand/loaders';
@@ -97,7 +98,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const title = payload.type === 'activity' ? activityLabel(payload.kind) : TYPE_META[payload.type].label;
 
   return (
-    <ScrollView className="flex-1 bg-ground" contentContainerStyle={{ padding: 20, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title }} />
 
       <FieldLabel>{timed ? 'Started' : 'Time'}</FieldLabel>
@@ -123,8 +124,8 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           ) : (
             <DateTimeField value={endedAt!} onChange={setEndedAt} maximumDate={new Date()} title="End time" />
           )}
-          {invalid ? <Text className="text-red-strong mt-2">End must be after start.</Text> : null}
-          {!invalid && overlap ? <Text className="text-red-strong mt-2">{overlap}</Text> : null}
+          {invalid ? <ErrorText className="mt-2">End must be after start.</ErrorText> : null}
+          {!invalid && overlap ? <ErrorText className="mt-2">{overlap}</ErrorText> : null}
         </>
       ) : null}
 
@@ -133,7 +134,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
       <CommonFields payload={payload} onChange={patch} />
 
       <Button label="Save" onPress={save} disabled={!changed || invalid || overlap !== null || !isCompletePayload(payload)} />
-      <Button label="Delete" variant="danger" onPress={confirmDelete} />
-    </ScrollView>
+      <Button label="Delete" variant="dangerQuiet" onPress={confirmDelete} />
+    </ScreenScroll>
   );
 }

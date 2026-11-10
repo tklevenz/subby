@@ -38,3 +38,16 @@ describe('ageInDays', () => {
     expect(ageInDays('2026-07-01', new Date(2026, 11, 1, 0, 30).getTime())).toBe(153);
   });
 });
+
+describe('durations', () => {
+  it('drops a zero part and, from a minute up, the seconds', async () => {
+    const { formatHoursMinutes, formatSpan } = await import('../domain/time');
+    expect(formatHoursMinutes(2 * 3600_000)).toBe('2h');
+    expect(formatHoursMinutes(150 * 60_000)).toBe('2h 30m');
+    expect(formatHoursMinutes(35 * 60_000)).toBe('35m');
+    expect(formatSpan(45_000)).toBe('45s');
+    expect(formatSpan(12 * 60_000)).toBe('12m');
+    expect(formatSpan(55 * 60_000 + 59_000)).toBe('55m');
+    expect(formatSpan(89 * 60_000)).toBe('1h 29m');
+  });
+});

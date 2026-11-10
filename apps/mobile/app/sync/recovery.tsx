@@ -5,7 +5,7 @@ import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
 import { useSyncStore } from '../../features/sync/engine';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { Button, FieldLabel, SECRET_INPUT, TextField } from '../../components/ui';
+import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
@@ -40,10 +40,10 @@ export default function RecoveryKeyScreen() {
         <>
           {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">Sync is on. One more step:</Text> : null}
           <Text className="text-ink text-xl font-bold">{hasRecovery ? 'Make a new recovery key' : 'A way back in if every phone is lost'}</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             24 words that get your family's data back on a new phone if every phone in the family is lost. Write them on paper and keep
             them somewhere safe. Anyone with the words can read your family's data.
-          </Text>
+          </Lead>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-3">
             Nobody else can recover your data, not even us: the server only stores data it can't read. If every phone is lost and there
             is no recovery key, the data is gone.
@@ -69,9 +69,9 @@ export default function RecoveryKeyScreen() {
       {step.kind === 'words' ? (
         <>
           <Text className="text-ink text-xl font-bold">Write these words down</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             In this order, on paper. Don't take a screenshot: photos often end up in the cloud.
-          </Text>
+          </Lead>
           <Words words={step.words} />
           <ServerNote />
           <Button label="I've written them down" onPress={() => setStep({ kind: 'check', words: step.words })} />
@@ -90,10 +90,10 @@ export default function RecoveryKeyScreen() {
       {step.kind === 'done' ? (
         <>
           <Text className="text-ink text-xl font-bold mt-4">Recovery key saved</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             To use it on a new phone, choose "Join a family", then "Use a recovery key". Keep the paper safe; this app won't show the
             words again.
-          </Text>
+          </Lead>
           <Button label="Done" onPress={() => router.back()} />
         </>
       ) : null}
@@ -149,7 +149,7 @@ function Check({ words, error, onBack, onOk }: { words: string[]; error: string 
   return (
     <>
       <Text className="text-ink text-xl font-bold">Check your paper</Text>
-      <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">Type these two words from what you wrote down.</Text>
+      <Lead className="mt-2">Type these two words from what you wrote down.</Lead>
       {picks.map((n, i) => (
         <View key={n} className="mt-5">
           <FieldLabel>Word {n + 1}</FieldLabel>
@@ -160,8 +160,8 @@ function Check({ words, error, onBack, onOk }: { words: string[]; error: string 
           />
         </View>
       ))}
-      {wrong ? <Text className="text-red-soft text-sm mt-4">That doesn't match. Check the paper against the words.</Text> : null}
-      {error ? <Text className="text-red-soft text-sm mt-4">{error}</Text> : null}
+      {wrong ? <ErrorText className="mt-4">That doesn't match. Check the paper against the words.</ErrorText> : null}
+      {error ? <ErrorText className="mt-4">{error}</ErrorText> : null}
       <Button label="Save the recovery key" onPress={check} disabled={answers.some((a) => !a.trim())} />
       <Button label="Show the words again" variant="ghost" onPress={onBack} />
     </>

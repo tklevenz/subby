@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import type { InviteResponse } from '@subby/shared/sync';
 import { approveClaim, claimCode, createInvite, inviteStatus, type Invite } from '../../features/sync/family';
 import QrCode from '../../components/QrCode';
-import { Button } from '../../components/ui';
+import { Button, ErrorText, Lead } from '../../components/ui';
 import { useNow } from '../../store/timeHelpers';
 import { PeriscopeLoader } from '../../components/brand/loaders';
 import { ScreenScroll } from '../../components/ScreenScroll';
@@ -83,9 +83,9 @@ export default function AddPhoneScreen() {
       {step.kind === 'showing' ? (
         <>
           <Text className="text-ink text-xl font-bold">Scan this on the other phone</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">
+          <Lead className="mt-2">
             On the new phone, open Subby and choose "Join a family" (or Settings → Sync → Join), then scan this code.
-          </Text>
+          </Lead>
           <View className="items-center mt-6">
             <View className="rounded-2xl overflow-hidden">
               <QrCode value={step.invite.code} size={size} />
@@ -119,7 +119,7 @@ export default function AddPhoneScreen() {
       {step.kind === 'done' ? (
         <>
           <Text className="text-ink text-xl font-bold mt-4">Phone added</Text>
-          <Text className="text-ink-soft text-[15px] leading-[22px] mt-2">It's downloading everything now. New entries show up on both phones within seconds.</Text>
+          <Lead className="mt-2">It's downloading everything now. New entries show up on both phones within seconds.</Lead>
           <Button label="Done" onPress={() => router.back()} />
         </>
       ) : null}
@@ -127,7 +127,7 @@ export default function AddPhoneScreen() {
       {step.kind === 'error' ? (
         <>
           <Text className="text-ink text-xl font-bold mt-4">Something went wrong</Text>
-          <Text className="text-red-soft text-sm mt-2">{step.message}</Text>
+          <ErrorText className="mt-2">{step.message}</ErrorText>
           {step.retry ? (
             <Button label="Try adding it again" onPress={() => approve(step.retry!)} />
           ) : (
