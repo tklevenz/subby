@@ -12,6 +12,9 @@ import { BlobsService } from '../blobs/blobs';
 import { PushService } from '../push/push';
 
 const PULL_LIMIT = 1000;
+/** How often a pull refreshes `families.last_active_at`. */
+const ACTIVE_EVERY_MS = 24 * 60 * 60 * 1000;
+
 /** A `moved` record's sealed body (server URL, two ids, a seq) is far below this. */
 const MOVED_MAX_CHARS = 2048;
 
@@ -92,9 +95,13 @@ export class SyncService {
 
   async pull(auth: AuthContext, since: number, limit: number): Promise<PullResponse> {
     const [family] = await this.db
-      .select({ seq: schema.families.seq, restoreGen: schema.families.restoreGen, restoredSeq: schema.families.restoredSeq })
+      .select({ seq: schema.families.seq, restoreGen: schema.families.restoreGen, restoredSeq: schema.families.restoredSeq, lastActiveAt: schema.families.lastActiveAt })
       .from(schema.families)
       .where(eq(schema.families.id, auth.familyId));
+    // A phone syncing keeps the family (hosted families nobody syncs for a year are deleted). At most one write a day.
+    if (family && Date.now() - family.lastActiveAt.getTime() > ACTIVE_EVERY_MS) {
+      await this.db.update(schema.families).set({ lastActiveAt: new Date() }).where(eq(schema.families.id, auth.familyId));
+    }
     const rows = await this.db
       .select()
       .from(schema.records)

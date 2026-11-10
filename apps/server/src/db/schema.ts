@@ -17,6 +17,10 @@ export const families = pgTable('families', {
    */
   restoreGen: integer('restore_gen').notNull().default(0),
   restoredSeq: bigint('restored_seq', { mode: 'number' }),
+  /** When a phone last pulled (updated at most daily). Hosted: a year without one deletes the family (Housekeeping). */
+  lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+  /** When Housekeeping last woke the family's phones because it had gone quiet (month 11). */
+  inactivityPingedAt: timestamp('inactivity_pinged_at', { withTimezone: true }),
 });
 
 /** The signed, hash-chained membership log, stored verbatim; verified on every append. */

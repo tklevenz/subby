@@ -1122,6 +1122,28 @@ describe.skipIf(!reachable)('sync server', () => {
       await expectStatus(buy(a, 'google', 'sync_other', 'x'), 400);
     });
 
+    it('deletes families no phone has synced for a year, after waking them in the last month', async () => {
+      const { a } = await pairedFamily(base);
+      expect((await entitlement(a)).inactiveDays).toBe(365);
+      const day = 86_400_000;
+      const quiet = (days: number) => db`update families set last_active_at = ${new Date(Date.now() - days * day)} where id = ${a.familyId}`;
+      const lastActive = async () => ((await db`select last_active_at from families where id = ${a.familyId}`)[0]!.last_active_at as Date).getTime();
+      // A pull counts as syncing.
+      await quiet(200);
+      await a.pull();
+      expect(Date.now() - (await lastActive())).toBeLessThan(60_000);
+      // Month 11: the phones are woken, once a week rather than every hour.
+      await quiet(340);
+      expect(await hosted.get(Housekeeping).run()).toMatchObject({ pinged: 1, deleted: 0 });
+      expect(await hosted.get(Housekeeping).run()).toMatchObject({ pinged: 0, deleted: 0 });
+      // A year: gone, with everything it had. A self-hosted server never does this.
+      await quiet(366);
+      expect(await app.get(Housekeeping).run()).toMatchObject({ pinged: 0, deleted: 0 });
+      expect(await hosted.get(Housekeeping).run()).toMatchObject({ deleted: 1 });
+      expect(await db`select 1 from families where id = ${a.familyId}`).toHaveLength(0);
+      await expectStatus(a.login(), 404);
+    });
+
     it('a Google refund takes the unlock away (checked hourly)', async () => {
       const { a } = await pairedFamily(base);
       await ageFamily(a, 30);

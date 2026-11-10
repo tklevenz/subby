@@ -43,6 +43,13 @@
       "when": 1794305020354,
       "tag": "0005_amused_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794306221574,
+      "tag": "0006_dapper_stepford_cuckoos",
+      "breakpoints": true
     }
   ]
 }

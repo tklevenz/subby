@@ -9,7 +9,7 @@ import { defaultDeviceName, removeDevice } from '../../features/sync/family';
 import { Button, Card, Row, TextField } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
-import { ACCESS_LABEL, AccessCard, AccessDevTools, GiftSlot } from '../../components/SyncAccess';
+import { ACCESS_LABEL, AccessCard, AccessDevTools, GiftSlot, PhotoStorage } from '../../components/SyncAccess';
 import { PRICE, useAccessStore } from '../../features/sync/access';
 import { isOfficialServer } from '../../features/sync/api';
 import { ScreenScroll } from '../../components/ScreenScroll';
@@ -139,6 +139,7 @@ function Status() {
         />
         <Row label="Last synced" value={sync.lastSyncedAt ? formatTime(sync.lastSyncedAt) : 'Not yet'} />
         <Row label="Server" value={isOfficialServer(sync.server) ? 'Subby Sync' : sync.server.replace(/^https?:\/\//, '')} />
+        <PhotoStorage />
         <Row label="Move to another server" onPress={() => router.push('/sync/move')} />
       </Card>
       {phase === 'error' && error ? <Text className="text-red-soft text-sm mt-3 ml-1">{error}</Text> : null}

@@ -32,7 +32,8 @@ import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
-import { canWrite, forgetAccess, refreshEntitlement } from './access';
+import { canWrite, forgetAccess, refreshEntitlement, useAccessStore } from './access';
+import { cancelInactivityWarning, planInactivityWarning } from './inactivity';
 import { followMove } from './move';
 
 const PUSH_BATCH = 500;
@@ -148,6 +149,7 @@ export function forgetSession() {
 
 async function forgetSync() {
   forgetSession();
+  await cancelInactivityWarning();
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
   useSyncStore.setState({ phase: 'off', error: null, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false });
@@ -242,6 +244,7 @@ async function runOnce() {
     pulledLogs = [];
     quiet = false;
     await notifyFamily(pulled).catch((e) => console.warn('Family notifications failed', e));
+    await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e));
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
   } catch (e) {
     const removed = isRemoved(e);

@@ -219,6 +219,13 @@ export const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
 export const GRACE_MS = 48 * 60 * 60 * 1000;
 /** Photo storage per family on the hosted server. */
 export const HOSTED_PHOTO_BYTES = 2 * 1024 ** 3;
+/**
+ * Hosted only (D5): a family with no phone syncing for this long is deleted from the server, gifted slots included.
+ * The server wakes its phones a month before; each phone also warns itself then, with a local notification
+ * scheduled after every sync, in case it can't be woken (`INACTIVE_WARN_DAYS`).
+ */
+export const INACTIVE_DELETE_DAYS = 365;
+export const INACTIVE_WARN_DAYS = INACTIVE_DELETE_DAYS - 30;
 
 /**
  * POST /v1/purchases: a store purchase made on this phone (or restored). `token` is Google's purchase token, or
@@ -252,6 +259,8 @@ export type EntitlementResponse = {
   /** Photo storage used and allowed (null: unlimited). */
   photoBytes: number;
   photoLimit: number | null;
+  /** Days without any phone syncing after which the server deletes the family (null: never; self-hosted, older servers). */
+  inactiveDays?: number | null;
 };
 
 // --- live (WebSocket /v1/live?token=) -----------------------------------------------------------------

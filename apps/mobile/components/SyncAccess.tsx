@@ -40,6 +40,34 @@ function useStoreAction() {
 }
 
 /** The Sync screen's card: this phone's trial, grace, unlock or gift, and what to do about it. Nothing on a self-hosted server. */
+/**
+ * Hosted: the family's photos on the server against its allowance (2 GB, D2), with a note once it's nearly or
+ * completely full (new photos then stay on the phones; entries still sync).
+ */
+export function PhotoStorage() {
+  const entitlement = useAccessStore((s) => s.entitlement);
+  if (!entitlement?.photoLimit) return null;
+  const { photoBytes: used, photoLimit: limit } = entitlement;
+  const share = used / limit;
+  return (
+    <>
+      <Row label="Photos on the server" value={`${formatBytes(used)} of ${formatBytes(limit)}`} />
+      {share >= 1 ? (
+        <Text className="text-amber-soft text-sm mx-4 mb-3 leading-5">
+          Full: new photos stay on the phone they were taken on. Entries still sync. Removing photos from entries makes room.
+        </Text>
+      ) : share >= 0.9 ? (
+        <Text className="text-amber-soft text-sm mx-4 mb-3 leading-5">
+          Nearly full. Once it is, new photos stay on the phone they were taken on.
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+const formatBytes = (n: number) =>
+  n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1).replace(/\.0$/, '')} GB` : `${Math.max(n > 0 ? 1 : 0, Math.round(n / 1024 ** 2))} MB`;
+
 export function AccessCard() {
   const access = useAccess();
   const entitlement = useAccessStore((s) => s.entitlement);

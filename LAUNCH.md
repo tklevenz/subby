@@ -38,7 +38,7 @@ These block tickets further down.
 - [x] **S1 Rate limiting** (per client IP; `common/rateLimit.ts`). On `auth/challenge`, `auth/verify`, `invites` (create, claim, status), `families` (create), blob uploads and push token registration. In memory is fine (the server is single-instance).
 - [x] **S2 `trustProxy`** for Fastify behind Caddy, so limits and logs see the real client IP. Off by default for self-hosters without a proxy.
 - [x] **S3 Photo allowance.** `Entitlements.canStore` sums the family's blob sizes in hosted mode. Self-hosted stays unlimited. [D2]
-- [ ] **S4 Inactive-family cleanup.** **Must be done before hosted sync opens:** subby.baby (/sync/, /privacy/) already promises deletion after 12 months with a warning in the app from month 11. Track the last sync per family; housekeeping warns (a live/push message the app shows) and later deletes. Deleting a family also deletes its gifted slots, so the warnings must say so. [D5, S5]
+- [x] **S4 Inactive-family cleanup.** Done 2026-11-11: pulls keep `families.last_active_at` (at most daily); Housekeeping (hosted) wakes a family's Android phones with a sync push weekly from day 335 and deletes it after 365 days without a pull (`INACTIVE_*_DAYS` in protocol.ts). The warning itself is local (A4), since a phone that doesn't sync can't hear the server. **Must be done before hosted sync opens:** subby.baby (/sync/, /privacy/) already promises deletion after 12 months with a warning in the app from month 11. Track the last sync per family; housekeeping warns (a live/push message the app shows) and later deletes. Deleting a family also deletes its gifted slots, so the warnings must say so. [D5, S5]
 - [x] **S5 Deleting a family's data.**
   - When the last phone leaves, delete everything: records, keys, the device log, blobs, push tokens and the family row.
   - Also a "Delete this family from the server" action in the app, for any member. Today nothing is ever deleted.
@@ -70,7 +70,7 @@ These block tickets further down.
   - Gifting a slot while adding a phone (or later, from the phone list), and assigning a free slot.
   - The "this phone can read but not log" state on the Sync screen and Home, with logging blocked in the UI (not silently queued for ever).
   - Setup copy: sharing costs, the app alone is free, self-hosting is free. [P1, S6]
-- [ ] **A4 Server-side warnings** (inactivity, storage full) shown on the Sync screen. [S3, S4] Before hosted sync opens: the website promises the month-11 warning.
+- [x] **A4 Server-side warnings** (inactivity, storage full) shown on the Sync screen. Done 2026-11-11: each sync schedules a local notification for 11 months later (`features/sync/inactivity.ts`, when the entitlement has `inactiveDays`), so only a phone that really stopped syncing gets it; it says gifted unlocks go too. The Sync screen shows "Photos on the server: x of 2 GB" and a note when nearly (90 %) or completely full. [S3, S4] Before hosted sync opens: the website promises the month-11 warning.
 - [x] **A5 Default server.** Done 2026-11-06: setting up and recovering use `https://sync.subby.baby`; the address field only shows after "Use your own server".
 - [ ] **A6 Small UX leftovers.**
   - "Discard changes?" when leaving an editor with edits.
