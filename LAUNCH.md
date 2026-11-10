@@ -49,6 +49,7 @@ These block tickets further down.
   - `canSync` per device: in the trial, or with an own unlock or an assigned slot → push allowed; otherwise pull only.
   - Self-hosted mode always allows everything. [D1, P1]
 - [ ] **S7 Metrics and logs without user data.** Request counts, error rates, family/blob totals; never ids or IPs in long-lived logs. `/healthz` done (Postgres and photo storage); Caddy keeps no access log.
+  - Plan (2026-11-10, before A14 and the dogfood run): in-memory counters per route and outcome (requests, 4xx, 5xx), pushes sent/failed, purchase checks, reachable only from the server itself; `monitor.sh` fails on a 5xx burst and sends a daily summary of totals (families, phones by access, photo storage, requests), no ids or IPs. In the app, "Copy diagnostics" for support (version, sync status, last error, counts; nothing personal, nothing sent by itself). No analytics or crash SDK (D9).
 - [ ] **S8 Dependency refresh** before launch (NestJS 12.2+ / fastify 5.12.7 clears the open low advisory), and `pnpm audit`.
 - [ ] **S9 Far-future `updatedAt` (audit S-7 leftover).** Decide whether to clamp. A phone with a wrong clock would win every edit; a clamp could get it stuck. At minimum, show a clock-skew warning in the app.
 - [ ] **S10 Moving between servers, robustly** (from the ultrareview 2026-11-09; moves are rare, nothing uses them yet).
@@ -87,6 +88,7 @@ These block tickets further down.
   - The other phones follow on their next sync: they check the new log against the members they already trust, switch, and re-send what they wrote after that seq. The old family is deleted once everyone has moved; a phone that missed it joins with a code.
   - Moving to the official server starts the trial; unlocks are restored from the store account.
 - [ ] **A14 Localization.** Seven languages at launch: English, German, Spanish, French, Dutch, Italian, Portuguese (Brazil). Polish next. No right-to-left (needs a mirrored layout) or Chinese/Japanese/Korean (line breaks, picker widths) at launch. Safety texts (recovery key warnings, medication, deleting a child, medical disclaimer: ~30 strings) get a native speaker's review per language. Legal texts: German binding, English alongside, the rest translations marked as such or the English version. `expo-localization` for the phone's language, with a choice in Settings; one string catalog per language, English as the fallback. Covers every screen, notifications (reminders, family alerts; scheduled in the language at the time), dates and times (day names, "Today"/"Yesterday", the wheel picker, 12/24 h stays a setting), numbers and units, pluralization, the milestone checklist and other bundled text in shared, CSV headers (keep them stable or per language: decide), and the store listings (R2, R3) and website (O5) in every language. Error messages from the server stay in English (shown rarely). A test fails on a key missing from a catalog.
+- [ ] **A15 Design polish pass** (before A14): go through every screen on a phone (screenshots), fix inconsistencies in spacing, type, colors, empty and error states, and small rough edges; one list, then one pass of fixes.
 - [ ] **A12 Accessibility pass**: screen-reader labels on tiles, icon buttons and the wheel picker; font scaling; reduced motion (the brand subs already respect it).
 
 ## Payments
@@ -157,7 +159,7 @@ These block tickets further down.
 1. ~~Decisions~~ (all made 2026-11-05).
 2. Small and independent: S1, S2, S5, A1, A2, O7.
 3. Payments: P1, S6, A3, P3, then S3, S4, A4.
-4. iOS, if launching on it: A7, A8, A9. Localization (A14) before the store listings.
+4. Next (2026-11-10): S7 metrics and diagnostics, then the design polish pass (A15), then localization (A14), then iOS (A7, A8, A9). All before the store listings.
 5. Operations O1–O4 and legal L1–L4, then the website (O5).
 6. Dogfood (O9) on the production server with release builds.
 7. Store release R1–R6.
