@@ -97,6 +97,8 @@ export class SyncSession {
   }
 
   log = () => this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
+  /** Gives back log entries the server lost (restored from a backup), signed as they were. */
+  restoreLog = (entries: DeviceLogEntry[]) => this.request<{ index: number }>('POST', '/v1/families/me/log/restore', { entries });
   keys = () => this.request<KeysResponse>('GET', '/v1/keys');
   push = (records: SyncRecord[]) => this.request<PushResponse>('POST', '/v1/sync/push', { records });
   pull = (since: number) => this.request<PullResponse>('GET', `/v1/sync/pull?since=${since}&limit=500`);

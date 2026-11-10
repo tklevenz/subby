@@ -26,6 +26,8 @@ export RCLONE_CONFIG_BACKUP_TYPE=s3 RCLONE_CONFIG_BACKUP_PROVIDER=Other
 export RCLONE_CONFIG_BACKUP_ENDPOINT=$(setting S3_ENDPOINT) RCLONE_CONFIG_BACKUP_REGION=$(setting S3_REGION)
 export RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID=$(setting S3_BACKUP_ACCESS_KEY_ID) RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY=$(setting S3_BACKUP_SECRET_ACCESS_KEY)
 export RCLONE_S3_NO_CHECK_BUCKET=true
+# The config comes from the environment: no "config file not found" notices.
+export RCLONE_LOG_LEVEL=ERROR
 remote="backup:$bucket"
 
 case ${1:-} in

@@ -3,6 +3,8 @@ import {
   RECOVERY_SIGNER,
   appendEntry,
   assertLogContinues,
+  belowFloors,
+  entriesToRestore,
   decryptFile,
   encryptFile,
   fromBase64,
@@ -18,6 +20,7 @@ import {
   verifyDeviceLog,
   verifyMovedLog,
   withinEpoch,
+  type RestoreFloor,
   type DeviceLogEntry,
   type DeviceLogState,
   type IdentityKeys,
@@ -31,6 +34,7 @@ import {
   newInviteSecret,
   UnsealedRecordError,
   openRecord,
+  serverWentBack,
   sealRecord,
   type InviteQr,
   type InviteResponse,
@@ -69,6 +73,11 @@ export class TestClient {
   /** From the last refresh: members that lack some epochs (see `heal`). */
   missing: KeysResponse['missing'] = [];
   state: DeviceLogState | null = null;
+  /** The server's restore count last seen, and the floors restores left (see `pull`). */
+  restoreGen = 0;
+  floors: RestoreFloor[] = [];
+  /** Set when a pull found the server restored from a backup: the app then pushes everything it has again. */
+  resynced = false;
 
   constructor(readonly server: string) {}
 
@@ -130,7 +139,13 @@ export class TestClient {
    * sealed for this device, each checked against the log's commitment. The current epoch comes from the log.
    */
   async refresh(identity = this.identity) {
-    const { entries } = await this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
+    let { entries } = await this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log');
+    // The server lost entries this phone verified (restored from a backup): give them back as they were signed.
+    const lost = entriesToRestore(entries, this.log);
+    if (lost) {
+      await this.request('POST', '/v1/families/me/log/restore', { entries: lost });
+      ({ entries } = await this.request<{ entries: DeviceLogEntry[] }>('GET', '/v1/families/me/log'));
+    }
     assertLogContinues(entries, this.log.length ? { length: this.log.length, head: this.state!.head } : null);
     const state = verifyDeviceLog(entries);
     const keys = await this.request<KeysResponse>('GET', '/v1/keys');
@@ -220,8 +235,19 @@ export class TestClient {
     for (;;) {
       const since = this.lastSeq;
       const page = await this.request<PullResponse>('GET', `/v1/sync/pull?since=${since}&limit=200`);
+      const gen = page.restored?.gen ?? 0;
+      // Restored from a backup (or behind this phone without saying so): pull everything again, and push it all
+      // (`resynced`). Old-key records past the restore's seq can't be genuine. A pull from 0 just notes the count.
+      if (since > 0 && (gen !== this.restoreGen || serverWentBack(since, page))) {
+        this.floors.push({ epoch: this.state!.epoch, seq: gen !== this.restoreGen ? page.restored!.seq : page.seq });
+        this.restoreGen = gen;
+        this.lastSeq = 0;
+        this.resynced = true;
+        continue;
+      }
+      this.restoreGen = gen;
       for (const { seq, ...record } of page.records) {
-        if (seq <= since || seq > page.seq || !withinEpoch(this.state!, record.epoch, seq)) {
+        if (seq <= since || seq > page.seq || !withinEpoch(this.state!, record.epoch, seq) || !belowFloors(this.floors, record.epoch, seq)) {
           this.rejected.push(record.id);
           continue;
         }

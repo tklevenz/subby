@@ -74,6 +74,32 @@ export class FamiliesService {
   }
 
   /**
+   * Takes back entries a phone verified that this server lost (it was restored from a backup), signed as they were.
+   * Each must continue the log and pass the whole chain's checks, as on append. Epochs come without their sealed
+   * keys: the phones that hold them grant them on their next sync, as for any member missing a key.
+   */
+  async restore(auth: AuthContext, entries: DeviceLogEntry[]) {
+    if (entries.some((e) => e.type === 'create')) throw new BadRequestException('Restored entries continue the family log');
+    const { result, deleted } = await this.db.transaction(async (tx) => {
+      await lockFamily(tx, auth.familyId);
+      for (const entry of entries) {
+        await appendVerified(tx, auth.familyId, entry);
+        await this.apply(tx, auth.familyId, entry);
+        if (entry.type === 'epoch') await tx.update(schema.families).set({ currentEpoch: entry.epoch! }).where(eq(schema.families.id, auth.familyId));
+      }
+      const remaining = await tx.$count(schema.devices, and(eq(schema.devices.familyId, auth.familyId), eq(schema.devices.active, true)));
+      return { result: { index: entries.at(-1)!.index }, deleted: remaining === 0 ? await deleteRows(tx, auth.familyId) : null };
+    });
+    if (deleted) {
+      await this.afterDelete(auth.familyId, deleted);
+      return result;
+    }
+    for (const e of entries) if (e.type === 'remove') this.live.closeDevice(auth.familyId, e.deviceId);
+    this.live.publish(auth.familyId, { type: 'log', index: result.index });
+    return result;
+  }
+
+  /**
    * Deletes everything the server holds for the family: records, keys, the device log, devices, sessions,
    * invites, push tokens and photo files. The phones keep their own data; the others find out on their next sync
    * (they can't log in any more, like a removed phone).

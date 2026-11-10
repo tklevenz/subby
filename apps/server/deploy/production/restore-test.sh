@@ -6,7 +6,9 @@
 #   KEEP=1 …                                                      leave the database running afterwards (port 54330)
 #
 # Needs Docker, age (brew install age) and the key at ~/subby-backup.key (or SUBBY_BACKUP_KEY=<path>).
-# For a real restore onto a server, decrypt the same way and pipe into `pg_restore --clean --if-exists -d subby`.
+# For a real restore onto the server: decrypt the same way and pipe it into `pg_restore --clean --if-exists -d subby`
+# there (server stopped), start the server, then `docker compose exec server node dist/admin.js restored`, so the
+# phones give back what happened after the backup (apps/server/README.md, "Restoring a backup").
 set -euo pipefail
 
 HOST=${SUBBY_HOST:-subby}

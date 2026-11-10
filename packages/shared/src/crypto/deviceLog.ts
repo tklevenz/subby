@@ -89,6 +89,15 @@ export const withinEpoch = (state: Pick<DeviceLogState, 'closedAt'>, epoch: numb
 };
 
 /**
+ * After the server was restored from a backup: records of epochs before `epoch` with a seq past `seq` (the server's
+ * seq at the restore) were written after the backup with a key the log had already retired, so they can't be
+ * genuine. The server refuses old keys once its log is complete again; this covers the time before.
+ */
+export type RestoreFloor = { epoch: number; seq: number };
+export const belowFloors = (floors: readonly RestoreFloor[] | null | undefined, epoch: number, seq: number) =>
+  !floors?.some((f) => epoch < f.epoch && seq > f.seq);
+
+/**
  * Opens a family key sealed to this phone and checks it against the log's commitment for that epoch.
  * Sealed boxes are anonymous (anyone, the server too, can seal to a public key), so this check is what makes
  * a key trustworthy.
@@ -108,6 +117,18 @@ export type LogSeen = { length: number; head: string };
  * Throws if the log doesn't continue the one seen before. Each entry is signed, but a server could still serve
  * an older prefix (hiding a removal or a newer epoch); remembering how far the log went catches that.
  */
+/**
+ * The entries this phone verified that the server's log lacks, when the server's log is exactly the start of this
+ * phone's (it was restored from a backup): the phone gives them back, signed as they are. null otherwise, and for
+ * an empty log (a deleted family looks the same, and must stay deleted).
+ */
+export function entriesToRestore(server: DeviceLogEntry[], local: DeviceLogEntry[] | null | undefined): DeviceLogEntry[] | null {
+  if (!local || !server.length || server.length >= local.length) return null;
+  // Entries chain by hash, so the same last entry means the same log up to there.
+  if (entryHash(server[server.length - 1]!) !== entryHash(local[server.length - 1]!)) return null;
+  return local.slice(server.length);
+}
+
 export function assertLogContinues(entries: DeviceLogEntry[], seen: LogSeen | null | undefined) {
   if (!seen) return;
   if (entries.length < seen.length || entryHash(entries[seen.length - 1]) !== seen.head) {

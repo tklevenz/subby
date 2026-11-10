@@ -91,6 +91,10 @@ export class SyncService {
   }
 
   async pull(auth: AuthContext, since: number, limit: number): Promise<PullResponse> {
+    const [family] = await this.db
+      .select({ seq: schema.families.seq, restoreGen: schema.families.restoreGen, restoredSeq: schema.families.restoredSeq })
+      .from(schema.families)
+      .where(eq(schema.families.id, auth.familyId));
     const rows = await this.db
       .select()
       .from(schema.records)
@@ -98,7 +102,10 @@ export class SyncService {
       .orderBy(asc(schema.records.seq))
       .limit(limit + 1);
     const page = rows.slice(0, limit).map(({ familyId: _, ...r }) => r);
-    return { records: page, seq: page.at(-1)?.seq ?? since, more: rows.length > limit };
+    // Nothing new: the family's latest seq, which is below `since` if this server lost data the phone has.
+    const seq = page.at(-1)?.seq ?? Math.min(since, family?.seq ?? since);
+    const restored = family?.restoreGen ? { gen: family.restoreGen, seq: family.restoredSeq ?? 0 } : undefined;
+    return { records: page, seq, more: rows.length > limit, ...(restored ? { restored } : {}) };
   }
 }
 

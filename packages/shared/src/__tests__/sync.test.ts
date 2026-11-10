@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fromBase64, newSymmetricKey } from '../crypto';
-import { MAX_PUSH, UnsealedRecordError, clientApplies, compareVersions, openRecord, pageContinues, pushChunks, sealRecord, serverAccepts, settlePush, type RecordMeta } from '../sync';
+import { MAX_PUSH, UnsealedRecordError, clientApplies, compareVersions, openRecord, pageContinues, pushChunks, sealRecord, serverAccepts, serverWentBack, settlePush, type RecordMeta } from '../sync';
 
 describe('records', () => {
   const key = newSymmetricKey();
@@ -104,6 +104,13 @@ describe('settling a push', () => {
     // More to come, but nothing (or not up to the claimed seq) in this page: a server stringing the phone along.
     expect(pageContinues(10, { seq: 11, more: true, records: [] })).toBe(false);
     expect(pageContinues(10, { seq: 20, more: true, records: at(11, 12) })).toBe(false);
+  });
+
+  it('notices a server that went back (restored from a backup)', () => {
+    expect(serverWentBack(10, { seq: 9, more: false })).toBe(true);
+    expect(serverWentBack(10, { seq: 10, more: false })).toBe(false);
+    expect(serverWentBack(10, { seq: 12, more: false })).toBe(false);
+    expect(serverWentBack(10, { seq: 9, more: true })).toBe(false);
   });
 });
 

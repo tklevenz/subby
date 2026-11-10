@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, type ReminderSettings, type UnitSystem } from '@subby/shared';
-import type { LogSeen } from '@subby/shared/crypto';
+import type { DeviceLogEntry, LogSeen, RestoreFloor } from '@subby/shared/crypto';
 import type { MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../db/client';
 
@@ -40,6 +40,12 @@ export type SyncSettings = {
   pushToken?: string;
   /** How far this phone has verified the device log, so a server can't serve an older one (`assertLogContinues`). */
   logSeen?: LogSeen;
+  /** The device log as this phone verified it, to give back what a server restored from a backup lost. */
+  log?: DeviceLogEntry[];
+  /** The server's count of restores from a backup last seen (`PullResponse.restored`); a change means sync everything again. */
+  restoreGen?: number;
+  /** What restores left: old-key records past their seq can't be genuine (`belowFloors`). */
+  floors?: RestoreFloor[];
   /** Another phone moved the family to another server (a `moved` record): this phone follows on its next sync run. */
   move?: MovedBody;
   /** When this phone started syncing with this family (set up, joined or recovered); kept across a server move. */

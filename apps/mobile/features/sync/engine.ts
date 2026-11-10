@@ -8,6 +8,8 @@ import {
   RECOVERY_SIGNER,
   appendEntry,
   assertLogContinues,
+  belowFloors,
+  entriesToRestore,
   fromBase64,
   newSymmetricKey,
   openFamilyKey,
@@ -17,8 +19,9 @@ import {
   withinEpoch,
   type DeviceLogEntry,
   type DeviceLogState,
+  type RestoreFloor,
 } from '@subby/shared/crypto';
-import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, pushChunks, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
+import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, pushChunks, serverWentBack, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
@@ -28,7 +31,7 @@ import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSessi
 import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
-import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos } from './photos';
+import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
 import { canWrite, forgetAccess, refreshEntitlement } from './access';
 import { followMove } from './move';
 
@@ -269,10 +272,20 @@ export const isRemoved = (e: unknown) =>
  * phone they didn't add.
  */
 export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
-  const { entries } = await api.log();
+  let { entries } = await api.log();
+  // The server lost entries this phone verified (it was restored from a backup): give them back as they were
+  // signed. The server checks they continue its log; anything else still fails below.
+  const lost = entriesToRestore(entries, syncSettings()?.log);
+  if (lost) {
+    console.warn(`[sync] the server lost ${lost.length} phone list entries; giving them back`);
+    await api.restoreLog(lost);
+    ({ entries } = await api.log());
+  }
   assertLogContinues(entries, syncSettings()?.logSeen ?? settings.logSeen);
   const state = verifyDeviceLog(entries);
-  if (syncSettings()?.logSeen?.length !== entries.length) await saveSync({ logSeen: { length: entries.length, head: state.head } });
+  if (syncSettings()?.logSeen?.length !== entries.length || syncSettings()?.log?.length !== entries.length) {
+    await saveSync({ logSeen: { length: entries.length, head: state.head }, log: entries });
+  }
   if (!state.members.has(settings.deviceId)) throw new SyncHttpError(401, 'Removed');
   const ids = [...state.members.keys()];
   const known = new Set(settings.knownDevices ?? [settings.deviceId]);
@@ -421,7 +434,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
       // (an older epoch's version this phone pulled long ago, or a server that withholds it) it stays pending.
       // Only versions that actually open and are well-formed count: the metadata alone is the server's word.
-      const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && withinEpoch({ closedAt }, r.epoch, r.seq));
+      const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && genuineAt(closedAt, r.epoch, r.seq));
       const openedNewer = openAll(candidates, keys);
       const genuine = new Set<SyncRecord>(openedNewer.map((o) => o.record));
       const { settled, newer } = settlePush(chunk, res, (r) => genuine.has(r));
@@ -452,15 +465,26 @@ const MAX_RECORD_CHARS = Math.ceil((MAX_RECORD_DATA * 4) / 3);
  * genuine are skipped: a seq outside the page asked for, or one of an old epoch past the seq the log closed it at
  * (written with a key a removed phone still has, and stored by a server that shouldn't have).
  */
-async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedAt }: Keys, since: number) {
+async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, closedAt }: Keys, since: number) {
   let seq = since;
   let applied = false;
   let done = 0;
   for (;;) {
     const page = await api.pull(seq);
+    const gen = page.restored?.gen ?? 0;
+    const seenGen = syncSettings()?.restoreGen ?? 0;
+    // Restored from a backup (or behind this phone without saying so): the server gets back what it lost, and
+    // pulling starts over. A pull from 0 (a new phone, or right after this) just notes the count.
+    if (seq > 0 && (gen !== seenGen || serverWentBack(seq, page))) {
+      await resyncAfterRestore(api, { epoch, seq: gen !== seenGen ? (page.restored?.seq ?? 0) : page.seq }, gen);
+      seq = 0;
+      applied = true;
+      continue;
+    }
+    if (gen !== seenGen) await saveSync({ restoreGen: gen });
     if (!pageContinues(seq, page)) throw new Error(`The server sent a page that doesn't continue from ${seq}`);
     const genuine = page.records.filter((r) => {
-      if (r.seq > seq && r.seq <= page.seq && withinEpoch({ closedAt }, r.epoch, r.seq)) return true;
+      if (r.seq > seq && r.seq <= page.seq && genuineAt(closedAt, r.epoch, r.seq)) return true;
       console.warn(`[sync] refused ${r.kind} record ${r.id}: seq ${r.seq} isn't valid for epoch ${r.epoch}`);
       return false;
     });
@@ -473,6 +497,31 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, closedA
     await saveSync({ lastSeq: seq });
     if (!page.more) return applied;
   }
+}
+
+/** A record of `epoch` at `seq` can be genuine: within what the log let that epoch have, and below every restore's floor. */
+const genuineAt = (closedAt: DeviceLogState['closedAt'], epoch: number, seq: number) =>
+  withinEpoch({ closedAt }, epoch, seq) && belowFloors(syncSettings()?.floors, epoch, seq);
+
+/**
+ * The server was restored from a backup (or lost data without saying so): it gets back from this phone what it
+ * lost. Every photo goes up again under its id and key (ones it still has are skipped), then every row is marked
+ * pending for the next run to push, and this phone's name with it; pulling starts over from 0. Old-key records
+ * past the restore's seq were written after the backup by a phone the log had already removed (`floor`).
+ * Each step is safe to repeat: until the new count is saved, the next run starts here again.
+ */
+async function resyncAfterRestore(api: SyncSession, floor: RestoreFloor, gen: number) {
+  console.warn(`[sync] the server was restored from a backup (count ${gen}, seq ${floor.seq}); syncing everything again`);
+  useSyncStore.setState({ progress: { label: 'Restoring the server', done: 0 } });
+  await uploadPhotosAsTheyAre(api, (done) => useSyncStore.setState({ progress: { label: 'Restoring the server', done } }), true);
+  await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
+  await db.update(schema.logsTable).set({ syncStatus: 'pending' });
+  const settings = syncSettings()!;
+  const name = settings.names?.[settings.deviceId];
+  if (name && canWrite()) await pushDeviceName(name);
+  quietNextRun();
+  await saveSync({ lastSeq: 0, restoreGen: gen, floors: [...(settings.floors ?? []), floor] });
+  again = true;
 }
 
 /** Entries other phones wrote, applied during this run (for `notifyFamily`). */

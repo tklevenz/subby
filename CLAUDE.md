@@ -174,6 +174,11 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - Pulled records are refused (skipped, not written) if their seq is outside the page asked for, or `withinEpoch` says the log closed their epoch before them. Unsealed tombstones, and records that don't open with a key this phone has (damaged or tampered with), are skipped too, so one bad record can't stop sync; a record of an epoch without a key still fails the run (the next one fetches it). A page that doesn't move forward, or claims more to come without ending at its last record (`pageContinues`), fails the run.
     - A photo blob that doesn't decrypt is skipped (retried next run). `uploadPhotos` reports changed rows, so the stores reload.
     - `rotateKeys` pulls everything first and signs `closedSeq` = this phone's `lastSeq`; on 409 (another phone pushed in between) it pulls and retries, up to three times.
+    - **A server restored from a backup** gets back what it lost, without anyone doing anything:
+      - Phones keep the whole verified device log (`settings.sync.log`). When the server's log is exactly the start of it (`entriesToRestore`), `refreshMembers` gives back the missing entries (`POST families/me/log/restore`), signed as they were; `heal` then grants the epochs members lack. A log that isn't a prefix still fails (`assertLogContinues`), and an empty one (a deleted family) is never restored.
+      - Pulls carry `restored: {gen, seq}` after `admin.js restored`. A phone that saw another `gen` (or finds the server's seq below its `lastSeq`, `serverWentBack`) runs `resyncAfterRestore`: every photo up again under its id and key (`uploadPhotosAsTheyAre`, tolerant), every row pending, its name pushed, `lastSeq` 0, no family alerts for that run. A pull from 0 only notes the `gen`.
+      - Each restore leaves a floor (`settings.sync.floors`: the epoch then current and the restore's seq): old-key records past it were written after the backup by a phone the log had already removed, and are refused (`belowFloors`, with `withinEpoch` in `genuineAt`).
+      - Not automatic: a family whose phones all joined after the backup isn't on the server; its phones see "no longer in the family" and set up sync again. Purchases made after the backup need a restore from the store.
     - **Self-healing** (`heal`, every run):
       - Grants epochs that `GET /v1/keys` lists as `missing` for a member or the recovery key, sealed only to public keys from the verified log.
       - Rotates when `rotationDue` (`rotateKeys`, also used by `removeDevice`). A concurrent rotation by another phone (400) is fine.
@@ -213,6 +218,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `info`.
   - `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed. `verify` re-checks membership (or the current recovery key) under `lockFamily` (`db/lock.ts`), so a phone removed after its challenge gets no session.
   - `families` (create) and `families/me/log`: the signed device log. The whole chain is verified with `verifyDeviceLog` on every append. Adds, removes and setRecovery update `devices` and `sessions`.
+  - `families/me/log/restore` (devices only): entries a phone verified that a restored server lost, epochs included (their keys come by grant); they must continue the log and pass the chain checks.
   - `DELETE families/me` (any member, or the recovery key): deletes the family row (every table cascades from it) and its photo files, and closes its live sockets. A `remove` that leaves no active phone does the same, recovery key included. Nothing of a deleted family is kept.
   - `keys`: `GET`, `grant`, and `rotate`.
     - A rotation is the signed `epoch` log entry plus the key sealed to exactly the current members plus the recovery key, stored in one transaction. `families/me/log` refuses `epoch` entries.
@@ -222,6 +228,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. A record can only link unlinked blobs or its own. Ids are lowercased (Postgres returns them so, and deletes use those). The allowance check and the id claim run under `lockFamily`. An upload claims its id with the row first, so a taken id is refused before the file is touched. `Entitlements.canStore` is the hosted quota hook.
   - `sync/push` and `sync/pull`:
     - Last writer wins via `serverAccepts`, and a per-family `seq`.
+    - A pull with nothing new answers the family's seq (below `since` if the server lost data), plus `restored` after `admin.js restored` (`families.restore_gen`, `restored_seq`).
     - New data must use the current epoch, deletions too.
     - Tombstones may carry a sealed body or (older apps) none; anything else needs data.
     - Records must be written as the calling device.
@@ -234,6 +241,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - Google: the Android Publisher API with a service account (`common/google.ts` `GoogleAuth`, shared with FCM push); refunds from `voidedpurchases`, checked hourly by Housekeeping.
   - Apple: StoreKit 2 JWS checked offline against the embedded Apple Root CA G3 (`purchases/appleRoot.ts`; x5c chain, Apple's marker OIDs, ES256); refunds from App Store Server Notifications V2 at `POST /v1/purchases/apple/notifications`. Sandbox purchases only with `APPLE_ALLOW_SANDBOX=1`.
   - Test store (`TEST_PURCHASES=1`, never on the official server; `/v1/info` reports `testPurchases`): accepts any `test-…` token the app makes up, plus `POST /v1/purchases/test/refund`. The app uses it (release builds too) whenever the server offers it.
+  - `node dist/admin.js restored` after restoring a backup (README "Restoring a backup"): counts up every family's `restore_gen` and notes its seq.
   - Grants: `node dist/admin.js status | grant-slots <family> [n] | revoke-grants <family>` inside the container (`src/admin.ts`, a second esbuild entry): slots with `store: 'grant'` and no buyer, for our own family, support and press. No HTTP endpoint.
   - Product ids: `PRODUCTS` in `protocol.ts` (`sync_unlock` non-consumable, `sync_slot` consumable). The e2e suite runs a hosted app against a fake Play API and an openssl-made Apple chain (`test/appleCerts.ts`).
 - **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, grant (only to a phone the recovery key added; grants are first-come), and delete the family. They can't sync or rotate.

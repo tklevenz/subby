@@ -11,6 +11,12 @@ export const families = pgTable('families', {
   /** Recovery signing key from the device log, so the recovery key can find its family to log in. */
   recoverySignKey: text('recovery_sign_key').unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  /**
+   * Restores from a backup so far (`admin.js restored`) and the family's seq right after the last one. Phones that
+   * saw an older count sync everything again, so what the server lost comes back from them.
+   */
+  restoreGen: integer('restore_gen').notNull().default(0),
+  restoredSeq: bigint('restored_seq', { mode: 'number' }),
 });
 
 /** The signed, hash-chained membership log, stored verbatim; verified on every append. */

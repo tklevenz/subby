@@ -71,6 +71,25 @@ docker run --rm -v server_blobs:/data -v "$PWD":/backup alpine tar czf /backup/b
 (The volume name starts with the Compose project name, by default the folder name `server`; see
 `docker volume ls`.) Backups contain only encrypted data, but keep them private anyway.
 
+### Restoring a backup
+
+The phones hold all of the family's data, so a restored server gets back from them whatever happened after the
+backup. Restore the database (and the photos), then tell the phones:
+
+```sh
+docker compose stop server
+docker compose exec db dropdb -U subby --force subby
+docker compose exec db createdb -U subby subby
+gunzip -c subby-2026-11-10.sql.gz | docker compose exec -T db psql -U subby -d subby -v ON_ERROR_STOP=1 -q
+docker compose start server
+docker compose exec server node dist/admin.js restored
+```
+
+On their next sync, the phones give back the newer phone list (paired and removed phones, new keys), photos and
+entries, and pull everything again. Nobody has to do anything, with one exception: a family whose phones all
+joined after the backup isn't on the server at all, and its phones say they're no longer in a family, like after
+the family was deleted. They set up sync again; their data is still on them.
+
 ### Building the image elsewhere
 
 The image builds from the repository root:
@@ -92,6 +111,7 @@ Gifted unlocks without a payment (our own family, support, press) are given from
 docker compose exec server node dist/admin.js status <family-id>
 docker compose exec server node dist/admin.js grant-slots <family-id> 3
 docker compose exec server node dist/admin.js revoke-grants <family-id>
+docker compose exec server node dist/admin.js restored          # after restoring a backup (see above)
 ```
 
 A slot belongs to the family, so it covers its phones through reinstalls and re-joins. The family id is on the app's Sync screen. Phones see a change on their next sync.

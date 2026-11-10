@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { loadConfig } from './config';
 import { openDb, schema, type Db } from './db/db';
 import { Entitlements } from './sync/entitlements';
@@ -14,7 +14,8 @@ import { Entitlements } from './sync/entitlements';
 const USAGE = `Usage: node dist/admin.js <command>
   status <family-id>             who may sync, slots, trial and photo use
   grant-slots <family-id> [n]    give the family n slots (default 1), no payment
-  revoke-grants <family-id>      take back every granted slot`;
+  revoke-grants <family-id>      take back every granted slot
+  restored                       after restoring the database from a backup: phones sync everything again`;
 
 /** The admin's grants have no buying phone. */
 const NOBODY = '00000000-0000-0000-0000-000000000000';
@@ -22,6 +23,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function runAdmin(db: Db, entitlements: Entitlements, args: string[], print: (line: string) => void = console.log) {
   const [command, familyId, count] = args;
+  if (command === 'restored') {
+    // Each family's phones see the count change on their next pull. They give back what this server lost (newer
+    // log entries, records, photos) and refuse old-key records written after the backup (past `restored_seq`).
+    const families = await db
+      .update(schema.families)
+      .set({ restoreGen: sql`${schema.families.restoreGen} + 1`, restoredSeq: sql`${schema.families.seq}` })
+      .returning({ id: schema.families.id });
+    print(`Marked ${families.length} famil${families.length === 1 ? 'y' : 'ies'} as restored. Their phones sync everything again on their next run.`);
+    return;
+  }
   if (!command || !familyId || !UUID.test(familyId)) throw new AdminError(USAGE);
   const [family] = await db.select({ id: schema.families.id }).from(schema.families).where(eq(schema.families.id, familyId));
   if (!family) throw new AdminError(`No family ${familyId} on this server`);

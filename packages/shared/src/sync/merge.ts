@@ -55,6 +55,12 @@ export function settlePush<R extends Version & { id: string; seq: number; epoch:
  * A page with more to come ends at its last record (as the server sends it), so empty pages can't keep a phone
  * pulling forever.
  */
+/**
+ * The server is behind this phone: its latest seq is below the one the phone already pulled to. It lost data
+ * (restored from a backup without saying so); the phone syncs everything again instead of failing forever.
+ */
+export const serverWentBack = (since: number, page: { seq: number; more: boolean }) => !page.more && page.seq < since;
+
 export function pageContinues(since: number, page: { seq: number; more: boolean; records: { seq: number }[] }) {
   if (!page.more) return page.seq >= since;
   const last = page.records.reduce((max, r) => Math.max(max, r.seq), -Infinity);

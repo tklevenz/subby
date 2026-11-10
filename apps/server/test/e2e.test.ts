@@ -397,14 +397,97 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(c.currentEpoch).toBe(1);
   });
 
-  it('phones notice a device log rolled back to an older version', async () => {
+  it('phones give back device log entries the server lost, and never accept the shorter log', async () => {
     const { a, b } = await pairedFamily();
     await a.rotate();
     await b.refresh();
     expect(b.currentEpoch).toBe(2);
-    // The server drops the epoch entry, hoping b goes back to the old key.
+    // The server loses the epoch entry (or drops it, hoping b goes back to the old key): b puts it back.
     await db`delete from device_log where family_id = ${a.familyId} and index = ${a.log.length - 1}`;
-    await expect(b.refresh()).rejects.toThrow('older');
+    await db`update families set current_epoch = 1 where id = ${a.familyId}`;
+    await b.refresh();
+    expect(b.currentEpoch).toBe(2);
+    expect((await db`select current_epoch from families where id = ${a.familyId}`)[0]!.current_epoch).toBe(2);
+    // A server that won't take it back can't make b use the shorter log either.
+    await db`delete from device_log where family_id = ${a.familyId} and index = ${a.log.length - 1}`;
+    const restore = b.request.bind(b);
+    b.request = (async (method: string, path: string, body?: unknown) =>
+      path.endsWith('/log/restore') ? Promise.reject(new HttpError(500, 'no')) : restore(method, path, body)) as typeof b.request;
+    await expect(b.refresh()).rejects.toThrow();
+    b.request = restore;
+  });
+
+  it("restored entries must continue the server's log and be signed", async () => {
+    const { a, b } = await pairedFamily();
+    await a.rotate();
+    const epoch = a.log.at(-1)!;
+    // Not continuing the log (the server already has it), forged, or a new family's first entry.
+    await expectStatus(b.request('POST', '/v1/families/me/log/restore', { entries: [epoch] }), 400);
+    await db`delete from device_log where family_id = ${a.familyId} and index = ${epoch.index}`;
+    await expectStatus(b.request('POST', '/v1/families/me/log/restore', { entries: [{ ...epoch, closedSeq: 99 }] }), 400);
+    await expectStatus(b.request('POST', '/v1/families/me/log/restore', { entries: [a.log[0]] }), 400);
+    await b.request('POST', '/v1/families/me/log/restore', { entries: [epoch] });
+  });
+
+  it('a server restored from a backup gets back from the phones what it lost', async () => {
+    const { a, b } = await pairedFamily();
+    const before = a.seal('log', randomUUID(), { before: 'backup' });
+    await a.push([before]);
+    await b.refresh();
+    await b.pull();
+
+    // The nightly backup.
+    const tables = ['devices', 'device_log', 'family_keys', 'sessions', 'invites', 'blobs', 'push_tokens', 'records', 'purchases'];
+    const backup: Record<string, Record<string, unknown>[]> = { families: [...(await db`select * from families where id = ${a.familyId}`)] };
+    for (const t of tables) backup[t] = [...(await db`select * from ${db(t)} where family_id = ${a.familyId}`)];
+
+    // After it: a third phone joins, a writes, then removes b (closing epoch 1 after that record).
+    const c = new TestClient(url);
+    const { qr, secret } = await a.invite();
+    await c.claim(qr);
+    await (await a.reviewClaim(qr.i, secret)).approve();
+    expect(await c.finishJoin(qr)).toBe(true);
+    const after = a.seal('log', randomUUID(), { after: 'backup' });
+    await a.push([after]);
+    await a.pull();
+    await a.removeDevice(b.deviceId);
+    expect(a.state!.closedAt.get(1)).toBe(2);
+    await c.refresh();
+    await c.pull();
+
+    // The server dies and comes back from the backup.
+    await db`delete from families where id = ${a.familyId}`;
+    for (const t of ['families', ...tables]) if (backup[t]!.length) await db`insert into ${db(t)} ${db(backup[t]!)}`;
+    await runAdmin(app.get(DB), app.get(Entitlements), ['restored'], () => {});
+
+    // In the meantime b, a member again as far as the server knows, writes with the key it still has. Its seq (2)
+    // is within what the log let epoch 1 have: only the restore's floor tells it from genuine history.
+    await b.login();
+    const evil = b.seal('log', randomUUID(), { written: 'after the backup' });
+    expect((await b.push([evil])).seq).toBe(2);
+    // c joined after the backup: the server doesn't know it yet.
+    await expectStatus(c.login(), 404);
+
+    // a's next run gives back the log (c's add, b's removal, the epoch), then grants what's missing.
+    await a.login();
+    await a.refresh();
+    await a.heal();
+    expect(a.log).toHaveLength(5);
+    await expectStatus(b.login(), 404);
+    // Its pull notices the restore: everything again, without b's old-key record, then a pushes all it has.
+    const pulled = await a.pull();
+    expect(a.resynced).toBe(true);
+    expect(pulled.map((p) => p.record.id)).toEqual([before.id]);
+    expect(a.rejected).toContain(evil.id);
+    await a.push([a.seal('log', before.id, { before: 'backup' }, { updatedAt: before.updatedAt }), a.seal('log', after.id, { after: 'backup' }, { updatedAt: after.updatedAt })]);
+
+    // c is back in, with its key, and gets everything.
+    await c.login();
+    await c.refresh();
+    const atC = await c.pull();
+    expect(c.resynced).toBe(true);
+    expect(atC.map((p) => p.record.id).sort()).toEqual([before.id, after.id].sort());
+    expect(c.rejected).toContain(evil.id);
   });
 
   it('a phone approved without its keys gets them on the next sync of any other phone', async () => {

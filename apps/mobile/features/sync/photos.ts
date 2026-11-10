@@ -190,3 +190,44 @@ async function download(api: SyncSession, blob: PhotoBlob): Promise<string | nul
   }
   return savePhotoBytes(`${blob.id}.jpg`, bytes);
 }
+
+/**
+ * Uploads every photo this phone has under its existing blob id and key, so records stay as they are: to a new
+ * server (moving), or to one restored from a backup (`tolerant`: a photo it still has (409), or has no room for,
+ * is skipped, so one photo can't stop the rest).
+ */
+export async function uploadPhotosAsTheyAre(api: SyncSession, onProgress: (done: number) => void, tolerant = false) {
+  const c = schema.childrenTable;
+  const l = schema.logsTable;
+  const children = await db
+    .select({ uri: c.photoUri, blob: c.photoBlob })
+    .from(c)
+    .where(and(eq(c.isDeleted, false), isNotNull(c.photoUri), isNotNull(c.photoBlob)));
+  const notes = await db
+    .select({ payload: l.payload })
+    .from(l)
+    .where(
+      and(
+        eq(l.logType, 'note'),
+        eq(l.isDeleted, false),
+        sql`json_extract(${l.payload}, '$.photoBlob') is not null`,
+        sql`json_extract(${l.payload}, '$.photoUri') is not null`,
+      ),
+    );
+  const photos = [
+    ...children.map((r) => ({ uri: r.uri!, blob: r.blob! })),
+    ...notes.flatMap(({ payload: p }) => (p.type === 'note' && p.photoUri && p.photoBlob ? [{ uri: p.photoUri, blob: p.photoBlob }] : [])),
+  ];
+  let done = 0;
+  for (const { uri, blob } of photos) {
+    const data = await readPhotoBytes(uri);
+    // A missing file: the entry moves without it, like any photo that never synced.
+    if (!data) continue;
+    try {
+      await api.putBlob(blob.id, encryptFile(fromBase64(blob.key), data));
+    } catch (e) {
+      if (!(tolerant && e instanceof SyncHttpError && [403, 409, 413].includes(e.status))) throw e;
+    }
+    onProgress(++done);
+  }
+}

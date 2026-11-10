@@ -4,6 +4,8 @@ import {
   RECOVERY_SIGNER,
   appendEntry,
   assertLogContinues,
+  belowFloors,
+  entriesToRestore,
   bytesToHex,
   decrypt,
   decryptFile,
@@ -249,6 +251,30 @@ describe('device log', () => {
     const other = push(push(created, phoneA, { type: 'add', deviceId: phoneC.id, keys: keysOf(phoneC.keys) }), phoneA, { type: 'remove', deviceId: phoneC.id });
     expect(() => assertLogContinues(other, seen)).toThrow('older');
     expect(() => assertLogContinues(log, null)).not.toThrow();
+  });
+
+  it('gives back the entries a server restored from a backup lost, and nothing else', () => {
+    const log = push(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) }), phoneA, { type: 'remove', deviceId: phoneB.id });
+    expect(entriesToRestore(log.slice(0, 1), log)).toEqual(log.slice(1));
+    expect(entriesToRestore(log.slice(0, 2), log)).toEqual(log.slice(2));
+    // Up to date, ahead, or nothing known here: nothing to give back.
+    expect(entriesToRestore(log, log)).toBeNull();
+    expect(entriesToRestore(log, log.slice(0, 2))).toBeNull();
+    expect(entriesToRestore(log.slice(0, 1), null)).toBeNull();
+    // A deleted family (no log at all) stays deleted.
+    expect(entriesToRestore([], log)).toBeNull();
+    // Another history: not this phone's to fix.
+    const phoneC = device();
+    const other = push(created, phoneA, { type: 'add', deviceId: phoneC.id, keys: keysOf(phoneC.keys) });
+    expect(entriesToRestore(other, log)).toBeNull();
+  });
+
+  it("refuses old-key records written after a restore's backup", () => {
+    const floors = [{ epoch: 3, seq: 400 }];
+    expect(belowFloors(floors, 2, 400)).toBe(true);
+    expect(belowFloors(floors, 2, 401)).toBe(false);
+    expect(belowFloors(floors, 3, 9999)).toBe(true);
+    expect(belowFloors(undefined, 1, 9999)).toBe(true);
   });
 });
 

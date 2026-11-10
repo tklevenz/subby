@@ -50,6 +50,11 @@ export const CreateFamilySchema = z.object({
 
 /** POST /v1/families/me/log: adds, removes and recovery changes. Epochs go through /v1/keys/rotate. */
 export const AppendLogSchema = z.object({ entry: DeviceLogEntrySchema });
+/**
+ * POST /v1/families/me/log/restore: entries a phone verified that the server lost (restored from a backup), given
+ * back as they were signed, epochs included. They must continue the server's log.
+ */
+export const RestoreLogSchema = z.object({ entries: z.array(DeviceLogEntrySchema).min(1).max(1000) });
 
 // --- auth ---------------------------------------------------------------------------------------------
 
@@ -180,8 +185,17 @@ export const PushSchema = z.object({ records: z.array(SyncRecordSchema).min(1).m
 /** `stale`: the server has a newer version of these; `newer` carries those versions, so no full re-pull is needed. */
 export type PushResponse = { seq: number; accepted: string[]; stale: string[]; newer: PullResponse['records'] };
 
-/** GET /v1/sync/pull?since=<seq>&limit=<n> */
-export type PullResponse = { records: (z.infer<typeof SyncRecordSchema> & { seq: number })[]; seq: number; more: boolean };
+/**
+ * GET /v1/sync/pull?since=<seq>&limit=<n>. `seq` is the last record's, or with none the family's latest (lower than
+ * `since` when the server lost data). `restored`: the server was restored from a backup (`gen` counts restores,
+ * `seq` was the family's seq right after); a phone that saw an older `gen` syncs everything again.
+ */
+export type PullResponse = {
+  records: (z.infer<typeof SyncRecordSchema> & { seq: number })[];
+  seq: number;
+  more: boolean;
+  restored?: { gen: number; seq: number };
+};
 
 // --- push (hosted) -------------------------------------------------------------------------------------
 

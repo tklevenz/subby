@@ -17,11 +17,11 @@ import {
 } from '@subby/shared/crypto';
 import { sealRecord, type MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
-import { readPhotoBytes } from '../photos';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
 import { deviceIdentity, saveFamilyKeys } from './keystore';
 import { setUpBackgroundSync } from './background';
+import { uploadPhotosAsTheyAre } from './photos';
 import {
   forgetSession,
   openLive,
@@ -161,7 +161,8 @@ async function switchTo(
     await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
     await db.update(schema.logsTable).set({ syncStatus: 'pending' });
   }
-  const { move: _, pushToken: __, push: ___, ...kept } = settings;
+  // The old family's log copy, restore count and floors belong to the old server.
+  const { move: _, pushToken: __, push: ___, log: ____, restoreGen: _____, floors: ______, ...kept } = settings;
   forgetSession();
   quietNextRun();
   await useSettingsStore.getState().set('sync', {
@@ -188,38 +189,5 @@ async function leave(oldApi: SyncSession, entries: DeviceLogEntry[], me: { id: s
     await oldApi.request('POST', '/v1/families/me/log', { entry: appendEntry(state, latest.length, me, { type: 'remove', deviceId: me.id }, Date.now()) });
   } catch (e) {
     console.warn('[sync] couldn’t leave the old family', e);
-  }
-}
-
-/** Uploads every photo this phone has to the new server under its existing blob id and key, so records stay as they are. */
-async function uploadPhotosAsTheyAre(api: SyncSession, onProgress: (done: number) => void) {
-  const c = schema.childrenTable;
-  const l = schema.logsTable;
-  const children = await db
-    .select({ uri: c.photoUri, blob: c.photoBlob })
-    .from(c)
-    .where(and(eq(c.isDeleted, false), isNotNull(c.photoUri), isNotNull(c.photoBlob)));
-  const notes = await db
-    .select({ payload: l.payload })
-    .from(l)
-    .where(
-      and(
-        eq(l.logType, 'note'),
-        eq(l.isDeleted, false),
-        sql`json_extract(${l.payload}, '$.photoBlob') is not null`,
-        sql`json_extract(${l.payload}, '$.photoUri') is not null`,
-      ),
-    );
-  const photos = [
-    ...children.map((r) => ({ uri: r.uri!, blob: r.blob! })),
-    ...notes.flatMap(({ payload: p }) => (p.type === 'note' && p.photoUri && p.photoBlob ? [{ uri: p.photoUri, blob: p.photoBlob }] : [])),
-  ];
-  let done = 0;
-  for (const { uri, blob } of photos) {
-    const data = await readPhotoBytes(uri);
-    // A missing file: the entry moves without it, like any photo that never synced.
-    if (!data) continue;
-    await api.putBlob(blob.id, encryptFile(fromBase64(blob.key), data));
-    onProgress(++done);
   }
 }

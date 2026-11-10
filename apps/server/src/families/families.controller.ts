@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Post, Query, UseGuards } from '@nestjs/common';
-import { AppendLogSchema, CreateFamilySchema } from '@subby/shared/sync';
+import { AppendLogSchema, CreateFamilySchema, RestoreLogSchema } from '@subby/shared/sync';
 import type { DeviceLogEntry } from '@subby/shared/crypto';
 import { parse, queryInt } from '../common/validate';
-import { Auth, DeviceOrRecoveryGuard } from '../auth/auth.guard';
+import { Auth, DeviceGuard, DeviceOrRecoveryGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { FamiliesService } from './families.service';
 
@@ -28,6 +28,13 @@ export class FamiliesController {
   @UseGuards(DeviceOrRecoveryGuard)
   append(@Auth() auth: AuthContext, @Body() body: unknown) {
     return this.families.append(auth, parse(AppendLogSchema, body).entry as DeviceLogEntry);
+  }
+
+  /** A phone gives back log entries this server lost (restored from a backup). */
+  @Post('me/log/restore')
+  @UseGuards(DeviceGuard)
+  restore(@Auth() auth: AuthContext, @Body() body: unknown) {
+    return this.families.restore(auth, parse(RestoreLogSchema, body).entries as DeviceLogEntry[]);
   }
 
   /** Deletes the family and all its data from the server. Any member, or the recovery key (a family whose phones are lost). */
