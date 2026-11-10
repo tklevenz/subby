@@ -13,8 +13,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "baby.subby.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "baby.subby.app",
+      "appleTeamId": "L33LRKM2NX"
     },
     "android": {
       "adaptiveIcon": {
@@ -96,7 +97,8 @@
             ]
           }
         }
-      ]
+      ],
+      "./plugins/withSceneLifecycle"
     ],
     "experiments": {
       "typedRoutes": true
