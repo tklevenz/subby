@@ -112,7 +112,7 @@ These block tickets further down.
   - Left: the privacy policy (L1) saying deleted data leaves backups within ~3 months (photos 30 days).
 - [ ] **O3 Monitoring.** Uptime check on `/healthz`, disk and DB size alerts, a TLS expiry check. [S7]
   - Built 2026-11-11: Healthchecks.io as a dead man's switch. `monitor.sh` (systemd timer, every 5 min) checks `/healthz` through Caddy, the website, both certificates (≥ 14 days), disk (< 80 %) and the database, and reports ok or `/fail` with the reason (`HC_PING_SERVER`); no report alerts too. `backup.sh` reports start, success or failure (`HC_PING_BACKUP`, daily). Only status numbers leave the server. `ops-setup.sh` (was backup-setup.sh) installs both timers.
-  - Left: the backup check's ping URL, run `ops-setup.sh`, and see an alert arrive once (e.g. pause the server check).
+  - Running since 2026-11-10 (both checks reporting). Left: see an alert arrive once (pause `subby-monitor.timer` for 15 min).
 - [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `subby-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @subby/server smoke https://sync.subby.baby`.
 - [ ] **O5 Website** at `subby.baby` (designed separately): home, how Sync works, pricing, self-hosting, privacy, Impressum. Static, no trackers, self-hosted fonts, HSTS.
 - [ ] **O6 Email**: `support@subby.baby`, `privacy@` and `security@` (named in SECURITY.md), with SPF/DKIM/DMARC.
