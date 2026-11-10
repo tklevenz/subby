@@ -4,6 +4,9 @@ The six catalogs were drafted by a model, then reviewed on 2026-11-10 by an inde
 (each review.ts text translated back to English and compared). Those passes fixed 56–79 messages per language.
 What they could not settle, for the next pass (Gemini, or a native speaker):
 
+## Second pass (Gemini, 2026-11-10), applied
+- nl `feed.formula` → Kunstvoeding; fr `home.ago` → "plus tôt · …"; fr disclaimer "votre pédiatre ou votre médecin"; de disclaimer "deiner Kinderärztin oder deinem Kinderarzt"; the new-phone list is capitalized in code (every language).
+
 ## All languages
 - Generic masculine left where no `{name}` is involved (e.g. milestones "sits", "your child"); `{name}` texts were made neutral.
 - "Passphrase" is translated as the common word for password (Passwort, contraseña, mot de passe, wachtwoord, password, senha).
@@ -11,7 +14,6 @@ What they could not settle, for the next pass (Gemini, or a native speaker):
 
 ## German (de)
 - `feed.formula`: "Säuglingsmilch" vs "Pulvermilch"; `diaper.dirty`: "Voll" vs "groß"/"Stuhl".
-- `schedule.disclaimer`: "eurer Kinderärztin oder eurem Kinderarzt" (du/euer mix).
 - `editor.parent` "Eltern" next to "Selbst gegessen"; "Oma und Opa" replaced "die Großeltern" (tone).
 - `percentile.*`: "<0,1. Perzentile" for the lowest band.
 
@@ -22,8 +24,6 @@ What they could not settle, for the next pass (Gemini, or a native speaker):
 - Present perfect ("se ha dormido") leans Spain; Latin America prefers "se durmió".
 
 ## French (fr)
-- `home.ago` "écoulé · {detail}" under the big "2 h 15 min" on the tile: needs a wording that fits, checked on a device.
-- `schedule.disclaimer`: "pédiatre" alone, or "votre pédiatre ou médecin" (many babies are followed by a GP or PMI).
 - Diaper "Pipi / Selles" vs potty "pipi / caca"; "Abandonner" vs "Supprimer" for discarding a sleep.
 - "stores", "build de dev", "Galerie": fine in France, less so in Quebec.
 
@@ -34,7 +34,7 @@ What they could not settle, for the next pass (Gemini, or a native speaker):
 
 ## Dutch (nl)
 - "gezin" vs "familie" (grandparents' phones join too); "Aansluiten bij een gezin".
-- "Flesvoeding" vs Flemish "kunstvoeding"; `schedule.disclaimer` "een arts of het consultatiebureau" (Flanders: Kind en Gezin).
+- `schedule.disclaimer` "een arts of het consultatiebureau" (Flanders: Kind en Gezin).
 - Anglicisms "loggen", "item", "Up-to-date"; "wakkere periode", "Langste stuk".
 
 ## Portuguese, Brazil (pt-BR)

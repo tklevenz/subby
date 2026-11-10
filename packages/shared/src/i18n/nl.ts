@@ -65,7 +65,7 @@ export const nl: Translation = {
   'story.head': 'hoofd {length}',
   'story.firstSolids': 'Eerste vaste voeding: {foods}',
 
-  'feed.formula': 'Flesvoeding',
+  'feed.formula': 'Kunstvoeding',
   'feed.breastMilk': 'Moedermelk',
   'feed.bottle': 'Fles',
   'feed.bothSides': 'Beide kanten',

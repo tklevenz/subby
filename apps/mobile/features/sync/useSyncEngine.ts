@@ -1,4 +1,4 @@
-import { t } from '@subby/shared/i18n';
+import { getLocale, t } from '@subby/shared/i18n';
 import { useEffect } from 'react';
 import { Alert, AppState } from 'react-native';
 import { router } from 'expo-router';
@@ -43,7 +43,9 @@ export function useSyncEngine(ready: boolean) {
       useSyncStore.subscribe((s) => {
         if (s.phase !== 'idle' || !s.newDevices.length) return;
         const names = useSettingsStore.getState().sync?.names ?? {};
-        const list = s.newDevices.map((id) => names[id] ?? t('sync.newPhone.unnamed')).join(t('list.join'));
+        const joined = s.newDevices.map((id) => names[id] ?? t('sync.newPhone.unnamed')).join(t('list.join'));
+        // It may open the sentence ("a new phone can now…"): capitalized, in every language.
+        const list = joined.charAt(0).toLocaleUpperCase(getLocale()) + joined.slice(1);
         useSyncStore.setState({ newDevices: [] });
         Alert.alert(t('sync.newPhone.title'), t('sync.newPhone.body', { phones: list }), [
           { text: t('common.ok') },

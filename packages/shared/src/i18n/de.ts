@@ -522,7 +522,7 @@ export const de: Translation = {
   'schedule.typical': 'Typisch in diesem Alter: {range} wach zwischen den Schlafphasen.',
   'schedule.adjusted': 'An den Rhythmus von {name} aus den letzten 7 Tagen angepasst.',
   'schedule.personalize': 'Trag ein paar Tage Schlaf ein, um das anzupassen.',
-  'schedule.disclaimer': 'Nur Schätzungen. Achte auf die Müdigkeitszeichen deines Babys und sprich bei Schlafsorgen mit eurer Kinderärztin oder eurem Kinderarzt.',
+  'schedule.disclaimer': 'Nur Schätzungen. Achte auf die Müdigkeitszeichen deines Babys und sprich bei Schlafsorgen mit deiner Kinderärztin oder deinem Kinderarzt.',
   'schedule.wakeUp': 'Aufwachen',
   'schedule.nap': 'Nickerchen {n}',
   'schedule.since': 'seit {time}',
