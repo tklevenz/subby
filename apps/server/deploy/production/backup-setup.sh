@@ -51,7 +51,7 @@ echo "→ Bucket rules"
 # The AWS CLI reads the keys from the environment; .env is only read on the server and nothing is printed.
 ssh "$HOST" "cd $DIR && bash -s" <<'REMOTE'
 set -e
-  setting() { grep -m1 "^$1=" .env | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'(.*)'$/\1/' || true; }
+  setting() { grep -m1 "^$1=" .env | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/' || true; }
   aws() {
     docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION="$(setting S3_REGION)" \
       -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
