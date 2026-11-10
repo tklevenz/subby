@@ -21,6 +21,9 @@ export const ptBR: Translation = {
   'day.today': 'Hoje',
   'day.yesterday': 'Ontem',
   'day.tomorrow': 'Amanhã',
+  'day.todayInline': 'hoje',
+  'day.yesterdayInline': 'ontem',
+  'day.onDate': 'em {date}',
 
   'unit.mg': 'mg',
   'unit.ml': 'ml',

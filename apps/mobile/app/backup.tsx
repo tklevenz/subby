@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import type { BackupContents, RestorePlan } from '@subby/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
 import { Button, FieldLabel, TextField, ErrorText, Lead } from '../components/ui';
-import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
+import { formatDayInline, useFormatTime } from '../store/timeHelpers';
 import { SubLoader, SubProgress } from '../components/brand/loaders';
 import { ScreenScroll } from '../components/ScreenScroll';
 import { useChildStore } from '../store/useChildStore';
@@ -237,7 +237,7 @@ function Preview({
       <Text className="text-ink text-xl font-bold">{t('backup.restoreThis')}</Text>
       <Lead className="mt-2">
         {t('backup.madeAt', {
-          day: formatDayLabel(backup.createdAt).toLowerCase(),
+          day: formatDayInline(backup.createdAt),
           time: formatTime(backup.createdAt),
           children: count(backup.children.length, 'children'),
           entries: count(backup.logs.length, 'entries'),

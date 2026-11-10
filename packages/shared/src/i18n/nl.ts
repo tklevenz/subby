@@ -21,6 +21,9 @@ export const nl: Translation = {
   'day.today': 'Vandaag',
   'day.yesterday': 'Gisteren',
   'day.tomorrow': 'Morgen',
+  'day.todayInline': 'vandaag',
+  'day.yesterdayInline': 'gisteren',
+  'day.onDate': 'op {date}',
 
   'unit.mg': 'mg',
   'unit.ml': 'ml',

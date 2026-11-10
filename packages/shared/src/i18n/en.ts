@@ -29,6 +29,10 @@ export const en = {
   'day.today': 'Today',
   'day.yesterday': 'Yesterday',
   'day.tomorrow': 'Tomorrow',
+  /** A day inside a sentence ("Made {day} at 16:25"): lowercase today/yesterday, else the date. */
+  'day.todayInline': 'today',
+  'day.yesterdayInline': 'yesterday',
+  'day.onDate': 'on {date}',
 
   // Medication units (stored as these ids).
   'unit.mg': 'mg',

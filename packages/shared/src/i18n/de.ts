@@ -21,6 +21,9 @@ export const de: Translation = {
   'day.today': 'Heute',
   'day.yesterday': 'Gestern',
   'day.tomorrow': 'Morgen',
+  'day.todayInline': 'heute',
+  'day.yesterdayInline': 'gestern',
+  'day.onDate': 'am {date}',
 
   'unit.mg': 'mg',
   'unit.ml': 'ml',

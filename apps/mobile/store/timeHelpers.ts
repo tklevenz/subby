@@ -34,6 +34,15 @@ export function formatDayLabel(epochMs: number, now = Date.now()): string {
   });
 }
 
+/** A day inside a sentence: "today", "yesterday", else "on Sat, Oct 24" (never lowercased by hand). */
+export function formatDayInline(epochMs: number, now = Date.now()): string {
+  const day = startOfDay(epochMs);
+  if (day === startOfDay(now)) return t('day.todayInline');
+  if (day === addDays(startOfDay(now), -1)) return t('day.yesterdayInline');
+  const sameYear = new Date(epochMs).getFullYear() === new Date(now).getFullYear();
+  return t('day.onDate', { date: formatDate(epochMs, { weekday: 'short', day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' }) });
+}
+
 /** Local calendar date as YYYY-MM-DD. */
 export function toIsoDate(epochMs: number): string {
   const d = new Date(epochMs);

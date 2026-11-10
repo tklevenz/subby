@@ -21,6 +21,9 @@ export const it: Translation = {
   'day.today': 'Oggi',
   'day.yesterday': 'Ieri',
   'day.tomorrow': 'Domani',
+  'day.todayInline': 'oggi',
+  'day.yesterdayInline': 'ieri',
+  'day.onDate': 'il {date}',
 
   'unit.mg': 'mg',
   'unit.ml': 'ml',
