@@ -2,6 +2,7 @@ import type { Locale, Translation } from './index';
 import { de } from './de';
 import { es } from './es';
 import { fr } from './fr';
+import { it } from './it';
 import { nl } from './nl';
 
 /**
@@ -9,4 +10,4 @@ import { nl } from './nl';
  * `{placeholders}` and plurals where English has them (the `Translation` type and i18n.test.ts check both). The app
  * registers these at startup; until a language is here, it shows English.
  */
-export const TRANSLATIONS: Partial<Record<Exclude<Locale, 'en'>, Translation>> = { de, es, fr, nl };
+export const TRANSLATIONS: Partial<Record<Exclude<Locale, 'en'>, Translation>> = { de, es, fr, it, nl };
