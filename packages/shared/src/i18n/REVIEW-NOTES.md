@@ -7,15 +7,13 @@ What they could not settle, for the next pass (Gemini, or a native speaker):
 ## Second pass (Gemini, 2026-11-10), applied
 - nl `feed.formula` → Kunstvoeding; fr `home.ago` → "plus tôt · …"; fr disclaimer "votre pédiatre ou votre médecin"; de disclaimer "deiner Kinderärztin oder deinem Kinderarzt"; the new-phone list is capitalized in code (every language).
 
+## Settled by the user (2026-11-10)
+- German and Dutch: reviewed by the user, nothing left open. Dutch keeps "gezin" and the anglicisms (loggen, item, Up-to-date).
+
 ## All languages
 - Generic masculine left where no `{name}` is involved (e.g. milestones "sits", "your child"); `{name}` texts were made neutral.
 - "Passphrase" is translated as the common word for password (Passwort, contraseña, mot de passe, wachtwoord, password, senha).
 - `sync.newPhone.body`: `{phones}` can be a list of names; check the verb reads right with one and with two phones.
-
-## German (de)
-- `feed.formula`: "Säuglingsmilch" vs "Pulvermilch"; `diaper.dirty`: "Voll" vs "groß"/"Stuhl".
-- `editor.parent` "Eltern" next to "Selbst gegessen"; "Oma und Opa" replaced "die Großeltern" (tone).
-- `percentile.*`: "<0,1. Perzentile" for the lowest band.
 
 ## Spanish (es)
 - "Toca" for a due dose (`home.dueAt`, `home.dueTomorrow`) is colloquial; "Próxima: a las {time}" may read better in Latin America.
@@ -31,11 +29,6 @@ What they could not settle, for the next pass (Gemini, or a native speaker):
 - "Veglia" / "in veglia" replaced "sveglio" (gender); a bit formal, generic masculine is the alternative.
 - `home.dueAt` / `home.dueTomorrow` "Alle {time}" next to the drug name: does it read as the next dose's time?
 - Terms: "Fortificato", "Circonferenza cranica", "Estrazione" vs "Tiralatte", "Pappa/Pappe" for solids; Subby treated as feminine.
-
-## Dutch (nl)
-- "gezin" vs "familie" (grandparents' phones join too); "Aansluiten bij een gezin".
-- `schedule.disclaimer` "een arts of het consultatiebureau" (Flanders: Kind en Gezin).
-- Anglicisms "loggen", "item", "Up-to-date"; "wakkere periode", "Langste stuk".
 
 ## Portuguese, Brazil (pt-BR)
 - `feedSheet.fortified` "Enriquecido" vs "aditivado"; "Extração" vs "ordenha"; "Tempo de bruços" vs "tummy time".
