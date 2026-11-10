@@ -47,7 +47,7 @@ export default function ScheduleScreen() {
             {/* The likely time, then the window to put down in; the suggested day below shows the nap itself. */}
             <Text className="text-ink text-2xl font-semibold mt-1">{t('schedule.around', { time: formatTime((next.earliest + next.latest) / 2) })}</Text>
             <Text className="text-ink-soft text-sm mt-0.5">
-              between {formatTime(next.earliest)} and {formatTime(next.latest)}
+              {t('schedule.between', { from: formatTime(next.earliest), to: formatTime(next.latest) })}
             </Text>
             <Text className="text-ink-muted text-xs mt-1">
               {t('schedule.awakeSince', {

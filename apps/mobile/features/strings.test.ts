@@ -30,6 +30,8 @@ const ENGLISH = new Set<string>(['../features/diagnostics.ts']);
 // lowercase letter ("Save", "Log a sleep", 'Bedtime'). Lines ending in `// i18n-ignore` are left alone.
 const JSX_TEXT = /(?<![=\-])>\s*([A-Za-z][^<>{}]*[A-Za-z.!?…:),·–-])\s*(?=[<{])/g;
 const QUOTED = /(['"`])([A-Z][A-Za-z'’]*(?: [^'"`\n]+)|[A-Z][a-z]+)\1/g;
+// A JSX text line that starts lowercase, before an expression ("between {a} and {b}").
+const BARE_TEXT = /^\s+([a-z][a-z’']+(?: [a-z’']+)* \{)/;
 // Not for people: component and type names, ids, header keys, log levels.
 const ALLOWED = /^(React|View|Text|Pressable|Platform|Authorization|Bearer .*|Content-Type|GET|PUT|POST|DELETE|OK|Subby|Subby Sync|Fredoka.*|Inter.*)$/;
 
@@ -40,6 +42,8 @@ export function untranslated(src: string): string[] {
     // Strings inside t(…) calls are keys, not text.
     const code = line.replace(/\bt\(\s*'[^']*'/g, "t(''");
     for (const m of code.matchAll(JSX_TEXT)) if (!ALLOWED.test(m[1])) hits.push(m[1]);
+    const bare = BARE_TEXT.exec(code);
+    if (bare && !/^\s*(return|const|let|if|else|case|export|import|type|function|await|try|finally|do|async)\b/.test(code)) hits.push(bare[1]);
     for (const m of code.matchAll(QUOTED)) if (!ALLOWED.test(m[2])) hits.push(m[2]);
   }
   return hits;
