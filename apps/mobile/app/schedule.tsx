@@ -33,12 +33,13 @@ export default function ScheduleScreen() {
   const { next, schedule } = data;
   const asleep = logs?.some((l) => l.endedAt === null);
   const { norms } = schedule;
+  const wakeRange = `${formatHoursMinutes(norms.wakeMin * 60_000)}–${formatHoursMinutes(norms.wakeMax * 60_000)}`;
 
   return (
     <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <View className="bg-violet/10 border border-violet/40 rounded-2xl p-4">
         <Text className="text-violet-pale text-xs font-medium">
-          {next ? (next.kind === 'bedtime' ? 'Bedtime' : `Next nap`) : 'Next sleep'}
+          {next?.kind === 'bedtime' ? 'Bedtime' : next?.kind === 'nap' ? 'Next nap' : 'Next sleep'}
         </Text>
         {next ? (
           <>
@@ -54,24 +55,43 @@ export default function ScheduleScreen() {
           </>
         ) : (
           <Text className="text-ink-soft mt-1">
-            {asleep ? `${child.name} is asleep.` : 'Log a sleep to get a prediction for the next one.'}
+            {asleep
+              ? `${child.name} is asleep.`
+              : logs?.length
+                ? 'Log the latest sleep to see when the next one is likely.'
+                : 'Log a sleep to get a prediction for the next one.'}
           </Text>
         )}
       </View>
 
       <SectionLabel>Suggested day</SectionLabel>
-      <View className="bg-surface border border-line rounded-2xl px-4 py-1">
-        {schedule.items.map((item, i) => (
-          <ItemRow key={i} item={item} now={now} formatTime={formatTime} />
-        ))}
-      </View>
+      {schedule.planned ? (
+        <View className="bg-surface border border-line rounded-2xl px-4 py-1">
+          {schedule.items.map((item, i) => (
+            <ItemRow key={i} item={item} now={now} formatTime={formatTime} />
+          ))}
+        </View>
+      ) : (
+        // Under 3 months, until nights are logged: no planned day (it would end in a mid-afternoon "bedtime").
+        <View className="bg-surface border border-line rounded-2xl p-4">
+          <Text className="text-ink-soft leading-5">
+            Newborns don't keep a schedule yet: days and nights sort themselves out over the first months. Offer sleep
+            after {wakeRange} awake, or sooner when {child.name} looks sleepy.
+          </Text>
+          <Text className="text-ink-muted text-sm mt-2 leading-5">
+            Once a few nights are logged, a suggested day appears here, planned around {child.name}'s own bedtime.
+          </Text>
+        </View>
+      )}
 
       <Text className="text-ink-faint text-xs mt-4 leading-5">
-        Typical at this age: {norms.naps} nap{norms.naps === 1 ? '' : 's'} a day, awake{' '}
-        {formatHoursMinutes(norms.wakeMin * 60_000)}–{formatHoursMinutes(norms.wakeMax * 60_000)} between sleeps.{' '}
+        Typical at this age: {schedule.planned && norms.bedtime !== null ? `${norms.naps} nap${norms.naps === 1 ? '' : 's'} a day, awake` : 'awake'}{' '}
+        {wakeRange} between sleeps.{' '}
         {schedule.basis === 'personal'
           ? `Adjusted towards ${child.name}'s own rhythm from the last 7 days.`
-          : 'Log a few days of sleep to personalize this.'}
+          : schedule.planned
+            ? 'Log a few days of sleep to personalize this.'
+            : ''}
       </Text>
       <Text className="text-ink-ghost text-xs mt-2 leading-5">
         Estimates only. Follow your baby's sleepy cues, and talk to your pediatrician about sleep concerns.

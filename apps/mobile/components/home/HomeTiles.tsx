@@ -174,6 +174,8 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
     } else if (prediction?.kind === 'nap') {
       lines.push(`Down for nap ${prediction.napIndex + 1} around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
       if (prediction.napMinutes) lines.push(`Naps usually ~${formatHoursMinutes(prediction.napMinutes * 60_000)}`);
+    } else if (prediction?.kind === 'sleep') {
+      lines.push(`Next sleep around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
     } else if (prediction) {
       lines.push(`Bedtime around ${formatTime(prediction.earliest)}–${formatTime(prediction.latest)}`);
     }

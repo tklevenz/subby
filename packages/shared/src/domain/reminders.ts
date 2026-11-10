@@ -162,7 +162,7 @@ export function planReminders(input: {
 
     if (settings.nap.enabled && c.nextSleep) {
       const s = c.nextSleep;
-      const what = s.kind === 'bedtime' ? 'Bedtime' : 'Nap window';
+      const what = s.kind === 'bedtime' ? 'Bedtime' : s.kind === 'sleep' ? 'Sleep window' : 'Nap window';
       add({
         id: `${REMINDER_ID_PREFIX}nap:${c.id}`,
         at: s.earliest - settings.nap.leadMin * 60_000,

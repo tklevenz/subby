@@ -18,25 +18,44 @@ export type AgeNorms = {
   naps: number;
   /** Typical nap length, minutes. */
   napLength: number;
+  /**
+   * Typical bedtime, minutes after midnight: the day's plan ends there until the baby's own bedtime is known.
+   * null under 3 months: newborns don't keep a schedule yet (no planned day, no bedtime, just the next sleep).
+   */
+  bedtime: number | null;
 };
+
+const BED = 19.5 * 60;
 
 /** Common pediatric sleep guidance; a starting point, not a rule. Upper bound in months (exclusive). */
 const AGE_NORMS: [maxMonths: number, norms: AgeNorms][] = [
-  [1, { wakeMin: 35, wakeMax: 60, naps: 5, napLength: 45 }],
-  [3, { wakeMin: 60, wakeMax: 90, naps: 4, napLength: 60 }],
-  [5, { wakeMin: 75, wakeMax: 120, naps: 4, napLength: 60 }],
-  [7, { wakeMin: 120, wakeMax: 150, naps: 3, napLength: 75 }],
-  [9, { wakeMin: 135, wakeMax: 180, naps: 2, napLength: 90 }],
-  [12, { wakeMin: 150, wakeMax: 210, naps: 2, napLength: 90 }],
-  [15, { wakeMin: 180, wakeMax: 240, naps: 2, napLength: 90 }],
-  [18, { wakeMin: 240, wakeMax: 330, naps: 1, napLength: 120 }],
-  [24, { wakeMin: 300, wakeMax: 360, naps: 1, napLength: 120 }],
-  [Infinity, { wakeMin: 330, wakeMax: 390, naps: 1, napLength: 105 }],
+  [1, { wakeMin: 35, wakeMax: 60, naps: 5, napLength: 45, bedtime: null }],
+  [3, { wakeMin: 60, wakeMax: 90, naps: 4, napLength: 60, bedtime: null }],
+  [5, { wakeMin: 75, wakeMax: 120, naps: 4, napLength: 60, bedtime: BED }],
+  [7, { wakeMin: 120, wakeMax: 150, naps: 3, napLength: 75, bedtime: BED }],
+  [9, { wakeMin: 135, wakeMax: 180, naps: 2, napLength: 90, bedtime: BED }],
+  [12, { wakeMin: 150, wakeMax: 210, naps: 2, napLength: 90, bedtime: BED }],
+  [15, { wakeMin: 180, wakeMax: 240, naps: 2, napLength: 90, bedtime: BED }],
+  [18, { wakeMin: 240, wakeMax: 330, naps: 1, napLength: 120, bedtime: BED }],
+  [24, { wakeMin: 300, wakeMax: 360, naps: 1, napLength: 120, bedtime: BED }],
+  [Infinity, { wakeMin: 330, wakeMax: 390, naps: 1, napLength: 105, bedtime: BED }],
 ];
 
 export function ageNorms(months: number): AgeNorms {
   return AGE_NORMS.find(([max]) => months < max)![1];
 }
+
+/**
+ * The bedtime a day is planned towards: the baby's own (last 7 days), else the age norm; null for a newborn whose
+ * nights aren't logged yet, who gets no planned day.
+ */
+const planBedtime = (habits: SleepHabits, norms: AgeNorms) => habits.bedtimeClock ?? norms.bedtime;
+
+/**
+ * Naps in a day: the baby's own count, else the age norm. Under 3 months (no norm bedtime) as many as fit before
+ * bedtime: newborns sleep on and off all day, so a low logged count means naps went unlogged.
+ */
+const plannedNaps = (habits: SleepHabits, norms: AgeNorms) => (norms.bedtime === null ? Infinity : (habits.napsPerDay ?? norms.naps));
 
 
 const median = (xs: number[]) => {
@@ -191,7 +210,8 @@ export function defaultNap(logs: LogEntry[], t: number): boolean {
 }
 
 export type SleepPrediction = {
-  kind: 'nap' | 'bedtime';
+  /** 'sleep': a newborn without a planned day (no nap count, no bedtime), only the next sleep. */
+  kind: 'nap' | 'bedtime' | 'sleep';
   earliest: number;
   latest: number;
   /** 'personal' when the baby's own history shaped it, else age-based. */
@@ -210,6 +230,13 @@ function blend(personal: number | null | undefined, norms: AgeNorms): { center: 
   const c = personal * 0.7 + ageMid * 0.3;
   return { center: Math.min(Math.max(c, norms.wakeMin * 0.75), norms.wakeMax * 1.25), personal: true };
 }
+
+/**
+ * A nap starting at `start` is too late for the day: it starts within 90 min of bedtime, or ends without at least
+ * the shortest wake window (×0.75, the same floor bedtime uses) left before it.
+ */
+const napRunsIntoBedtime = (start: number, napMinutes: number, bedtime: number, norms: AgeNorms) =>
+  start > bedtime - 90 * MIN || start + (napMinutes + norms.wakeMin * 0.75) * MIN > bedtime;
 
 /** Clock time (minutes after midnight, may exceed 24 h) on the day of `ref`. */
 const atClock = (ref: number, minutes: number) => {
@@ -243,7 +270,8 @@ export function isNightWaking(logs: LogEntry[], now: number): boolean {
 
 /**
  * When the baby will likely be ready for the next sleep, or null while asleep / without a
- * recent wake-up. `logs` needs at least the last 7 days of sleep.
+ * recent wake-up. `logs` needs at least the last 7 days of sleep. Bedtime is the baby's usual one, else the age
+ * norm's; a newborn without logged nights gets `kind: 'sleep'` (no nap count or bedtime).
  */
 export function predictNextSleep(
   logs: LogEntry[],
@@ -271,30 +299,46 @@ export function predictNextSleep(
     if (i > 0 && sorted[i].startedAt - sorted[i - 1].endedAt! > 10 * H) break;
   }
 
-  const napsPerDay = habits.napsPerDay ?? norms.naps;
+  const napsPerDay = plannedNaps(habits, norms);
   const nap = blend(habits.napWindows.get(napIndex), norms);
   const napStart = wakeAt + nap.center * MIN;
-  const bedtimeClock = habits.bedtimeClock !== null ? atClock(wakeAt, habits.bedtimeClock) : null;
+  const bedClock = planBedtime(habits, norms);
+  const bedtimeClock = bedClock !== null ? atClock(wakeAt, bedClock) : null;
 
   const half = nap.personal ? RANGE_MIN : (norms.wakeMax - norms.wakeMin) / 2;
+  const napMinutes = habits.napLengths.get(napIndex) ?? habits.napLength ?? norms.napLength;
+
+  // A newborn without a planned day: just the next sleep, until its window has passed (slept unlogged, most likely).
+  if (bedtimeClock === null) {
+    if (napStart + (half + 30) * MIN < now) return null;
+    return {
+      kind: 'sleep',
+      earliest: napStart - half * MIN,
+      latest: napStart + half * MIN,
+      basis: nap.personal ? 'personal' : 'age',
+      wakeAt,
+      napIndex,
+      napMinutes,
+    };
+  }
 
   // Bedtime once the day's naps are done, when a nap would run into the usual bedtime, or
   // when the nap window has already passed (skipped, or not logged).
-  const isBedtime =
-    napIndex >= napsPerDay ||
-    (bedtimeClock !== null && napStart > bedtimeClock - 90 * MIN) ||
-    napStart + (half + 30) * MIN < now;
+  const passed = napStart + (half + 30) * MIN < now;
+  // Under 3 months a passed window means naps go unlogged, not that the day's are done: nothing until bedtime is next.
+  if (passed && norms.bedtime === null && !napRunsIntoBedtime(now + nap.center * MIN, napMinutes, bedtimeClock, norms)) return null;
+  const isBedtime = napIndex >= napsPerDay || napRunsIntoBedtime(napStart, napMinutes, bedtimeClock, norms) || passed;
 
   if (isBedtime) {
     const bed = blend(habits.bedtimeWindow, norms);
     const byWindow = wakeAt + bed.center * MIN;
     // Prefer the usual bedtime (naps may simply not be logged), unless it leaves too short a window.
-    const center = bedtimeClock !== null && bedtimeClock - wakeAt >= norms.wakeMin * 0.75 * MIN ? bedtimeClock : byWindow;
+    const center = bedtimeClock - wakeAt >= norms.wakeMin * 0.75 * MIN ? bedtimeClock : byWindow;
     return {
       kind: 'bedtime',
       earliest: center - RANGE_MIN * MIN,
       latest: center + RANGE_MIN * MIN,
-      basis: bed.personal || bedtimeClock !== null ? 'personal' : 'age',
+      basis: bed.personal || habits.bedtimeClock !== null ? 'personal' : 'age',
       wakeAt,
       napIndex,
       napMinutes: null,
@@ -308,7 +352,7 @@ export function predictNextSleep(
     basis: nap.personal ? 'personal' : 'age',
     wakeAt,
     napIndex,
-    napMinutes: habits.napLengths.get(napIndex) ?? habits.napLength ?? norms.napLength,
+    napMinutes,
   };
 }
 
@@ -321,15 +365,19 @@ export type ScheduleItem =
 /**
  * A suggested day: morning wake-up, naps and bedtime. Uses what today already logged (the wake-up, naps so far,
  * bedtime once it started) and predicts the rest from there; without a logged wake-up, the usual one (or 07:00).
+ * Towards the usual bedtime, else the age norm's. A newborn without logged nights gets no plan (`planned: false`).
  */
 export function suggestedSchedule(
   logs: LogEntry[],
   child: Pick<Child, 'birthDate'>,
   now: number,
-): { items: ScheduleItem[]; basis: 'age' | 'personal'; norms: AgeNorms } {
+): { items: ScheduleItem[]; basis: 'age' | 'personal'; norms: AgeNorms; planned: boolean } {
   const norms = ageNorms(growthAgeMonths(child, now));
   const habits = sleepHabits(logs, now);
   const today = startOfDay(now);
+  const bedClock = planBedtime(habits, norms);
+  // A newborn whose nights aren't logged yet: no planned day.
+  if (bedClock === null) return { items: [], basis: basis(habits), norms, planned: false };
 
   // Today's logged wake-up, unless the night may not be over: awake in the night, or back asleep since.
   const usualWake = habits.wakeClock ?? 7 * 60;
@@ -340,7 +388,7 @@ export function suggestedSchedule(
   const wakeLogged = night !== undefined && !backAsleep && !stillNight(night, now, habits.wakeClock);
   const wake = wakeLogged ? night.endedAt! : atClock(today, usualWake);
   const napLength = (i: number) => (habits.napLengths.get(i) ?? norms.napLength) * MIN;
-  const usualBedtime = habits.bedtimeClock !== null ? atClock(today, habits.bedtimeClock) : null;
+  const usualBedtime = atClock(today, bedClock);
 
   const items: ScheduleItem[] = [{ kind: 'wake', at: wake, ...(wakeLogged ? { logged: true as const } : {}) }];
   let t = wake;
@@ -350,7 +398,7 @@ export function suggestedSchedule(
   for (const s of logged) {
     if (!isNap(s)) {
       items.push({ kind: 'bedtime', at: s.startedAt, logged: true });
-      return { items, basis: basis(habits), norms };
+      return { items, basis: basis(habits), norms, planned: true };
     }
     const running = s.endedAt === null;
     const end = running ? Math.max(now, s.startedAt + napLength(index)) : s.endedAt!;
@@ -360,17 +408,17 @@ export function suggestedSchedule(
   }
 
   // The rest of the day, from the last wake-up. A nap that would run into the usual bedtime is left out.
-  const napsPerDay = habits.napsPerDay ?? norms.naps;
+  const napsPerDay = plannedNaps(habits, norms);
   for (; index < napsPerDay; index++) {
     const start = t + blend(habits.napWindows.get(index), norms).center * MIN;
-    if (usualBedtime !== null && start > usualBedtime - 90 * MIN) break;
+    if (napRunsIntoBedtime(start, napLength(index) / MIN, usualBedtime, norms)) break;
     const end = start + napLength(index);
     items.push({ kind: 'nap', start, end, index });
     t = end;
   }
   const byWindow = t + blend(habits.bedtimeWindow, norms).center * MIN;
-  items.push({ kind: 'bedtime', at: usualBedtime !== null && usualBedtime - t >= norms.wakeMin * 0.75 * MIN ? usualBedtime : byWindow });
-  return { items, basis: basis(habits), norms };
+  items.push({ kind: 'bedtime', at: usualBedtime - t >= norms.wakeMin * 0.75 * MIN ? usualBedtime : byWindow });
+  return { items, basis: basis(habits), norms, planned: true };
 }
 
 const basis = (habits: SleepHabits): 'age' | 'personal' =>

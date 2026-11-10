@@ -164,6 +164,52 @@ describe('suggestedSchedule', () => {
   });
 });
 
+describe('newborns', () => {
+  const newborn = { birthDate: '2026-10-20' };
+  const firstNight = [entry({ type: 'sleep', nap: false }, at(-1, 22), at(0, 7))];
+
+  it('get no planned day or bedtime until nights are logged, only the next sleep', () => {
+    expect(suggestedSchedule(firstNight, newborn, at(0, 7, 30))).toMatchObject({ items: [], planned: false });
+    const n = ageNorms(0);
+    expect(predictNextSleep(firstNight, newborn, at(0, 7, 30))).toMatchObject({
+      kind: 'sleep', basis: 'age', earliest: at(0, 7) + n.wakeMin * MIN, latest: at(0, 7) + n.wakeMax * MIN,
+    });
+    // Never "bedtime" in the afternoon: once the window has passed (slept unlogged, most likely), nothing.
+    expect(predictNextSleep(firstNight, newborn, at(0, 15, 30))).toBeNull();
+  });
+
+  it('get a day filled with naps up to their own bedtime once nights are logged', () => {
+    const logs = [-3, -2, -1, 0].map((d) => entry({ type: 'sleep', nap: false }, at(d - 1, 21), at(d, 7)));
+    const { items, planned } = suggestedSchedule(logs, newborn, at(0, 7, 30));
+    expect(planned).toBe(true);
+    expect(items.at(-1)).toEqual({ kind: 'bedtime', at: at(0, 21) });
+    // 47.5 min awake + 45 min nap, from 07:00, while a nap starts before 19:30.
+    expect(items.filter((i) => i.kind === 'nap')).toHaveLength(8);
+  });
+
+  it("don't jump to bedtime in the afternoon when naps go unlogged", () => {
+    const fiveWeeks = { birthDate: '2026-09-15' };
+    const logs = [-3, -2, -1, 0].map((d) => entry({ type: 'sleep', nap: false }, at(d - 1, 21), at(d, 7)));
+    expect(predictNextSleep(logs, fiveWeeks, at(0, 16, 30))).toBeNull();
+    expect(predictNextSleep(logs, fiveWeeks, at(0, 18, 45))).toMatchObject({ kind: 'bedtime', earliest: at(0, 20, 30) });
+    // The last nap leaves a wake window before the usual bedtime, which stays the plan's end.
+    const { items } = suggestedSchedule(logs, fiveWeeks, at(0, 8));
+    expect(items.at(-1)).toEqual({ kind: 'bedtime', at: at(0, 21) });
+    const last = items.at(-2)!;
+    expect(last.kind === 'nap' && at(0, 21) - last.end).toBeGreaterThanOrEqual(45 * MIN);
+  });
+});
+
+describe('without history', () => {
+  it('plans towards a typical bedtime from 3 months', () => {
+    const fourMonths = { birthDate: '2026-06-20' };
+    const { items, planned } = suggestedSchedule([], fourMonths, at(0, 8));
+    expect(planned).toBe(true);
+    expect(items.map((i) => i.kind)).toEqual(['wake', 'nap', 'nap', 'nap', 'nap', 'bedtime']);
+    expect(items.at(-1)).toEqual({ kind: 'bedtime', at: at(0, 19, 30) });
+  });
+});
+
 describe('night wakings', () => {
   it('treats night sleep logged in pieces as one night', () => {
     const logs = week(7).flatMap((l) => {
