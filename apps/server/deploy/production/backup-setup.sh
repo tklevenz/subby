@@ -58,7 +58,7 @@ ssh "$HOST" 'set -e; cd '"$DIR"'
   }
   rule() { echo "{\"ID\":\"$1\",\"Status\":\"Enabled\",\"Filter\":{\"Prefix\":\"$1/\"},\"Expiration\":{\"Days\":$2}}"; }
 
-  export AWS_ACCESS_KEY_ID=$(setting S3_BACKUP_ACCESS_KEY) AWS_SECRET_ACCESS_KEY=$(setting S3_BACKUP_SECRET_ACCESS_KEY)
+  export AWS_ACCESS_KEY_ID=$(setting S3_BACKUP_ACCESS_KEY_ID) AWS_SECRET_ACCESS_KEY=$(setting S3_BACKUP_SECRET_ACCESS_KEY)
   aws s3api put-bucket-lifecycle-configuration --bucket "$(setting S3_BACKUP_BUCKET)" \
     --lifecycle-configuration "{\"Rules\":[$(rule daily 8),$(rule weekly 36),$(rule monthly 95)]}"
   echo "  backup bucket: lifecycle set"
