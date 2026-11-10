@@ -5,7 +5,8 @@
 #   apps/server/deploy/production/deploy.sh --rollback  start the previous image again
 #
 # - The image is built here (linux/amd64), tagged with the commit, and loaded on the server: nothing builds there.
-# - Before switching, the database is dumped to /opt/subby/backups/pre-<tag>.sql.gz.
+# - Before switching, the database is dumped to /opt/subby/backups/pre-<tag>.sql.gz (the last 10, at most 30 days:
+#   they're unencrypted, so deleted data mustn't linger). The nightly encrypted backups are backup.sh's.
 # - The server runs its migrations itself at start. Migrations only go forward: a rollback runs the old code
 #   on the new schema, which is fine as long as migrations only add (keep it that way), otherwise restore the dump.
 set -euo pipefail
@@ -57,7 +58,8 @@ docker save "subby-sync:$tag" | gzip | ssh "$HOST" 'gunzip | docker load'
 
 echo "→ Installing compose file and Caddyfile"
 caddyfile_before=$(remote "sha256sum Caddyfile 2>/dev/null | cut -d' ' -f1" || true)
-scp -q "$HERE/docker-compose.yml" "$HERE/Caddyfile" "$HOST:$DIR/"
+scp -q "$HERE/docker-compose.yml" "$HERE/Caddyfile" "$HERE/backup.sh" "$HOST:$DIR/"
+remote "chmod 0700 backup.sh"
 remote "install -d -m 0755 site"
 
 # The tag running now becomes the rollback target, and the database is dumped before anything changes.
@@ -68,7 +70,8 @@ remote "install -d -m 0700 backups
     docker compose exec -T db pg_dump -U subby subby | gzip > backups/pre-$tag.sql.gz
     echo '→ Database dumped to backups/pre-$tag.sql.gz'
   fi
-  ls -1t backups/pre-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm --"
+  ls -1t backups/pre-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm --
+  find backups -name 'pre-*.sql.gz' -mtime +30 -delete"
 
 start "$tag"
 # Caddy reads its Caddyfile only at start (its admin API is off), so a changed one needs a restart.

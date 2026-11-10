@@ -240,6 +240,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 - **Code conventions:**
   - No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
   - `lockFamily(tx, id)` serializes writes per family.
+- **Production backups** (`deploy/production`, LAUNCH.md O2): `backup.sh` (nightly systemd timer on the server) streams `pg_dump -Fc | age` to the `S3_BACKUP_BUCKET` (daily/weekly/monthly prefixes, deleted by the bucket's lifecycle after 8/36/95 days; the script never deletes); the server only has the age public key. `backup-setup.sh` (run from the Mac) installs it and sets the bucket rules (photo bucket: versioning, 30 days); `restore-test.sh` restores into a throwaway Postgres on the Mac with `~/subby-backup.key`. Backup retention is what the privacy policy promises; change both together.
 - **Single-instance assumptions:** auth challenges, rate limits and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
 - **Housekeeping** (`common/housekeeping.ts`, hourly): deletes expired sessions and invites more than a day past expiry.
 - **Shutdown:** Fastify runs with `forceCloseConnections: true`, and `LiveGateway` terminates its sockets on destroy. Otherwise a connection that never sent a request (or a closing WebSocket) holds a restart for up to the 60 s header timeout; that was the flaky e2e teardown.

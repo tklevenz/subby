@@ -106,6 +106,8 @@ These block tickets further down.
   - Server + Postgres + blob storage at `sync.subby.baby`, Caddy with HTTPS and HSTS, `HTTP_BIND=127.0.0.1`.
   - The production Firebase service-account key in `./secrets`. [D8]
 - [ ] **O2 Backups.** Nightly Postgres dumps and blob storage versioning, kept off the host, encrypted. **Do a test restore before launch.**
+  - Built 2026-11-10 (`apps/server/deploy/production`): `backup.sh` (systemd timer, 03:30 UTC) streams `pg_dump -Fc` through `age` (public key only on the server; the private key is offline with the owner) into the `subby-backups` bucket: daily/ (8 days), weekly/ (36), monthly/ (95) via bucket lifecycle rules; `backups/last-backup` for O3. Photo bucket: versioning, old versions expire after 30 days. Pre-deploy dumps (unencrypted, on the host) are kept 10 deploys, at most 30 days. `backup-setup.sh` installs it all; `restore-test.sh` restores into a throwaway Postgres on the Mac and compares row counts with production.
+  - Left: run `backup-setup.sh`, a test restore, and the privacy policy (L1) saying deleted data leaves backups within ~3 months (photos 30 days).
 - [ ] **O3 Monitoring.** Uptime check on `/healthz`, disk and DB size alerts, a TLS expiry check. [S7]
 - [x] **O4 Deploy procedure.** `apps/server/deploy/production/deploy.sh`: builds the commit as `subby-sync:<sha>`, ships it, dumps the database, starts, waits for `/healthz`; `--rollback`. Then `pnpm --filter @subby/server smoke https://sync.subby.baby`.
 - [ ] **O5 Website** at `subby.baby` (designed separately): home, how Sync works, pricing, self-hosting, privacy, Impressum. Static, no trackers, self-hosted fonts, HSTS.
