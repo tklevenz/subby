@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Nightly backup of the official server's database (LAUNCH.md O2). Lives in /opt/subby next to .env; a systemd timer
-# runs it (backup-setup.sh installs both). It never sees a decryption key:
+# runs it (ops-setup.sh installs both). It never sees a decryption key:
 #   backup.sh               dump the database, encrypt it to the age public key below, upload it to S3_BACKUP_BUCKET
 #   backup.sh --list        list the backups in the bucket
 #   backup.sh --cat <path>  print one (still encrypted) to stdout, for restore-test.sh on the Mac
 #
 # - pg_dump in custom format (compressed), encrypted with age, streamed to the bucket: nothing readable touches the disk.
 # - Every night goes to daily/, Sundays also to weekly/, the 1st of a month also to monthly/. The bucket's lifecycle
-#   rules (backup-setup.sh) delete them after 8, 36 and 95 days; this script deletes nothing. So data a family
+#   rules (ops-setup.sh) delete them after 8, 36 and 95 days; this script deletes nothing. So data a family
 #   deleted is gone from backups after at most ~3 months (the privacy policy says so).
-# - On success it writes backups/last-backup (UTC time and size) for monitoring (O3).
+# - On success it writes backups/last-backup (UTC time and size) and reports to Healthchecks.io (HC_PING_BACKUP,
+#   LAUNCH.md O3), which emails when a run fails or none arrives for a day.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -44,6 +45,12 @@ case ${1:-} in
   *) echo "Usage: backup.sh [--list | --cat <path>]" >&2; exit 1 ;;
 esac
 
+# Healthchecks.io: start, then success or failure (a missing report alerts too).
+hc=$(setting HC_PING_BACKUP)
+report() { [[ -z $hc ]] || curl -fsS --max-time 10 --retry 3 -o /dev/null --data-raw "${2:-}" "$hc$1" || true; }
+trap 'rc=$?; (( rc == 0 )) || report /fail "backup failed (exit $rc)"' EXIT
+report /start
+
 name=subby-$(date -u +%Y-%m-%dT%H%MZ).dump.age
 target=daily/$name
 echo "→ Backing up to $target"
@@ -63,3 +70,4 @@ size=$(rclone size --json "$remote/$target" | sed -E 's/.*"bytes":([0-9]+).*/\1/
 install -d -m 0700 backups
 echo "$(date -u +%FT%TZ) $target $size" > backups/last-backup
 echo "✓ $target ($size bytes)"
+report "" "$target, $size bytes"

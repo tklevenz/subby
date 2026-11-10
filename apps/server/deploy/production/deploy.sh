@@ -58,8 +58,8 @@ docker save "subby-sync:$tag" | gzip | ssh "$HOST" 'gunzip | docker load'
 
 echo "→ Installing compose file and Caddyfile"
 caddyfile_before=$(remote "sha256sum Caddyfile 2>/dev/null | cut -d' ' -f1" || true)
-scp -q "$HERE/docker-compose.yml" "$HERE/Caddyfile" "$HERE/backup.sh" "$HOST:$DIR/"
-remote "chmod 0700 backup.sh"
+scp -q "$HERE/docker-compose.yml" "$HERE/Caddyfile" "$HERE/backup.sh" "$HERE/monitor.sh" "$HOST:$DIR/"
+remote "chmod 0700 backup.sh monitor.sh"
 remote "install -d -m 0755 site"
 
 # The tag running now becomes the rollback target, and the database is dumped before anything changes.
