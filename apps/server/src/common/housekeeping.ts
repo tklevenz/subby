@@ -1,6 +1,7 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { INACTIVE_DELETE_DAYS, INACTIVE_WARN_DAYS } from '@subby/shared/sync';
+import { Metrics } from './metrics';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
 import { FamiliesService } from '../families/families.service';
@@ -28,6 +29,7 @@ export class Housekeeping implements OnModuleInit, OnModuleDestroy {
     @Inject(FamiliesService) private readonly families: FamiliesService,
     @Inject(PushService) private readonly push: PushService,
     @Inject(CONFIG) private readonly config: Config,
+    @Inject(Metrics) private readonly metrics: Metrics,
   ) {}
 
   onModuleInit() {
@@ -43,10 +45,14 @@ export class Housekeeping implements OnModuleInit, OnModuleDestroy {
     const sessions = await this.db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, new Date(now))).returning({ t: schema.sessions.tokenHash });
     const invites = await this.db.delete(schema.invites).where(lt(schema.invites.expiresAt, new Date(now - INVITE_GRACE_MS))).returning({ id: schema.invites.id });
     const refunds = await this.purchases.checkVoided(now).catch((e: unknown) => {
+      this.metrics.count('refund_check_failed');
       console.warn('Checking Google Play refunds failed', e);
       return 0;
     });
     const inactive = await this.inactiveFamilies(now);
+    this.metrics.count('purchase_refunded', refunds);
+    this.metrics.count('family_inactive_pinged', inactive.pinged);
+    this.metrics.count('family_inactive_deleted', inactive.deleted);
     return { sessions: sessions.length, invites: invites.length, refunds, ...inactive };
   }
 

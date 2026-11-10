@@ -38,8 +38,12 @@ function openWithKey(name: string, key: string): SQLiteDatabase {
  * Opens the app database. In native builds it is encrypted with SQLCipher, with a random 256-bit key kept in
  * the keychain/keystore. A database from before encryption is copied into the encrypted file once, then deleted.
  */
+/** Whether the database is SQLCipher-encrypted (native builds), for diagnostics. */
+export let dbEncrypted = false;
+
 function openAppDatabase(): SQLiteDatabase {
   const cipher = hasSQLCipher();
+  dbEncrypted = cipher;
   let key = cipher ? SecureStore.getItem(KEY_ITEM, KEY_OPTIONS) : null;
   const plan = planOpen({
     cipher,

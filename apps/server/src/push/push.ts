@@ -5,6 +5,7 @@ import { CONFIG, type Config } from '../config';
 import { GoogleAuth } from '../common/google';
 import { DB, schema, type Db } from '../db/db';
 import { parse } from '../common/validate';
+import { Metrics } from '../common/metrics';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 
@@ -26,6 +27,7 @@ export class PushService implements OnModuleDestroy {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: Config,
+    @Inject(Metrics) private readonly metrics: Metrics,
   ) {
     const fcm = config.push;
     this.auth = fcm.kind === 'fcm' ? new GoogleAuth(fcm, 'https://www.googleapis.com/auth/firebase.messaging') : null;
@@ -63,7 +65,10 @@ export class PushService implements OnModuleDestroy {
       this.pending.delete(familyId);
       // Two phones writing at once each need the other's change, so only a lone writer is skipped.
       const skip = writers.size === 1 ? [...writers][0]! : null;
-      void this.send(familyId, skip).catch((e: unknown) => console.warn('Push failed', e));
+      void this.send(familyId, skip).catch((e: unknown) => {
+        this.metrics.count('push_error');
+        console.warn('Push failed', e);
+      });
     }, COALESCE_MS);
     timer.unref();
     this.pending.set(familyId, { writers, timer });
@@ -104,6 +109,9 @@ export class PushService implements OnModuleDestroy {
     );
 
     const gone = results.filter((r) => r.gone).map((r) => r.deviceId);
+    this.metrics.count('push_sent', results.filter((r) => r.sent).length);
+    this.metrics.count('push_failed', results.filter((r) => !r.sent && !r.gone).length);
+    this.metrics.count('push_token_dropped', gone.length);
     if (gone.length) await this.db.delete(schema.pushTokens).where(inArray(schema.pushTokens.deviceId, gone));
     return results.filter((r) => r.sent).length;
   }

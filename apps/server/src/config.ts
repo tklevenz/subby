@@ -21,6 +21,8 @@ export type Config = {
   trustProxy: false | string;
   /** Verifying store purchases (hosted only); a store left out can't be bought from. */
   stores: { google: GooglePlayConfig | null; apple: AppStoreConfig | null; test: boolean };
+  /** Port for `GET /metrics` on the container's own 127.0.0.1 (`common/metrics.ts`); left out, none is opened. */
+  metricsPort?: number;
 };
 
 /** Google Play: a service account with access to the app in the Play Console (View financial data, Manage orders). */
@@ -123,6 +125,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, migrationsFolder: string): Co
     rateLimit: env.RATE_LIMIT !== 'off',
     trustProxy: trustProxy(env.TRUST_PROXY),
     stores: storesConfig(env),
+    metricsPort: env.METRICS_PORT === 'off' ? undefined : Number(env.METRICS_PORT || 8788),
   };
 }
 

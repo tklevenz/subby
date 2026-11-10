@@ -49,6 +49,14 @@ curl http://localhost:8787/v1/info             # {"service":"subby-sync",...}
 docker compose logs -f server
 ```
 
+Counters since the server started (requests per route and outcome, pushes, purchase checks; Prometheus text, no
+ids or IP addresses) are on port 8788 of the container's own loopback, so nothing outside the container reaches
+them. `?totals=1` adds totals from the database (families, phones by access, records, photos):
+
+```sh
+docker compose exec server node -e "fetch('http://127.0.0.1:8788/metrics?totals=1').then(r => r.text()).then(console.log)"
+```
+
 ### Updating
 
 ```sh
@@ -132,6 +140,7 @@ A slot belongs to the family, so it covers its phones through reinstalls and re-
 | `GOOGLE_PLAY_PACKAGE`, `APPLE_BUNDLE_ID` | `baby.subby.app` | hosted only: the app whose purchases count |
 | `APPLE_ALLOW_SANDBOX` | | hosted only: `1` accepts TestFlight/sandbox purchases (dogfooding); `APPLE_IAP=off` turns App Store purchases off |
 | `TEST_PURCHASES` | | `1` adds a pretend store, so the app's unlock screens can be tried end to end without paying (with `MODE=hosted`). **Never on a public server:** anyone could unlock |
+| `METRICS_PORT` | `8788` | the counters above, on the container's 127.0.0.1 only; `off` for none |
 | `TRUST_PROXY` | (none) | reverse proxies whose `X-Forwarded-For` to believe: `uniquelocal` for Caddy in this compose, or addresses/ranges |
 
 Without push, phones sync while the app is open, and in the background as often as the phone allows (roughly

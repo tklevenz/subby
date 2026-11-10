@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { useActiveChild } from '../../store/useActiveChild';
 import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/engine';
+import { diagnostics } from '../../features/diagnostics';
 import { Card, Row, Segmented } from '../../components/ui';
 import { colors } from '../../theme/colors';
 import { SubMono, Wordmark } from '../../components/brand/Sub';
@@ -40,6 +41,15 @@ function ChildCard({
       <Text className="text-xs text-ink-muted" numberOfLines={1}>{subtitle || ' '}</Text>
     </Pressable>
   );
+}
+
+/** Shows the report first; it only leaves the phone if the person shares it (to support, by email). */
+async function showDiagnostics() {
+  const text = await diagnostics().catch((e: unknown) => `Couldn't make the report: ${e instanceof Error ? e.message : String(e)}`);
+  Alert.alert('Diagnostics', `${text}\n\nNo names, entries or ids. Only shared if you share it.`, [
+    { text: 'Close', style: 'cancel' },
+    { text: 'Share', onPress: () => void Share.share({ message: text }) },
+  ]);
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -154,6 +164,11 @@ export default function SettingsScreen() {
         value={clock}
         onChange={(v) => setSetting('clock', v)}
       />
+
+      <SectionTitle>Help</SectionTitle>
+      <Card>
+        <Row label="Share diagnostics" onPress={showDiagnostics} right={chevron} />
+      </Card>
 
       <View className="mt-10 items-center">
         <View className="flex-row items-center">

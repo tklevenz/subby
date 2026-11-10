@@ -120,7 +120,7 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
 
   /** Deletes stored files whose rows are gone. Failures only leave orphan files behind. */
   async deleteFiles(ids: string[]) {
-    for (const id of ids) await this.store.delete(id).catch((e: unknown) => console.warn(`Couldn't delete blob ${id}`, e));
+    for (const id of ids) await this.store.delete(id).catch((e: unknown) => console.warn("Couldn't delete a photo file", e));
   }
 
   /** Removes uploads that no record listed within the grace period (abandoned or rejected pushes). */

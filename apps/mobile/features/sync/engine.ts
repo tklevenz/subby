@@ -57,9 +57,11 @@ type SyncStatus = {
   tooLarge: number;
   /** The family just moved to this server (this phone followed): shown once. */
   movedTo: string | null;
+  /** The last run that failed, kept after later runs succeed (for diagnostics). */
+  lastError: { message: string; at: number } | null;
 };
 
-export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false, tooLarge: 0, movedTo: null }));
+export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false, tooLarge: 0, movedTo: null, lastError: null }));
 
 let session: SyncSession | null = null;
 export function sessionFor(s: SyncSettings) {
@@ -249,7 +251,7 @@ async function runOnce() {
   } catch (e) {
     const removed = isRemoved(e);
     const message = removed ? 'This phone is no longer in the family' : e instanceof Error ? e.message : String(e);
-    useSyncStore.setState({ phase: 'error', error: message, removed, progress: null, pending: await pendingCount() });
+    useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, progress: null, pending: await pendingCount() });
     throw e;
   }
 }

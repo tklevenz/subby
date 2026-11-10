@@ -20,6 +20,7 @@ import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
 import { lockFamily } from '../db/lock';
 import { parse } from '../common/validate';
+import { Metrics } from '../common/metrics';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';
@@ -41,6 +42,7 @@ export class PurchasesService {
     @Inject(DB) private readonly db: Db,
     @Inject(Entitlements) private readonly entitlements: Entitlements,
     @Inject(LiveBus) private readonly live: LiveBus,
+    @Inject(Metrics) private readonly metrics: Metrics,
   ) {
     this.google = config.stores.google ? new GooglePlay(config.stores.google) : null;
     this.apple = config.stores.apple ? new AppStore(config.stores.apple) : null;
@@ -62,7 +64,10 @@ export class PurchasesService {
     let verified;
     try {
       verified = await store.verify(purchase.product, purchase.token);
+      this.metrics.count(`purchase_${purchase.store}_verified`);
     } catch (e) {
+      const outcome = e instanceof PurchasePending ? 'pending' : e instanceof PurchaseRefused ? 'refused' : 'error';
+      this.metrics.count(`purchase_${purchase.store}_${outcome}`);
       if (e instanceof PurchasePending) throw new ConflictException(e.message);
       if (e instanceof PurchaseRefused) throw new ForbiddenException(e.message);
       throw e;

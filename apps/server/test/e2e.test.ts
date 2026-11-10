@@ -12,6 +12,7 @@ import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
 import { Housekeeping } from '../src/common/housekeeping';
+import { Metrics } from '../src/common/metrics';
 import { AdminError, runAdmin } from '../src/admin';
 import { DB } from '../src/db/db';
 import { Entitlements } from '../src/sync/entitlements';
@@ -145,6 +146,32 @@ describe.skipIf(!reachable)('sync server', () => {
     const res = await fetch(`${url}/healthz`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, db: true, blobs: true });
+  });
+
+  it('counts requests per route and outcome, without ids, for monitor.sh', async () => {
+    const { a, b } = await pairedFamily();
+    await a.push([a.seal('log', randomUUID(), { n: 1 })]);
+    await fetch(`${url}/v1/blobs/${randomUUID()}`); // 401
+    await fetch(`${url}/wp-login.php?user=${a.deviceId}`); // no such route
+    const metrics = app.get(Metrics);
+    const server = await metrics.listen(0);
+    try {
+      const { port, address } = server.address() as { port: number; address: string };
+      expect(address).toBe('127.0.0.1');
+      const text = await (await fetch(`http://127.0.0.1:${port}/metrics?totals=1`)).text();
+      const value = (name: string) => Number(text.match(new RegExp(`^${name.replace(/[{}]/g, '\\$&')} (\\d+)$`, 'm'))?.[1]);
+      expect(value('subby_requests{route="POST /v1/sync/push"}')).toBeGreaterThanOrEqual(1);
+      expect(value('subby_requests_4xx{route="GET /v1/blobs/:id"}')).toBeGreaterThanOrEqual(1);
+      expect(value('subby_requests{route="unmatched"}')).toBeGreaterThanOrEqual(1);
+      expect(value('subby_requests_5xx_total')).toBe(0);
+      expect(value('subby_families')).toBeGreaterThanOrEqual(1);
+      expect(value('subby_phones{access="free"}')).toBeGreaterThanOrEqual(2);
+      for (const id of [a.familyId, a.deviceId, b.deviceId]) expect(text).not.toContain(id);
+      expect(text).not.toMatch(/127\.0\.0\.1|wp-login/);
+      expect((await fetch(`http://127.0.0.1:${port}/other`)).status).toBe(404);
+    } finally {
+      server.close();
+    }
   });
 
   it('creates a family and logs in', async () => {

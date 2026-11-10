@@ -85,3 +85,13 @@ export async function stopBackgroundSync() {
   if (BackgroundTask && (await TaskManager.isTaskRegisteredAsync(SYNC_TASK))) await BackgroundTask.unregisterTaskAsync(SYNC_TASK);
   if (Notifications && (await TaskManager.isTaskRegisteredAsync(PUSH_TASK))) await Notifications.unregisterTaskAsync(PUSH_TASK);
 }
+
+/** For diagnostics: whether the OS lets the periodic task run, and which tasks are registered. */
+export async function backgroundStatus(): Promise<string> {
+  if (!BackgroundTask || !TaskManager) return 'not in this build';
+  const status = await BackgroundTask.getStatusAsync();
+  const allowed = status === BackgroundTask.BackgroundTaskStatus.Available ? 'allowed' : 'restricted by the system';
+  const periodic = (await TaskManager.isTaskRegisteredAsync(SYNC_TASK)) ? 'periodic' : null;
+  const push = (await TaskManager.isTaskRegisteredAsync(PUSH_TASK)) ? 'push' : null;
+  return `${allowed}, tasks: ${[periodic, push].filter(Boolean).join(' + ') || 'none'}`;
+}

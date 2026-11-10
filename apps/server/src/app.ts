@@ -23,6 +23,7 @@ import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
 import { PurchasesController, PurchasesService } from './purchases/purchases';
 import { installRateLimits } from './common/rateLimit';
+import { Metrics } from './common/metrics';
 import { MAX_BLOB_BYTES, MAX_REQUEST_BYTES } from '@subby/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
@@ -95,6 +96,7 @@ class AppModule {
         LiveBus,
         LiveGateway,
         Housekeeping,
+        Metrics,
       ],
     };
   }
@@ -119,13 +121,17 @@ export async function createApp(config: Config) {
     { logger: ['error', 'warn'] },
   );
   const fastify = app.getHttpAdapter().getInstance();
+  const metrics = app.get(Metrics);
+  metrics.install(fastify);
   if (config.rateLimit) installRateLimits(fastify);
   // Encrypted files arrive as raw bytes.
   fastify.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_BLOB_BYTES + 1 }, (_req, body, done) => done(null, body));
   app.useWebSocketAdapter(new WsAdapter(app));
   app.enableShutdownHooks();
+  const metricsServer = config.metricsPort === undefined ? null : await metrics.listen(config.metricsPort);
   const originalClose = app.close.bind(app);
   app.close = async () => {
+    metricsServer?.close();
     await originalClose();
     await close();
   };
