@@ -16,8 +16,8 @@ cd "$(dirname "$0")"
 # The matching private key is kept offline, never on this server.
 AGE_RECIPIENT=${AGE_RECIPIENT:-age19q8v038r7jnmryec9tr28heuhwuju7773lrdrd2yk2gss5maes8sv2mjks}
 
-# Reads one setting from .env without sourcing it (values aren't shell-quoted).
-setting() { grep -m1 "^$1=" .env | cut -d= -f2- || true; }
+# Reads one setting from .env without sourcing it, like Compose does: an inline " # comment" and quotes are dropped.
+setting() { grep -m1 "^$1=" .env | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/' || true; }
 
 bucket=$(setting S3_BACKUP_BUCKET)
 [[ -n $bucket ]] || { echo "S3_BACKUP_BUCKET is not set in .env" >&2; exit 1; }

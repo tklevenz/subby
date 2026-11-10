@@ -49,10 +49,11 @@ EOF
 
 echo "→ Bucket rules"
 # The AWS CLI reads the keys from the environment; .env is only read on the server and nothing is printed.
-ssh "$HOST" 'set -e; cd '"$DIR"'
-  setting() { grep -m1 "^$1=" .env | cut -d= -f2- || true; }
+ssh "$HOST" "cd $DIR && bash -s" <<'REMOTE'
+set -e
+  setting() { grep -m1 "^$1=" .env | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'(.*)'$/\1/' || true; }
   aws() {
-    docker run --rm -i -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION="$(setting S3_REGION)" \
+    docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION="$(setting S3_REGION)" \
       -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
       amazon/aws-cli:2.17.0 --endpoint-url "$(setting S3_ENDPOINT)" "$@"
   }
@@ -68,7 +69,8 @@ ssh "$HOST" 'set -e; cd '"$DIR"'
   aws s3api put-bucket-versioning --bucket "$photos" --versioning-configuration Status=Enabled
   aws s3api put-bucket-lifecycle-configuration --bucket "$photos" --lifecycle-configuration \
     "{\"Rules\":[{\"ID\":\"old-versions\",\"Status\":\"Enabled\",\"Filter\":{\"Prefix\":\"\"},\"NoncurrentVersionExpiration\":{\"NoncurrentDays\":30},\"Expiration\":{\"ExpiredObjectDeleteMarker\":true}}]}"
-  echo "  photo bucket: versioning on, old versions expire after 30 days"'
+  echo "  photo bucket: versioning on, old versions expire after 30 days"
+REMOTE
 
 echo "→ First backup"
 ssh "$HOST" "systemctl start subby-backup.service && journalctl -u subby-backup.service -n 3 --no-pager -o cat && $DIR/backup.sh --list"
