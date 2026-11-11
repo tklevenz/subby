@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import type { InviteResponse } from '@subby/shared/sync';
 import { approveClaim, claimCode, createInvite, inviteStatus, type Invite } from '../../features/sync/family';
 import QrCode from '../../components/QrCode';
-import { Button, ErrorText, Lead } from '../../components/ui';
+import { Button, ErrorText, Lead, ScreenTitle, LoaderBlock } from '../../components/ui';
 import { useNow } from '../../store/timeHelpers';
 import { PeriscopeLoader } from '../../components/brand/loaders';
 import { usePoll } from '../../features/usePoll';
@@ -71,15 +71,12 @@ export default function AddPhoneScreen() {
   return (
     <ScreenScroll>
       {step.kind === 'loading' || step.kind === 'approving' ? (
-        <View className="items-center mt-24">
-          <PeriscopeLoader />
-          <Text className="text-ink-muted mt-4">{t(step.kind === 'approving' ? 'add.adding' : 'add.creating')}</Text>
-        </View>
+        <LoaderBlock loader={<PeriscopeLoader />} label={t(step.kind === 'approving' ? 'add.adding' : 'add.creating')} />
       ) : null}
 
       {step.kind === 'showing' ? (
         <>
-          <Text className="text-ink text-xl font-bold">{t('add.scanThis')}</Text>
+          <ScreenTitle>{t('add.scanThis')}</ScreenTitle>
           <Lead className="mt-2">
             {t('add.howTo')}
           </Lead>
@@ -101,7 +98,7 @@ export default function AddPhoneScreen() {
 
       {step.kind === 'confirm' ? (
         <>
-          <Text className="text-ink text-xl font-bold">{t('add.sameCode')}</Text>
+          <ScreenTitle>{t('add.sameCode')}</ScreenTitle>
           <Text className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-8">
             {step.code.slice(0, 3)} {step.code.slice(3)}
           </Text>
@@ -115,7 +112,7 @@ export default function AddPhoneScreen() {
 
       {step.kind === 'done' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">{t('add.added')}</Text>
+          <ScreenTitle className="mt-4">{t('add.added')}</ScreenTitle>
           <Lead className="mt-2">{t('add.addedText')}</Lead>
           <Button label={t('common.done')} onPress={() => router.back()} />
         </>
@@ -123,7 +120,7 @@ export default function AddPhoneScreen() {
 
       {step.kind === 'error' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">{t('add.wrong')}</Text>
+          <ScreenTitle className="mt-4">{t('add.wrong')}</ScreenTitle>
           <ErrorText className="mt-2">{step.message}</ErrorText>
           {step.retry ? (
             <Button label={t('add.retryAdd')} onPress={() => approve(step.retry!)} />

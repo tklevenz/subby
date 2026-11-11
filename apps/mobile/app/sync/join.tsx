@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimInvite, defaultDeviceName, finishJoin, hasLocalData, joinStatus, type Join } from '../../features/sync/family';
 import { syncNow } from '../../features/sync/engine';
-import { useSyncStore } from '../../features/sync/state';
-import { Button, FieldLabel, TextField, ErrorText, Lead, SectionLabel } from '../../components/ui';
-import { PeriscopeLoader, SubLoader } from '../../components/brand/loaders';
+import { Button, FieldLabel, TextField, Lead, LoaderBlock, SectionLabel, ScreenTitle } from '../../components/ui';
+import { PeriscopeLoader } from '../../components/brand/loaders';
+import { FailedStep, ReplaceOrMerge, SyncBusy } from '../../components/SyncSteps';
 import { usePoll } from '../../features/usePoll';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
@@ -76,40 +76,25 @@ export default function JoinScreen() {
     <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'scan' ? <Scan onCode={claim} /> : null}
 
-      {step.kind === 'claiming' || step.kind === 'finishing' ? <Busy label={t(step.kind === 'claiming' ? 'join.checking' : 'join.joining')} /> : null}
+      {step.kind === 'claiming' || step.kind === 'finishing' ? <SyncBusy label={t(step.kind === 'claiming' ? 'join.checking' : 'join.joining')} /> : null}
 
       {step.kind === 'waiting' ? (
         <>
-          <Text className="text-ink text-xl font-bold">{t('join.confirmThere')}</Text>
+          <ScreenTitle>{t('join.confirmThere')}</ScreenTitle>
           <Lead className="mt-2">{t('join.confirmText')}</Lead>
           <Text className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-10">
             {step.join.code.slice(0, 3)} {step.join.code.slice(3)}
           </Text>
-          <View className="items-center mt-10">
-            <PeriscopeLoader width={72} />
-            <Text className="text-ink-muted mt-3">{t('join.waiting')}</Text>
-          </View>
+          <LoaderBlock className="mt-10" loader={<PeriscopeLoader width={72} />} label={t('join.waiting')} />
         </>
       ) : null}
 
       {step.kind === 'choose' ? (
-        <>
-          <Text className="text-ink text-xl font-bold">{t('join.hasEntries')}</Text>
-          <Lead className="mt-2">
-            {t('join.hasEntriesText')}
-          </Lead>
-          <Button label={t('join.replace')} onPress={() => finish(step.join, 'replace')} />
-          <Text className="text-ink-faint text-xs text-center mt-2">{t('join.replaceNote')}</Text>
-          <Button label={t('join.merge')} variant="ghost" onPress={() => finish(step.join, 'merge')} />
-        </>
+        <ReplaceOrMerge lead={t('join.hasEntriesText')} onReplace={() => finish(step.join, 'replace')} onMerge={() => finish(step.join, 'merge')} />
       ) : null}
 
       {step.kind === 'error' ? (
-        <>
-          <Text className="text-ink text-xl font-bold mt-4">{t('join.failed')}</Text>
-          <ErrorText className="mt-2">{step.message}</ErrorText>
-          <Button label={t('join.scanNew')} onPress={() => setStep({ kind: 'scan' })} />
-        </>
+        <FailedStep title={t('join.failed')} message={step.message} retryLabel={t('join.scanNew')} onRetry={() => setStep({ kind: 'scan' })} />
       ) : null}
     </ScreenScroll>
   );
@@ -157,15 +142,5 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
       <SectionLabel>{t('join.noPhoneLeft')}</SectionLabel>
       <Button label={t('join.useRecovery')} variant="ghost" onPress={() => router.push('/sync/recover')} />
     </>
-  );
-}
-
-function Busy({ label }: { label: string }) {
-  const progress = useSyncStore((s) => s.progress);
-  return (
-    <View className="items-center mt-24">
-      <SubLoader />
-      <Text className="text-ink-muted mt-4">{progress ? t('syncScreen.progress', { label: progress.label, count: progress.done }) : label}</Text>
-    </View>
   );
 }

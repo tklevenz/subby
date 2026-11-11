@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { SyncAccess } from '@subby/shared/sync';
-import { Button, Card, Row, Segmented, SectionLabel } from './ui';
+import { Button, Card, Row, Segmented, SectionLabel, Hint } from './ui';
 import { PRICE, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools } from '../features/sync/access';
 import { syncNow } from '../features/sync/engine';
 import { sessionFor, useSyncStore } from '../features/sync/state';
@@ -130,13 +130,13 @@ export function GiftSlot() {
   const free = entitlement.freeSlots;
   return (
     <>
-      <Text className="text-ink-faint text-xs mt-2 ml-1 leading-4">
+      <Hint className="ml-1 leading-4">
         {free
           ? t('access.unusedGifts', { count: free })
           : waiting
             ? t('access.giftWaiting')
             : t('access.giftNext')}
-      </Text>
+      </Hint>
       <Button label={t('access.giftButton', { price: PRICE })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy()} />
     </>
   );
@@ -187,10 +187,10 @@ export function AccessDevTools() {
     <>
       <SectionLabel>{DEV.title}</SectionLabel>
       <Segmented options={options} value={pretend ?? 'real'} onChange={(v) => useAccessStore.setState({ pretend: v === 'real' ? null : (v as SyncAccess) })} />
-      <Text className="text-ink-faint text-xs mt-2 ml-1">
+      <Hint className="ml-1">
         {DEV.pretends}
         {testStore ? DEV.testStore : ''}
-      </Text>
+      </Hint>
       {hasTest ? (
         <Card>
           <Row label={DEV.refund} onPress={busy ? undefined : () => run(refundLastTest)} />

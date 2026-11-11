@@ -7,9 +7,9 @@ import { isValidRecoveryWords, normalizeRecoveryWords } from '@subby/shared/cryp
 import { defaultDeviceName, hasLocalData, recoverFamily, removeDevices } from '../../features/sync/family';
 import { syncNow } from '../../features/sync/engine';
 import { useSyncStore } from '../../features/sync/state';
-import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead } from '../../components/ui';
+import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead, Hint, LoaderBlock, ScreenTitle } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
-import { SubLoader } from '../../components/brand/loaders';
+import { FailedStep, ReplaceOrMerge, SyncBusy } from '../../components/SyncSteps';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { colors } from '../../theme/colors';
@@ -51,7 +51,7 @@ export default function RecoverScreen() {
     <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'enter' ? (
         <>
-          <Text className="text-ink text-xl font-bold">{t('recover.title')}</Text>
+          <ScreenTitle>{t('recover.title')}</ScreenTitle>
           <Lead className="mt-2">
             {t('recover.lead')}
           </Lead>
@@ -65,9 +65,9 @@ export default function RecoverScreen() {
               {...SECRET_INPUT}
               style={{ minHeight: 120, textAlignVertical: 'top' }}
             />
-            <Text className="text-ink-faint text-xs mt-2 ml-1">
+            <Hint className="ml-1">
               {count === 24 && !valid ? t('recover.wrongWord') : t('recover.count', { count })}
-            </Text>
+            </Hint>
           </View>
 
           {field ? <View className="mt-3">{field}</View> : null}
@@ -77,39 +77,17 @@ export default function RecoverScreen() {
       ) : null}
 
       {step.kind === 'choose' ? (
-        <>
-          <Text className="text-ink text-xl font-bold">{t('join.hasEntries')}</Text>
-          <Lead className="mt-2">
-            {t('recover.hasEntriesText')}
-          </Lead>
-          <Button label={t('join.replace')} onPress={() => run('replace')} />
-          <Text className="text-ink-faint text-xs text-center mt-2">{t('join.replaceNote')}</Text>
-          <Button label={t('join.merge')} variant="ghost" onPress={() => run('merge')} />
-        </>
+        <ReplaceOrMerge lead={t('recover.hasEntriesText')} onReplace={() => run('replace')} onMerge={() => run('merge')} />
       ) : null}
 
-      {step.kind === 'working' ? <Busy /> : null}
+      {step.kind === 'working' ? <SyncBusy label={t('recover.recovering')} /> : null}
 
       {step.kind === 'lost' ? <LostPhones ids={step.ids} /> : null}
 
       {step.kind === 'error' ? (
-        <>
-          <Text className="text-ink text-xl font-bold mt-4">{t('recover.failed')}</Text>
-          <ErrorText className="mt-2">{step.message}</ErrorText>
-          <Button label={t('common.retry')} onPress={() => setStep({ kind: 'enter' })} />
-        </>
+        <FailedStep title={t('recover.failed')} message={step.message} retryLabel={t('common.retry')} onRetry={() => setStep({ kind: 'enter' })} />
       ) : null}
     </ScreenScroll>
-  );
-}
-
-function Busy() {
-  const progress = useSyncStore((s) => s.progress);
-  return (
-    <View className="items-center mt-24">
-      <SubLoader />
-      <Text className="text-ink-muted mt-4">{progress ? t('syncScreen.progress', { label: progress.label, count: progress.done }) : t('recover.recovering')}</Text>
-    </View>
   );
 }
 
@@ -141,15 +119,12 @@ function LostPhones({ ids }: { ids: string[] }) {
 
   if (busy) {
     return (
-      <View className="items-center mt-24">
-        <SubLoader />
-        <Text className="text-ink-muted mt-4">{t('recover.removing', { count: chosen.size })}</Text>
-      </View>
+      <LoaderBlock label={t('recover.removing', { count: chosen.size })} />
     );
   }
   return (
     <>
-      <Text className="text-ink text-xl font-bold">{t('recover.back')}</Text>
+      <ScreenTitle>{t('recover.back')}</ScreenTitle>
       <Lead className="mt-2">
         {t(ids.length === 1 ? 'recover.lostOne' : 'recover.lostMany')}
       </Lead>
@@ -176,7 +151,7 @@ function LostPhones({ ids }: { ids: string[] }) {
         disabled={!chosen.size}
       />
       <Button label={t('recover.keep')} variant="ghost" onPress={() => router.replace('/')} />
-      <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">{t('recover.later')}</Text>
+      <Hint className="ml-1 text-center">{t('recover.later')}</Hint>
     </>
   );
 }

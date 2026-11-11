@@ -8,7 +8,7 @@ import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
 import { CommonFields } from '../../components/sheets/LogSheet';
 import { TYPE_META, activityLabel } from '../../components/logTypes';
-import { Button, FieldLabel, ErrorText } from '../../components/ui';
+import { Button, FieldLabel, ErrorText, LoaderBlock } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import { SubSpinner } from '../../components/brand/loaders';
@@ -26,7 +26,7 @@ export default function EntryScreen() {
     void useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
   }, [id]);
 
-  if (entry === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
+  if (entry === undefined) return <LoaderBlock className="mt-10" loader={<SubSpinner size={36} />} />;
   if (!entry) return <Stack.Screen options={{ title: t('entry.notFound') }} />;
   // A finished night sleep opens as its whole night (with its wakings); anything else as itself.
   return isSleepEntry(entry) && entry.endedAt !== null && !isNap(entry) ? <NightLoader key={entry.id} entry={entry} /> : <EntryForm key={entry.id} entry={entry} />;
@@ -40,7 +40,7 @@ function NightLoader({ entry }: { entry: LogEntry }) {
     if (rows && night === undefined) setNight(nightOf(groupNights(rows, Date.now()), entry.id) ?? null);
   }, [rows, night, entry.id]);
 
-  if (night === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;
+  if (night === undefined) return <LoaderBlock className="mt-10" loader={<SubSpinner size={36} />} />;
   // Still running at its end (back asleep after a waking): edit the piece itself.
   return night && night.end !== null ? <NightForm night={night} /> : <EntryForm entry={entry} />;
 }

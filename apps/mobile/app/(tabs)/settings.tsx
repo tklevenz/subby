@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AngleRight, Plus } from '../../components/icons';
+import { Plus } from '../../components/icons';
 import { activeReminderCount, formatAge } from '@subby/shared';
 import { remindersAvailable, requestNotifications, setRemindersEnabled } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
@@ -14,7 +14,7 @@ import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/state';
 import { diagnostics } from '../../features/diagnostics';
-import { Card, Row, Segmented, Toggle, SectionLabel } from '../../components/ui';
+import { Card, Row, Segmented, Toggle, SectionLabel, Chevron } from '../../components/ui';
 import { colors } from '../../theme/colors';
 import { SubMono, Wordmark } from '../../components/brand/Sub';
 import LanguagePicker, { languageLabel } from '../../components/LanguagePicker';
@@ -70,7 +70,6 @@ export default function SettingsScreen() {
     await setSetting('familyAlerts', { ...familyAlerts, ...patch });
   };
   const setSetting = useSettingsStore((s) => s.set);
-  const chevron = <AngleRight color={colors.inkGhost} size={16} />;
   const sync = useSettingsStore((s) => s.sync);
   const syncPhase = useSyncStore((s) => s.phase);
   const syncLabel = t(!sync ? 'settings.syncOff' : syncPhase === 'error' ? 'settings.syncError' : syncPhase === 'syncing' ? 'settings.syncing' : 'settings.syncOn');
@@ -109,7 +108,7 @@ export default function SettingsScreen() {
 
       <SectionLabel>{t('settings.sync')}</SectionLabel>
       <Card>
-        <Row label={t('settings.syncRow')} value={syncLabel} onPress={() => router.push('/sync')} right={chevron} />
+        <Row label={t('settings.syncRow')} value={syncLabel} onPress={() => router.push('/sync')} right={<Chevron />} />
       </Card>
 
       <SectionLabel>{t('settings.notifications')}</SectionLabel>
@@ -130,7 +129,7 @@ export default function SettingsScreen() {
                   : t('settings.none')
           }
           onPress={() => router.push('/reminders')}
-          right={chevron}
+          right={<Chevron />}
         />
       </Card>
       {sync ? (
@@ -156,14 +155,14 @@ export default function SettingsScreen() {
 
       <SectionLabel>{t('settings.data')}</SectionLabel>
       <Card>
-        <Row label={t('settings.backup')} onPress={() => router.push('/backup')} right={chevron} />
-        <Row label={t('settings.export')} onPress={() => router.push('/export')} right={chevron} />
-        <Row label={t('settings.import')} onPress={() => router.push('/import/babybuddy')} right={chevron} />
+        <Row label={t('settings.backup')} onPress={() => router.push('/backup')} right={<Chevron />} />
+        <Row label={t('settings.export')} onPress={() => router.push('/export')} right={<Chevron />} />
+        <Row label={t('settings.import')} onPress={() => router.push('/import/babybuddy')} right={<Chevron />} />
       </Card>
 
       <SectionLabel>{t('language.title')}</SectionLabel>
       <Card>
-        <Row label={languageLabel(language)} onPress={() => setPickingLanguage(true)} right={chevron} />
+        <Row label={languageLabel(language)} onPress={() => setPickingLanguage(true)} right={<Chevron />} />
       </Card>
       <LanguagePicker
         visible={pickingLanguage}
@@ -191,7 +190,7 @@ export default function SettingsScreen() {
 
       <SectionLabel>{t('settings.help')}</SectionLabel>
       <Card>
-        <Row label={t('settings.diagnostics')} onPress={showDiagnostics} right={chevron} />
+        <Row label={t('settings.diagnostics')} onPress={showDiagnostics} right={<Chevron />} />
       </Card>
 
       <View className="mt-10 items-center">

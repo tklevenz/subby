@@ -7,8 +7,7 @@ import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
 import { useSyncStore } from '../../features/sync/state';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead } from '../../components/ui';
-import { SubLoader } from '../../components/brand/loaders';
+import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead, Hint, ScreenTitle, LoaderBlock } from '../../components/ui';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { serverLabel } from '../../features/sync/api';
 
@@ -42,7 +41,7 @@ export default function RecoveryKeyScreen() {
       {step.kind === 'intro' ? (
         <>
           {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">{t('recovery.syncOn')}</Text> : null}
-          <Text className="text-ink text-xl font-bold">{t(hasRecovery ? 'recovery.makeNew' : 'recovery.wayBack')}</Text>
+          <ScreenTitle>{t(hasRecovery ? 'recovery.makeNew' : 'recovery.wayBack')}</ScreenTitle>
           <Lead className="mt-2">
             {t('recovery.lead')}
           </Lead>
@@ -61,7 +60,7 @@ export default function RecoveryKeyScreen() {
           {afterSetup ? (
             <>
               <Button label={t('common.later')} variant="ghost" onPress={() => router.back()} />
-              <Text className="text-ink-faint text-xs mt-2 ml-1 text-center">{t('recovery.later')}</Text>
+              <Hint className="ml-1 text-center">{t('recovery.later')}</Hint>
             </>
           ) : null}
         </>
@@ -69,7 +68,7 @@ export default function RecoveryKeyScreen() {
 
       {step.kind === 'words' ? (
         <>
-          <Text className="text-ink text-xl font-bold">{t('recovery.writeDown')}</Text>
+          <ScreenTitle>{t('recovery.writeDown')}</ScreenTitle>
           <Lead className="mt-2">
             {t('recovery.inOrder')}
           </Lead>
@@ -82,15 +81,12 @@ export default function RecoveryKeyScreen() {
       {step.kind === 'check' ? <Check words={step.words} error={error} onBack={() => setStep({ kind: 'words', words: step.words })} onOk={save} /> : null}
 
       {step.kind === 'saving' ? (
-        <View className="items-center mt-24">
-          <SubLoader />
-          <Text className="text-ink-muted mt-4">{t('recovery.saving')}</Text>
-        </View>
+        <LoaderBlock label={t('recovery.saving')} />
       ) : null}
 
       {step.kind === 'done' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">{t('recovery.saved')}</Text>
+          <ScreenTitle className="mt-4">{t('recovery.saved')}</ScreenTitle>
           <Lead className="mt-2">
             {t('recovery.savedText')}
           </Lead>
@@ -149,7 +145,7 @@ function Check({ words, error, onBack, onOk }: { words: string[]; error: string 
 
   return (
     <>
-      <Text className="text-ink text-xl font-bold">{t('recovery.check')}</Text>
+      <ScreenTitle>{t('recovery.check')}</ScreenTitle>
       <Lead className="mt-2">{t('recovery.checkText')}</Lead>
       {picks.map((n, i) => (
         <View key={n} className="mt-5">

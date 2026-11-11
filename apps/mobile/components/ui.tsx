@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, TextInput, Platform, Switch, type SwitchProps, type TextInputProps, type TextProps } from 'react-native';
 import { AngleRight } from './icons';
+import { SubLoader } from './brand/loaders';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 
@@ -144,22 +145,66 @@ export function WarningText({ className = 'mt-3', ...props }: TextProps & { clas
   return <Text {...props} className={`text-amber-soft text-sm leading-5 ${className}`} />;
 }
 
+/** A step's heading on the pairing, recovery, backup and similar screens. */
+export function ScreenTitle({ className = '', ...props }: TextProps & { className?: string }) {
+  return <Text {...props} className={`text-ink text-xl font-bold ${className}`} />;
+}
+
+/** The small footnote under a card or button. */
+export function Hint({ className = '', ...props }: TextProps & { className?: string }) {
+  return <Text {...props} className={`text-ink-faint text-xs mt-2 ${className}`} />;
+}
+
+/** An amber box for something to look at before going on; a button when `onPress` is given. */
+export function Notice({ onPress, className = '', children }: { onPress?: () => void; className?: string; children: React.ReactNode }) {
+  const box = `rounded-xl border border-amber/40 bg-amber/10 p-3 ${className}`;
+  return onPress ? (
+    <Pressable onPress={onPress} className={box}>
+      {children}
+    </Pressable>
+  ) : (
+    <View className={box}>{children}</View>
+  );
+}
+
+/** A centered wait: a brand loader (the bobbing sub unless another is given), a label and anything under it. */
+export function LoaderBlock({
+  label,
+  loader = <SubLoader />,
+  className = 'mt-24',
+  children,
+}: {
+  label?: string;
+  loader?: React.ReactNode;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <View className={`items-center ${className}`}>
+      {loader}
+      {label ? <Text className="text-ink-muted mt-4 text-center">{label}</Text> : null}
+      {children}
+    </View>
+  );
+}
+
 /** The arrow on a row that opens something. */
 export function Chevron() {
   return <AngleRight color={colors.inkGhost} size={16} />;
 }
 
 export function Card({ children }: { children: React.ReactNode }) {
-  return <View className="bg-surface rounded-2xl border border-line overflow-hidden">{children}</View>;
+  // The last row has no line under it (the card has its own border).
+  const items = React.Children.toArray(children);
+  const last = items.length - 1;
+  return (
+    <View className="bg-surface rounded-2xl border border-line overflow-hidden">
+      {items.map((child, i) => (i === last && React.isValidElement(child) && child.type === Row ? React.cloneElement(child as React.ReactElement<RowProps>, { last: true }) : child))}
+    </View>
+  );
 }
 
-export function Row({
-  label,
-  value,
-  onPress,
-  right,
-  action,
-}: {
+type RowProps = {
   label: string;
   value?: string;
   onPress?: () => void;
@@ -167,7 +212,12 @@ export function Row({
   right?: React.ReactNode;
   /** A button of its own, beside the row's tap area rather than inside it (nested Pressables miss taps on Android). */
   action?: React.ReactNode;
-}) {
+  /** The last row of a card (set by `Card`): no line under it. */
+  last?: boolean;
+};
+
+export function Row({ label, value, onPress, right, action, last }: RowProps) {
+  const line = last ? '' : 'border-b border-line';
   const content = (
     <>
       <Text className="flex-1 text-ink text-base">{label}</Text>
@@ -177,7 +227,7 @@ export function Row({
   );
   if (action) {
     return (
-      <View className="flex-row items-center border-b border-line">
+      <View className={`flex-row items-center ${line}`}>
         <Pressable onPress={onPress} disabled={!onPress} className="flex-1 flex-row items-center pl-4 py-3.5">
           {content}
         </Pressable>
@@ -186,7 +236,7 @@ export function Row({
     );
   }
   return (
-    <Pressable onPress={onPress} disabled={!onPress} className="flex-row items-center px-4 py-3.5 border-b border-line">
+    <Pressable onPress={onPress} disabled={!onPress} className={`flex-row items-center px-4 py-3.5 ${line}`}>
       {content}
     </Pressable>
   );

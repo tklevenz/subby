@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { BackupContents, RestorePlan } from '@subby/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
-import { Button, FieldLabel, TextField, ErrorText, Lead } from '../components/ui';
+import { Button, FieldLabel, TextField, ErrorText, Lead, ScreenTitle, LoaderBlock } from '../components/ui';
 import { formatDayInline, useFormatTime } from '../store/timeHelpers';
 import { SubLoader, SubProgress } from '../components/brand/loaders';
 import { ScreenScroll } from '../components/ScreenScroll';
@@ -118,7 +118,7 @@ export default function BackupScreen() {
 
       {!busy && step.kind === 'done' ? (
         <>
-          <Text className="text-ink text-xl font-bold mt-4">{t('backup.complete')}</Text>
+          <ScreenTitle className="mt-4">{t('backup.complete')}</ScreenTitle>
           <Lead className="mt-2">{step.message}</Lead>
           <Button label={t('common.done')} onPress={() => router.replace('/')} />
         </>
@@ -159,7 +159,7 @@ function BackUp({
 
   return (
     <>
-      <Text className="text-ink text-xl font-bold">{t('backup.backUp')}</Text>
+      <ScreenTitle>{t('backup.backUp')}</ScreenTitle>
       <Lead className="mt-2">
         {t('backup.lead')}{' '}
         {t(savesToDownloads ? 'backup.whereDownloads' : 'backup.whereFiles')}
@@ -207,7 +207,7 @@ function Unlock({
   const [passphrase, setPassphrase] = useState('');
   return (
     <>
-      <Text className="text-ink text-xl font-bold">{t('backup.encrypted')}</Text>
+      <ScreenTitle>{t('backup.encrypted')}</ScreenTitle>
       <Lead className="mt-2">{name}</Lead>
       <FieldLabel>{t('backup.passphrase')}</FieldLabel>
       <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} autoFocus />
@@ -235,7 +235,7 @@ function Preview({
   const changes = plan.children.length + plan.logs.length + plan.deletions.length;
   return (
     <>
-      <Text className="text-ink text-xl font-bold">{t('backup.restoreThis')}</Text>
+      <ScreenTitle>{t('backup.restoreThis')}</ScreenTitle>
       <Lead className="mt-2">
         {t('backup.madeAt', {
           day: formatDayInline(backup.createdAt),
@@ -274,9 +274,9 @@ function Line({ label, value }: { label: string; value: number }) {
 
 function Busy({ label, progress }: { label: string; progress: number }) {
   return (
-    <View className="items-center mt-24">
-      {progress > 0 && progress < 1 ? <SubProgress progress={progress} /> : <SubLoader />}
-      <Text className="text-ink-muted mt-4">{progress > 0 && progress < 1 ? t('backup.percent', { label, percent: Math.round(progress * 100) }) : label}</Text>
-    </View>
+    <LoaderBlock
+      loader={progress > 0 && progress < 1 ? <SubProgress progress={progress} /> : <SubLoader />}
+      label={progress > 0 && progress < 1 ? t('backup.percent', { label, percent: Math.round(progress * 100) }) : label}
+    />
   );
 }

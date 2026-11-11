@@ -21,7 +21,7 @@ import {
 import { avatarColors } from '../../../components/ChildAvatar';
 import GrowthChart from '../../../components/charts/GrowthChart';
 import PhotoMenu from '../../../components/PhotoMenu';
-import { Button, Segmented, SectionLabel } from '../../../components/ui';
+import { Button, Segmented, SectionLabel, Hint } from '../../../components/ui';
 import { HAS_FOODS, fetchLogs } from '../../../store/queries';
 import { useActiveChild } from '../../../store/useActiveChild';
 import { useChildStore } from '../../../store/useChildStore';
@@ -235,7 +235,7 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
       </View>
       {!sex ? (
         <Pressable onPress={() => router.push(`/child/${child.id}/edit`)}>
-          <Text className="text-ink-faint text-xs mt-2 ml-1">{t('profile.setSex')}</Text>
+          <Hint className="ml-1">{t('profile.setSex')}</Hint>
         </Pressable>
       ) : null}
     </>

@@ -17,7 +17,7 @@ import {
   type BBEndpoint,
   type ImportUnits,
 } from '@subby/shared';
-import { Button, Card, FieldLabel, Row, Segmented, TextField, ErrorText, WarningText, Lead } from '../../components/ui';
+import { Button, Card, FieldLabel, Row, Segmented, TextField, ErrorText, WarningText, Lead, Hint } from '../../components/ui';
 import { BBClient, BBError } from '../../features/import/babybuddy/client';
 import { previewImport, runImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../features/import/babybuddy/importer';
 import { useChildStore } from '../../store/useChildStore';
@@ -110,7 +110,7 @@ export default function BabyBuddyImport() {
           <TextField value={url} onChangeText={setUrl} placeholder="https://babybuddy.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
           <FieldLabel>{t('bb.apiKey')}</FieldLabel>
           <TextField value={token} onChangeText={setToken} placeholder={t('bb.apiKeyPlaceholder')} autoCapitalize="none" autoCorrect={false} secureTextEntry />
-          <Text className="text-ink-faint text-xs mt-2">{t('bb.notSaved')}</Text>
+          <Hint>{t('bb.notSaved')}</Hint>
           {url.trim().toLowerCase().startsWith('http://') ? (
             <Text className="text-amber-soft text-xs mt-2">{t('bb.http')}</Text>
           ) : null}
@@ -160,9 +160,9 @@ export default function BabyBuddyImport() {
               <View className="w-full mt-3">
                 <SubProgress progress={step.progress.done / Math.max(1, step.progress.total)} />
               </View>
-              <Text className="text-ink-faint text-xs mt-2">
+              <Hint>
                 {t('bb.step', { n: BB_ENDPOINTS.indexOf(step.progress.endpoint) + 1, total: BB_ENDPOINTS.length })}
-              </Text>
+              </Hint>
             </>
           ) : (
             <>
@@ -173,7 +173,7 @@ export default function BabyBuddyImport() {
           <View className="w-full">
             <Button label={t('common.cancel')} variant="ghost" onPress={() => (cancelled.current = true)} />
           </View>
-          <Text className="text-ink-faint text-xs mt-2 text-center">{t('bb.keepGoing')}</Text>
+          <Hint className="text-center">{t('bb.keepGoing')}</Hint>
         </View>
       ) : null}
 

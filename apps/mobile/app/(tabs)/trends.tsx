@@ -4,11 +4,10 @@ import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabHeader from '../../components/TabHeader';
-import { AngleRight } from '../../components/icons';
 import { addDays, averageNights, averageStats, dailyStats, dayRange, formatHoursMinutes, formatVolume, groupNights, mlToOz, nightsByDay, startOfDay, type DayStats, HOUR_MS } from '@subby/shared';
 import BarChart, { type Bar } from '../../components/charts/BarChart';
 import { TYPE_META } from '../../components/logTypes';
-import { Card, Row, Segmented } from '../../components/ui';
+import { Card, Row, Segmented, Chevron } from '../../components/ui';
 import { useLogQuery } from '../../store/queries';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useNow } from '../../store/timeHelpers';
@@ -37,7 +36,6 @@ export default function TrendsScreen() {
   // Each day's night is the one that ended that morning, so today's counts once it's over.
   const nights = useMemo(() => (logs ? nightsByDay(groupNights(logs, now), days) : null), [logs, days, now]);
   const avgNight = useMemo(() => (nights ? averageNights(nights) : null), [nights]);
-  const chevron = <AngleRight color={colors.inkGhost} size={16} />;
 
   const bars = (values: (s: DayStats) => number[]): Bar[] =>
     (stats ?? []).map((s) => ({
@@ -180,10 +178,10 @@ export default function TrendsScreen() {
 
       <View className="mt-6">
         <Card>
-          <Row label={t('trends.schedule')} value={t('trends.predicted')} onPress={() => router.push('/schedule')} right={chevron} />
-          <Row label={t('trends.growth')} value={t('trends.who')} onPress={() => router.push('/growth')} right={chevron} />
-          <Row label={t('trends.solids')} onPress={() => router.push('/solids')} right={chevron} />
-          <Row label={t('trends.export')} onPress={() => router.push('/export')} right={chevron} />
+          <Row label={t('trends.schedule')} value={t('trends.predicted')} onPress={() => router.push('/schedule')} right={<Chevron />} />
+          <Row label={t('trends.growth')} value={t('trends.who')} onPress={() => router.push('/growth')} right={<Chevron />} />
+          <Row label={t('trends.solids')} onPress={() => router.push('/solids')} right={<Chevron />} />
+          <Row label={t('trends.export')} onPress={() => router.push('/export')} right={<Chevron />} />
         </Card>
       </View>
       </ScrollView>

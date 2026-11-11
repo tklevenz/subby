@@ -1,15 +1,14 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
 import React, { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Text } from 'react-native';
 import { router } from 'expo-router';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/state';
 import { moveToServer } from '../../features/sync/move';
 import { isOfficialServer, serverLabel } from '../../features/sync/api';
 import { PRICE } from '../../features/sync/access';
-import { Button, ErrorText, Lead } from '../../components/ui';
-import { SubLoader } from '../../components/brand/loaders';
+import { Button, ErrorText, Lead, Hint, LoaderBlock } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
@@ -50,11 +49,9 @@ export default function MoveScreen() {
   return (
     <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'working' ? (
-        <View className="items-center mt-24">
-          <SubLoader />
-          <Text className="text-ink-muted mt-4 text-center">{step.label}</Text>
-          <Text className="text-ink-faint text-xs mt-2 text-center">{t('move.keepOpen')}</Text>
-        </View>
+        <LoaderBlock label={step.label}>
+          <Hint className="text-center">{t('move.keepOpen')}</Hint>
+        </LoaderBlock>
       ) : (
         <>
           <Lead>

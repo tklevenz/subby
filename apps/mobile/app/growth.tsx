@@ -16,7 +16,7 @@ import {
   type GrowthMeasure,
 } from '@subby/shared';
 import GrowthChart, { chartUnitLabel } from '../components/charts/GrowthChart';
-import { Button, Segmented } from '../components/ui';
+import { Button, Segmented, Hint, Notice } from '../components/ui';
 import { useLogQuery } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -74,11 +74,11 @@ export default function GrowthScreen() {
       <Segmented options={measures()} value={measure} onChange={setMeasure} />
 
       {!sex ? (
-        <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} className="mt-4 rounded-xl border border-amber/40 bg-amber/10 p-3">
+        <Notice className="mt-4" onPress={() => router.push(`/child/${child.id}/edit`)}>
           <Text className="text-amber-pale text-sm leading-5">
             {t('growth.setSex', { name: child.name })}
           </Text>
-        </Pressable>
+        </Notice>
       ) : null}
 
       {/* Captured as the shared image, so it carries its own title. */}
@@ -98,7 +98,7 @@ export default function GrowthScreen() {
       {points.length === 0 && logs ? (
         <Text className="text-ink-faint text-center mt-4">{t(NONE_KEYS[measure])}</Text>
       ) : null}
-      {beyondWho ? <Text className="text-ink-faint text-xs mt-2">{t('growth.beyondWho')}</Text> : null}
+      {beyondWho ? <Hint>{t('growth.beyondWho')}</Hint> : null}
 
       <Button label={t('growth.add')} onPress={() => setAdding(true)} />
 

@@ -1,9 +1,10 @@
 import { t } from '@subby/shared/i18n';
+import { Chevron } from '../ui';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, PoopDroplet, Xmark, type IconComponent } from '../icons';
+import { Baby, CalendarDays, ClockRotateLeft, Moon, PoopDroplet, Xmark, type IconComponent } from '../icons';
 import { activeSleep, describeDiaper, describeFeed, formatDuration, formatHoursMinutes, formatElapsed, groupNights, defaultNap, isNightWaking, isRunning, lastOfType, lastWakeAt, medicationsDue, predictNextSleep, pumpingDue, startOfDay, suggestedNextSide, type Child, type LogEntry, HOUR_MS, MINUTE_MS } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
@@ -396,13 +397,13 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
       <Pressable onPress={() => router.push('/schedule')} className="flex-row items-center px-3.5 py-3 border-b border-line">
         <CalendarDays color={colors.violetSoft} size={16} />
         <Text className="flex-1 text-ink text-sm ml-2.5">{t('home.schedule')}</Text>
-        <AngleRight color={colors.inkGhost} size={16} />
+        <Chevron />
       </Pressable>
       <Pressable onPress={() => router.push('/history')} className="flex-row items-center px-3.5 py-3">
         <ClockRotateLeft color={colors.inkSoft} size={16} />
         <Text className="flex-1 text-ink text-sm ml-2.5">{t('home.todaysLog')}</Text>
         <Text className="text-ink-muted text-xs mr-1">{t('home.entries', { count: today })}</Text>
-        <AngleRight color={colors.inkGhost} size={16} />
+        <Chevron />
       </Pressable>
     </View>
   );

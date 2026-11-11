@@ -8,8 +8,9 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync } from '../../features/sync/engine';
 import { useSyncStore } from '../../features/sync/state';
+import { progressLabel } from '../../components/SyncSteps';
 import { defaultDeviceName, removeDevice } from '../../features/sync/family';
-import { Button, Card, Row, TextField, ErrorText, WarningText, Lead, SectionLabel, Chevron } from '../../components/ui';
+import { Button, Card, Row, TextField, ErrorText, WarningText, Lead, SectionLabel, Chevron, Hint, ScreenTitle } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
 import { accessLabel, AccessCard, AccessDevTools, GiftSlot, PhotoStorage } from '../../components/SyncAccess';
@@ -49,7 +50,7 @@ function SetUp() {
 
   return (
     <>
-      <Text className="text-ink text-xl font-bold">{t('syncScreen.title')}</Text>
+      <ScreenTitle>{t('syncScreen.title')}</ScreenTitle>
       <Lead className="mt-2">
         {t('syncScreen.lead', { name: child?.name ?? t('syncScreen.yourChild') })}
       </Lead>
@@ -81,7 +82,7 @@ function Status() {
   const state =
     phase === 'syncing'
       ? progress
-        ? t('syncScreen.progress', { label: progress.label, count: progress.done })
+        ? progressLabel(progress)
         : t('syncScreen.syncing')
       : phase === 'error'
         ? t('syncScreen.error')
@@ -117,7 +118,7 @@ function Status() {
   if (removed) {
     return (
       <>
-        <Text className="text-ink text-xl font-bold">{t('syncScreen.removed')}</Text>
+        <ScreenTitle>{t('syncScreen.removed')}</ScreenTitle>
         <Lead className="mt-2">
           {t('syncScreen.removedText')}
         </Lead>
@@ -183,7 +184,7 @@ function Recovery() {
           <Card>
             <Row label={t('syncScreen.recovery')} value={t('syncScreen.recoverySaved')} onPress={open} right={<Chevron />} />
           </Card>
-          <Text className="text-ink-faint text-xs mt-2 ml-1">{t('syncScreen.lostPaper')}</Text>
+          <Hint className="ml-1">{t('syncScreen.lostPaper')}</Hint>
         </>
       ) : (
         <View className={`rounded-2xl px-4 py-4 border ${alone ? 'bg-violet/10 border-violet/40' : 'bg-surface border-line'}`}>
@@ -263,7 +264,7 @@ function Phones() {
           ),
         )}
       </Card>
-      <Text className="text-ink-faint text-xs mt-2 ml-1">{t('syncScreen.tapRename')}</Text>
+      <Hint className="ml-1">{t('syncScreen.tapRename')}</Hint>
       <Button label={t('syncScreen.addPhone')} onPress={() => router.push('/sync/add')} />
       <GiftSlot />
     </>

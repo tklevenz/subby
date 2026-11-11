@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Linking, Text, View } from 'react-native';
 import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@subby/shared';
-import { Card, Segmented, Toggle, SectionLabel } from '../components/ui';
+import { Card, Segmented, Toggle, SectionLabel, Notice } from '../components/ui';
 import {
   notificationsBlocked,
   remindersAvailable,
@@ -72,13 +72,13 @@ export default function RemindersScreen() {
   return (
     <ScreenScroll>
       {!remindersAvailable ? (
-        <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
+        <Notice className="mb-4">
           <Text className="text-amber-pale text-sm leading-5">
             {t('reminders.expoGo')}
           </Text>
-        </View>
+        </Notice>
       ) : blocked ? (
-        <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
+        <Notice className="mb-4">
           <Text className="text-amber-pale text-sm leading-5">
             {t('reminders.off')}{' '}
             <Text className="underline" onPress={() => Linking.openSettings()}>
@@ -86,7 +86,7 @@ export default function RemindersScreen() {
             </Text>
             {t('reminders.toAllow')}
           </Text>
-        </View>
+        </Notice>
       ) : null}
 
       <View className="bg-surface border border-line rounded-2xl p-4 mb-5 flex-row items-center">
