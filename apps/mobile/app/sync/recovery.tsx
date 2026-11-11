@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
-import { useSyncStore } from '../../features/sync/engine';
+import { useSyncStore } from '../../features/sync/state';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';

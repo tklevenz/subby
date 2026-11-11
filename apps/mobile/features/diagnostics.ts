@@ -6,7 +6,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { TIMED_LOG_TYPES, activeReminderCount } from '@subby/shared';
 import { notificationsAllowed, remindersAvailable } from './reminders/scheduler';
 import { isOfficialServer } from './sync/api';
-import { useSyncStore } from './sync/engine';
+import { useSyncStore } from './sync/state';
 import { useAccessStore } from './sync/access';
 import { backgroundStatus } from './sync/background';
 

@@ -8,26 +8,26 @@ import { deletePhoto, photoSize, readPhotoBytes, savePhotoBytes } from '../photo
 import { isHttpError, type SyncSession } from './api';
 import { needsPhotoUpload } from './records';
 
+const c = schema.childrenTable;
+const l = schema.logsTable;
+
+/** A note's `photoBlob` (the synced reference) or `photoUri` (the file on this phone) is set / not set. */
+const noteHas = (field: 'photoBlob' | 'photoUri', set = true) =>
+  sql`json_extract(${l.payload}, ${sql.raw(`'$.${field}'`)}) is ${sql.raw(set ? 'not null' : 'null')}`;
+/** The same for a child's columns. */
+const childHas = (field: 'photoBlob' | 'photoUri', set = true) => (set ? isNotNull(c[field]) : isNull(c[field]));
+
 /**
  * Photo references point at blobs on one server, for one family. A phone starting or joining another family
  * (a new server, or setting sync up again) forgets them, so its photos upload to the new family. With
  * `onlyLocal`, only rows whose photo file is on this phone are touched (they're the ones it can re-upload).
  */
 export async function forgetPhotoUploads({ onlyLocal = false } = {}) {
+  await db.update(c).set({ photoBlob: null }).where(childHas(onlyLocal ? 'photoUri' : 'photoBlob'));
   await db
-    .update(schema.childrenTable)
-    .set({ photoBlob: null })
-    .where(onlyLocal ? isNotNull(schema.childrenTable.photoUri) : isNotNull(schema.childrenTable.photoBlob));
-  await db
-    .update(schema.logsTable)
-    .set({ payload: sql`json_remove(${schema.logsTable.payload}, '$.photoBlob')` })
-    .where(
-      and(
-        eq(schema.logsTable.logType, 'note'),
-        sql`json_extract(${schema.logsTable.payload}, '$.photoBlob') is not null`,
-        ...(onlyLocal ? [sql`json_extract(${schema.logsTable.payload}, '$.photoUri') is not null`] : []),
-      ),
-    );
+    .update(l)
+    .set({ payload: sql`json_remove(${l.payload}, '$.photoBlob')` })
+    .where(and(eq(l.logType, 'note'), noteHas('photoBlob'), ...(onlyLocal ? [noteHas('photoUri')] : [])));
 }
 
 /**
@@ -37,28 +37,13 @@ export async function forgetPhotoUploads({ onlyLocal = false } = {}) {
 export async function queueUnsyncedPhotos() {
   const now = Date.now();
   await db
-    .update(schema.childrenTable)
+    .update(c)
     .set({ syncStatus: 'pending', updatedAt: now })
-    .where(
-      and(
-        eq(schema.childrenTable.syncStatus, 'synced'),
-        eq(schema.childrenTable.isDeleted, false),
-        isNotNull(schema.childrenTable.photoUri),
-        isNull(schema.childrenTable.photoBlob),
-      ),
-    );
+    .where(and(eq(c.syncStatus, 'synced'), eq(c.isDeleted, false), childHas('photoUri'), childHas('photoBlob', false)));
   await db
-    .update(schema.logsTable)
+    .update(l)
     .set({ syncStatus: 'pending', updatedAt: now })
-    .where(
-      and(
-        eq(schema.logsTable.syncStatus, 'synced'),
-        eq(schema.logsTable.logType, 'note'),
-        eq(schema.logsTable.isDeleted, false),
-        sql`json_extract(${schema.logsTable.payload}, '$.photoUri') is not null`,
-        sql`json_extract(${schema.logsTable.payload}, '$.photoBlob') is null`,
-      ),
-    );
+    .where(and(eq(l.syncStatus, 'synced'), eq(l.logType, 'note'), eq(l.isDeleted, false), noteHas('photoUri'), noteHas('photoBlob', false)));
 }
 
 /**
@@ -77,9 +62,9 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
     Object.assign(child, change);
     changed = true;
     await db
-      .update(schema.childrenTable)
+      .update(c)
       .set(change)
-      .where(and(eq(schema.childrenTable.id, child.id), eq(schema.childrenTable.updatedAt, child.updatedAt)));
+      .where(and(eq(c.id, child.id), eq(c.updatedAt, child.updatedAt)));
   }
   for (const log of logs) {
     if (!needsPhotoUpload(log) || log.payload.type !== 'note') continue;
@@ -89,9 +74,9 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
     log.payload = blob ? { ...log.payload, photoBlob: blob } : note;
     changed = true;
     await db
-      .update(schema.logsTable)
+      .update(l)
       .set({ payload: log.payload })
-      .where(and(eq(schema.logsTable.id, log.id), eq(schema.logsTable.updatedAt, log.updatedAt)));
+      .where(and(eq(l.id, log.id), eq(l.updatedAt, log.updatedAt)));
   }
   return changed;
 }
@@ -132,20 +117,13 @@ async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null |
  */
 export async function downloadPhotos(api: SyncSession, onProgress: (done: number) => void): Promise<number> {
   const children = await db
-    .select({ id: schema.childrenTable.id, blob: schema.childrenTable.photoBlob })
-    .from(schema.childrenTable)
-    .where(and(eq(schema.childrenTable.isDeleted, false), isNotNull(schema.childrenTable.photoBlob), isNull(schema.childrenTable.photoUri)));
+    .select({ id: c.id, blob: c.photoBlob })
+    .from(c)
+    .where(and(eq(c.isDeleted, false), childHas('photoBlob'), childHas('photoUri', false)));
   const notes = await db
-    .select({ id: schema.logsTable.id, payload: schema.logsTable.payload })
-    .from(schema.logsTable)
-    .where(
-      and(
-        eq(schema.logsTable.logType, 'note'),
-        eq(schema.logsTable.isDeleted, false),
-        sql`json_extract(${schema.logsTable.payload}, '$.photoBlob') is not null`,
-        sql`json_extract(${schema.logsTable.payload}, '$.photoUri') is null`,
-      ),
-    );
+    .select({ id: l.id, payload: l.payload })
+    .from(l)
+    .where(and(eq(l.logType, 'note'), eq(l.isDeleted, false), noteHas('photoBlob'), noteHas('photoUri', false)));
 
   let done = 0;
   for (const { id, blob } of children) {
@@ -153,9 +131,9 @@ export async function downloadPhotos(api: SyncSession, onProgress: (done: number
     if (!uri) continue;
     // Only if the row still wants this photo (a newer version may have arrived meanwhile).
     const res = await db
-      .update(schema.childrenTable)
+      .update(c)
       .set({ photoUri: uri })
-      .where(and(eq(schema.childrenTable.id, id), sql`json_extract(${schema.childrenTable.photoBlob}, '$.id') = ${blob!.id}`));
+      .where(and(eq(c.id, id), sql`json_extract(${c.photoBlob}, '$.id') = ${blob!.id}`));
     if (!res.changes) deletePhoto(uri);
     else onProgress(++done);
   }
@@ -164,9 +142,9 @@ export async function downloadPhotos(api: SyncSession, onProgress: (done: number
     const uri = await download(api, payload.photoBlob);
     if (!uri) continue;
     const res = await db
-      .update(schema.logsTable)
-      .set({ payload: sql`json_set(${schema.logsTable.payload}, '$.photoUri', ${uri})` })
-      .where(and(eq(schema.logsTable.id, id), sql`json_extract(${schema.logsTable.payload}, '$.photoBlob.id') = ${payload.photoBlob.id}`));
+      .update(l)
+      .set({ payload: sql`json_set(${l.payload}, '$.photoUri', ${uri})` })
+      .where(and(eq(l.id, id), sql`json_extract(${l.payload}, '$.photoBlob.id') = ${payload.photoBlob.id}`));
     if (!res.changes) deletePhoto(uri);
     else onProgress(++done);
   }
@@ -197,23 +175,14 @@ async function download(api: SyncSession, blob: PhotoBlob): Promise<string | nul
  * is skipped, so one photo can't stop the rest).
  */
 export async function uploadPhotosAsTheyAre(api: SyncSession, onProgress: (done: number) => void, tolerant = false) {
-  const c = schema.childrenTable;
-  const l = schema.logsTable;
   const children = await db
     .select({ uri: c.photoUri, blob: c.photoBlob })
     .from(c)
-    .where(and(eq(c.isDeleted, false), isNotNull(c.photoUri), isNotNull(c.photoBlob)));
+    .where(and(eq(c.isDeleted, false), childHas('photoUri'), childHas('photoBlob')));
   const notes = await db
     .select({ payload: l.payload })
     .from(l)
-    .where(
-      and(
-        eq(l.logType, 'note'),
-        eq(l.isDeleted, false),
-        sql`json_extract(${l.payload}, '$.photoBlob') is not null`,
-        sql`json_extract(${l.payload}, '$.photoUri') is not null`,
-      ),
-    );
+    .where(and(eq(l.logType, 'note'), eq(l.isDeleted, false), noteHas('photoBlob'), noteHas('photoUri')));
   const photos = [
     ...children.map((r) => ({ uri: r.uri!, blob: r.blob! })),
     ...notes.flatMap(({ payload: p }) => (p.type === 'note' && p.photoUri && p.photoBlob ? [{ uri: p.photoUri, blob: p.photoBlob }] : [])),

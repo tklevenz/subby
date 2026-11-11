@@ -11,7 +11,7 @@ import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { useSyncStore } from '../../features/sync/engine';
+import { useSyncStore } from '../../features/sync/state';
 import { diagnostics } from '../../features/diagnostics';
 import { Card, Row, Segmented, Toggle, SectionLabel } from '../../components/ui';
 import { colors } from '../../theme/colors';

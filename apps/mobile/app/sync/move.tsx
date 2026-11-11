@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { useSyncStore } from '../../features/sync/engine';
+import { useSyncStore } from '../../features/sync/state';
 import { moveToServer } from '../../features/sync/move';
 import { isOfficialServer, serverLabel } from '../../features/sync/api';
 import { PRICE } from '../../features/sync/access';

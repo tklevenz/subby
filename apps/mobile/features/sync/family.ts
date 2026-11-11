@@ -31,7 +31,8 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { call, checkServer, isHttpError, normalizeServerUrl, sealEpochs, SyncSession } from './api';
 import { deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys, saveSync, sessionFor, syncSettings } from './engine';
+import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys } from './engine';
+import { newSyncSettings, saveSync, sessionFor, syncSettings } from './state';
 
 export { defaultDeviceName } from './engine';
 
@@ -294,17 +295,9 @@ async function completeJoin(
     await forgetPhotoUploads();
   }
 
-  await useSettingsStore.getState().set('sync', {
-    server,
-    familyId,
-    deviceId,
-    lastSeq: 0,
-    lastSyncedAt: null,
-    since: Date.now(),
-    knownDevices: [...state.members.keys()],
-    photosFamily: familyId,
-    logSeen: { length: entries.length, head: state.head },
-  });
+  await useSettingsStore
+    .getState()
+    .set('sync', newSyncSettings({ server, familyId, deviceId, knownDevices: [...state.members.keys()], logSeen: { length: entries.length, head: state.head } }));
   await pushDeviceName(name);
   requestSync(0);
 }

@@ -5,7 +5,9 @@ import { router } from 'expo-router';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { closeLive, openLive, pendingCount, requestSync, useSyncStore } from './engine';
+import { pendingCount, requestSync } from './engine';
+import { closeLive, openLive } from './live';
+import { useSyncStore } from './state';
 import { setUpBackgroundSync, stopBackgroundSync } from './background';
 import { serverLabel } from './api';
 
@@ -21,7 +23,7 @@ export function useSyncEngine(ready: boolean) {
       useSyncStore.setState((s) => (s.phase === 'off' ? { phase: 'idle' } : s));
       void pendingCount().then((pending) => useSyncStore.setState({ pending }));
       requestSync(0);
-      void openLive();
+      void openLive(() => requestSync(300));
       setUpBackgroundSync().catch((e: unknown) => console.warn('Background sync setup failed', e)); // i18n-ignore
     };
     start();

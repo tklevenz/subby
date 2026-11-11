@@ -21,19 +21,10 @@ import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealTo, ser
 import { deviceIdentity, saveFamilyKeys } from './keystore';
 import { setUpBackgroundSync } from './background';
 import { uploadPhotosAsTheyAre } from './photos';
-import {
-  forgetSession,
-  openLive,
-  pushDeviceName,
-  quietNextRun,
-  refreshKeys,
-  refreshMembers,
-  requestSync,
-  sessionFor,
-  syncNow,
-  syncSettings,
-  useSyncStore,
-} from './engine';
+import { forgetSession, pushDeviceName, refreshKeys, refreshMembers, requestSync, syncNow } from './engine';
+import { quietNextRun } from './apply';
+import { openLive } from './live';
+import { sessionFor, syncSettings, useSyncStore } from './state';
 
 /**
  * Moving the family to another server (official ↔ self-hosted), without pairing again (LAUNCH.md A13).
@@ -93,7 +84,7 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
   }
 
   onStep(t('sync.move.entries'));
-  await switchTo(settings, { server, familyId, entries: log, key: familyKey, members: [...verifyDeviceLog(log).members.keys()] });
+  await switchTo(settings, { server, familyId, entries: log, keys: new Map([[1, familyKey]]), members: [...verifyDeviceLog(log).members.keys()], markAllPending: true });
   // Names stay as they were (each phone's own record, written here for them).
   for (const [id, name] of Object.entries(settings.names ?? {})) {
     if (verifyDeviceLog(log).members.has(id)) await pushDeviceName(name, id).catch(() => {});
@@ -135,7 +126,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     }
     await markAllPending(own);
 
-    await switchTo(settings, { server: move.server, familyId: move.familyId, entries, key: null, keys, members: [...state.members.keys()] });
+    await switchTo(settings, { server: move.server, familyId: move.familyId, entries, keys, members: [...state.members.keys()], markAllPending: false });
     await leave(oldApi, oldEntries, me);
     useSyncStore.setState({ movedTo: move.server });
   } catch (e) {
@@ -145,16 +136,24 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
   }
 }
 
+/** Settings that belong to the old server: its log copy, restore count and floors, push registration, and the move note itself. */
+const OLD_SERVER_ONLY = ['move', 'pushToken', 'push', 'log', 'restoreGen', 'floors'] as const;
+
+const omit = <T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Omit<T, K> => {
+  const copy = { ...obj };
+  for (const k of keys) delete copy[k];
+  return copy;
+};
+
 /** Points this phone at the new family: its keys, server and log; every row of it then syncs there. */
 async function switchTo(
   settings: SyncSettings,
-  next: { server: string; familyId: string; entries: DeviceLogEntry[]; key: Uint8Array | null; keys?: Map<number, Uint8Array>; members: string[] },
+  next: { server: string; familyId: string; entries: DeviceLogEntry[]; keys: Map<number, Uint8Array>; members: string[]; markAllPending: boolean },
 ) {
-  saveFamilyKeys(next.keys ?? new Map([[1, next.key!]]));
+  saveFamilyKeys(next.keys);
   // The mover sends everything it has; a follower only what the mover can't have (marked pending before this).
-  if (next.key) await markAllPending();
-  // The old family's log copy, restore count and floors belong to the old server.
-  const { move: _, pushToken: __, push: ___, log: ____, restoreGen: _____, floors: ______, ...kept } = settings;
+  if (next.markAllPending) await markAllPending();
+  const kept = omit(settings, OLD_SERVER_ONLY);
   forgetSession();
   quietNextRun();
   await useSettingsStore.getState().set('sync', {
@@ -167,7 +166,7 @@ async function switchTo(
     photosFamily: next.familyId,
     logSeen: { length: next.entries.length, head: verifyDeviceLog(next.entries).head },
   });
-  void openLive();
+  void openLive(() => requestSync(300));
   setUpBackgroundSync().catch((e: unknown) => console.warn('[sync] background setup after the move failed', e));
   requestSync(0);
 }

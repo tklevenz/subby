@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useSyncStore } from '../features/sync/engine';
+import { useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useActiveChild } from '../store/useActiveChild';
 import { Xmark } from './icons';

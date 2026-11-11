@@ -7,7 +7,8 @@ import { appReady } from '../startup';
 import { replanReminders } from '../reminders/scheduler';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { checkServer } from './api';
-import { saveSync, sessionFor, syncNow, syncSettings } from './engine';
+import { syncNow } from './engine';
+import { saveSync, sessionFor, syncSettings } from './state';
 
 /** Periodic sync for everyone (as often as the OS allows, at best every 15 minutes). */
 const SYNC_TASK = 'subby-sync-periodic';

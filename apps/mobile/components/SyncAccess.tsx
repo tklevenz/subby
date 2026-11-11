@@ -5,7 +5,8 @@ import { router } from 'expo-router';
 import type { SyncAccess } from '@subby/shared/sync';
 import { Button, Card, Row, Segmented, SectionLabel } from './ui';
 import { PRICE, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools } from '../features/sync/access';
-import { sessionFor, syncNow, useSyncStore } from '../features/sync/engine';
+import { syncNow } from '../features/sync/engine';
+import { sessionFor, useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime, useNow } from '../store/timeHelpers';
 

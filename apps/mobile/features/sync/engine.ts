@@ -1,10 +1,9 @@
 import { t } from '@subby/shared/i18n';
-import { create } from 'zustand';
 import * as Device from 'expo-device';
-import { and, count, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, count, eq, notInArray } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { uuidv7 } from 'uuidv7';
-import { notePhoto, type Child, type LogEntry } from '@subby/shared';
+import type { Child, LogEntry } from '@subby/shared';
 import {
   RECOVERY_SIGNER,
   appendEntry,
@@ -20,63 +19,30 @@ import {
   type DeviceLogState,
   type RestoreFloor,
 } from '@subby/shared/crypto';
-import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, pushChunks, serverWentBack, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
+import { MAX_RECORD_DATA, pageContinues, pushChunks, serverWentBack, settlePush, sealRecord, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
-import { deletePhoto } from '../photos';
-import { deletedLog, deletedLogs } from '../../db/tombstone';
 import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
-import { notifyFamily, type PulledLog } from '../reminders/family';
+import { notifyFamily } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, type ChildBody, type LogBody } from './records';
+import { blobIdsOf, childToBody, logToBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
 import { canWrite, forgetAccess, refreshEntitlement, useAccessStore } from './access';
 import { cancelInactivityWarning, planInactivityWarning } from './inactivity';
 import { followMove } from './move';
+import { applyOpened, applyPage, openAll, quietNextRun, takePulledLogs, type DeviceBody } from './apply';
+import { closeLive } from './live';
+import { INITIAL_STATUS, dropSession, newSyncSettings, saveSync, sessionFor, syncSettings, useSyncStore } from './state';
 
+/** Rows per push request (a batch of large notes is split further by `pushChunks`). */
 const PUSH_BATCH = 500;
 
-type SyncStatus = {
-  phase: 'off' | 'idle' | 'syncing' | 'error';
-  error: string | null;
-  /** Local changes not yet uploaded. */
-  pending: number;
-  /** During a long first upload or download. */
-  progress: { label: string; done: number } | null;
-  /** The family's phones, from the verified device log. */
-  members: { id: string; isMe: boolean }[];
-  /** Phones that joined since this phone last looked (shown once as a heads-up). */
-  newDevices: string[];
-  /** Another phone removed this one from the family: it can only turn sync off. */
-  removed: boolean;
-  /** Whether the family has a recovery key (from the verified device log). */
-  hasRecovery: boolean;
-  /** Local changes too large for the server, left unsynced (a very long note). */
-  tooLarge: number;
-  /** The family just moved to this server (this phone followed): shown once. */
-  movedTo: string | null;
-  /** The last run that failed, kept after later runs succeed (for diagnostics). */
-  lastError: { message: string; at: number } | null;
-};
+/** The server's limit on a record's ciphertext (base64url characters). */
+const MAX_RECORD_CHARS = Math.ceil((MAX_RECORD_DATA * 4) / 3);
 
-export const useSyncStore = create<SyncStatus>(() => ({ phase: 'off', error: null, pending: 0, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false, tooLarge: 0, movedTo: null, lastError: null }));
-
-let session: SyncSession | null = null;
-export function sessionFor(s: SyncSettings) {
-  if (!session || session.server !== s.server || session.deviceId !== s.deviceId) {
-    session = new SyncSession(s.server, s.deviceId, deviceIdentity());
-  }
-  return session;
-}
-
-export const syncSettings = () => useSettingsStore.getState().sync;
-export const saveSync = (patch: Partial<SyncSettings>) => {
-  const current = syncSettings();
-  return current ? useSettingsStore.getState().set('sync', { ...current, ...patch }) : Promise.resolve();
-};
 
 export async function pendingCount(): Promise<number> {
   const [c] = await db.select({ n: count() }).from(schema.childrenTable).where(eq(schema.childrenTable.syncStatus, 'pending'));
@@ -106,17 +72,7 @@ export async function setUpSync(serverInput: string, deviceName: string) {
   await forgetPhotoUploads();
   await useSettingsStore
     .getState()
-    .set('sync', {
-      server,
-      familyId,
-      deviceId,
-      lastSeq: 0,
-      lastSyncedAt: null,
-      since: Date.now(),
-      knownDevices: [deviceId],
-      photosFamily: familyId,
-      logSeen: { length: 1, head: verifyDeviceLog([entry]).head },
-    });
+    .set('sync', newSyncSettings({ server, familyId, deviceId, knownDevices: [deviceId], logSeen: { length: 1, head: verifyDeviceLog([entry]).head } }));
   await pushDeviceName(deviceName);
   requestSync(0);
 }
@@ -146,7 +102,7 @@ export async function deleteFamilyOnServer() {
 export function forgetSession() {
   closeLive();
   forgetAccess();
-  session = null;
+  dropSession();
 }
 
 async function forgetSync() {
@@ -154,7 +110,8 @@ async function forgetSync() {
   await cancelInactivityWarning();
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
-  useSyncStore.setState({ phase: 'off', error: null, progress: null, members: [], newDevices: [], removed: false, hasRecovery: false });
+  // The last error stays for support (diagnostics); everything else goes back to what an unset-up phone has.
+  useSyncStore.setState({ ...INITIAL_STATUS, lastError: useSyncStore.getState().lastError });
 }
 
 async function leaveFamily(settings: SyncSettings) {
@@ -168,7 +125,7 @@ async function leaveFamily(settings: SyncSettings) {
 // --- one sync run -----------------------------------------------------------------------------------------
 
 let running: Promise<void> | null = null;
-let again = false;
+let again = false; // a request that came in during a run: one more run after it
 
 /** Runs a sync now, or once more right after the current one finishes. */
 export function syncNow(): Promise<void> {
@@ -178,10 +135,11 @@ export function syncNow(): Promise<void> {
   }
   running = (async () => {
     try {
-      do {
+      // `again` (a request during the run) and the run's own answer (it followed a move, or the server was restored).
+      for (let repeat = true; repeat; ) {
         again = false;
-        await runOnce();
-      } while (again);
+        repeat = (await runOnce()) || again;
+      }
     } finally {
       running = null;
     }
@@ -200,11 +158,12 @@ export function requestSync(delayMs = 1500) {
   }, delayMs);
 }
 
-async function runOnce() {
+/** One run. Returns whether another should follow right away (it followed a move, noted one, or restarted after a restore). */
+async function runOnce(): Promise<boolean> {
   const settings = syncSettings();
   if (!settings) {
     useSyncStore.setState({ phase: 'off' });
-    return;
+    return false;
   }
   useSyncStore.setState({ phase: 'syncing', error: null });
   try {
@@ -212,14 +171,16 @@ async function runOnce() {
     if (settings.move) {
       useSyncStore.setState({ progress: { label: t('sync.progress.moving'), done: 0 } });
       await followMove(settings, settings.move);
-      again = true;
-      return;
+      return true;
     }
     const api = sessionFor(settings);
     let { entries, state } = await refreshMembers(api, settings);
     let keys = await refreshKeys(api, state);
     // Finish what a phone left half done (a grant or a rotation), then work with the result.
-    if (await heal(api, settings, entries, state, keys)) {
+    let restarted = false;
+    const healed = await heal(api, settings, entries, state, keys);
+    if (healed.changed) {
+      restarted = healed.again;
       ({ entries, state } = await refreshMembers(api, settings));
       keys = await refreshKeys(api, state);
     }
@@ -234,20 +195,19 @@ async function runOnce() {
     // A phone without an unlock (hosted, after the trial) still pulls; its own changes wait, pending, until it's unlocked.
     await refreshEntitlement(api);
     const pushed = canWrite() ? await pushUnlessLocked(api, settings, keys) : { applied: false, tooLarge: 0 };
-    const applied = (await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq)) || pushed.applied;
+    const pulled = await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq);
+    const applied = pulled.applied || pushed.applied;
+    restarted ||= pulled.again;
     const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: t('sync.progress.photos'), done } }));
     // Phones set up before names existed (or whose name record was lost) name themselves once.
     if (!syncSettings()?.names?.[settings.deviceId] && canWrite()) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
-    // A pulled `moved` record: the next round follows it.
-    if (syncSettings()?.move) again = true;
-    const pulled = quiet ? [] : pulledLogs;
-    pulledLogs = [];
-    quiet = false;
-    await notifyFamily(pulled).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
+    await notifyFamily(takePulledLogs()).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
     await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e)); // i18n-ignore
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
+    // A pulled `moved` record: the next round follows it.
+    return restarted || Boolean(syncSettings()?.move);
   } catch (e) {
     const removed = isRemoved(e);
     const message = removed ? t('sync.error.removed') : e instanceof Error ? e.message : String(e);
@@ -280,15 +240,16 @@ export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
   let { entries } = await api.log();
   // The server lost entries this phone verified (it was restored from a backup): give them back as they were
   // signed. The server checks they continue its log; anything else still fails below.
-  const lost = entriesToRestore(entries, syncSettings()?.log);
+  const saved = syncSettings();
+  const lost = entriesToRestore(entries, saved?.log);
   if (lost) {
     console.warn(`[sync] the server lost ${lost.length} phone list entries; giving them back`);
     await api.restoreLog(lost);
     ({ entries } = await api.log());
   }
-  assertLogContinues(entries, syncSettings()?.logSeen ?? settings.logSeen);
+  assertLogContinues(entries, saved?.logSeen ?? settings.logSeen);
   const state = verifyDeviceLog(entries);
-  if (syncSettings()?.logSeen?.length !== entries.length || syncSettings()?.log?.length !== entries.length) {
+  if (saved?.logSeen?.length !== entries.length || saved?.log?.length !== entries.length) {
     await saveSync({ logSeen: { length: entries.length, head: state.head }, log: entries });
   }
   if (!state.members.has(settings.deviceId)) throw new SyncHttpError(401, 'Removed'); // i18n-ignore
@@ -328,10 +289,11 @@ type Keys = Awaited<ReturnType<typeof refreshKeys>>;
 /**
  * Finishes what another phone (or this one) left half done: grants epochs a member lacks, sealed only to keys from
  * the verified log, and starts the epoch the log says is owed (after a removal or a replaced recovery key).
- * Returns whether it changed anything. A rotation another phone made first is fine.
+ * Returns whether it changed anything, and whether the run should start over (`again`). A rotation another phone made first is fine.
  */
 async function heal(api: SyncSession, settings: SyncSettings, entries: DeviceLogEntry[], state: DeviceLogState, { keys, missing }: Keys) {
   let changed = false;
+  let again = false;
   for (const { recipient, epochs } of missing) {
     const member = recipient === RECOVERY_SIGNER ? state.recovery : state.members.get(recipient);
     const held = epochs.filter((e) => keys.has(e));
@@ -341,14 +303,14 @@ async function heal(api: SyncSession, settings: SyncSettings, entries: DeviceLog
   }
   if (state.rotationDue) {
     try {
-      await rotateKeys(api, settings, entries, state, keys);
+      again = (await rotateKeys(api, settings, entries, state, keys)).again;
     } catch (e) {
       // Another phone rotated at the same moment: its epoch counts.
       if (!isHttpError(e, 400, 409)) throw e;
     }
     changed = true;
   }
-  return changed;
+  return { changed, again };
 }
 
 /**
@@ -366,8 +328,11 @@ export async function rotateKeys(api: SyncSession, settings: SyncSettings, entri
   for (const [id, m] of state.members) sealed[id] = sealTo(m.boxKey, key);
   if (state.recovery) sealed[RECOVERY_SIGNER] = sealTo(state.recovery.boxKey, key);
   const current: Keys = { keys, epoch: state.epoch, missing: [], closedAt: state.closedAt };
+  let again = false;
   for (let attempt = 1; ; attempt++) {
-    if (await pullAll(api, settings, current, syncSettings()?.lastSeq ?? 0)) await reloadStores();
+    const pulled = await pullAll(api, settings, current, syncSettings()?.lastSeq ?? 0);
+    again ||= pulled.again;
+    if (pulled.applied) await reloadStores();
     const closedSeq = syncSettings()?.lastSeq ?? 0;
     const entry = appendEntry(state, entries.length, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key }, closedSeq }, Date.now());
     try {
@@ -379,7 +344,7 @@ export async function rotateKeys(api: SyncSession, settings: SyncSettings, entri
   }
   keys.set(epoch, key);
   saveFamilyKeys(keys);
-  return { epoch, key };
+  return { epoch, key, again };
 }
 
 async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, closedAt }: Keys) {
@@ -399,7 +364,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
   const tooLarge = new Set<string>();
   // Rows the server called stale without sending a version that beats them: left pending for the next run.
   const held = new Set<string>();
-  const notTooLarge = <T extends { id: SQLiteColumn }>(t: T) => {
+  const unlessSkipped = <T extends { id: SQLiteColumn }>(t: T) => {
     const skip = [...tooLarge, ...held];
     return skip.length ? [notInArray(t.id, skip)] : [];
   };
@@ -408,9 +373,9 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     // Children first, so a fresh device sees a child before its entries.
     const c = schema.childrenTable;
     const l = schema.logsTable;
-    const children = await db.select().from(c).where(and(eq(c.syncStatus, 'pending'), ...notTooLarge(c))).limit(PUSH_BATCH);
+    const children = await db.select().from(c).where(and(eq(c.syncStatus, 'pending'), ...unlessSkipped(c))).limit(PUSH_BATCH);
     const logs = children.length < PUSH_BATCH
-      ? await db.select().from(l).where(and(eq(l.syncStatus, 'pending'), ...notTooLarge(l))).limit(PUSH_BATCH - children.length)
+      ? await db.select().from(l).where(and(eq(l.syncStatus, 'pending'), ...unlessSkipped(l))).limit(PUSH_BATCH - children.length)
       : [];
     if (!children.length && !logs.length) return { applied, tooLarge: tooLarge.size };
 
@@ -459,17 +424,15 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
   }
 }
 
-/** The server's limit on a record's ciphertext (base64url characters). */
-const MAX_RECORD_CHARS = Math.ceil((MAX_RECORD_DATA * 4) / 3);
-
 /**
  * Pulls every page since `since` and applies it. Returns whether anything changed locally. Records that can't be
  * genuine are skipped: a seq outside the page asked for, or one of an old epoch past the seq the log closed it at
  * (written with a key a removed phone still has, and stored by a server that shouldn't have).
  */
-async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, closedAt }: Keys, since: number) {
+async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, closedAt }: Keys, since: number): Promise<{ applied: boolean; again: boolean }> {
   let seq = since;
   let applied = false;
+  let again = false;
   let done = 0;
   for (;;) {
     const page = await api.pull(seq);
@@ -481,6 +444,7 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       await resyncAfterRestore(api, { epoch, seq: gen !== seenGen ? (page.restored?.seq ?? 0) : page.seq }, gen);
       seq = 0;
       applied = true;
+      again = true;
       continue;
     }
     if (gen !== seenGen) await saveSync({ restoreGen: gen });
@@ -497,7 +461,7 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     }
     seq = page.seq;
     await saveSync({ lastSeq: seq });
-    if (!page.more) return applied;
+    if (!page.more) return { applied, again };
   }
 }
 
@@ -522,141 +486,9 @@ async function resyncAfterRestore(api: SyncSession, floor: RestoreFloor, gen: nu
   if (name && canWrite()) await pushDeviceName(name);
   quietNextRun();
   await saveSync({ lastSeq: 0, restoreGen: gen, floors: [...(settings.floors ?? []), floor] });
-  again = true;
 }
-
-/** Entries other phones wrote, applied during this run (for `notifyFamily`). */
-let pulledLogs: PulledLog[] = [];
-/** The first run after a move pulls everything again, all of it already here: no family notifications for it. */
-let quiet = false;
-export const quietNextRun = () => {
-  quiet = true;
-};
-
-/** Decrypts, checks and applies one page (see `openAll` and `applyOpened`). */
-async function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): Promise<boolean> {
-  return applyOpened(openAll(records, keys), ownDeviceId);
-}
-
-type Opened = { record: SyncRecord; body: ChildBody | LogBody | DeviceBody | MovedBody | null };
-
-/**
- * Decrypts and checks records, before anything is written. A record of an epoch we have no key for throws, failing
- * the run (the next one fetches the key). One that doesn't open with a key we have (damaged or tampered with), one
- * that opens but is malformed (a buggy or hostile phone), or a tombstone nobody sealed (an older app's, or a
- * server's), is skipped, so a single bad record can't stop sync for good. Bodies come back as checked.
- */
-function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>): Opened[] {
-  return records
-    .flatMap((r) => {
-      try {
-        return [{ record: r, body: openRecord<Opened['body']>(keys, r) }];
-      } catch (e) {
-        if (e instanceof UnsealedRecordError) console.warn(`[sync] skipped unsealed ${r.kind} record ${r.id}`);
-        else if (keys.has(r.epoch)) console.warn(`[sync] skipped ${r.kind} record ${r.id}: it doesn't open`, e);
-        else throw e;
-        return [];
-      }
-    })
-    .flatMap(({ record, body }) => {
-      if (record.deleted) return [{ record, body }];
-      const valid = validBody<NonNullable<Opened['body']>>(record.kind, body);
-      if (valid) return [{ record, body: valid }];
-      console.warn(`[sync] skipped malformed ${record.kind} record ${record.id}`);
-      return [];
-    });
-}
-
-/** Applies opened records in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
-async function applyOpened(opened: Opened[], ownDeviceId: string): Promise<boolean> {
-  await applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
-  await noteMove(opened.filter((o) => o.record.kind === 'moved'), ownDeviceId);
-  const photos: (string | null | undefined)[] = [];
-  let changed = false;
-
-  db.transaction((tx) => {
-    const childIds = opened.filter((o) => o.record.kind === 'child').map((o) => o.record.id);
-    const logIds = opened.filter((o) => o.record.kind === 'log').map((o) => o.record.id);
-    const localChildren = new Map(
-      (childIds.length ? tx.select().from(schema.childrenTable).where(inArray(schema.childrenTable.id, childIds)).all() : []).map((c) => [c.id, c]),
-    );
-    const localLogs = new Map(
-      (logIds.length ? tx.select().from(schema.logsTable).where(inArray(schema.logsTable.id, logIds)).all() : []).map((l) => [l.id, l]),
-    );
-
-    for (const { record: r, body } of opened) {
-      if (r.kind === 'device' || r.kind === 'moved') continue; // applied above
-      const local: Child | LogEntry | undefined = r.kind === 'child' ? localChildren.get(r.id) : localLogs.get(r.id);
-      // Our own upload coming back: already applied.
-      if (local && r.deviceId === ownDeviceId && local.updatedAt === r.updatedAt) continue;
-      const localVersion = local ? { updatedAt: local.updatedAt, pending: local.syncStatus === 'pending' } : null;
-      if (!clientApplies(localVersion, r, ownDeviceId)) continue;
-      changed = true;
-
-      if (r.kind === 'child') {
-        const row = r.deleted ? childTombstone(r.id, r.updatedAt, 'synced') : bodyToChild(r.id, body as ChildBody, r, local as Child | undefined);
-        tx.insert(schema.childrenTable).values(row).onConflictDoUpdate({ target: schema.childrenTable.id, set: row }).run();
-        // This phone's copy of a photo the new version no longer uses (replaced, removed or deleted).
-        const oldPhoto = (local as Child | undefined)?.photoUri;
-        if (oldPhoto && oldPhoto !== row.photoUri) photos.push(oldPhoto);
-        if (r.deleted) {
-          for (const note of tx.select().from(schema.logsTable).where(and(eq(schema.logsTable.childId, r.id), eq(schema.logsTable.logType, 'note'))).all()) {
-            photos.push(notePhoto(note.payload));
-          }
-          tx.update(schema.logsTable)
-            .set(deletedLogs({ importRef: null, syncStatus: 'synced' }))
-            .where(eq(schema.logsTable.childId, r.id))
-            .run();
-        }
-      } else if (r.deleted) {
-        const old = local as LogEntry | undefined;
-        if (!old) continue; // never had it; nothing to delete
-        photos.push(notePhoto(old.payload));
-        tx.update(schema.logsTable)
-          .set(deletedLog(old.logType, { importRef: null, updatedAt: r.updatedAt, syncStatus: 'synced' }))
-          .where(eq(schema.logsTable.id, r.id))
-          .run();
-        if (r.deviceId !== ownDeviceId) pulledLogs.push({ before: old, after: { ...old, isDeleted: true }, deviceId: r.deviceId });
-      } else {
-        const row = bodyToLog(r.id, body as LogBody, r, local as LogEntry | undefined);
-        tx.insert(schema.logsTable).values(row).onConflictDoUpdate({ target: schema.logsTable.id, set: row }).run();
-        const old = local as LogEntry | undefined;
-        if (r.deviceId !== ownDeviceId) pulledLogs.push({ before: old ?? null, after: row, deviceId: r.deviceId });
-        const oldPhoto = old && notePhoto(old.payload);
-        if (oldPhoto && oldPhoto !== notePhoto(row.payload)) photos.push(oldPhoto);
-      }
-    }
-  });
-
-  for (const uri of photos) deletePhoto(uri ?? undefined);
-  return changed;
-}
-
 /** A sensible default name for this phone in the family's list, e.g. "Pixel 10". */
 export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? t('sync.phone');
-
-/** A phone's display name, as its encrypted `device` record (id = that phone's device id). */
-export type DeviceBody = { name: string };
-
-async function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]) {
-  if (!records.length) return;
-  const names = { ...syncSettings()?.names };
-  for (const { record, body } of records) {
-    if (record.deleted) delete names[record.id];
-    else names[record.id] = (body as DeviceBody).name;
-  }
-  await saveSync({ names });
-}
-
-/** Another phone moved the family to another server: remember where, and follow on the next round (`followMove`). */
-async function noteMove(records: Opened[], ownDeviceId: string) {
-  const current = syncSettings();
-  for (const { record, body } of records) {
-    const moved = body as MovedBody | null;
-    if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.from !== record.deviceId || moved.familyId === current.familyId) continue;
-    await saveSync({ move: moved });
-  }
-}
 
 /** Publishes a phone's name to the family (this phone's at setup, join and rename). */
 export async function pushDeviceName(name: string, deviceId?: string) {
@@ -680,39 +512,3 @@ async function reloadStores() {
   if (active) await useLogStore.getState().loadLogs(active.id);
 }
 
-// --- live notifications -----------------------------------------------------------------------------------
-
-let socket: WebSocket | null = null;
-let retry: ReturnType<typeof setTimeout> | null = null;
-let attempts = 0;
-
-/** While the app is open: the server pings on every change, and this phone pulls right away. */
-export async function openLive() {
-  const settings = syncSettings();
-  if (!settings || socket) return;
-  try {
-    const url = await sessionFor(settings).liveUrl();
-    socket = new WebSocket(url);
-    socket.onopen = () => (attempts = 0);
-    socket.onmessage = () => requestSync(300);
-    socket.onclose = (e) => {
-      socket = null;
-      if (e.code === 4401 || !syncSettings()) return;
-      // Reconnect with backoff (phones lose connections all the time).
-      retry = setTimeout(openLive, Math.min(30_000, 1000 * 2 ** attempts++));
-    };
-  } catch {
-    retry = setTimeout(openLive, Math.min(30_000, 1000 * 2 ** attempts++));
-  }
-}
-
-export function closeLive() {
-  if (retry) clearTimeout(retry);
-  retry = null;
-  const s = socket;
-  socket = null;
-  if (s) {
-    s.onclose = null;
-    s.close();
-  }
-}
