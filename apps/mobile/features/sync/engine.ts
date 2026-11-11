@@ -1,10 +1,10 @@
 import { t } from '@subby/shared/i18n';
 import { create } from 'zustand';
 import * as Device from 'expo-device';
-import { and, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, notInArray } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogEntry } from '@subby/shared';
+import { notePhoto, type Child, type LogEntry } from '@subby/shared';
 import {
   RECOVERY_SIGNER,
   appendEntry,
@@ -23,13 +23,15 @@ import {
 import { MAX_RECORD_DATA, UnsealedRecordError, clientApplies, openRecord, pageContinues, pushChunks, serverWentBack, settlePush, sealRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto } from '../photos';
+import { deletedLog, deletedLogs } from '../../db/tombstone';
+import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
 import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
+import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, type ChildBody, type LogBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
 import { canWrite, forgetAccess, refreshEntitlement, useAccessStore } from './access';
 import { cancelInactivityWarning, planInactivityWarning } from './inactivity';
@@ -100,8 +102,7 @@ export async function setUpSync(serverInput: string, deviceName: string) {
 
   saveFamilyKeys(new Map([[1, familyKey]]));
   // Everything on this phone goes up, including deletions made before sync existed, and photos to this family.
-  await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
-  await db.update(schema.logsTable).set({ syncStatus: 'pending' });
+  await markAllPending();
   await forgetPhotoUploads();
   await useSettingsStore
     .getState()
@@ -515,8 +516,7 @@ async function resyncAfterRestore(api: SyncSession, floor: RestoreFloor, gen: nu
   console.warn(`[sync] the server was restored from a backup (count ${gen}, seq ${floor.seq}); syncing everything again`);
   useSyncStore.setState({ progress: { label: t('sync.progress.restoring'), done: 0 } });
   await uploadPhotosAsTheyAre(api, (done) => useSyncStore.setState({ progress: { label: t('sync.progress.restoring'), done } }), true);
-  await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
-  await db.update(schema.logsTable).set({ syncStatus: 'pending' });
+  await markAllPending();
   const settings = syncSettings()!;
   const name = settings.names?.[settings.deviceId];
   if (name && canWrite()) await pushDeviceName(name);
@@ -601,19 +601,19 @@ async function applyOpened(opened: Opened[], ownDeviceId: string): Promise<boole
         if (oldPhoto && oldPhoto !== row.photoUri) photos.push(oldPhoto);
         if (r.deleted) {
           for (const note of tx.select().from(schema.logsTable).where(and(eq(schema.logsTable.childId, r.id), eq(schema.logsTable.logType, 'note'))).all()) {
-            photos.push(note.payload.type === 'note' ? note.payload.photoUri : undefined);
+            photos.push(notePhoto(note.payload));
           }
           tx.update(schema.logsTable)
-            .set({ isDeleted: true, payload: sql`json_object('type', ${schema.logsTable.logType})`, importRef: null, syncStatus: 'synced' })
+            .set(deletedLogs({ importRef: null, syncStatus: 'synced' }))
             .where(eq(schema.logsTable.childId, r.id))
             .run();
         }
       } else if (r.deleted) {
         const old = local as LogEntry | undefined;
         if (!old) continue; // never had it; nothing to delete
-        photos.push(old.payload.type === 'note' ? old.payload.photoUri : undefined);
+        photos.push(notePhoto(old.payload));
         tx.update(schema.logsTable)
-          .set({ isDeleted: true, payload: scrubbedPayload(old.logType), importRef: null, updatedAt: r.updatedAt, syncStatus: 'synced' })
+          .set(deletedLog(old.logType, { importRef: null, updatedAt: r.updatedAt, syncStatus: 'synced' }))
           .where(eq(schema.logsTable.id, r.id))
           .run();
         if (r.deviceId !== ownDeviceId) pulledLogs.push({ before: old, after: { ...old, isDeleted: true }, deviceId: r.deviceId });
@@ -622,8 +622,8 @@ async function applyOpened(opened: Opened[], ownDeviceId: string): Promise<boole
         tx.insert(schema.logsTable).values(row).onConflictDoUpdate({ target: schema.logsTable.id, set: row }).run();
         const old = local as LogEntry | undefined;
         if (r.deviceId !== ownDeviceId) pulledLogs.push({ before: old ?? null, after: row, deviceId: r.deviceId });
-        const oldPhoto = old?.payload.type === 'note' ? old.payload.photoUri : undefined;
-        if (oldPhoto && oldPhoto !== (row.payload.type === 'note' ? row.payload.photoUri : undefined)) photos.push(oldPhoto);
+        const oldPhoto = old && notePhoto(old.payload);
+        if (oldPhoto && oldPhoto !== notePhoto(row.payload)) photos.push(oldPhoto);
       }
     }
   });

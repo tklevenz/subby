@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import { and, asc, count, eq, min, notInArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, min, notInArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogPayload, LogType } from '@subby/shared';
+import { notePhoto, type Child, type LogType } from '@subby/shared';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
+import { deletedLogs } from '../db/tombstone';
 
 export type ChildInput = Pick<Child, 'name' | 'birthDate'> &
   Partial<Pick<Child, 'birthTime' | 'dueDate' | 'sex' | 'photoUri' | 'importRef'>>;
@@ -111,7 +112,7 @@ export const useChildStore = create<ChildState>((set, get) => ({
     db.transaction((tx) => {
       const now = Date.now();
       tx.update(schema.logsTable)
-        .set({ isDeleted: true, payload: sql`json_object('type', ${schema.logsTable.logType})`, importRef: null, updatedAt: now, syncStatus: 'pending' })
+        .set(deletedLogs({ importRef: null, updatedAt: now, syncStatus: 'pending' }))
         .where(eq(schema.logsTable.childId, id))
         .run();
       tx.delete(schema.remindersTable).where(eq(schema.remindersTable.childId, id)).run();
@@ -123,7 +124,7 @@ export const useChildStore = create<ChildState>((set, get) => ({
     });
 
     deletePhoto(child?.photoUri);
-    for (const { payload } of notes) deletePhoto((payload as Extract<LogPayload, { type: 'note' }>).photoUri);
+    for (const { payload } of notes) deletePhoto(notePhoto(payload));
 
     set((state) => ({ children: state.children.filter((c) => c.id !== id) }));
   },

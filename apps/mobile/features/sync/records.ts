@@ -118,6 +118,3 @@ export const childTombstone = (id: string, updatedAt: number, syncStatus: 'pendi
   isDeleted: true,
   syncStatus,
 });
-
-/** A deleted log keeps only its id and type; nothing personal stays behind. */
-export const scrubbedPayload = (type: LogPayload['type']) => ({ type }) as LogPayload;

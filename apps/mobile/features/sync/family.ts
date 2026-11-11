@@ -25,6 +25,7 @@ import {
 import { db, schema } from '../../db/client';
 import { deleteAllPhotos } from '../photos';
 import { forgetPhotoUploads } from './photos';
+import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -288,8 +289,7 @@ async function completeJoin(
     useLogStore.setState({ logs: [], activeChildId: null });
     await useChildStore.getState().hydrate();
   } else {
-    await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
-    await db.update(schema.logsTable).set({ syncStatus: 'pending' });
+    await markAllPending();
     // This phone's photos belong to its old family (if any); they upload to this one.
     await forgetPhotoUploads();
   }

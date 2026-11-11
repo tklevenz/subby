@@ -1,5 +1,4 @@
 import { t } from '@subby/shared/i18n';
-import { inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import {
   RECOVERY_SIGNER,
@@ -16,7 +15,7 @@ import {
   type DeviceLogEntry,
 } from '@subby/shared/crypto';
 import { sealRecord, type MovedBody } from '@subby/shared/sync';
-import { db, schema } from '../../db/client';
+import { markAllPending } from './pending';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealTo, serverLabel, SyncSession } from './api';
 import { deviceIdentity, saveFamilyKeys } from './keystore';
@@ -134,11 +133,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
       if (!page.more || page.seq <= since) break;
       since = page.seq;
     }
-    for (let i = 0; i < own.length; i += 500) {
-      const ids = own.slice(i, i + 500);
-      await db.update(schema.childrenTable).set({ syncStatus: 'pending' }).where(inArray(schema.childrenTable.id, ids));
-      await db.update(schema.logsTable).set({ syncStatus: 'pending' }).where(inArray(schema.logsTable.id, ids));
-    }
+    await markAllPending(own);
 
     await switchTo(settings, { server: move.server, familyId: move.familyId, entries, key: null, keys, members: [...state.members.keys()] });
     await leave(oldApi, oldEntries, me);
@@ -157,10 +152,7 @@ async function switchTo(
 ) {
   saveFamilyKeys(next.keys ?? new Map([[1, next.key!]]));
   // The mover sends everything it has; a follower only what the mover can't have (marked pending before this).
-  if (next.key) {
-    await db.update(schema.childrenTable).set({ syncStatus: 'pending' });
-    await db.update(schema.logsTable).set({ syncStatus: 'pending' });
-  }
+  if (next.key) await markAllPending();
   // The old family's log copy, restore count and floors belong to the old server.
   const { move: _, pushToken: __, push: ___, log: ____, restoreGen: _____, floors: ______, ...kept } = settings;
   forgetSession();

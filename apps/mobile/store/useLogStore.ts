@@ -1,10 +1,12 @@
 import { create } from 'zustand';
-import { eq, and, desc, gte, isNull, or, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, gte, isNull, or, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
+import { deletedLogs } from '../db/tombstone';
 import {
   TIMED_LOG_TYPES,
+  notePhoto,
   pauseFeed,
   type LogEntry,
   type LogPayload,
@@ -53,8 +55,6 @@ interface LogState {
   getLog: (id: string) => Promise<LogEntry | undefined>;
 }
 
-const photoOf = (p: LogPayload) => (p.type === 'note' ? p.photoUri : undefined);
-
 /** The entry as an edit leaves it. A new or removed photo drops the synced reference, so the next sync uploads the new one (or none). */
 function applyPatch(current: LogEntry, patch: LogPatch): LogEntry {
   const updated: LogEntry = {
@@ -65,7 +65,7 @@ function applyPatch(current: LogEntry, patch: LogPatch): LogEntry {
     updatedAt: Date.now(),
     syncStatus: 'pending',
   };
-  if (photoOf(current.payload) !== photoOf(updated.payload) && updated.payload.type === 'note') {
+  if (notePhoto(current.payload) !== notePhoto(updated.payload) && updated.payload.type === 'note') {
     const { photoBlob: _, ...payload } = updated.payload;
     updated.payload = payload;
   }
@@ -189,7 +189,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       for (const { id } of removed) {
         tx.update(t)
           // Only the id and type stay behind (for sync); nothing personal is kept in a deleted entry.
-          .set({ isDeleted: true, payload: sql`json_object('type', ${t.logType})`, updatedAt: now, syncStatus: 'pending' })
+          .set(deletedLogs({ updatedAt: now, syncStatus: 'pending' }))
           .where(eq(t.id, id))
           .run();
       }
@@ -197,9 +197,9 @@ export const useLogStore = create<LogState>((set, get) => ({
     });
 
     for (const { before, after } of edits) {
-      if (photoOf(before.payload) !== photoOf(after.payload)) deletePhoto(photoOf(before.payload));
+      if (notePhoto(before.payload) !== notePhoto(after.payload)) deletePhoto(notePhoto(before.payload));
     }
-    for (const entry of removed) deletePhoto(photoOf(entry.payload));
+    for (const entry of removed) deletePhoto(notePhoto(entry.payload));
 
     set((state) => {
       const touched = new Set([...edits.map((e) => e.after.id), ...removed.map((r) => r.id)]);

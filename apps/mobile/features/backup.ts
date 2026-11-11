@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { eq, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import type { Child, LogEntry } from '@subby/shared';
+import { notePhoto, type Child, type LogEntry } from '@subby/shared';
 import {
   decryptBackup,
   encryptBackup,
@@ -16,15 +16,14 @@ import {
 } from '@subby/shared/domain/backup';
 import { db, schema } from '../db/client';
 import { deletePhoto, readPhotoBytes, savePhotoBytes } from './photos';
-import { childTombstone, scrubbedPayload } from './sync/records';
+import { childTombstone } from './sync/records';
+import { deletedLog } from '../db/tombstone';
 import { requestSync } from './sync/engine';
 import { useChildStore } from '../store/useChildStore';
 import { useLogStore } from '../store/useLogStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { toIsoDate } from '../store/timeHelpers';
 import { downloads } from '../modules/subby-downloads';
-
-const notePhoto = (l: LogEntry) => (l.payload.type === 'note' ? l.payload.photoUri : undefined);
 
 /** Android saves straight into Downloads; elsewhere (iOS) the share sheet has "Save to Files". */
 export const savesToDownloads = downloads !== null;
@@ -57,7 +56,7 @@ async function buildBackup(passphrase: string | null, onProgress?: (p: number) =
   const children = await db.select().from(schema.childrenTable);
   const logs = await db.select().from(schema.logsTable);
   const photos = new Map<string, Uint8Array>();
-  for (const uri of [...children.map((c) => c.photoUri), ...logs.map(notePhoto)]) {
+  for (const uri of [...children.map((c) => c.photoUri), ...logs.map((l) => notePhoto(l.payload))]) {
     if (!uri || photos.has(uri)) continue;
     const data = await readPhotoBytes(uri).catch(() => null);
     if (data) photos.set(uri, data);
@@ -160,7 +159,7 @@ export async function restoreBackup(contents: BackupContents, plan: RestorePlan)
       }
       for (const l of logs.map(ownRef)) {
         const old = tx.select({ payload: schema.logsTable.payload }).from(schema.logsTable).where(eq(schema.logsTable.id, l.id)).get();
-        if (old?.payload.type === 'note') replaced.push(old.payload.photoUri);
+        if (old) replaced.push(notePhoto(old.payload));
         tx.insert(schema.logsTable).values(l).onConflictDoUpdate({ target: schema.logsTable.id, set: l }).run();
       }
       // Deletions scrub the row like deleting it here would (a child's entries go with it).
@@ -169,13 +168,13 @@ export async function restoreBackup(contents: BackupContents, plan: RestorePlan)
           const old = tx.select().from(schema.childrenTable).where(eq(schema.childrenTable.id, d.id)).get();
           replaced.push(old?.photoUri);
           for (const n of tx.select({ payload: schema.logsTable.payload }).from(schema.logsTable).where(eq(schema.logsTable.childId, d.id)).all()) {
-            if (n.payload.type === 'note') replaced.push(n.payload.photoUri);
+            replaced.push(notePhoto(n.payload));
           }
           const row = childTombstone(d.id, d.updatedAt, 'pending');
           tx.update(schema.childrenTable).set(row).where(eq(schema.childrenTable.id, d.id)).run();
           for (const l of tx.select({ id: schema.logsTable.id, logType: schema.logsTable.logType }).from(schema.logsTable).where(eq(schema.logsTable.childId, d.id)).all()) {
             tx.update(schema.logsTable)
-              .set({ isDeleted: true, payload: scrubbedPayload(l.logType), importRef: null, updatedAt: Date.now(), syncStatus: 'pending' })
+              .set(deletedLog(l.logType, { importRef: null, updatedAt: Date.now(), syncStatus: 'pending' }))
               .where(eq(schema.logsTable.id, l.id))
               .run();
           }
@@ -183,9 +182,9 @@ export async function restoreBackup(contents: BackupContents, plan: RestorePlan)
         } else {
           const old = tx.select().from(schema.logsTable).where(eq(schema.logsTable.id, d.id)).get();
           if (!old) continue;
-          if (old.payload.type === 'note') replaced.push(old.payload.photoUri);
+          replaced.push(notePhoto(old.payload));
           tx.update(schema.logsTable)
-            .set({ isDeleted: true, payload: scrubbedPayload(old.logType), importRef: null, updatedAt: d.updatedAt, syncStatus: 'pending' })
+            .set(deletedLog(old.logType, { importRef: null, updatedAt: d.updatedAt, syncStatus: 'pending' }))
             .where(eq(schema.logsTable.id, d.id))
             .run();
         }

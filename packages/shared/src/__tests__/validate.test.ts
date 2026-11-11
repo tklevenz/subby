@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isCompletePayload, isEmptySolids, endBeforeStart } from '../domain/validate';
+import { notePhoto } from '../domain/photo';
 
 describe('isCompletePayload', () => {
   it('rejects empty entries', () => {
@@ -36,5 +37,13 @@ describe('endBeforeStart', () => {
     expect(endBeforeStart(1000, 1000)).toBe(false);
     expect(endBeforeStart(1000, 2000)).toBe(false);
     expect(endBeforeStart(1000, null)).toBe(false); // a running timer
+  });
+});
+
+describe('notePhoto', () => {
+  it('is a note\'s photo file, and nothing for other types', () => {
+    expect(notePhoto({ type: 'note', text: 'x', photoUri: 'file:///p.jpg' })).toBe('file:///p.jpg');
+    expect(notePhoto({ type: 'note', text: 'x' })).toBeUndefined();
+    expect(notePhoto({ type: 'sleep' })).toBeUndefined();
   });
 });
