@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageInDays, ageParts, formatAgeLong, nextAgeMilestone } from '../domain/time';
+import { ageInDays, ageParts, formatAgeLong, nextAgeMilestone, formatTimerFace } from '../domain/time';
 
 const on = (y: number, m: number, d: number) => new Date(y, m - 1, d, 15).getTime();
 
@@ -49,5 +49,14 @@ describe('durations', () => {
     expect(formatSpan(12 * 60_000)).toBe('12m');
     expect(formatSpan(55 * 60_000 + 59_000)).toBe('55m');
     expect(formatSpan(89 * 60_000)).toBe('1h 29m');
+  });
+});
+
+describe('formatTimerFace', () => {
+  it('shows m:ss', () => {
+    expect(formatTimerFace(0)).toBe('0:00');
+    expect(formatTimerFace(65)).toBe('1:05');
+    expect(formatTimerFace(3725)).toBe('62:05');
+    expect(formatTimerFace(-3)).toBe('0:00');
   });
 });

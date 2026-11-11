@@ -14,24 +14,22 @@ export default function AddLogSheet({ at }: { at?: number }) {
 
   return (
     <View className="flex-row flex-wrap gap-3 pt-2">
-        {LOG_TILE_KEYS.map(logTile).map(({ key, label, Icon, color, bg, request }) => {
-          return (
-            <Pressable
-              key={key}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                if (at === undefined) open(request);
-                else if (request.kind === 'log') open({ ...request, at });
-                else open({ kind: 'log', type: 'feed', at }); // the feed tile's own sheet
-              }}
-              className={`items-center justify-center rounded-2xl border py-4 ${bg}`}
-              style={{ width: '30.5%' }}
-            >
-              <Icon color={color} size={24} />
-              <Text className="text-ink text-xs font-medium mt-2">{label}</Text>
-            </Pressable>
-          );
-        })}
+      {LOG_TILE_KEYS.map(logTile).map(({ key, label, Icon, color, bg, request }) => (
+        <Pressable
+          key={key}
+          onPress={() => {
+            void Haptics.selectionAsync();
+            if (at === undefined) open(request);
+            else if (request.kind === 'log') open({ ...request, at });
+            else open({ kind: 'log', type: 'feed', at }); // the feed tile's own sheet
+          }}
+          className={`items-center justify-center rounded-2xl border py-4 ${bg}`}
+          style={{ width: '30.5%' }}
+        >
+          <Icon color={color} size={24} />
+          <Text className="text-ink text-xs font-medium mt-2">{label}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }

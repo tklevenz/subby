@@ -21,6 +21,9 @@ import { colors } from '../theme/colors';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 SplashScreen.setOptions({ fade: true, duration: 250 });
 
+/** A screen with the navigation header (the stack hides it by default). */
+const header = (title: string, more: { presentation?: 'modal'; headerBackTitle?: string } = {}) => ({ headerShown: true, title, ...more });
+
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,28 +78,28 @@ export default function RootLayout() {
       >
         <Stack.Protected guard={hasChild}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="entry/[id]" options={{ presentation: 'modal', headerShown: true, title: t('screen.editEntry') }} />
-          <Stack.Screen name="growth" options={{ headerShown: true, title: t('screen.growth'), headerBackTitle: t('tabs.trends') }} />
-          <Stack.Screen name="solids" options={{ headerShown: true, title: t('screen.solids'), headerBackTitle: t('tabs.trends') }} />
-          <Stack.Screen name="export" options={{ headerShown: true, title: t('screen.export'), headerBackTitle: t('tabs.trends') }} />
-          <Stack.Screen name="schedule" options={{ headerShown: true, title: t('screen.schedule') }} />
-          <Stack.Screen name="child/new" options={{ presentation: 'modal', headerShown: true, title: t('screen.addChild') }} />
+          <Stack.Screen name="entry/[id]" options={header(t('screen.editEntry'), { presentation: 'modal' })} />
+          <Stack.Screen name="growth" options={header(t('screen.growth'), { headerBackTitle: t('tabs.trends') })} />
+          <Stack.Screen name="solids" options={header(t('screen.solids'), { headerBackTitle: t('tabs.trends') })} />
+          <Stack.Screen name="export" options={header(t('screen.export'), { headerBackTitle: t('tabs.trends') })} />
+          <Stack.Screen name="schedule" options={header(t('screen.schedule'))} />
+          <Stack.Screen name="child/new" options={header(t('screen.addChild'), { presentation: 'modal' })} />
           <Stack.Screen name="child/[id]/index" options={{ headerShown: false }} />
-          <Stack.Screen name="child/[id]/edit" options={{ presentation: 'modal', headerShown: true, title: t('screen.edit') }} />
-          <Stack.Screen name="reminders" options={{ headerShown: true, title: t('screen.reminders'), headerBackTitle: t('tabs.settings') }} />
-          <Stack.Screen name="sync/index" options={{ headerShown: true, title: t('screen.sync'), headerBackTitle: t('tabs.settings') }} />
-          <Stack.Screen name="sync/add" options={{ headerShown: true, title: t('screen.addPhone') }} />
-          <Stack.Screen name="sync/recovery" options={{ headerShown: true, title: t('screen.recoveryKey') }} />
-          <Stack.Screen name="sync/move" options={{ headerShown: true, title: t('screen.move') }} />
+          <Stack.Screen name="child/[id]/edit" options={header(t('screen.edit'), { presentation: 'modal' })} />
+          <Stack.Screen name="reminders" options={header(t('screen.reminders'), { headerBackTitle: t('tabs.settings') })} />
+          <Stack.Screen name="sync/index" options={header(t('screen.sync'), { headerBackTitle: t('tabs.settings') })} />
+          <Stack.Screen name="sync/add" options={header(t('screen.addPhone'))} />
+          <Stack.Screen name="sync/recovery" options={header(t('screen.recoveryKey'))} />
+          <Stack.Screen name="sync/move" options={header(t('screen.move'))} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
         {/* Reachable from onboarding too, so they aren't guarded. */}
-        <Stack.Screen name="import/babybuddy" options={{ headerShown: true, title: t('screen.import') }} />
-        <Stack.Screen name="backup" options={{ headerShown: true, title: t('screen.backup'), headerBackTitle: t('tabs.settings') }} />
-        <Stack.Screen name="sync/join" options={{ headerShown: true, title: t('screen.join') }} />
-        <Stack.Screen name="sync/recover" options={{ headerShown: true, title: t('screen.recover') }} />
+        <Stack.Screen name="import/babybuddy" options={header(t('screen.import'))} />
+        <Stack.Screen name="backup" options={header(t('screen.backup'), { headerBackTitle: t('tabs.settings') })} />
+        <Stack.Screen name="sync/join" options={header(t('screen.join'))} />
+        <Stack.Screen name="sync/recover" options={header(t('screen.recover'))} />
       </Stack>
     </>
   );

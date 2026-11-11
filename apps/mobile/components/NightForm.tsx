@@ -1,6 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { confirmDestructive } from './confirmDestructive';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ScreenScroll } from './ScreenScroll';
 import { Pressable, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
@@ -36,7 +36,10 @@ export default function NightForm({ night }: { night: Night }) {
   const [wakeUp, setWakeUp] = useState(night.end!);
   // Pieces that touch (edited to meet) make a waking of no length: left out, so saving joins them.
   const [initialWakings] = useState(() => night.wakings.filter((w) => w.end > w.start));
-  const [wakings, setWakings] = useState<Waking[]>(initialWakings);
+  // Each row keeps a key of its own, so removing one in the middle doesn't hand its pickers to the next.
+  const nextKey = useRef(0);
+  const [rows, setRows] = useState<(Waking & { key: number })[]>(() => initialWakings.map((w) => ({ ...w, key: nextKey.current++ })));
+  const wakings: Waking[] = rows.map(({ start, end }) => ({ start, end }));
   const { payload, patch, changed: payloadChanged } = usePayloadForm<PayloadOf<'sleep'>>(first.payload);
 
   const pieces = nightPieces(bedtime, wakeUp, wakings);
@@ -57,13 +60,13 @@ export default function NightForm({ night }: { night: Night }) {
     JSON.stringify(wakings) !== JSON.stringify(initialWakings) ||
     payloadChanged;
 
-  const setWaking = (i: number, w: Partial<Waking>) => setWakings((cur) => cur.map((x, j) => (j === i ? { ...x, ...w } : x)));
+  const setWaking = (i: number, w: Partial<Waking>) => setRows((cur) => cur.map((x, j) => (j === i ? { ...x, ...w } : x)));
   const addWaking = () => {
     const stretches = pieces ?? [{ start: bedtime, end: wakeUp }];
     const longest = stretches.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a));
     if (longest.end - longest.start < NEW_WAKING_MS + 2 * MINUTE_MS) return;
     const mid = Math.round((longest.start + longest.end - NEW_WAKING_MS) / 2 / (5 * MINUTE_MS)) * 5 * MINUTE_MS;
-    setWakings((cur) => [...cur, { start: mid, end: mid + NEW_WAKING_MS }].sort((a, b) => a.start - b.start));
+    setRows((cur) => [...cur, { start: mid, end: mid + NEW_WAKING_MS, key: nextKey.current++ }].sort((a, b) => a.start - b.start));
   };
 
   const once = useSingleFlight();
@@ -138,8 +141,8 @@ export default function NightForm({ night }: { night: Night }) {
         <>
           <FieldLabel>{t('night.wakings')}</FieldLabel>
           <View className="bg-surface border border-line rounded-2xl">
-            {wakings.map((w, i) => (
-              <View key={i} className="flex-row items-center gap-2 px-3 py-2.5 border-b border-line">
+            {rows.map((w, i) => (
+              <View key={w.key} className="flex-row items-center gap-2 px-3 py-2.5 border-b border-line">
                 <DateTimeField value={w.start} onChange={(start) => setWaking(i, { start })} title={t('night.awakeFrom')} timeOnly />
                 <Text className="text-ink-muted">–</Text>
                 <DateTimeField value={w.end} onChange={(end) => setWaking(i, { end })} title={t('night.backAsleep')} timeOnly />
@@ -147,7 +150,7 @@ export default function NightForm({ night }: { night: Night }) {
                   {w.end > w.start ? formatHoursMinutes(w.end - w.start) : ''}
                 </Text>
                 <Pressable
-                  onPress={() => setWakings((cur) => cur.filter((_, j) => j !== i))}
+                  onPress={() => setRows((cur) => cur.filter((_, j) => j !== i))}
                   hitSlop={8}
                   accessibilityLabel={t('night.removeWaking')}
                   className="w-8 h-8 rounded-full border border-line-strong items-center justify-center"

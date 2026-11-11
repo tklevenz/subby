@@ -26,7 +26,11 @@ export default function EntryScreen() {
   const [entry, setEntry] = useState<LogEntry | null | undefined>(undefined);
 
   useEffect(() => {
-    void useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
+    let alive = true;
+    void useLogStore.getState().getLog(id).then((e) => alive && setEntry(e ?? null));
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   if (entry === undefined) return <LoaderBlock className="mt-10" loader={<SubSpinner size={36} />} />;

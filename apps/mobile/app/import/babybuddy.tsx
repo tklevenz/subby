@@ -75,9 +75,11 @@ const UNIT_OPTIONS: { [K in keyof ImportUnits]: { value: ImportUnits[K]; label: 
 };
 
 export default function BabyBuddyImport() {
-  const settings = useSettingsStore();
+  const bbUrl = useSettingsStore((s) => s.bbUrl);
+  const units = useSettingsStore((s) => s.units);
+  const setSetting = useSettingsStore((s) => s.set);
   const [step, setStep] = useState<Step>({ kind: 'connect' });
-  const [url, setUrl] = useState(settings.bbUrl ?? '');
+  const [url, setUrl] = useState(bbUrl ?? '');
   const [token, setToken] = useState('');
   const { run, busy, error, setError } = useAsyncAction();
   const cancelled = useRef(false);
@@ -86,8 +88,8 @@ export default function BabyBuddyImport() {
     run(
       async () => {
         const client = new BBClient(url, token);
-        const preview = await previewImport(client, settings.units);
-        await settings.set('bbUrl', client.baseUrl);
+        const preview = await previewImport(client, units);
+        await setSetting('bbUrl', client.baseUrl);
         setStep({ kind: 'review', client, preview });
       },
       (e) => setError(e instanceof BBError ? e.message : t('bb.unexpected', { error: String(e) })),
@@ -206,7 +208,9 @@ function Review({
 }) {
   const localChildren = useChildStore((s) => s.children);
   const { addChild, updateChild } = useChildStore.getState();
-  const settings = useSettingsStore();
+  const activeChildId = useSettingsStore((s) => s.activeChildId);
+  const phoneUnits = useSettingsStore((s) => s.units);
+  const setSetting = useSettingsStore((s) => s.set);
   const [units, setUnits] = useState(preview.units);
   const total = BB_ENDPOINTS.reduce((n, e) => n + preview.counts[e], 0);
 
@@ -251,7 +255,7 @@ function Review({
     }
     const fallback = [...childMap.values()].find((id) => id !== null) ?? localChildren[0]?.id;
     if (!fallback) return;
-    if (!settings.activeChildId) await settings.set('activeChildId', fallback);
+    if (!activeChildId) await setSetting('activeChildId', fallback);
     onStart(units, childMap, fallback);
   };
 
@@ -276,7 +280,7 @@ function Review({
       {(Object.keys(UNIT_OPTIONS) as (keyof ImportUnits)[]).map((measure) => (
         <View key={measure} className="mb-3">
           <Text className="text-ink-soft mb-1.5">
-            {t(`bb.measure.${measure}`)} <Text className="text-ink-faint">· {unitExample(measure, preview.examples[measure], units, settings.units)}</Text>
+            {t(`bb.measure.${measure}`)} <Text className="text-ink-faint">· {unitExample(measure, preview.examples[measure], units, phoneUnits)}</Text>
           </Text>
           <Segmented
             options={UNIT_OPTIONS[measure] as { value: string; label: string }[]}

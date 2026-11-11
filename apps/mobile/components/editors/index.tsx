@@ -7,6 +7,7 @@ import {
   medicationUnit,
   MILESTONES,
   MEASURES,
+  sameName,
   hasStool,
   type Measure,
   recentMedications,
@@ -196,7 +197,7 @@ function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
               <Chip
                 key={m.name}
                 label={m.dose !== undefined ? t('summary.pair', { a: m.name, b: formatDose(m.dose, m.unit) }) : m.name}
-                selected={p.name.toLowerCase() === m.name.toLowerCase()}
+                selected={sameName(p.name, m.name)}
                 onPress={() => onChange({ name: m.name, dose: m.dose, unit: m.unit, nextDoseIntervalMin: m.nextDoseIntervalMin })}
               />
             ))}
@@ -337,6 +338,8 @@ export function PayloadEditor({
   payload: LogPayload;
   onChange: (patch: Partial<LogPayload>) => void;
 }) {
-  const Editor = EDITORS[payload.type] as React.ComponentType<EditorProps<typeof payload.type>>;
-  return <Editor payload={payload as never} onChange={onChange as never} />;
+  // EDITORS is typed per payload type; indexing it with a union type gives a union of components, which can't be
+  // called. This cast, once, says "the editor that matches this payload's type".
+  const Editor = EDITORS[payload.type] as React.ComponentType<EditorProps<LogPayload['type']>>;
+  return <Editor payload={payload} onChange={onChange} />;
 }

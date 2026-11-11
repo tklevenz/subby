@@ -15,23 +15,18 @@ export function useNow(intervalMs = 1000) {
   return now;
 }
 
-export function formatTimeShort(epochMs: number, clock: '12h' | '24h' = '24h'): string {
-  return formatClock(epochMs, clock);
+/** "Sat, Oct 24", with the year only when it isn't this one. */
+function weekdayDate(epochMs: number, now: number): string {
+  const sameYear = new Date(epochMs).getFullYear() === new Date(now).getFullYear();
+  return formatDate(epochMs, { weekday: 'short', day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' });
 }
 
 export function formatDayLabel(epochMs: number, now = Date.now()): string {
-  const d = new Date(epochMs);
-  const today = new Date(now);
   const day = startOfDay(epochMs);
   if (day === startOfDay(now)) return t('day.today');
   // Calendar day before, not 24 h before (DST days are 23/25 h).
   if (day === addDays(startOfDay(now), -1)) return t('day.yesterday');
-  return formatDate(epochMs, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric',
-  });
+  return weekdayDate(epochMs, now);
 }
 
 /** A day inside a sentence: "today", "yesterday", else "on Sat, Oct 24" (never lowercased by hand). */
@@ -39,8 +34,7 @@ export function formatDayInline(epochMs: number, now = Date.now()): string {
   const day = startOfDay(epochMs);
   if (day === startOfDay(now)) return t('day.todayInline');
   if (day === addDays(startOfDay(now), -1)) return t('day.yesterdayInline');
-  const sameYear = new Date(epochMs).getFullYear() === new Date(now).getFullYear();
-  return t('day.onDate', { date: formatDate(epochMs, { weekday: 'short', day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' }) });
+  return t('day.onDate', { date: weekdayDate(epochMs, now) });
 }
 
 /** Local calendar date as YYYY-MM-DD. */
@@ -56,8 +50,8 @@ export function fromIsoDate(iso: string): number {
   return new Date(y, m - 1, d).getTime();
 }
 
-/** formatTimeShort bound to the user's clock preference. */
+/** `formatClock` bound to the user's clock preference. */
 export function useFormatTime() {
   const clock = useSettingsStore((s) => s.clock);
-  return (epochMs: number) => formatTimeShort(epochMs, clock);
+  return (epochMs: number) => formatClock(epochMs, clock);
 }

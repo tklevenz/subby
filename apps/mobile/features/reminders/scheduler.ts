@@ -1,4 +1,4 @@
-import { t } from '@subby/shared/i18n';
+import { t, formatClock } from '@subby/shared/i18n';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import type * as NotificationsModule from 'expo-notifications';
@@ -6,7 +6,6 @@ import { router } from 'expo-router';
 import { REMINDER_ID_PREFIX, activeReminderCount, isNap, isRunning, type LogType, medicationsDue, planReminders, predictNextSleep, type ReminderChild, DAY_MS } from '@subby/shared';
 import { optionalModule } from '../optionalModule';
 import { fetchLogs } from '../../store/queries';
-import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type Settings } from '../../store/useSettingsStore';
@@ -111,7 +110,7 @@ async function sync() {
           now,
           settings: reminders,
           children: await Promise.all(useChildStore.getState().children.map((c) => reminderChild(c.id, c.name, now))),
-          formatTime: (ms) => formatTimeShort(ms, clock),
+          formatTime: (ms) => formatClock(ms, clock),
           checkBeforeDosing: sharedWithoutPush(syncSettings),
         })
       : [];

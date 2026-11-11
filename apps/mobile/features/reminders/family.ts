@@ -1,8 +1,7 @@
-import { t } from '@subby/shared/i18n';
+import { t, formatClock } from '@subby/shared/i18n';
 import { Platform } from 'react-native';
 import { familyAlerts, type LogEntry, DAY_MS } from '@subby/shared';
 import { fetchLogs } from '../../store/queries';
-import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Notifications, notificationsAllowed } from './scheduler';
@@ -31,7 +30,7 @@ export async function notifyFamily(pulled: PulledLog[]) {
     sleeps: (id) => sleeps.get(id) ?? [],
     childName: (id) => children.find((c) => c.id === id)?.name,
     now,
-    formatTime: (ms) => formatTimeShort(ms, clock),
+    formatTime: (ms) => formatClock(ms, clock),
   });
 
   if (alerts.some((a) => a.kind === 'show') && Platform.OS === 'android') {

@@ -31,3 +31,6 @@ export const isEmptySolids = (p: LogPayload): boolean =>
  * nothing): the log sheet and the edit screen share this rule.
  */
 export const endBeforeStart = (startedAt: number, endedAt: number | null): boolean => endedAt !== null && endedAt < startedAt;
+
+/** Whether two names are the same one: compared without case and surrounding spaces ("Carrot" and " carrot "). */
+export const sameName = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();

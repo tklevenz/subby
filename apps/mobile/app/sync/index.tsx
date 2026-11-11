@@ -8,10 +8,11 @@ import { router } from 'expo-router';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
-import { deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync } from '../../features/sync/engine';
+import { defaultDeviceName, deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync } from '../../features/sync/engine';
+import { useShallow } from 'zustand/react/shallow';
 import { useSyncStore } from '../../features/sync/state';
 import { progressLabel } from '../../components/SyncSteps';
-import { defaultDeviceName, removeDevice } from '../../features/sync/family';
+import { removeDevice } from '../../features/sync/family';
 import { Button, Card, Row, TextField, ErrorText, WarningText, Lead, SectionLabel, Chevron, Hint, ScreenTitle } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
@@ -67,7 +68,10 @@ function SetUp() {
 
 function Status() {
   const sync = useSettingsStore((s) => s.sync)!;
-  const { phase, error, pending: waiting, progress, removed, tooLarge, members } = useSyncStore();
+  // Only the fields shown, so a change to the others (lastError, movedTo) doesn't re-render the screen.
+  const { phase, error, pending: waiting, progress, removed, tooLarge, members } = useSyncStore(
+    useShallow((s) => ({ phase: s.phase, error: s.error, pending: s.pending, progress: s.progress, removed: s.removed, tooLarge: s.tooLarge, members: s.members })),
+  );
   // Entries too large to sync stay pending; they're reported on their own, not as "waiting".
   const pending = Math.max(0, waiting - tooLarge);
   const formatTime = useFormatTime();

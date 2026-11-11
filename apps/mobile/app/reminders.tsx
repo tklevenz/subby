@@ -6,6 +6,7 @@ import { Card, Segmented, Toggle, SectionLabel, Notice } from '../components/ui'
 import {
   notificationsBlocked,
   remindersAvailable,
+  replanReminders,
   requestNotifications,
   setRemindersEnabled,
   upcomingReminders,
@@ -37,15 +38,19 @@ export default function RemindersScreen() {
 
   const refresh = useCallback(() => {
     void notificationsBlocked().then(setBlocked);
-    // The scheduler re-plans ~1 s after a change.
-    setTimeout(() => upcomingReminders().then(setUpcoming), 1500);
+    void upcomingReminders().then(setUpcoming);
   }, []);
+  // After a change: plan now (not on the scheduler's own debounce), then show what got planned.
+  const replanAndRefresh = async () => {
+    await replanReminders();
+    refresh();
+  };
 
   useEffect(() => {
     refresh();
     const sub = AppState.addEventListener('change', (s) => s === 'active' && refresh());
     return () => sub.remove();
-  }, [refresh, reminders]);
+  }, [refresh]);
 
   const update = async (patch: Partial<ReminderSettings>, enabling: boolean) => {
     if (enabling && !(await requestNotifications())) {
@@ -53,6 +58,7 @@ export default function RemindersScreen() {
       return;
     }
     await setSetting('reminders', { ...reminders, ...patch });
+    await replanAndRefresh();
   };
 
   return (
@@ -80,7 +86,7 @@ export default function RemindersScreen() {
           <Text className="text-ink text-base font-semibold">{t('reminders.allow')}</Text>
           <Text className="text-ink-muted text-xs mt-1 leading-4">{t('reminders.allowHint')}</Text>
         </View>
-        <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(refresh)} disabled={!remindersAvailable} />
+        <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(replanAndRefresh)} disabled={!remindersAvailable} />
       </View>
 
       <View style={{ opacity: reminders.enabled ? 1 : 0.5 }}>

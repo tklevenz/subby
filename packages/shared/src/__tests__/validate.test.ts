@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCompletePayload, isEmptySolids, endBeforeStart } from '../domain/validate';
+import { isCompletePayload, isEmptySolids, endBeforeStart, sameName } from '../domain/validate';
 import { notePhoto } from '../domain/photo';
 import { hasStool } from '../schemas/log.schema';
 
@@ -55,5 +55,12 @@ describe('hasStool', () => {
     expect(hasStool('both')).toBe(true);
     expect(hasStool('wet')).toBe(false);
     expect(hasStool('dry')).toBe(false);
+  });
+});
+
+describe('sameName', () => {
+  it('ignores case and surrounding spaces', () => {
+    expect(sameName('Carrot', ' carrot ')).toBe(true);
+    expect(sameName('Carrot', 'Carrots')).toBe(false);
   });
 });

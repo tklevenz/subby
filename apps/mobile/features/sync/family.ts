@@ -34,8 +34,6 @@ import { deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys } from './engine';
 import { newSyncSettings, saveSync, sessionFor, syncSettings } from './state';
 
-export { defaultDeviceName } from './engine';
-
 const member = () => {
   const settings = syncSettings();
   if (!settings) throw new Error(t('sync.error.notSetUp'));

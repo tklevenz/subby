@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Plus, TriangleExclamation } from '../icons';
-import { flaggedFoods, recentFoods, type PayloadOf } from '@subby/shared';
+import { flaggedFoods, recentFoods, sameName, type PayloadOf } from '@subby/shared';
 import { HAS_FOODS, useLogQuery } from '../../store/queries';
 import { Chip, FieldLabel, TextField, Toggle } from '../ui';
 import { colors } from '../../theme/colors';
@@ -19,11 +19,11 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
   const [draft, setDraft] = useState('');
   const foods = value.foods ?? [];
   const flagged = new Set(flaggedFoods(logs).map((f) => f.toLowerCase()));
-  const has = (f: string) => foods.some((x) => x.toLowerCase() === f.toLowerCase());
+  const has = (f: string) => foods.some((x) => sameName(x, f));
   const options = [...foods, ...recentFoods(logs, 20).filter((f) => !has(f))];
 
   const toggle = (f: string) =>
-    onChange({ foods: has(f) ? foods.filter((x) => x.toLowerCase() !== f.toLowerCase()) : [...foods, f] });
+    onChange({ foods: has(f) ? foods.filter((x) => !sameName(x, f)) : [...foods, f] });
   const add = () => {
     const f = draft.trim();
     if (f && !has(f)) onChange({ foods: [...foods, f] });

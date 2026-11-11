@@ -7,6 +7,7 @@ import { savedFeedback } from '../savedFeedback';
 import * as Haptics from 'expo-haptics';
 import { Minus, Pause, Plus } from '../icons';
 import {
+  formatTimerFace,
   formatVolume,
   isEmptySolids,
   isRunning,
@@ -36,8 +37,6 @@ type RunningFeed = LogEntry & { payload: Feed };
 const ML_PRESETS = [60, 90, 120, 150, 180];
 const OZ_PRESETS = [2, 3, 4, 5, 6];
 
-const mmss = (secs: number) => `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-
 function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: number; active: boolean; hint: boolean; onPress: () => void }) {
   return (
     <Pressable
@@ -45,7 +44,7 @@ function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: n
       className={`flex-1 items-center rounded-2xl border py-6 ${active ? 'bg-cyan/30 border-cyan-soft' : 'bg-raised border-line-strong'}`}
     >
       <Text className="text-ink-soft text-sm font-medium">{t(side === 'left' ? 'feed.left' : 'feed.right')}</Text>
-      <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{mmss(secs)}</Text>
+      <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{formatTimerFace(secs)}</Text>
       <View className="flex-row items-center mt-1 h-4">
         {active ? <Pause color={colors.cyanPale} size={12} /> : null}
         <Text className="text-xs text-cyan-pale ml-1">{active ? t('feedSheet.tapToPause') : hint ? t('feedSheet.suggested') : ''}</Text>
@@ -56,7 +55,10 @@ function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: n
 
 function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDone: () => void }) {
   const logs = useLogStore((s) => s.logs);
-  const { startTimer, updateLog, stopTimer, softDeleteLog } = useLogStore.getState();
+  const startTimer = useLogStore((s) => s.startTimer);
+  const updateLog = useLogStore((s) => s.updateLog);
+  const stopTimer = useLogStore((s) => s.stopTimer);
+  const softDeleteLog = useLogStore((s) => s.softDeleteLog);
   const open = useSheetStore((s) => s.open);
   const now = useNow();
   const next = suggestedNextSide(logs);
