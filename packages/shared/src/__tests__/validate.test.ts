@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isCompletePayload, isEmptySolids, endBeforeStart } from '../domain/validate';
 import { notePhoto } from '../domain/photo';
+import { hasStool } from '../schemas/log.schema';
 
 describe('isCompletePayload', () => {
   it('rejects empty entries', () => {
@@ -45,5 +46,14 @@ describe('notePhoto', () => {
     expect(notePhoto({ type: 'note', text: 'x', photoUri: 'file:///p.jpg' })).toBe('file:///p.jpg');
     expect(notePhoto({ type: 'note', text: 'x' })).toBeUndefined();
     expect(notePhoto({ type: 'sleep' })).toBeUndefined();
+  });
+});
+
+describe('hasStool', () => {
+  it('is dirty and both', () => {
+    expect(hasStool('dirty')).toBe(true);
+    expect(hasStool('both')).toBe(true);
+    expect(hasStool('wet')).toBe(false);
+    expect(hasStool('dry')).toBe(false);
   });
 });

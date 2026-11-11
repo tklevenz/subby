@@ -4,33 +4,23 @@ import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Check, type IconProps } from '../icons';
 import { diaperLook } from '../logTypes';
-import type { DIAPER_COLORS, LogEntry } from '@subby/shared';
+import { hasStool, type DiaperColor, type DiaperCondition, type LogEntry } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSheetStore } from '../../store/useSheetStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
-import { COLOR_SWATCH } from '../editors';
+import { DiaperColors } from '../editors/DiaperColors';
 import { Button } from '../ui';
 import { colors } from '../../theme/colors';
 import { useSingleFlight } from '../useSingleFlight';
 
-type Condition = 'wet' | 'dirty' | 'both';
-type DiaperColor = (typeof DIAPER_COLORS)[number];
+type Condition = Exclude<DiaperCondition, 'dry'>;
 
 // Wet is blue, dirty brown; both is neutral and lets its two colored icons say it.
-const KINDS: { condition: Condition; readonly label: string; className: string; Icon: (p: IconProps) => React.ReactNode }[] = [
-  { condition: 'wet', get label() { return t('diaper.wet'); }, className: 'bg-blue/20 border-blue/40', Icon: diaperLook('wet').Icon },
-  { condition: 'dirty', get label() { return t('diaper.dirty'); }, className: 'bg-brown/30 border-brown-strong/50', Icon: diaperLook('dirty').Icon },
-  {
-    condition: 'both',
-    get label() {
-      return t('diaper.both');
-    },
-    className: 'bg-raised border-line-strong',
-    Icon: diaperLook('both').Icon,
-  },
+const kinds = (): { condition: Condition; label: string; className: string; Icon: (p: IconProps) => React.ReactNode }[] => [
+  { condition: 'wet', label: t('diaper.wet'), className: 'bg-blue/20 border-blue/40', Icon: diaperLook('wet').Icon },
+  { condition: 'dirty', label: t('diaper.dirty'), className: 'bg-brown/30 border-brown-strong/50', Icon: diaperLook('dirty').Icon },
+  { condition: 'both', label: t('diaper.both'), className: 'bg-raised border-line-strong', Icon: diaperLook('both').Icon },
 ];
-// Most common first.
-const COLOR_ORDER: DiaperColor[] = ['yellow', 'brown', 'green', 'orange', 'black', 'red', 'white', 'gray'];
 const AUTO_CLOSE_MS = 5000;
 
 /** One tap logs a diaper now; then an optional color, Undo, and it closes by itself. */
@@ -66,7 +56,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
           </Pressable>
         </View>
         <View className="flex-row gap-2.5">
-          {KINDS.map((k) => (
+          {kinds().map((k) => (
             <Pressable
               key={k.condition}
               onPress={() => log(k.condition)}
@@ -83,13 +73,17 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
   }
 
   const p = logged.payload;
-  const label = KINDS.find((k) => k.condition === p.condition)?.label ?? t('type.diaper');
-  const setColor = async (color: DiaperColor) => {
+  const label = kinds().find((k) => k.condition === p.condition)?.label ?? t('type.diaper');
+  const setColor = once(async (color: DiaperColor | undefined) => {
     void Haptics.selectionAsync();
-    const payload = { ...p, color: p.color === color ? undefined : color };
+    const payload = { ...p, color };
     await updateLog(logged.id, { payload });
     setLogged({ ...logged, payload });
-  };
+  });
+  const undo = once(async () => {
+    await softDeleteLog(logged.id);
+    onClose();
+  });
 
   return (
     <View className="pt-1 pb-2">
@@ -105,32 +99,17 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
           </Text>
         </View>
         <Pressable
-          onPress={async () => {
-            await softDeleteLog(logged.id);
-            onClose();
-          }}
+          onPress={undo}
           className="h-9 px-4 rounded-full border border-line-strong bg-raised items-center justify-center"
         >
           <Text className="text-ink text-sm">{t('common.undo')}</Text>
         </Pressable>
       </View>
 
-      {p.condition === 'dirty' || p.condition === 'both' ? (
+      {hasStool(p.condition) ? (
         <>
           <Text className="text-ink-muted text-xs font-medium mt-5 mb-2">{t('diaperSheet.color')}</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {COLOR_ORDER.map((c) => (
-              <Pressable
-                key={c}
-                onPress={() => setColor(c)}
-                style={{ width: '23%' }}
-                className={`h-14 rounded-xl items-center justify-center bg-raised border-2 ${p.color === c ? 'border-violet-strong' : 'border-transparent'}`}
-              >
-                <View style={{ backgroundColor: COLOR_SWATCH[c] }} className="w-5 h-5 rounded-full border border-line-heavy" />
-                <Text className="text-ink-soft text-[11px] mt-1 capitalize">{t(`diaperColor.${c}`)}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <DiaperColors variant="sheet" value={p.color} onChange={setColor} />
         </>
       ) : null}
 

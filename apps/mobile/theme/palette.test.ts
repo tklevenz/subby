@@ -14,7 +14,7 @@ const sources = import.meta.glob(['../app/**/*.{ts,tsx}', '../components/**/*.{t
   eager: true,
 });
 // Hex values here are data, not UI chrome: real diaper colors.
-const HEX_ALLOWED = new Set(['../components/editors/index.tsx']);
+const HEX_ALLOWED = new Set(['../components/logTypes.tsx']);
 
 describe('theme', () => {
   it('finds the UI sources', () => {

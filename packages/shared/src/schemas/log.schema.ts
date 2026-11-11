@@ -13,9 +13,17 @@ export const DIAPER_COLORS = [
   'black', 'brown', 'gray', 'green', 'orange', 'red', 'white', 'yellow',
 ] as const;
 
+export type DiaperColor = (typeof DIAPER_COLORS)[number];
+
+export const DIAPER_CONDITIONS = ['wet', 'dirty', 'both', 'dry'] as const;
+export type DiaperCondition = (typeof DIAPER_CONDITIONS)[number];
+
+/** Whether the diaper had a stool (dirty or both): the only ones a color is asked for. */
+export const hasStool = (condition: DiaperCondition): boolean => condition === 'dirty' || condition === 'both';
+
 export const DiaperPayloadSchema = z.object({
   type: z.literal('diaper'),
-  condition: z.enum(['wet', 'dirty', 'both', 'dry']),
+  condition: z.enum(DIAPER_CONDITIONS),
   color: z.enum(DIAPER_COLORS).optional(),
   amount: z.number().nonnegative().optional(),
   ...base,

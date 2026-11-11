@@ -1,4 +1,4 @@
-import type { LogEntry, PayloadOf } from '../schemas/log.schema';
+import { hasStool, type LogEntry, type PayloadOf } from '../schemas/log.schema';
 import { startOfDay } from './time';
 
 /** Local midnight `n` days after `dayStart` (DST-safe, unlike adding 24h). */
@@ -104,7 +104,7 @@ export function dailyStats(logs: LogEntry[], days: number[], now: number): DaySt
       case 'diaper':
         s.diapers++;
         if (p.condition === 'wet' || p.condition === 'both') s.wet++;
-        if (p.condition === 'dirty' || p.condition === 'both') s.dirty++;
+        if (hasStool(p.condition)) s.dirty++;
         break;
       case 'pumping':
         s.pumpedMl += p.amountMl ?? (p.leftMl ?? 0) + (p.rightMl ?? 0);

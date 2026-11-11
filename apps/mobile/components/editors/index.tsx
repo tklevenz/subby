@@ -3,11 +3,11 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
   ACTIVITY_KINDS,
-  DIAPER_COLORS,
   MEDICATION_UNITS,
   medicationUnit,
   MILESTONES,
   MEASURES,
+  hasStool,
   type Measure,
   recentMedications,
   type LogPayload,
@@ -20,6 +20,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { activityLabel, feedMethods, milkTypes } from '../logTypes';
 import { Chip, FieldLabel, Segmented, TextField, Toggle } from '../ui';
 import FoodPicker from './FoodPicker';
+import { DiaperColors } from './DiaperColors';
 import { NumberField, PhotoField, UnitNumberField } from './fields';
 
 export { NumberField } from './fields';
@@ -97,11 +98,6 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
   );
 }
 
-export const COLOR_SWATCH: Record<(typeof DIAPER_COLORS)[number], string> = {
-  black: '#0a0a0a', brown: '#7c4a1e', gray: '#9ca3af', green: '#4d7c0f',
-  orange: '#f97316', red: '#dc2626', white: '#f8fafc', yellow: '#facc15',
-};
-
 function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
   return (
     <View>
@@ -116,21 +112,10 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
         value={p.condition}
         onChange={(condition) => onChange({ condition })}
       />
-      {p.condition === 'dirty' || p.condition === 'both' ? (
+      {hasStool(p.condition) ? (
         <>
           <FieldLabel>{t('editor.color')}</FieldLabel>
-          <View className="flex-row flex-wrap gap-3">
-            {DIAPER_COLORS.map((c) => (
-              <Pressable
-                key={c}
-                onPress={() => onChange({ color: p.color === c ? undefined : c })}
-                className={`items-center rounded-xl p-1.5 border ${p.color === c ? 'border-violet-strong' : 'border-transparent'}`}
-              >
-                <View style={{ backgroundColor: COLOR_SWATCH[c] }} className="w-8 h-8 rounded-full border border-line-heavy" />
-                <Text className="text-ink-muted text-[10px] mt-1">{t(`diaperColor.${c}`)}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <DiaperColors variant="editor" value={p.color} onChange={(color) => onChange({ color })} />
         </>
       ) : null}
     </View>

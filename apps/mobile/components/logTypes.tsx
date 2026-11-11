@@ -1,6 +1,6 @@
 import React, { type ComponentType } from 'react';
 import { Baby, BottleWater, ChildReaching, Droplet, Flag, Moon, PenToSquare, Pills, Poop, PoopDroplet, RulerVertical, Shapes, TemperatureHalf, Toilet, type IconComponent, type IconProps } from './icons';
-import { ACTIVITY_KINDS, LOG_TYPES, type LogPayload, type LogType } from '@subby/shared';
+import { ACTIVITY_KINDS, LOG_TYPES, type DiaperColor, type LogPayload, type LogType } from '@subby/shared';
 import { t } from '@subby/shared/i18n';
 import type { SheetRequest } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
@@ -85,6 +85,12 @@ export function diaperLook(condition: Extract<LogPayload, { type: 'diaper' }>['c
       return { Icon: (p) => <PoopDroplet {...p} color={colors.amberStrong} />, color: colors.amberStrong };
   }
 }
+
+/** What each diaper color looks like: data colors, not theme ones. */
+export const COLOR_SWATCH: Record<DiaperColor, string> = {
+  black: '#0a0a0a', brown: '#7c4a1e', gray: '#9ca3af', green: '#4d7c0f',
+  orange: '#f97316', red: '#dc2626', white: '#f8fafc', yellow: '#facc15',
+};
 
 /** The ways to feed, labelled in the current language (the feed sheet's tabs and the editor's choice). */
 export const feedMethods = () =>
