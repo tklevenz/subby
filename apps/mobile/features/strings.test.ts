@@ -29,7 +29,9 @@ const ENGLISH = new Set<string>(['../features/diagnostics.ts']);
 // JSX text ("<Text>Save</Text>") and quoted strings that read like words for people: a capital, then a space or a
 // lowercase letter ("Save", "Log a sleep", 'Bedtime'). Lines ending in `// i18n-ignore` are left alone.
 const JSX_TEXT = /(?<![=\-])>\s*([A-Za-z][^<>{}]*[A-Za-z.!?…:),·–-])\s*(?=[<{])/g;
-const QUOTED = /(['"`])([A-Z][A-Za-z'’]*(?: [^'"`\n]+)|[A-Z][a-z]+)\1/g;
+// Each quote style on its own, so an apostrophe inside "double" or `template` strings ("doesn't match") doesn't end it.
+const QUOTED = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\\n]|\\.)*)`/g;
+const WORDS = /^(?:[A-Z][A-Za-z'’]*(?: .+)|[A-Z][a-z]+)$/;
 // A JSX text line that starts lowercase, before an expression ("between {a} and {b}").
 const BARE_TEXT = /^\s+([a-z][a-z’']+(?: [a-z’']+)* \{)/;
 // JSX text after an expression, up to a closing tag ("{label} logged</Text>").
@@ -55,7 +57,10 @@ export function untranslated(src: string): string[] {
     for (const m of code.matchAll(AFTER_EXPR)) if (!ALLOWED.test(m[1])) hits.push(m[1]);
     const bare = BARE_TEXT.exec(code);
     if (bare && !/^\s*(return|const|let|if|else|case|export|import|type|function|await|try|finally|do|async)\b/.test(code)) hits.push(bare[1]);
-    for (const m of code.matchAll(QUOTED)) if (!ALLOWED.test(m[2])) hits.push(m[2]);
+    for (const m of code.matchAll(QUOTED)) {
+      const text = m[1] ?? m[2] ?? m[3];
+      if (WORDS.test(text) && !ALLOWED.test(text)) hits.push(text);
+    }
     for (const expr of code.matchAll(CHILD_EXPR)) {
       for (const m of expr[1].matchAll(SHOWN)) if (!ALLOWED.test(m[2])) hits.push(m[2]);
     }
@@ -78,6 +83,8 @@ describe('strings', () => {
     expect(untranslated(`<Text>{kind === 'nap' ? t('a.b') : t('c.d', { n: 1 })}</Text>`)).toEqual([]);
     expect(untranslated(`{ text: t('common.cancel'), style: 'cancel' },`)).toEqual([]);
     expect(untranslated(`{ value: 'ml', label: 'ml' },`)).toEqual([]);
+    expect(untranslated(`throw new Error("This phone didn't get the key yet")`)).toEqual(["This phone didn't get the key yet"]);
+    expect(untranslated('throw new Error(`Moved to ${server}, but it failed`)')).toEqual(['Moved to ${server}, but it failed']);
   });
 
   it('UI text comes from the catalog (t()), not English in the code', () => {

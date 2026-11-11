@@ -124,7 +124,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     const state = verifyMovedLog(oldEntries, entries, move.from, me.id, move.entries);
     const res = await api.keys();
     const sealed = res.keys.find((k) => k.epoch === state.epoch);
-    if (!sealed) throw new Error("The new server hasn't got this phone's key yet");
+    if (!sealed) throw new Error(t('sync.error.newServerNoKey'));
     const keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(me.keys, state, k.epoch, fromBase64(k.sealed))]));
 
     // What this phone wrote to the old family after the mover's last pull isn't in the new one yet.
@@ -147,7 +147,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
   } catch (e) {
     // Not "removed": that's about the old family, which this phone is still in.
     const why = e instanceof Error ? e.message : String(e);
-    throw new Error(`Your family moved to ${move.server.replace(/^https?:\/\//, '')}, but this phone couldn't follow yet: ${why}`);
+    throw new Error(t('sync.error.followFailed', { server: move.server.replace(/^https?:\/\//, ''), why }));
   }
 }
 

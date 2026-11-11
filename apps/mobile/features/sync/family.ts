@@ -66,7 +66,7 @@ export const inviteStatus = (inviteId: string) => member().api.request<InviteRes
  * the QR secret, which the server never had).
  */
 export function claimCode(invite: Invite, claimant: NonNullable<InviteResponse['claimant']>) {
-  if (!checkClaimMac(invite.secret, claimant)) throw new Error("This request didn't come from the phone that scanned the code");
+  if (!checkClaimMac(invite.secret, claimant)) throw new Error(t('sync.error.claimAltered'));
   return pairingCode(member().me.keys.sign.publicKey, fromBase64(claimant.signKey), invite.secret);
 }
 
@@ -165,13 +165,13 @@ export async function recoverFamily(serverInput: string, words: string, local: '
   try {
     await rec.login();
   } catch (e) {
-    if (e instanceof SyncHttpError && e.status === 404) throw new Error("These words don't belong to a family on this server");
+    if (e instanceof SyncHttpError && e.status === 404) throw new Error(t('sync.error.recoveryNoFamily'));
     throw e;
   }
   const { entries } = await rec.log();
   const state = verifyDeviceLog(entries);
   if (!state.recovery || toBase64(state.recovery.signKey) !== toBase64(recovery.sign.publicKey)) {
-    throw new Error("The family's recovery key doesn't match these words");
+    throw new Error(t('sync.error.recoveryMismatch'));
   }
   const res = await rec.keys();
   const familyKeys = res.keys.map((k) => ({ epoch: k.epoch, key: openFamilyKey(recovery, state, k.epoch, fromBase64(k.sealed)) }));
@@ -245,7 +245,7 @@ export function finishJoin(join: Join, local: 'merge' | 'replace', name: string)
     join.deviceId,
     (state) => {
       const inviter = state.members.get(join.qr.d);
-      if (!inviter || toBase64(inviter.signKey) !== join.qr.p) throw new Error("The family's phone list doesn't match the code. Try again.");
+      if (!inviter || toBase64(inviter.signKey) !== join.qr.p) throw new Error(t('sync.error.logMismatch'));
     },
     local,
     name,
@@ -276,7 +276,7 @@ async function completeJoin(
     const res = await session.request<KeysResponse>('GET', '/v1/keys');
     keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(identity, state, k.epoch, fromBase64(k.sealed))]));
   }
-  if (!keys.has(state.epoch)) throw new Error("This phone didn't get the family key yet. Open Sync on the other phone, then try again.");
+  if (!keys.has(state.epoch)) throw new Error(t('sync.error.noFamilyKey'));
   saveFamilyKeys(keys);
 
   if (local === 'replace') {

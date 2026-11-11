@@ -488,7 +488,7 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       continue;
     }
     if (gen !== seenGen) await saveSync({ restoreGen: gen });
-    if (!pageContinues(seq, page)) throw new Error(`The server sent a page that doesn't continue from ${seq}`);
+    if (!pageContinues(seq, page)) throw new Error(t('sync.error.pageStalled', { seq: String(seq) }));
     const genuine = page.records.filter((r) => {
       if (r.seq > seq && r.seq <= page.seq && genuineAt(closedAt, r.epoch, r.seq)) return true; // i18n-ignore
       console.warn(`[sync] refused ${r.kind} record ${r.id}: seq ${r.seq} isn't valid for epoch ${r.epoch}`);
