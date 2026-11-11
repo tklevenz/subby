@@ -72,8 +72,11 @@ export default function TrendsScreen() {
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
       <TabHeader className="mb-2" />
+      {/* The range stays put; the charts scroll. */}
+      <View className="px-4 pb-2">
+        <Segmented options={ranges()} value={range} onChange={setRange} />
+      </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 }}>
-      <Segmented options={ranges()} value={range} onChange={setRange} />
 
       {stats && avg ? (
         avg.days === 0 && !stats[stats.length - 1].tracked ? (

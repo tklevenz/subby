@@ -73,9 +73,12 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
   return (
     <View>
       <Text className="text-ink-muted text-sm mt-3 mb-3">
+        {/* Before a feed both: which side to offer, and that a tap starts the timer. */}
         {running
           ? t('feedSheet.feedingFor', { span: formatDuration(now - running.startedAt) })
-          : next ? t(next === 'left' ? 'feedSheet.offerLeft' : 'feedSheet.offerRight') : t('feedSheet.tapSide')}
+          : next
+            ? `${t(next === 'left' ? 'feedSheet.offerLeft' : 'feedSheet.offerRight')} ${t('feedSheet.tapSide')}`
+            : t('feedSheet.tapSide')}
       </Text>
       <View className="flex-row gap-3">
         <SideButton side="left" secs={secs.left} active={active === 'left'} hint={!running && next === 'left'} onPress={() => tap('left')} />

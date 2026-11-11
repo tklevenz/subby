@@ -3,11 +3,9 @@ import { t as tr } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowUpFromBracket, Camera, Download, ImageIcon, Plus, ShareNodes, Xmark } from '../icons';
-import { recentTags } from '@subby/shared';
+import { ArrowUpFromBracket, Camera, Download, ImageIcon, ShareNodes, Xmark } from '../icons';
 import { canSavePhoto, pickPhoto, savePhoto, sharePhoto } from '../../features/photos';
-import { useLogStore } from '../../store/useLogStore';
-import { Chip, TextField } from '../ui';
+import { TextField } from '../ui';
 import { colors } from '../../theme/colors';
 
 const parse = (t: string) => {
@@ -75,43 +73,6 @@ export function UnitNumberField({
       onChange={(v) => onChange(v === undefined ? undefined : fromDisplay(v))}
       suffix={suffix}
     />
-  );
-}
-
-/** Free-form tags with recent tags as quick chips. */
-export function TagsField({ value, onChange }: { value: string[] | undefined; onChange: (tags: string[] | undefined) => void }) {
-  const logs = useLogStore((s) => s.logs);
-  const [draft, setDraft] = useState('');
-  const tags = value ?? [];
-  const suggestions = recentTags(logs).filter((t) => !tags.some((x) => x.toLowerCase() === t.toLowerCase()));
-
-  const set = (next: string[]) => onChange(next.length ? next : undefined);
-  const add = () => {
-    const t = draft.trim();
-    if (t && !tags.includes(t)) set([...tags, t]);
-    setDraft('');
-  };
-
-  return (
-    <View>
-      <View className="flex-row flex-wrap gap-2">
-        {tags.map((t) => (
-          <Pressable key={t} onPress={() => set(tags.filter((x) => x !== t))} className="flex-row items-center px-3 py-1.5 rounded-full bg-violet/30 border border-violet-strong/60">
-            <Text className="text-violet-faint mr-1">{t}</Text>
-            <Xmark color={colors.violetPale} size={12} />
-          </Pressable>
-        ))}
-        {suggestions.map((t) => (
-          <Chip key={t} label={tr('fields.newTag', { tag: t })} selected={false} onPress={() => set([...tags, t])} />
-        ))}
-      </View>
-      <View className="flex-row items-center mt-2">
-        <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder={tr('fields.addTag')} onSubmitEditing={add} returnKeyType="done" />
-        <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-raised" hitSlop={6}>
-          <Plus color={colors.inkSoft} size={18} />
-        </Pressable>
-      </View>
-    </View>
   );
 }
 

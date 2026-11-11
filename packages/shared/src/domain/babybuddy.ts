@@ -142,7 +142,6 @@ export type MappedEntry = {
 
 const common = (r: BBBase) => ({
   notes: r.notes?.trim() || undefined,
-  tags: r.tags?.length ? r.tags : undefined,
 });
 
 /** Stable reference so re-imports from the same server skip existing rows. */
@@ -253,7 +252,7 @@ export function mapRecord<E extends BBEndpoint>(
       }
       case 'notes': {
         const n = r as BBNote;
-        return { startedAt: bbTime(n.time), endedAt: null, payload: { type: 'note', text: n.note, tags: common(n).tags } };
+        return { startedAt: bbTime(n.time), endedAt: null, payload: { type: 'note', text: n.note } };
       }
     }
     throw new Error(`Unsupported endpoint ${endpoint}`);

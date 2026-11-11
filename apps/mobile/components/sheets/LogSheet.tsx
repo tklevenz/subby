@@ -7,7 +7,6 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import DateTimeField from '../DateTimeField';
 import { PayloadEditor } from '../editors';
-import { TagsField } from '../editors/fields';
 import { defaultPayload } from '../logTypes';
 import { Button, FieldLabel, TextField, ErrorText } from '../ui';
 import { useSingleFlight } from '../useSingleFlight';
@@ -15,7 +14,7 @@ import { useSingleFlight } from '../useSingleFlight';
 /** Types logged with a start and an end here, or started as a live timer from the chosen start. */
 const TIMED: readonly LogType[] = ['sleep', 'pumping', 'activity'];
 
-/** Common fields shared by the log sheet and the edit screen. */
+/** Common fields shared by the log sheet and the edit screen: notes (a note is its own text). */
 export function CommonFields({ payload, onChange }: { payload: LogPayload; onChange: (p: Partial<LogPayload>) => void }) {
   return (
     <View>
@@ -31,8 +30,6 @@ export function CommonFields({ payload, onChange }: { payload: LogPayload; onCha
           />
         </>
       ) : null}
-      <FieldLabel>{t('logSheet.tags')}</FieldLabel>
-      <TagsField value={payload.tags} onChange={(tags) => onChange({ tags })} />
     </View>
   );
 }
@@ -41,10 +38,13 @@ export function CommonFields({ payload, onChange }: { payload: LogPayload; onCha
 export default function LogSheet({
   type,
   initial,
+  initialStart,
   onClose,
 }: {
   type: LogType;
   initial?: Partial<LogPayload>;
+  /** Where the start begins (History's + on another day); else now. */
+  initialStart?: number;
   onClose: () => void;
 }) {
   const addLog = useLogStore((s) => s.addLog);
@@ -55,7 +55,7 @@ export default function LogSheet({
   const startOffsetMin = pastBreastfeed ? 15 : 0;
 
   // Timed types start now with no end: "Start timer" runs from the start; logging a past one needs an end.
-  const [startedAt, setStart] = useState(() => Date.now() - startOffsetMin * 60_000);
+  const [startedAt, setStart] = useState(() => (initialStart ?? Date.now()) - startOffsetMin * 60_000);
   const [end, setEnd] = useState<number | null>(null);
   // Nap or night follows the start time (the usual bedtime, else the clock) until the toggle is used.
   const isNapAt = (t: number) => defaultNap(useLogStore.getState().logs, t);

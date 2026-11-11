@@ -45,7 +45,6 @@ const COLUMNS: [header: string, get: (p: LogPayload) => Value][] = [
         : undefined],
   ['text', (p) => (p.type === 'note' ? p.text : undefined)],
   ['notes', (p) => p.notes],
-  ['tags', (p) => list(p.tags)],
 ];
 
 const pad = (n: number) => String(n).padStart(2, '0');

@@ -37,10 +37,10 @@ export default function SheetHost() {
   return (
     <BottomSheet visible={sheet !== null} onClose={close} title={title} icon={icon}>
       {sheet?.kind === 'feed' ? <FeedSheet key="feed" initialTab={sheet.tab} onClose={close} /> : null}
-      {sheet?.kind === 'add' ? <AddLogSheet key="add" /> : null}
+      {sheet?.kind === 'add' ? <AddLogSheet key="add" at={sheet.at} /> : null}
       {sheet?.kind === 'diaper' ? <DiaperSheet key="diaper" onClose={close} /> : null}
       {/* Keyed so switching from one type to another resets the form state. */}
-      {sheet?.kind === 'log' ? <LogSheet key={`log-${sheet.type}`} type={sheet.type} initial={sheet.payload} onClose={close} /> : null}
+      {sheet?.kind === 'log' ? <LogSheet key={`log-${sheet.type}`} type={sheet.type} initial={sheet.payload} initialStart={sheet.at} onClose={close} /> : null}
     </BottomSheet>
   );
 }

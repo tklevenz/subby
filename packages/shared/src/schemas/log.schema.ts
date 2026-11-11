@@ -4,9 +4,9 @@ import { PhotoBlobSchema } from './child.schema';
 // All quantities are stored in canonical units (ml, g, cm, °C, seconds, epoch ms)
 // and converted for display only (see domain/units.ts).
 
+// Tags were dropped (2026-11-11): unused. A `tags` field from an older app passes through untouched (unknown fields do).
 const base = {
   notes: z.string().optional(),
-  tags: z.array(z.string()).optional(),
 };
 
 export const DIAPER_COLORS = [

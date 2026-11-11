@@ -4,8 +4,12 @@ import * as Haptics from 'expo-haptics';
 import { useSheetStore } from '../../store/useSheetStore';
 import { LOG_TILE_KEYS, logTile } from '../logTypes';
 
-/** Grid of everything that can be logged; second tap of the 2-tap rule for anything without a Home tile (the + in Home's header opens it). */
-export default function AddLogSheet() {
+/**
+ * Grid of everything that can be logged; second tap of the 2-tap rule for anything without a Home tile (the + in the
+ * header opens it). With `at` (History's + on another day) every tile opens the plain log sheet starting then: the
+ * live breastfeeding timer logs now, so it doesn't fit a past day.
+ */
+export default function AddLogSheet({ at }: { at?: number }) {
   const open = useSheetStore((s) => s.open);
 
   return (
@@ -16,7 +20,9 @@ export default function AddLogSheet() {
               key={key}
               onPress={() => {
                 Haptics.selectionAsync();
-                open(request);
+                if (at === undefined) open(request);
+                else if (request.kind === 'log') open({ ...request, at });
+                else open({ kind: 'log', type: 'feed', at }); // the feed tile's own sheet
               }}
               className={`items-center justify-center rounded-2xl border py-4 ${bg}`}
               style={{ width: '30.5%' }}

@@ -343,7 +343,6 @@ export const en = {
   'feedSheet.logSolids': 'Log solids',
   'logSheet.notes': 'Notes',
   'logSheet.optional': 'Optional',
-  'logSheet.tags': 'Tags',
   'logSheet.start': 'Start',
   'logSheet.started': 'Started',
   'logSheet.time': 'Time',
@@ -401,8 +400,6 @@ export const en = {
   'editor.notePlaceholder': 'What happened?',
   'editor.photo': 'Photo',
   // Fields.
-  'fields.addTag': 'Add tag',
-  'fields.newTag': '+ {tag}',
   'fields.viewPhoto': 'View photo',
   'fields.removePhoto': 'Remove photo',
   'fields.photoRemoved': 'Photo removed when you save',

@@ -23,7 +23,7 @@ const NEW_WAKING_MS = 15 * MIN;
 /**
  * A finished night as one: bedtime, wake-up and the wakings between. Saving turns it back into sleep pieces,
  * reusing the existing entries in order, adding new ones for added wakings and deleting the ones a removed waking
- * joined (their notes and tags move to the first). Opened from any piece of the night.
+ * joined (their notes move to the first). Opened from any piece of the night.
  */
 export default function NightForm({ night }: { night: Night }) {
   const updateLog = useLogStore((s) => s.updateLog);
@@ -73,8 +73,7 @@ export default function NightForm({ night }: { night: Night }) {
     if (!pieces) return;
     const joined = night.pieces.slice(pieces.length);
     const notes = [payload.notes, ...joined.map((p) => p.payload.notes)].filter(Boolean).join('\n') || undefined;
-    const tags = [...new Set([...(payload.tags ?? []), ...joined.flatMap((p) => p.payload.tags ?? [])])];
-    const firstPayload = { ...payload, notes, tags: tags.length ? tags : undefined };
+    const firstPayload = { ...payload, notes };
     for (const [i, { start, end }] of pieces.entries()) {
       const existing = night.pieces[i];
       if (!existing) await addLog({ type: 'sleep', nap: false }, { startedAt: start, endedAt: end });

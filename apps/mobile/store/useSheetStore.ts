@@ -3,11 +3,12 @@ import type { LogPayload, LogType } from '@subby/shared';
 
 export type SheetRequest =
   | { kind: 'feed'; tab?: 'breast' | 'bottle' | 'solids' }
-  | { kind: 'add' }
+  /** `at`: logging on another day (History's +): the grid opens plain log sheets starting then. */
+  | { kind: 'add'; at?: number }
   | { kind: 'diaper' }
-  | { kind: 'log'; type: LogType; payload?: Partial<LogPayload> };
+  | { kind: 'log'; type: LogType; payload?: Partial<LogPayload>; at?: number };
 
-/** Which logging sheet is open on the Home screen (opened from the dock, header, timers…). */
+/** Which logging sheet is open on the tabs (opened from Home's tiles, the + in the header, timers…). */
 export const useSheetStore = create<{
   sheet: SheetRequest | null;
   open: (sheet: SheetRequest) => void;

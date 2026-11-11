@@ -8,13 +8,13 @@ import { useSheetStore } from '../store/useSheetStore';
 import { colors } from '../theme/colors';
 
 /** Everything without a tile of its own ("Log something"); replaced the recent-category shortcuts (canvas row "Home · only the +", D). */
-function LogButton() {
+function LogButton({ at }: { at?: number }) {
   const open = useSheetStore((s) => s.open);
   return (
     <Pressable
       onPress={() => {
         Haptics.selectionAsync();
-        open({ kind: 'add' });
+        open({ kind: 'add', at });
       }}
       hitSlop={8}
       accessibilityRole="button"
@@ -30,15 +30,16 @@ function LogButton() {
 
 /**
  * The child (switch, open the profile) and the round +, on Home, History and Trends: the screens that show one
- * child's log. The tab bar names the screen, so there's no title. The + opens the tabs' shared log sheet.
+ * child's log. The tab bar names the screen, so there's no title. The + opens the tabs' shared log sheet; `logAt`
+ * starts what it logs on another day (History).
  */
-export default function TabHeader({ className = 'mb-4' }: { className?: string }) {
+export default function TabHeader({ className = 'mb-4', logAt }: { className?: string; logAt?: number }) {
   return (
     <View className={`mx-4 mt-2 flex-row items-center ${className}`}>
       <View className="flex-1">
         <ChildSwitcher />
       </View>
-      <LogButton />
+      <LogButton at={logAt} />
     </View>
   );
 }

@@ -18,10 +18,6 @@ export function recentFoods(logs: LogEntry[], limit = 12): string[] {
   );
 }
 
-export function recentTags(logs: LogEntry[], limit = 12): string[] {
-  return distinctRecent(logs.flatMap((l) => l.payload.tags ?? []), limit);
-}
-
 /** Last-used dose settings per medication name, most recent first. */
 export function recentMedications(logs: LogEntry[], limit = 6): PayloadOf<'medication'>[] {
   const out = new Map<string, PayloadOf<'medication'>>();

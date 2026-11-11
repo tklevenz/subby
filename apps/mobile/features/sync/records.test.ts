@@ -95,7 +95,9 @@ describe('isValidBody', () => {
     expect(isValidBody('log', log({ type: 'medication', name: 123 }))).toBe(false);
     expect(isValidBody('log', log({ type: 'medication' }))).toBe(false);
     expect(isValidBody('log', log({ type: 'feed', method: 'solids', foods: 'apple' }))).toBe(false);
-    expect(isValidBody('log', log({ type: 'note', text: 'x', tags: [1] }))).toBe(false);
+    expect(isValidBody('log', log({ type: 'sleep', notes: ['x'] }))).toBe(false);
+    // Tags were dropped: an older app's still sync, as an unknown field.
+    expect(isValidBody('log', log({ type: 'note', text: 'x', tags: ['a'] }))).toBe(true);
     // Unusual values still sync: empty text, an unknown enum value or field, a null, a negative amount.
     expect(isValidBody('log', log({ type: 'note', text: '' }))).toBe(true);
     expect(isValidBody('log', log({ type: 'feed', method: 'spoon', amountMl: -5, newField: { a: 1 } }))).toBe(true);

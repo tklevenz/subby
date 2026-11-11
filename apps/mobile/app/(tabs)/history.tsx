@@ -24,6 +24,8 @@ export default function HistoryScreen() {
   const logs = useLogQuery({ from: addDays(anchor, -2), to: addDays(anchor, 1) });
   const stats = useMemo(() => (logs ? dailyStats(logs, days, now) : null), [logs, days, now]);
   const [picking, setPicking] = useState(false);
+  // The + logs on the day shown: another day at the current time of day (never later than now).
+  const logAt = anchor === today ? undefined : Math.min(atTimeOfDay(anchor, now), now);
 
   const title = formatDayLabel(anchor, now);
   // Under "Today" or "Yesterday", the date itself.
@@ -34,8 +36,9 @@ export default function HistoryScreen() {
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <TabHeader className="mb-2" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
+      <TabHeader className="mb-2" logAt={logAt} />
+      {/* The day and its totals stay put; only the timeline scrolls. */}
+      <View className="px-4">
         <View className="flex-row items-center justify-between my-2">
           <NavButton icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -1))} />
           <View className="items-center">
@@ -65,27 +68,31 @@ export default function HistoryScreen() {
           />
         </View>
 
-        {!logs || !stats ? null : (
-          <>
-            <DayTotals stats={stats[0]!} units={units} />
-            <View className="mt-2.5">
-              <DayLog logs={logs} day={anchor} now={now} />
-            </View>
-          </>
-        )}
-        {picking ? (
-          <CalendarSheet
-            value={anchor}
-            onClose={() => setPicking(false)}
-            onPick={(day) => {
-              setPicking(false);
-              setAnchor(day);
-            }}
-          />
-        ) : null}
+        {logs && stats ? <DayTotals stats={stats[0]!} units={units} /> : null}
+      </View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 32 }}>
+        {logs ? <DayLog logs={logs} day={anchor} now={now} /> : null}
       </ScrollView>
+      {picking ? (
+        <CalendarSheet
+          value={anchor}
+          onClose={() => setPicking(false)}
+          onPick={(day) => {
+            setPicking(false);
+            setAnchor(day);
+          }}
+        />
+      ) : null}
     </View>
   );
+}
+
+/** `day` (a local midnight) at the clock time of `now`. */
+function atTimeOfDay(day: number, now: number): number {
+  const d = new Date(day);
+  const n = new Date(now);
+  d.setHours(n.getHours(), n.getMinutes(), 0, 0);
+  return d.getTime();
 }
 
 function NavButton({ icon, onPress, disabled }: { icon: React.ReactNode; onPress: () => void; disabled?: boolean }) {
