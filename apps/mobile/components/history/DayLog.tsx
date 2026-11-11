@@ -77,11 +77,18 @@ export function DayLog({ logs, day, now }: { logs: LogEntry[]; day: number; now:
   );
 }
 
+/** The times' column: "16:31" fits 48, "4:31 PM" needs more, or it wraps. */
+function useTimeColumn() {
+  const clock = useSettingsStore((s) => s.clock);
+  return { width: clock === '12h' ? 64 : 48 };
+}
+
 function AwakeRow({ item }: { item: Extract<TimelineItem, { kind: 'awake' }> }) {
   const length = formatHoursMinutes(item.to - item.from);
+  const timeColumn = useTimeColumn();
   return (
     <View className="flex-row items-center" style={{ minHeight: 34 }}>
-      <View className="w-12" />
+      <View style={timeColumn} />
       {/* A dotted stretch of rail: awake, between two sleeps. */}
       <View className="w-7 self-stretch items-center justify-evenly">
         {[0, 1, 2, 3].map((i) => (
@@ -104,9 +111,10 @@ function NightRow({ night, day, now }: { night: Night; day: number; now: number 
   const edit = () => router.push(`/entry/${night.pieces[0]!.id}`);
   const n = night.wakings.length;
   const running = night.end === null;
+  const timeColumn = useTimeColumn();
   return (
     <View className="flex-row" style={{ minHeight: 64 }}>
-      <View className="w-12 pt-4">
+      <View className="pt-4" style={timeColumn}>
         <Text className="text-[13px] text-ink-soft" style={{ fontVariant: ['tabular-nums'] }}>
           {formatTime(night.start)}
         </Text>
@@ -163,6 +171,7 @@ function EntryRow({ entry, day }: { entry: LogEntry; day: number }) {
   const units = useSettingsStore((s) => s.units);
   const formatTime = useFormatTime();
   const display = logDisplay(entry, units, formatTime);
+  const timeColumn = useTimeColumn();
   const sleep = entry.logType === 'sleep';
   // A night that started the evening before still shows its start time, with the weekday under it.
   const earlier = entry.startedAt < day;
@@ -174,7 +183,7 @@ function EntryRow({ entry, day }: { entry: LogEntry; day: number }) {
       className="flex-row items-center"
       style={{ minHeight: sleep ? 64 : 52 }}
     >
-      <View className="w-12">
+      <View style={timeColumn}>
         <Text className="text-[13px] text-ink-soft" style={{ fontVariant: ['tabular-nums'] }}>
           {formatTime(entry.startedAt)}
         </Text>

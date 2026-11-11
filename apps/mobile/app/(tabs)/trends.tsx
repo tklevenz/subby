@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import TabHeader from '../../components/TabHeader';
 import { AngleRight } from '../../components/icons';
 import {
   addDays,
@@ -70,7 +71,7 @@ export default function TrendsScreen() {
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">{t('tabs.trends')}</Text>
+      <TabHeader className="mb-2" />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 }}>
       <Segmented options={ranges()} value={range} onChange={setRange} />
 

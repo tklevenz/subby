@@ -2,6 +2,7 @@ import { formatDate, t } from '@subby/shared/i18n';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import TabHeader from '../../components/TabHeader';
 import { AngleDown, AngleLeft, AngleRight } from '../../components/icons';
 import CalendarSheet from '../../components/datetime/CalendarSheet';
 import { addDays, dailyStats, startOfDay } from '@subby/shared';
@@ -33,7 +34,7 @@ export default function HistoryScreen() {
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">{t('tabs.history')}</Text>
+      <TabHeader className="mb-2" />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
         <View className="flex-row items-center justify-between my-2">
           <NavButton icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -1))} />
