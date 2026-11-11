@@ -268,6 +268,7 @@ export const nl: Translation = {
   'home.openDiaperA11y': 'Deze luier openen',
   'home.log': 'Loggen',
   'home.start': 'Starten',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Kolven gestart',
   'home.overdue': '{span} over tijd',
   'home.dueTomorrow': 'Volgende morgen om {time}',

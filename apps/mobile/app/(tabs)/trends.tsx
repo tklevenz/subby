@@ -37,16 +37,19 @@ export default function TrendsScreen() {
   const nights = useMemo(() => (logs ? nightsByDay(groupNights(logs, now), days) : null), [logs, days, now]);
   const avgNight = useMemo(() => (nights ? averageNights(nights) : null), [nights]);
 
+  // A weekday letter for a week, else the day of the month.
+  const dayLabel = (day: number) => (count <= 7 ? formatDate(day, { weekday: 'narrow' }) : String(new Date(day).getDate()));
+
   const bars = (values: (s: DayStats) => number[]): Bar[] =>
     (stats ?? []).map((s) => ({
-      label: count <= 7 ? formatDate(s.day, { weekday: 'narrow' }) : String(new Date(s.day).getDate()),
+      label: dayLabel(s.day),
       values: values(s),
       dim: s.day === today,
     }));
 
   const nightBars = (value: (n: NonNullable<NonNullable<typeof nights>[number]>) => number): Bar[] =>
     days.map((day, i) => ({
-      label: count <= 7 ? formatDate(day, { weekday: 'narrow' }) : String(new Date(day).getDate()),
+      label: dayLabel(day),
       values: [nights?.[i] ? value(nights[i]!) : 0],
     }));
 
@@ -62,128 +65,128 @@ export default function TrendsScreen() {
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 }}>
 
-      {stats && avg ? (
-        avg.days === 0 && !stats[stats.length - 1].tracked ? (
-          <EmptyState small text={t('trends.empty')} />
-        ) : (
-          <>
-            {any('sleepMs') ? (
-              <Section
-                title={t('trends.sleep')}
-                color={TYPE_META.sleep.color}
-                stats={[
-                  [t('trends.perDay'), formatHoursMinutes(avg.sleepMs)],
-                  [t('trends.night'), formatHoursMinutes(avg.nightMs), colors.violetDeep],
-                  [t('trends.naps'), t('trends.napsValue', { count: one(avg.naps), span: formatHoursMinutes(avg.napMs) }), colors.violetSoft],
-                ]}
-              >
-                <BarChart
-                  bars={bars((s) => [s.nightMs / HOUR_MS, s.napMs / HOUR_MS])}
-                  colors={[colors.violetDeep, colors.violetSoft]}
-                  average={avg.sleepMs / HOUR_MS}
-                  formatValue={(v) => `${v}h`}
-                />
-              </Section>
-            ) : null}
-
-            {/* Only once wakings are logged: without them, a night's longest stretch is just the night. */}
-            {avgNight && nights?.some((n) => n && n.wakings > 0) ? (
-              <Section
-                title={t('trends.nights')}
-                color={colors.violetDeep}
-                stats={[
-                  [t('trends.asleep'), formatHoursMinutes(avgNight.asleepMs)],
-                  [t('trends.wakings'), one(avgNight.wakings)],
-                  [t('trends.longest'), formatHoursMinutes(avgNight.longestMs)],
-                  [t('trends.awake'), formatHoursMinutes(avgNight.awakeMs)],
-                ]}
-              >
-                <Text className="text-ink-muted text-xs mb-1">{t('trends.wakings')}</Text>
-                <BarChart bars={nightBars((n) => n.wakings)} colors={[colors.amberPale]} average={avgNight.wakings} />
-                <View className="mt-4">
-                  <Text className="text-ink-muted text-xs mb-1">{t('trends.longest')}</Text>
+        {stats && avg ? (
+          avg.days === 0 && !stats[stats.length - 1].tracked ? (
+            <EmptyState small text={t('trends.empty')} />
+          ) : (
+            <>
+              {any('sleepMs') ? (
+                <Section
+                  title={t('trends.sleep')}
+                  color={TYPE_META.sleep.color}
+                  stats={[
+                    [t('trends.perDay'), formatHoursMinutes(avg.sleepMs)],
+                    [t('trends.night'), formatHoursMinutes(avg.nightMs), colors.violetDeep],
+                    [t('trends.naps'), t('trends.napsValue', { count: one(avg.naps), span: formatHoursMinutes(avg.napMs) }), colors.violetSoft],
+                  ]}
+                >
                   <BarChart
-                    bars={nightBars((n) => n.longestMs / HOUR_MS)}
-                    colors={[colors.violetDeep]}
-                    average={avgNight.longestMs / HOUR_MS}
+                    bars={bars((s) => [s.nightMs / HOUR_MS, s.napMs / HOUR_MS])}
+                    colors={[colors.violetDeep, colors.violetSoft]}
+                    average={avg.sleepMs / HOUR_MS}
                     formatValue={(v) => `${v}h`}
                   />
-                </View>
-              </Section>
-            ) : null}
+                </Section>
+              ) : null}
 
-            {any('feeds') || any('solids') ? (
-              <Section
-                title={t('trends.feeding')}
-                color={TYPE_META.feed.color}
-                stats={[
-                  [t('trends.feedsPerDay'), one(avg.feeds), any('solids') ? TYPE_META.feed.color : undefined],
-                  ...(any('bottleMl') ? [[t('trends.bottlePerDay'), formatVolume(avg.bottleMl, units)] as Stat] : []),
-                  ...(any('breastSec') ? [[t('trends.breastPerDay'), formatHoursMinutes(avg.breastSec * 1000)] as Stat] : []),
-                  ...(any('solids') ? [[t('trends.solidsPerDay'), one(avg.solids), colors.amberPale] as Stat] : []),
-                ]}
-              >
-                <BarChart bars={bars((s) => [s.feeds, s.solids])} colors={[TYPE_META.feed.color, colors.amberPale]} average={avg.feeds} />
-                {any('bottleMl') ? (
+              {/* Only once wakings are logged: without them, a night's longest stretch is just the night. */}
+              {avgNight && nights?.some((n) => n && n.wakings > 0) ? (
+                <Section
+                  title={t('trends.nights')}
+                  color={colors.violetDeep}
+                  stats={[
+                    [t('trends.asleep'), formatHoursMinutes(avgNight.asleepMs)],
+                    [t('trends.wakings'), one(avgNight.wakings)],
+                    [t('trends.longest'), formatHoursMinutes(avgNight.longestMs)],
+                    [t('trends.awake'), formatHoursMinutes(avgNight.awakeMs)],
+                  ]}
+                >
+                  <Text className="text-ink-muted text-xs mb-1">{t('trends.wakings')}</Text>
+                  <BarChart bars={nightBars((n) => n.wakings)} colors={[colors.amberPale]} average={avgNight.wakings} />
                   <View className="mt-4">
-                    <Text className="text-ink-muted text-xs mb-1">{t('trends.bottleVolume')}</Text>
+                    <Text className="text-ink-muted text-xs mb-1">{t('trends.longest')}</Text>
                     <BarChart
-                      bars={bars((s) => [volume(s.bottleMl)])}
-                      colors={[colors.cyanStrong]}
-                      average={volume(avg.bottleMl)}
-                      formatValue={(v) => `${formatNumber(v)} ${volumeUnit(units)}`}
+                      bars={nightBars((n) => n.longestMs / HOUR_MS)}
+                      colors={[colors.violetDeep]}
+                      average={avgNight.longestMs / HOUR_MS}
+                      formatValue={(v) => `${v}h`}
                     />
                   </View>
-                ) : null}
-              </Section>
-            ) : null}
+                </Section>
+              ) : null}
 
-            {any('diapers') ? (
-              <Section
-                title={t('trends.diapers')}
-                color={TYPE_META.diaper.color}
-                stats={[
-                  [t('trends.perDay'), one(avg.diapers)],
-                  [t('trends.wet'), one(avg.wet)],
-                  [t('trends.dirty'), one(avg.dirty)],
-                ]}
-              >
-                <BarChart bars={bars((s) => [s.diapers])} colors={[TYPE_META.diaper.color]} average={avg.diapers} />
-              </Section>
-            ) : null}
+              {any('feeds') || any('solids') ? (
+                <Section
+                  title={t('trends.feeding')}
+                  color={TYPE_META.feed.color}
+                  stats={[
+                    [t('trends.feedsPerDay'), one(avg.feeds), any('solids') ? TYPE_META.feed.color : undefined],
+                    ...(any('bottleMl') ? [[t('trends.bottlePerDay'), formatVolume(avg.bottleMl, units)] as Stat] : []),
+                    ...(any('breastSec') ? [[t('trends.breastPerDay'), formatHoursMinutes(avg.breastSec * 1000)] as Stat] : []),
+                    ...(any('solids') ? [[t('trends.solidsPerDay'), one(avg.solids), colors.amberPale] as Stat] : []),
+                  ]}
+                >
+                  <BarChart bars={bars((s) => [s.feeds, s.solids])} colors={[TYPE_META.feed.color, colors.amberPale]} average={avg.feeds} />
+                  {any('bottleMl') ? (
+                    <View className="mt-4">
+                      <Text className="text-ink-muted text-xs mb-1">{t('trends.bottleVolume')}</Text>
+                      <BarChart
+                        bars={bars((s) => [volume(s.bottleMl)])}
+                        colors={[colors.cyanStrong]}
+                        average={volume(avg.bottleMl)}
+                        formatValue={(v) => `${formatNumber(v)} ${volumeUnit(units)}`}
+                      />
+                    </View>
+                  ) : null}
+                </Section>
+              ) : null}
 
-            {any('pumpedMl') ? (
-              <Section title={t('trends.pumping')} color={TYPE_META.pumping.color} stats={[[t('trends.perDay'), formatVolume(avg.pumpedMl, units)]]}>
-                <BarChart
-                  bars={bars((s) => [volume(s.pumpedMl)])}
-                  colors={[TYPE_META.pumping.color]}
-                  average={volume(avg.pumpedMl)}
-                  formatValue={(v) => `${formatNumber(v)} ${volumeUnit(units)}`}
-                />
-              </Section>
-            ) : null}
+              {any('diapers') ? (
+                <Section
+                  title={t('trends.diapers')}
+                  color={TYPE_META.diaper.color}
+                  stats={[
+                    [t('trends.perDay'), one(avg.diapers)],
+                    [t('trends.wet'), one(avg.wet)],
+                    [t('trends.dirty'), one(avg.dirty)],
+                  ]}
+                >
+                  <BarChart bars={bars((s) => [s.diapers])} colors={[TYPE_META.diaper.color]} average={avg.diapers} />
+                </Section>
+              ) : null}
 
-            {any('tummyMs') ? (
-              <Section title={t('trends.tummy')} color={TYPE_META.activity.color} stats={[[t('trends.perDay'), formatHoursMinutes(avg.tummyMs)]]}>
-                <BarChart bars={bars((s) => [s.tummyMs / 60_000])} colors={[TYPE_META.activity.color]} formatValue={(v) => t('time.m', { m: v })} />
-              </Section>
-            ) : null}
+              {any('pumpedMl') ? (
+                <Section title={t('trends.pumping')} color={TYPE_META.pumping.color} stats={[[t('trends.perDay'), formatVolume(avg.pumpedMl, units)]]}>
+                  <BarChart
+                    bars={bars((s) => [volume(s.pumpedMl)])}
+                    colors={[TYPE_META.pumping.color]}
+                    average={volume(avg.pumpedMl)}
+                    formatValue={(v) => `${formatNumber(v)} ${volumeUnit(units)}`}
+                  />
+                </Section>
+              ) : null}
 
-            <Text className="text-ink-ghost text-xs mt-3">
-              {t('trends.averages', { count: avg.days })}
-            </Text>
-          </>
-        )
-      ) : null}
+              {any('tummyMs') ? (
+                <Section title={t('trends.tummy')} color={TYPE_META.activity.color} stats={[[t('trends.perDay'), formatHoursMinutes(avg.tummyMs)]]}>
+                  <BarChart bars={bars((s) => [s.tummyMs / 60_000])} colors={[TYPE_META.activity.color]} formatValue={(v) => t('time.m', { m: v })} />
+                </Section>
+              ) : null}
 
-      <View className="mt-6">
-        <Card>
-          <Row label={t('trends.schedule')} value={t('trends.predicted')} onPress={() => router.push('/schedule')} right={<Chevron />} />
-          <Row label={t('trends.growth')} value={t('trends.who')} onPress={() => router.push('/growth')} right={<Chevron />} />
-          <Row label={t('trends.solids')} onPress={() => router.push('/solids')} right={<Chevron />} />
-          <Row label={t('trends.export')} onPress={() => router.push('/export')} right={<Chevron />} />
-        </Card>
-      </View>
+              <Text className="text-ink-ghost text-xs mt-3">
+                {t('trends.averages', { count: avg.days })}
+              </Text>
+            </>
+          )
+        ) : null}
+
+        <View className="mt-6">
+          <Card>
+            <Row label={t('trends.schedule')} value={t('trends.predicted')} onPress={() => router.push('/schedule')} right={<Chevron />} />
+            <Row label={t('trends.growth')} value={t('trends.who')} onPress={() => router.push('/growth')} right={<Chevron />} />
+            <Row label={t('trends.solids')} onPress={() => router.push('/solids')} right={<Chevron />} />
+            <Row label={t('trends.export')} onPress={() => router.push('/export')} right={<Chevron />} />
+          </Card>
+        </View>
       </ScrollView>
     </View>
   );

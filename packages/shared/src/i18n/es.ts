@@ -268,6 +268,7 @@ export const es: Translation = {
   'home.openDiaperA11y': 'Abrir este cambio de pañal',
   'home.log': 'Registrar',
   'home.start': 'Empezar',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Extracción iniciada',
   'home.overdue': 'Con {span} de retraso',
   'home.dueTomorrow': 'Toca mañana a las {time}',

@@ -268,6 +268,7 @@ export const de: Translation = {
   'home.openDiaperA11y': 'Diesen Windeleintrag öffnen',
   'home.log': 'Eintragen',
   'home.start': 'Starten',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Abpumpen gestartet',
   'home.overdue': 'Seit {span} überfällig',
   'home.dueTomorrow': 'Fällig morgen um {time}',

@@ -268,6 +268,7 @@ export const ptBR: Translation = {
   'home.openDiaperA11y': 'Abrir esta troca de fralda',
   'home.log': 'Registrar',
   'home.start': 'Iniciar',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Extração iniciada',
   'home.overdue': '{span} de atraso',
   'home.dueTomorrow': 'Próxima amanhã às {time}',

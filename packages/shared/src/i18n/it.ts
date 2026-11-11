@@ -268,6 +268,7 @@ export const it: Translation = {
   'home.openDiaperA11y': 'Apri questo pannolino',
   'home.log': 'Registra',
   'home.start': 'Avvia',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Estrazione iniziata',
   'home.overdue': 'In ritardo di {span}',
   'home.dueTomorrow': 'Domani alle {time}',

@@ -35,10 +35,10 @@ type TileContent = {
   entryId?: string;
 };
 
-/** A tap on a big tile can be taken back for a few seconds: the tile is easy to hit by accident. */
 /** A sleep stopped sooner than this from the tile is taken as a mistap and not kept. */
 const ACCIDENTAL_SLEEP_MS = MINUTE_MS;
 
+/** A tap on a big tile can be taken back for a few seconds (`UNDO_MS`): the tile is easy to hit by accident. */
 type UndoOffer = { label: string; undo: () => void; /** Sleep's: the bar carries the sub. */ sub?: boolean };
 const UNDO_MS = 5000;
 
@@ -164,11 +164,10 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       lines.push(t('home.sleptTonight', { span: formatHoursMinutes(tonight.asleepMs), time: formatTime(tonight.start) }));
     } else if (prediction?.kind === 'nap') {
       lines.push(t('home.napAround', { n: prediction.napIndex + 1, from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
-      if (prediction.napMinutes) lines.push(t('home.napsUsually', { span: formatHoursMinutes(prediction.napMinutes * 60_000) }));
-    } else if (prediction?.kind === 'sleep') {
-      lines.push(t('home.sleepAround', { from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
+      if (prediction.napMinutes) lines.push(t('home.napsUsually', { span: formatHoursMinutes(prediction.napMinutes * MINUTE_MS) }));
     } else if (prediction) {
-      lines.push(t('home.bedtimeAround', { from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
+      // A newborn's "next sleep" (no nap number) or bedtime.
+      lines.push(t(prediction.kind === 'sleep' ? 'home.sleepAround' : 'home.bedtimeAround', { from: formatTime(prediction.earliest), to: formatTime(prediction.latest) }));
     }
     sleep = {
       value: wakeAt !== null ? formatHoursMinutes(now - wakeAt) : '–',
@@ -253,7 +252,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
   return (
     <View
       onLayout={tile === 'sleep' ? (e) => setHeight(e.nativeEvent.layout.height) : undefined}
-      className={`flex-1 border justify-between overflow-hidden ${large ? 'rounded-3xl p-5' : 'rounded-3xl p-4'} ${content.active ? s.boxActive : s.box}`}
+      className={`flex-1 border justify-between overflow-hidden rounded-3xl ${large ? 'p-5' : 'p-4'} ${content.active ? s.boxActive : s.box}`}
     >
       {tile === 'sleep' ? <SleepSub large={large} asleep={!!content.active} height={height} /> : null}
       <Pressable
@@ -296,9 +295,9 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           >
             {content.value}
           </Text>
-          {content.lines.map((line) => (
+          {content.lines.map((line, i) => (
             // Clear of a small tile's ✕ (a 12-hour "since 12:06 PM" is long enough to reach it).
-            <Text key={line} className={`text-ink-muted text-xs mt-0.5 ${!large && content.onDiscard ? 'mr-9' : ''}`} numberOfLines={large ? 2 : 1}>
+            <Text key={`${i}:${line}`} className={`text-ink-muted text-xs mt-0.5 ${!large && content.onDiscard ? 'mr-9' : ''}`} numberOfLines={large ? 2 : 1}>
               {line}
             </Text>
           ))}
@@ -327,6 +326,18 @@ function SleepSub({ large, asleep, height }: { large?: boolean; asleep: boolean;
     <View pointerEvents="none" className="absolute" style={[{ opacity: 0.08 }, large ? { right: -18, bottom: -14 } : { right: -8, top: 6 }]}>
       <SubMono width={large ? 170 : 64} color={colors.violetStrong} />
     </View>
+  );
+}
+
+/** A row under "up next" that opens a screen: icon, label, an optional note and the chevron. */
+function LinkRow({ icon, label, note, onPress, last }: { icon: React.ReactNode; label: string; note?: string; onPress: () => void; last?: boolean }) {
+  return (
+    <Pressable onPress={onPress} className={`flex-row items-center px-3.5 py-3 ${last ? '' : 'border-b border-line'}`}>
+      {icon}
+      <Text className="flex-1 text-ink text-sm ml-2.5">{label}</Text>
+      {note ? <Text className="text-ink-muted text-xs mr-1">{note}</Text> : null}
+      <Chevron />
+    </Pressable>
   );
 }
 
@@ -387,22 +398,19 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
                 ? t('home.dueTomorrow', { time: formatTime(dueAt) })
                 : t('home.dueAt', { time: formatTime(dueAt) })}
           </Text>
-          <Pressable onPress={onPress} accessibilityLabel={`${action} ${label.toLowerCase()}`} className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}>
+          <Pressable onPress={onPress} accessibilityLabel={t('home.dueAction', { action, name: label })} className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}>
             <Text className="text-ink text-[13px] font-semibold">{action}</Text>
           </Pressable>
         </View>
       ))}
-      <Pressable onPress={() => router.push('/schedule')} className="flex-row items-center px-3.5 py-3 border-b border-line">
-        <CalendarDays color={colors.violetSoft} size={16} />
-        <Text className="flex-1 text-ink text-sm ml-2.5">{t('home.schedule')}</Text>
-        <Chevron />
-      </Pressable>
-      <Pressable onPress={() => router.push('/history')} className="flex-row items-center px-3.5 py-3">
-        <ClockRotateLeft color={colors.inkSoft} size={16} />
-        <Text className="flex-1 text-ink text-sm ml-2.5">{t('home.todaysLog')}</Text>
-        <Text className="text-ink-muted text-xs mr-1">{t('home.entries', { count: today })}</Text>
-        <Chevron />
-      </Pressable>
+      <LinkRow icon={<CalendarDays color={colors.violetSoft} size={16} />} label={t('home.schedule')} onPress={() => router.push('/schedule')} />
+      <LinkRow
+        icon={<ClockRotateLeft color={colors.inkSoft} size={16} />}
+        label={t('home.todaysLog')}
+        note={t('home.entries', { count: today })}
+        onPress={() => router.push('/history')}
+        last
+      />
     </View>
   );
 }

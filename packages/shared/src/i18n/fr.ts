@@ -268,6 +268,7 @@ export const fr: Translation = {
   'home.openDiaperA11y': 'Ouvrir cette couche',
   'home.log': 'Noter',
   'home.start': 'Démarrer',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Tirage commencé',
   'home.overdue': 'En retard de {span}',
   'home.dueTomorrow': 'Prévu demain à {time}',

@@ -41,22 +41,29 @@ export default function BottomSheet({
   const { height } = useWindowDimensions();
   const slideY = useRef(new Animated.Value(height)).current;
 
+  /** Moves the sheet to `toValue` (0 is open, `height` is away). */
+  const slideTo = (toValue: number, duration: number, easing?: (t: number) => number, done?: () => void) =>
+    Animated.timing(slideY, { toValue, duration, easing, useNativeDriver: true }).start(done);
+  const settle = () => slideTo(0, 180, Easing.out(Easing.cubic));
+
   useEffect(() => {
     if (!visible) return;
     slideY.setValue(height);
     // Not a spring: an underdamped one overshot and then crept to rest for most of a second, and a tap landing while
     // the sheet still moved under the finger was cancelled (the Diaper sheet's "first tap does nothing").
-    Animated.timing(slideY, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    slideTo(0, 240, Easing.out(Easing.cubic));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- slideTo only closes over slideY, which is stable
   }, [visible, slideY, height]);
 
-  const dismiss = () =>
-    Animated.timing(slideY, { toValue: height, duration: 220, useNativeDriver: true }).start(() => onClose());
+  const dismiss = () => slideTo(height, 220, undefined, onClose);
 
   // Claims the touch at its start: asked only on a move, the strip never got it (seen on Android, New
   // Architecture). The ✕ still gets its taps, since the deepest view is asked first. A plain tap on the strip
   // just springs back. Refs: the responder is made once, `dismiss` changes.
   const dismissRef = useRef(dismiss);
   dismissRef.current = dismiss;
+  const settleRef = useRef(settle);
+  settleRef.current = settle;
   const drag = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -64,10 +71,9 @@ export default function BottomSheet({
       onPanResponderMove: (_, g) => slideY.setValue(Math.max(0, g.dy)),
       onPanResponderRelease: (_, g) => {
         if (g.dy > CLOSE_DISTANCE || g.vy > FLICK_VELOCITY) dismissRef.current();
-        else Animated.timing(slideY, { toValue: 0, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+        else settleRef.current();
       },
-      onPanResponderTerminate: () =>
-        Animated.timing(slideY, { toValue: 0, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(),
+      onPanResponderTerminate: () => settleRef.current(),
     }),
   ).current;
 

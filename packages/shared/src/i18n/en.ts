@@ -300,6 +300,7 @@ export const en = {
   'home.openDiaperA11y': 'Open this diaper entry',
   'home.log': 'Log',
   'home.start': 'Start',
+  'home.dueAction': '{action} {name}',
   'home.pumpingStarted': 'Pumping started',
   'home.overdue': 'Overdue by {span}',
   'home.dueTomorrow': 'Due tomorrow {time}',
