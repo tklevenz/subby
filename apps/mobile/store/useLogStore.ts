@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import { eq, and, desc, gte, isNull, or, inArray } from 'drizzle-orm';
+import { eq, and, desc, gte, or } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
 import { deletedLogs } from '../db/tombstone';
-import { DAY_MS, TIMED_LOG_TYPES, notePhoto, pauseFeed, type LogEntry, type LogPayload, type PayloadOf } from '@subby/shared';
+import { runningTimer } from '../db/logFilters';
+import { DAY_MS, TIMED_LOG_TYPES, isRunning, notePhoto, pauseFeed, type LogEntry, type LogPayload, type PayloadOf } from '@subby/shared';
 
 const WINDOW_DAYS = 30;
 
@@ -23,7 +24,6 @@ export type LogWrites = {
 interface LogState {
   activeChildId: string | null;
   logs: LogEntry[];
-  isLoading: boolean;
   /** Oldest startedAt currently loaded; older entries are paged in by loadOlder(). */
   loadedSince: number;
   /** Bumped on every write, including to entries outside the loaded window (see useLogQuery). */
@@ -80,47 +80,40 @@ function newEntry(childId: string, payload: LogPayload, startedAt: number, ended
   };
 }
 
+/** A child's entries from `since` on, newest first; with `runningToo`, running timers of any age as well. */
+async function readSince(childId: string, since: number, runningToo: boolean): Promise<LogEntry[]> {
+  const t = schema.logsTable;
+  const inRange = runningToo ? or(gte(t.startedAt, since), runningTimer()) : gte(t.startedAt, since);
+  return db
+    .select()
+    .from(t)
+    .where(and(eq(t.childId, childId), eq(t.isDeleted, false), inRange))
+    .orderBy(desc(t.startedAt));
+}
+
 const byStartedDesc = (a: LogEntry, b: LogEntry) => b.startedAt - a.startedAt;
 
 export const useLogStore = create<LogState>((set, get) => ({
   activeChildId: null,
   logs: [],
-  isLoading: false,
   loadedSince: 0,
   revision: 0,
 
   loadLogs: async (childId: string) => {
-    set({ isLoading: true, activeChildId: childId });
+    set({ activeChildId: childId });
     const since = Date.now() - WINDOW_DAYS * DAY_MS;
-    const t = schema.logsTable;
-    const rows = await db
-      .select()
-      .from(t)
-      .where(
-        and(
-          eq(t.childId, childId),
-          eq(t.isDeleted, false),
-          // Always include running timers, however old.
-          or(gte(t.startedAt, since), and(isNull(t.endedAt), inArray(t.logType, [...TIMED_LOG_TYPES]))),
-        ),
-      )
-      .orderBy(desc(t.startedAt));
-
+    // Always include running timers, however old.
+    const rows = await readSince(childId, since, true);
     // Ignore results for a child that's no longer active (fast switching).
     if (get().activeChildId !== childId) return;
-    set((s) => ({ logs: rows, isLoading: false, loadedSince: since, revision: s.revision + 1 }));
+    set((s) => ({ logs: rows, loadedSince: since, revision: s.revision + 1 }));
   },
 
   loadOlder: async () => {
     const { activeChildId: childId, loadedSince } = get();
     if (!childId) return;
     const since = loadedSince - WINDOW_DAYS * DAY_MS;
-    const t = schema.logsTable;
-    const rows = await db
-      .select()
-      .from(t)
-      .where(and(eq(t.childId, childId), eq(t.isDeleted, false), gte(t.startedAt, since)))
-      .orderBy(desc(t.startedAt));
+    const rows = await readSince(childId, since, false);
     if (get().activeChildId !== childId) return;
     set((s) => ({ logs: rows, loadedSince: since, revision: s.revision + 1 }));
   },
@@ -198,8 +191,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       const others = state.logs.filter((l) => !touched.has(l.id));
       // Keep the in-memory window consistent: an entry may move into or out of it.
       // Running timers are always loaded, however old (see loadLogs).
-      const inWindow = ({ childId: c, startedAt, endedAt, logType }: LogEntry) =>
-        c === state.activeChildId && (startedAt >= state.loadedSince || (endedAt === null && TIMED_LOG_TYPES.includes(logType)));
+      const inWindow = (e: LogEntry) => e.childId === state.activeChildId && (e.startedAt >= state.loadedSince || isRunning(e));
       return {
         logs: [...others, ...edits.map((e) => e.after).filter(inWindow), ...added].sort(byStartedDesc),
         revision: state.revision + 1,

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
-import { TIMED_LOG_TYPES, type LogEntry, type LogType } from '@subby/shared';
+import { and, asc, eq, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
+import type { LogEntry, LogType } from '@subby/shared';
 import { db, schema } from '../db/client';
+import { runningTimer } from '../db/logFilters';
 import { useLogStore } from './useLogStore';
 
 /** Feeds with foods; avoids parsing thousands of milk feeds. Use with `types: ['feed']`. */
@@ -20,8 +21,7 @@ export async function fetchLogs(childId: string, q: LogQuery = {}): Promise<LogE
   const t = schema.logsTable;
   const conditions = [eq(t.childId, childId), eq(t.isDeleted, false)];
   if (q.from !== undefined) {
-    const running = and(isNull(t.endedAt), inArray(t.logType, [...TIMED_LOG_TYPES]));
-    conditions.push(or(gte(t.startedAt, q.from), gte(t.endedAt, q.from), running)!);
+    conditions.push(or(gte(t.startedAt, q.from), gte(t.endedAt, q.from), runningTimer())!);
   }
   if (q.to !== undefined) conditions.push(lt(t.startedAt, q.to));
   if (q.types) conditions.push(inArray(t.logType, [...q.types]));

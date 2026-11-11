@@ -25,6 +25,7 @@ import { db, schema } from '../../db/client';
 import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
+import { activeChildOf } from '../../store/useActiveChild';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
 import { notifyFamily } from '../reminders/family';
@@ -508,7 +509,7 @@ async function reloadStores() {
   const settings = useSettingsStore.getState();
   const children = useChildStore.getState().children;
   // The active child may have been deleted on another phone, or this phone had none yet.
-  const active = children.find((c) => c.id === settings.activeChildId) ?? children[0];
+  const active = activeChildOf(children, settings.activeChildId);
   if (active && active.id !== settings.activeChildId) await settings.set('activeChildId', active.id);
   if (active) await useLogStore.getState().loadLogs(active.id);
 }
