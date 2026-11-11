@@ -26,14 +26,12 @@ export default function ActiveTimers() {
       {timers.map((t) => {
         const d = logDisplay(t, units, formatTime);
         return (
-          <Pressable
-            key={t.id}
-            onPress={() => router.push(`/entry/${t.id}`)}
-            className={`flex-row items-center rounded-xl border px-3 py-2.5 ${d.bg}`}
-          >
-            {d.icon}
-            <Text className="text-ink font-medium ml-2 flex-1">{d.label}</Text>
-            <Text className="text-ink font-semibold mr-3">{formatDuration(now - t.startedAt)}</Text>
+          <View key={t.id} className={`flex-row items-center rounded-xl border ${d.bg}`}>
+            <Pressable onPress={() => router.push(`/entry/${t.id}`)} className="flex-1 flex-row items-center pl-3 py-2.5">
+              {d.icon}
+              <Text className="text-ink font-medium ml-2 flex-1">{d.label}</Text>
+              <Text className="text-ink font-semibold mr-3">{formatDuration(now - t.startedAt)}</Text>
+            </Pressable>
             <Pressable
               hitSlop={10}
               onPress={async () => {
@@ -42,11 +40,11 @@ export default function ActiveTimers() {
                 // Pumped amount is only known at the end: go straight to the editor.
                 if (t.payload.type === 'pumping') router.push(`/entry/${t.id}`);
               }}
-              className="bg-raised rounded-full p-2"
+              className="bg-raised rounded-full p-2 mr-3"
             >
               <Stop color={colors.ink} size={14} />
             </Pressable>
-          </Pressable>
+          </View>
         );
       })}
     </View>

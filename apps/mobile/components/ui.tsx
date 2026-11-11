@@ -158,17 +158,36 @@ export function Row({
   value,
   onPress,
   right,
+  action,
 }: {
   label: string;
   value?: string;
   onPress?: () => void;
+  /** Part of the row's tap area (a chevron). */
   right?: React.ReactNode;
+  /** A button of its own, beside the row's tap area rather than inside it (nested Pressables miss taps on Android). */
+  action?: React.ReactNode;
 }) {
-  return (
-    <Pressable onPress={onPress} disabled={!onPress} className="flex-row items-center px-4 py-3.5 border-b border-line">
+  const content = (
+    <>
       <Text className="flex-1 text-ink text-base">{label}</Text>
       {value ? <Text className="text-ink-muted text-base">{value}</Text> : null}
       {right}
+    </>
+  );
+  if (action) {
+    return (
+      <View className="flex-row items-center border-b border-line">
+        <Pressable onPress={onPress} disabled={!onPress} className="flex-1 flex-row items-center pl-4 py-3.5">
+          {content}
+        </Pressable>
+        <View className="px-4">{action}</View>
+      </View>
+    );
+  }
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} className="flex-row items-center px-4 py-3.5 border-b border-line">
+      {content}
     </Pressable>
   );
 }

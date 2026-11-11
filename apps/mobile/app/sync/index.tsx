@@ -250,9 +250,9 @@ function Phones() {
                     }
                   : undefined
               }
-              right={
+              action={
                 m.isMe ? undefined : (
-                  <Pressable onPress={() => confirmRemove(m.id)} hitSlop={8} className="ml-3">
+                  <Pressable onPress={() => confirmRemove(m.id)} hitSlop={8}>
                     <Text className="text-red-soft text-sm">{t('syncScreen.remove')}</Text>
                   </Pressable>
                 )
