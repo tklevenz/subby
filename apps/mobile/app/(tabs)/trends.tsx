@@ -71,7 +71,7 @@ export default function TrendsScreen() {
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <TabHeader className="mb-2" />
+      <TabHeader />
       {/* The range stays put; the charts scroll. */}
       <View className="px-4 pb-2">
         <Segmented options={ranges()} value={range} onChange={setRange} />
