@@ -1,9 +1,9 @@
 import { Platform } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type * as BackgroundTaskModule from 'expo-background-task';
 import type * as NotificationsModule from 'expo-notifications';
 import type * as TaskManagerModule from 'expo-task-manager';
 import { appReady } from '../startup';
+import { optionalModule } from '../optionalModule';
 import { replanReminders } from '../reminders/scheduler';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { checkServer } from './api';
@@ -15,20 +15,11 @@ const SYNC_TASK = 'subby-sync-periodic';
 /** Runs when a hosted server's "sync now" push arrives while the app is in the background. */
 const PUSH_TASK = 'subby-sync-push';
 
-// Background tasks and push need a development or store build; Expo Go has neither (and crashes on
-// importing expo-notifications on Android), so the modules are loaded lazily.
-const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-const optional = <T>(load: () => T): T | null => {
-  if (inExpoGo) return null;
-  try {
-    return load();
-  } catch {
-    return null;
-  }
-};
-const TaskManager = optional(() => require('expo-task-manager') as typeof TaskManagerModule);
-const BackgroundTask = optional(() => require('expo-background-task') as typeof BackgroundTaskModule);
-const Notifications = optional(() => require('expo-notifications') as typeof NotificationsModule);
+// Background tasks and push need a development or store build; Expo Go has neither, on either platform (unlike the
+// reminders' local notifications, which iOS Expo Go can schedule), so these skip Expo Go everywhere.
+const TaskManager = optionalModule(() => require('expo-task-manager') as typeof TaskManagerModule, 'expo-go');
+const BackgroundTask = optionalModule(() => require('expo-background-task') as typeof BackgroundTaskModule, 'expo-go');
+const Notifications = optionalModule(() => require('expo-notifications') as typeof NotificationsModule, 'expo-go');
 
 /** Pulls and pushes, then re-plans reminders, so a feed logged on another phone moves this phone's reminder. */
 export async function backgroundSync() {

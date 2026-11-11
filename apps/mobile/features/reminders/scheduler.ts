@@ -1,7 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type * as NotificationsModule from 'expo-notifications';
 import { router } from 'expo-router';
 import {
@@ -15,6 +14,7 @@ import {
   predictNextSleep,
   type ReminderChild,
 } from '@subby/shared';
+import { optionalModule } from '../optionalModule';
 import { fetchLogs } from '../../store/queries';
 import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';
@@ -28,16 +28,7 @@ const DAY = 86_400_000;
  * expo-notifications crashes on import in Expo Go on Android (missing native module since
  * SDK 53), so it's loaded lazily and reminders are disabled where it can't run.
  */
-function loadNotifications(): typeof NotificationsModule | null {
-  if (Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
-  try {
-    return require('expo-notifications') as typeof NotificationsModule;
-  } catch {
-    return null;
-  }
-}
-
-export const Notifications = loadNotifications();
+export const Notifications = optionalModule(() => require('expo-notifications') as typeof NotificationsModule, 'expo-go-android');
 
 /** False in Expo Go on Android; reminders need a development build there. */
 export const remindersAvailable = Notifications !== null;
@@ -155,21 +146,24 @@ async function sync() {
 const sharedWithoutPush = (s: Settings['sync']) => Boolean(s && !s.push && (s.knownDevices?.length ?? 1) > 1);
 
 let running: Promise<void> = Promise.resolve();
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+/** Queues one re-plan after the ones already running, so two never overlap. */
+function queueSync(): Promise<void> {
+  running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e)); // i18n-ignore
+  return running;
+}
 
 /** Re-plans now and resolves when done (background tasks, which may be stopped right after). */
 export function replanReminders(): Promise<void> {
   clearTimeout(timer);
-  running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e)); // i18n-ignore
-  return running;
+  return queueSync();
 }
-let timer: ReturnType<typeof setTimeout> | undefined;
 
 /** Debounced, serialized re-plan. Call after anything that could move a reminder. */
 export function scheduleReminderSync(delayMs = 1000) {
   clearTimeout(timer);
-  timer = setTimeout(() => {
-    running = running.then(sync).catch((e) => console.warn('Reminder sync failed', e)); // i18n-ignore
-  }, delayMs);
+  timer = setTimeout(() => void queueSync(), delayMs);
 }
 
 /** Pending reminders, soonest first (for the settings screen). */
