@@ -85,3 +85,19 @@ export function diaperLook(condition: Extract<LogPayload, { type: 'diaper' }>['c
       return { Icon: (p) => <PoopDroplet {...p} color={colors.amberStrong} />, color: colors.amberStrong };
   }
 }
+
+/** The ways to feed, labelled in the current language (the feed sheet's tabs and the editor's choice). */
+export const feedMethods = () =>
+  [
+    { value: 'breast', label: t('feed.breast') },
+    { value: 'bottle', label: t('feed.bottle') },
+    { value: 'solids', label: t('feed.solids') },
+  ] as const;
+
+/** What a bottle holds. */
+export const milkTypes = () =>
+  [
+    { value: 'breast_milk', label: t('feed.breastMilk') },
+    { value: 'formula', label: t('feed.formula') },
+    { value: 'fortified', label: t('feedSheet.fortified') },
+  ] as const;

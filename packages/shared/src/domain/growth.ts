@@ -2,8 +2,16 @@ import { formatNumber, getLocale, t } from '../i18n';
 import type { Child } from '../schemas/child.schema';
 import type { LogEntry } from '../schemas/log.schema';
 import { WHO_LMS, type LmsRow } from './who/lms';
+import { formatLength, formatWeight, type UnitSystem } from './units';
 
 export type GrowthMeasure = keyof typeof WHO_LMS; // weightKg | lengthCm | headCm
+
+/** The sex the WHO curves can be drawn for; "other" or not given has no curve of its own (null). */
+export const growthSex = (sex: Child['sex'] | undefined): 'female' | 'male' | null => (sex === 'male' || sex === 'female' ? sex : null);
+
+/** A measurement as shown: weights in kg (as the curves have them) or lengths in cm, in the phone's unit system. */
+export const formatGrowthValue = (measure: GrowthMeasure, value: number, system: UnitSystem): string =>
+  measure === 'weightKg' ? formatWeight(value * 1000, system) : formatLength(value, system);
 export type WhoSex = 'male' | 'female';
 
 const DAYS_PER_MONTH = 30.4375;

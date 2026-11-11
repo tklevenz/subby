@@ -8,9 +8,9 @@ import { captureRef } from 'react-native-view-shot';
 import {
   WHO_MAX_MONTHS,
   formatAge,
-  formatLength,
+  formatGrowthValue,
   formatPercentile,
-  formatWeight,
+  growthSex,
   growthPercentile,
   growthPoints,
   type GrowthMeasure,
@@ -23,16 +23,10 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { SubMono } from '../components/brand/Sub';
 import { colors } from '../theme/colors';
 import { ScreenScroll } from '../components/ScreenScroll';
+import { growthMeasures } from '../features/growthMeasures';
 import BottomSheet from '../components/BottomSheet';
 import LogSheet from '../components/sheets/LogSheet';
 import { TYPE_META } from '../components/logTypes';
-
-const measures = () =>
-  [
-    { value: 'weightKg', label: t('growth.weight') },
-    { value: 'lengthCm', label: t('growth.length') },
-    { value: 'headCm', label: t('growth.head') },
-  ] as const;
 
 const TITLE_KEYS = { weightKg: 'growth.weightTitle', lengthCm: 'growth.lengthTitle', headCm: 'growth.headTitle' } as const;
 const NONE_KEYS = { weightKg: 'growth.noWeight', lengthCm: 'growth.noLength', headCm: 'growth.noHead' } as const;
@@ -53,8 +47,8 @@ export default function GrowthScreen() {
   const points = useMemo(() => (logs && child ? growthPoints(logs, child, measure) : []), [logs, child, measure]);
   if (!child) return null;
 
-  const sex = child.sex === 'male' || child.sex === 'female' ? child.sex : null;
-  const format = (v: number) => (measure === 'weightKg' ? formatWeight(v * 1000, units) : formatLength(v, units));
+  const sex = growthSex(child.sex);
+  const format = (v: number) => formatGrowthValue(measure, v, units);
   const beyondWho = points.some((p) => p.months > WHO_MAX_MONTHS);
 
   const share = async () => {
@@ -71,7 +65,7 @@ export default function GrowthScreen() {
 
   return (
     <ScreenScroll>
-      <Segmented options={measures()} value={measure} onChange={setMeasure} />
+      <Segmented options={growthMeasures()} value={measure} onChange={setMeasure} />
 
       {!sex ? (
         <Notice className="mt-4" onPress={() => router.push(`/child/${child.id}/edit`)}>

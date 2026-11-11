@@ -2,6 +2,7 @@ import { t } from '@subby/shared/i18n';
 import { confirmDestructive } from '../confirmDestructive';
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { feedMethods, milkTypes } from '../logTypes';
 import { savedFeedback } from '../savedFeedback';
 import * as Haptics from 'expo-haptics';
 import { Minus, Pause, Plus } from '../icons';
@@ -136,11 +137,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
       <DateTimeField value={at} onChange={setAt} maximumDate={new Date()} title={t('feedSheet.time')} />
       <FieldLabel>{t('feedSheet.milk')}</FieldLabel>
       <Segmented
-        options={[
-          { value: 'breast_milk', label: t('feed.breastMilk') },
-          { value: 'formula', label: t('feed.formula') },
-          { value: 'fortified', label: t('feedSheet.fortified') },
-        ]}
+        options={milkTypes()}
         value={milkType}
         onChange={setMilkType}
       />
@@ -209,11 +206,7 @@ export default function FeedSheet({ initialTab, onClose }: { initialTab?: Tab; o
   return (
     <>
       <Segmented
-        options={[
-          { value: 'breast', label: t('feed.breast') },
-          { value: 'bottle', label: t('feed.bottle') },
-          { value: 'solids', label: t('feed.solids') },
-        ]}
+        options={feedMethods()}
         value={tab}
         onChange={setTab}
       />

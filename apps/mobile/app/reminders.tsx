@@ -14,25 +14,11 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
 import { ScreenScroll } from '../components/ScreenScroll';
 
-type Interval = { value: string; label: string };
-const FEED_INTERVALS: Interval[] = [
-  { value: '120', get label() { return t('reminders.hours', { h: 2 }); } },
-  { value: '150', get label() { return t('reminders.hours', { h: 2.5 }); } },
-  { value: '180', get label() { return t('reminders.hours', { h: 3 }); } },
-  { value: '210', get label() { return t('reminders.hours', { h: 3.5 }); } },
-  { value: '240', get label() { return t('reminders.hours', { h: 4 }); } },
-];
-const DIAPER_INTERVALS: Interval[] = [
-  { value: '120', get label() { return t('reminders.hours', { h: 2 }); } },
-  { value: '180', get label() { return t('reminders.hours', { h: 3 }); } },
-  { value: '240', get label() { return t('reminders.hours', { h: 4 }); } },
-];
-const PUMP_INTERVALS: Interval[] = [
-  { value: '120', get label() { return t('reminders.hours', { h: 2 }); } },
-  { value: '180', get label() { return t('reminders.hours', { h: 3 }); } },
-  { value: '240', get label() { return t('reminders.hours', { h: 4 }); } },
-  { value: '300', get label() { return t('reminders.hours', { h: 5 }); } },
-];
+/** Interval choices in hours (the values are minutes). */
+const intervals = (hours: number[]) => hours.map((h) => ({ value: String(h * 60), label: t('reminders.hours', { h }) }));
+const feedIntervals = () => intervals([2, 2.5, 3, 3.5, 4]);
+const diaperIntervals = () => intervals([2, 3, 4]);
+const pumpIntervals = () => intervals([2, 3, 4, 5]);
 
 const napLeads = () =>
   [
@@ -102,21 +88,21 @@ export default function RemindersScreen() {
           title={t('reminders.feeding')}
           description={t('reminders.feedingText')}
           value={reminders.feed}
-          options={FEED_INTERVALS}
+          options={feedIntervals()}
           onChange={(feed, enabling) => update({ feed }, enabling)}
         />
         <IntervalSection
           title={t('reminders.diaper')}
           description={t('reminders.diaperText')}
           value={reminders.diaper}
-          options={DIAPER_INTERVALS}
+          options={diaperIntervals()}
           onChange={(diaper, enabling) => update({ diaper }, enabling)}
         />
         <IntervalSection
           title={t('reminders.pumping')}
           description={t('reminders.pumpingText')}
           value={reminders.pumping}
-          options={PUMP_INTERVALS}
+          options={pumpIntervals()}
           onChange={(pumping, enabling) => update({ pumping }, enabling)}
         />
 
@@ -183,7 +169,7 @@ function IntervalSection({
   title: string;
   description: string;
   value: { enabled: boolean; intervalMin: number };
-  options: Interval[];
+  options: ReturnType<typeof intervals>;
   onChange: (value: { enabled: boolean; intervalMin: number }, enabling: boolean) => void;
 }) {
   return (

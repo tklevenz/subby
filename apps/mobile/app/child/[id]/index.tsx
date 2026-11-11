@@ -8,16 +8,17 @@ import { AngleLeft, AngleRight, Baby, CakeCandles, Camera, Flag, RulerVertical }
 import {
   childStory,
   formatAgeLong,
-  formatLength,
+  formatGrowthValue,
   formatPercentile,
-  formatWeight,
   growthPercentile,
+  growthSex,
   growthPoints,
   type Child,
   type GrowthMeasure,
   type LogEntry,
   type StoryItem,
 } from '@subby/shared';
+import { fromIsoDate } from '../../../store/timeHelpers';
 import { avatarColors } from '../../../components/ChildAvatar';
 import GrowthChart from '../../../components/charts/GrowthChart';
 import PhotoMenu from '../../../components/PhotoMenu';
@@ -29,20 +30,12 @@ import { useLogStore } from '../../../store/useLogStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { colors } from '../../../theme/colors';
 import { ScreenScroll } from '../../../components/ScreenScroll';
+import { growthMeasures } from '../../../features/growthMeasures';
 
-const MEASURES = [
-  { value: 'weightKg', get label() { return t('growth.weight'); } },
-  { value: 'lengthCm', get label() { return t('growth.length'); } },
-  { value: 'headCm', get label() { return t('growth.head'); } },
-] as const;
 const STORY_PAGE = 12;
 
 const fmtDate = (ms: number, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) =>
   formatDate(ms, opts);
-const isoToMs = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).getTime();
-};
 
 /** A child's own page: photo cover, growth chart and their story of firsts. */
 export default function ChildProfileScreen() {
@@ -178,7 +171,7 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
         <View className="flex-1">
           <Text style={textOnPhoto} className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1}>{child.name}</Text>
           <Text style={textOnPhoto} className="text-violet-pale text-[15px] mt-0.5">
-            {t('profile.ageBorn', { age: formatAgeLong(child.birthDate, Date.now()), date: fmtDate(isoToMs(child.birthDate), { day: 'numeric', month: 'short' }) })}
+            {t('profile.ageBorn', { age: formatAgeLong(child.birthDate, Date.now()), date: fmtDate(fromIsoDate(child.birthDate), { day: 'numeric', month: 'short' }) })}
           </Text>
         </View>
         {isActive ? (
@@ -195,10 +188,10 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
   const units = useSettingsStore((s) => s.units);
   const [measure, setMeasure] = useState<GrowthMeasure>('weightKg');
   const points = useMemo(() => growthPoints(logs, child, measure), [logs, child, measure]);
-  const sex = child.sex === 'male' || child.sex === 'female' ? child.sex : null;
+  const sex = growthSex(child.sex);
   const last = points.at(-1);
   const pct = last ? growthPercentile(measure, child.sex, last.months, last.value) : null;
-  const format = (v: number) => (measure === 'weightKg' ? formatWeight(v * 1000, units) : formatLength(v, units));
+  const format = (v: number) => formatGrowthValue(measure, v, units);
 
   const openGrowth = async () => {
     if (!isActive) await useSettingsStore.getState().set('activeChildId', child.id);
@@ -215,7 +208,7 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
         </Pressable>
       </View>
       <View className="bg-surface border border-line rounded-2xl p-3.5">
-        <Segmented options={MEASURES} value={measure} onChange={setMeasure} />
+        <Segmented options={growthMeasures()} value={measure} onChange={setMeasure} />
         {last ? (
           <>
             <View className="flex-row items-baseline justify-between mt-3">

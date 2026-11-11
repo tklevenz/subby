@@ -17,7 +17,7 @@ import {
 import { useLogQuery } from '../../store/queries';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { activityLabel } from '../logTypes';
+import { activityLabel, feedMethods, milkTypes } from '../logTypes';
 import { Chip, FieldLabel, Segmented, TextField, Toggle } from '../ui';
 import FoodPicker from './FoodPicker';
 import { NumberField, PhotoField, UnitNumberField } from './fields';
@@ -44,11 +44,7 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
     <View>
       <FieldLabel>{t('editor.method')}</FieldLabel>
       <Segmented
-        options={[
-          { value: 'breast', label: t('feed.breast') },
-          { value: 'bottle', label: t('feed.bottle') },
-          { value: 'solids', label: t('feed.solids') },
-        ]}
+        options={feedMethods()}
         value={p.method}
         onChange={(method) =>
           // Drop fields that belong to the other methods.
@@ -64,11 +60,7 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
         <>
           <FieldLabel>{t('feedSheet.milk')}</FieldLabel>
           <Segmented
-            options={[
-              { value: 'breast_milk', label: t('feed.breastMilk') },
-              { value: 'formula', label: t('feed.formula') },
-              { value: 'fortified', label: t('feedSheet.fortified') },
-            ]}
+            options={milkTypes()}
             value={p.milkType}
             onChange={(milkType) => onChange({ milkType })}
           />

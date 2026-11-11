@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPercentile, growthAgeMonths, growthPercentile, growthPoints, lmsAt, normalCdf, percentileCurves, valueAtZ, zScore } from '../domain/growth';
+import { formatPercentile, growthAgeMonths, growthPercentile, growthPoints, lmsAt, normalCdf, percentileCurves, valueAtZ, zScore, formatGrowthValue, growthSex } from '../domain/growth';
 import { entry } from './fixtures';
 
 describe('WHO LMS', () => {
@@ -52,5 +52,20 @@ describe('growth helpers', () => {
     expect(formatPercentile(22)).toBe('22nd');
     expect(formatPercentile(12)).toBe('12th');
     expect(formatPercentile(99.95)).toBe('>99.9th');
+  });
+});
+
+describe('growthSex and formatGrowthValue', () => {
+  it('only male and female have a curve', () => {
+    expect(growthSex('male')).toBe('male');
+    expect(growthSex('female')).toBe('female');
+    expect(growthSex('other')).toBeNull();
+    expect(growthSex(null)).toBeNull();
+    expect(growthSex(undefined)).toBeNull();
+  });
+
+  it('shows weights from kg and lengths from cm', () => {
+    expect(formatGrowthValue('weightKg', 3.5, 'metric')).toBe('3.5 kg');
+    expect(formatGrowthValue('lengthCm', 50, 'metric')).toBe('50 cm');
   });
 });
