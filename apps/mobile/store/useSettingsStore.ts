@@ -4,7 +4,9 @@ import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, typ
 import type { DeviceLogEntry, LogSeen, RestoreFloor } from '@subby/shared/crypto';
 import type { MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../db/client';
+import { getCalendars, getLocales } from 'expo-localization';
 import { applyLanguage, type LanguageChoice } from '../features/i18n';
+import { regionalDefaults } from '../features/regional';
 
 export type Settings = {
   units: UnitSystem;
@@ -88,7 +90,20 @@ export const useSettingsStore = create<SettingsState>((setState) => ({
     const reminders = { ...DEFAULTS.reminders, ...stored.reminders };
     const familyAlerts = { ...DEFAULTS.familyAlerts, ...stored.familyAlerts };
     applyLanguage(stored.language ?? DEFAULTS.language);
-    setState({ ...DEFAULTS, ...stored, reminders, familyAlerts, hydrated: true });
+    // Units and clock start as the phone's, then stay as stored (a trip abroad doesn't flip them).
+    const regional: Partial<Settings> = {};
+    if (stored.units === undefined || stored.clock === undefined) {
+      const phone = regionalDefaults({
+        measurementSystem: getLocales()[0]?.measurementSystem,
+        uses24hourClock: getCalendars()[0]?.uses24hourClock,
+      });
+      if (stored.units === undefined) regional.units = phone.units;
+      if (stored.clock === undefined) regional.clock = phone.clock;
+      for (const [key, value] of Object.entries(regional)) {
+        await db.insert(schema.settingsTable).values({ key, value }).onConflictDoNothing();
+      }
+    }
+    setState({ ...DEFAULTS, ...regional, ...stored, reminders, familyAlerts, hydrated: true });
   },
 
   set: async (key, value) => {

@@ -4,7 +4,7 @@ import { AppState, Linking, Text, View } from 'react-native';
 import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@subby/shared';
 import { Card, Segmented, Toggle, SectionLabel } from '../components/ui';
 import {
-  notificationsAllowed,
+  notificationsBlocked,
   remindersAvailable,
   requestNotifications,
   setRemindersEnabled,
@@ -45,11 +45,12 @@ export default function RemindersScreen() {
   const reminders = useSettingsStore((s) => s.reminders);
   const setSetting = useSettingsStore((s) => s.set);
   const formatTime = useFormatTime();
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  // Only once the phone won't ask again: before the first switch, it simply asks.
+  const [blocked, setBlocked] = useState(false);
   const [upcoming, setUpcoming] = useState<Awaited<ReturnType<typeof upcomingReminders>>>([]);
 
   const refresh = useCallback(() => {
-    notificationsAllowed().then(setAllowed);
+    notificationsBlocked().then(setBlocked);
     // The scheduler re-plans ~1 s after a change.
     setTimeout(() => upcomingReminders().then(setUpcoming), 1500);
   }, []);
@@ -62,7 +63,7 @@ export default function RemindersScreen() {
 
   const update = async (patch: Partial<ReminderSettings>, enabling: boolean) => {
     if (enabling && !(await requestNotifications())) {
-      setAllowed(false);
+      setBlocked(true); // just denied: say where to allow them
       return;
     }
     await setSetting('reminders', { ...reminders, ...patch });
@@ -76,7 +77,7 @@ export default function RemindersScreen() {
             {t('reminders.expoGo')}
           </Text>
         </View>
-      ) : allowed === false ? (
+      ) : blocked ? (
         <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
           <Text className="text-amber-pale text-sm leading-5">
             {t('reminders.off')}{' '}

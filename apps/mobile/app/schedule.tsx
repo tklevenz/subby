@@ -45,7 +45,14 @@ export default function ScheduleScreen() {
         {next ? (
           <>
             {/* The likely time, then the window to put down in; the suggested day below shows the nap itself. */}
-            <Text className="text-ink text-2xl font-semibold mt-1">{t('schedule.around', { time: formatTime((next.earliest + next.latest) / 2) })}</Text>
+            {/* Past the likely time it says so, instead of a time that has gone by. */}
+            <Text className="text-ink text-2xl font-semibold mt-1">
+              {now > next.latest
+                ? t('schedule.pastWindow')
+                : now >= (next.earliest + next.latest) / 2
+                  ? t('schedule.anyTimeNow')
+                  : t('schedule.around', { time: formatTime((next.earliest + next.latest) / 2) })}
+            </Text>
             <Text className="text-ink-soft text-sm mt-0.5">
               {t('schedule.between', { from: formatTime(next.earliest), to: formatTime(next.latest) })}
             </Text>

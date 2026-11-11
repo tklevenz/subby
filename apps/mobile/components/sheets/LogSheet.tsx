@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { defaultNap, formatHoursMinutes, isCompletePayload, type LogPayload, type LogType } from '@subby/shared';
+import { defaultNap, formatHoursMinutes, isCompletePayload, isEmptySolids, type LogPayload, type LogType } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import DateTimeField from '../DateTimeField';
@@ -73,7 +73,7 @@ export default function LogSheet({
     setStart(t);
     if (type === 'sleep' && !napChosen) setPayload((cur) => ({ ...cur, nap: isNapAt(t) }) as LogPayload);
   };
-  const complete = isCompletePayload(payload);
+  const complete = isCompletePayload(payload) && !isEmptySolids(payload);
   const invalidEnd = timed && end !== null && end <= startedAt;
   // The same time can't be two sleeps: checked for what Save would log and for a timer from the start.
   const isSleep = type === 'sleep';

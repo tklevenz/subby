@@ -54,6 +54,9 @@ type TileContent = {
 };
 
 /** A tap on a big tile can be taken back for a few seconds: the tile is easy to hit by accident. */
+/** A sleep stopped sooner than this from the tile is taken as a mistap and not kept. */
+const ACCIDENTAL_SLEEP_MS = 60_000;
+
 type UndoOffer = { label: string; undo: () => void; /** Sleep's: the bar carries the sub. */ sub?: boolean };
 const UNDO_MS = 5000;
 
@@ -159,9 +162,16 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       entryId: sleeping.id,
       onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const slept = formatHoursMinutes(Date.now() - sleeping.startedAt);
+        const sleptMs = Date.now() - sleeping.startedAt;
+        // Under a minute is a mistap on the big tile (or a change of mind), not a sleep: it isn't kept, so it
+        // can't count as a nap or move the prediction. Undo brings the running sleep back.
+        if (sleptMs < ACCIDENTAL_SLEEP_MS) {
+          await softDeleteLog(sleeping.id);
+          offerUndo({ label: t('home.sleepNotKept'), undo: () => startTimer(sleeping.payload, sleeping.startedAt), sub: true });
+          return;
+        }
         await stopTimer(sleeping.id);
-        offerUndo({ label: t('home.wokeUpAfter', { span: slept }), undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
+        offerUndo({ label: t('home.wokeUpAfter', { span: formatHoursMinutes(sleptMs) }), undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
       },
       onDiscard: () =>
         Alert.alert(t('home.discardTitle'), t('home.discardText'), [

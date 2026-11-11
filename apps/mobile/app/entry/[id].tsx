@@ -5,6 +5,7 @@ import { Alert, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import {
   TIMED_LOG_TYPES,
+  formatHoursMinutes,
   groupNights,
   isCompletePayload,
   isNap,
@@ -127,6 +128,9 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           )}
           {invalid ? <ErrorText className="mt-2">{t('logSheet.endAfterStart')}</ErrorText> : null}
           {!invalid && overlap ? <ErrorText className="mt-2">{overlap}</ErrorText> : null}
+          {!invalid && !overlap && !running && endedAt !== null ? (
+            <Text className="text-ink-muted text-sm mt-2">{formatHoursMinutes(endedAt - startedAt)}</Text>
+          ) : null}
         </>
       ) : null}
 

@@ -22,6 +22,9 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { SubMono } from '../components/brand/Sub';
 import { colors } from '../theme/colors';
 import { ScreenScroll } from '../components/ScreenScroll';
+import BottomSheet from '../components/BottomSheet';
+import LogSheet from '../components/sheets/LogSheet';
+import { TYPE_META } from '../components/logTypes';
 
 const measures = () =>
   [
@@ -43,6 +46,8 @@ export default function GrowthScreen() {
   const logs = useLogQuery({ types: GROWTH });
   const chartRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
+  // The log sheet lives on Home; this screen has its own, so a measurement goes in without leaving the chart.
+  const [adding, setAdding] = useState(false);
 
   const points = useMemo(() => (logs && child ? growthPoints(logs, child, measure) : []), [logs, child, measure]);
   if (!child) return null;
@@ -94,6 +99,8 @@ export default function GrowthScreen() {
       ) : null}
       {beyondWho ? <Text className="text-ink-faint text-xs mt-2">{t('growth.beyondWho')}</Text> : null}
 
+      <Button label={t('growth.add')} onPress={() => setAdding(true)} />
+
       {points.length > 0 ? (
         <>
           <Button label={t(sharing ? 'growth.preparing' : 'growth.share')} variant="ghost" disabled={sharing} onPress={share} />
@@ -115,6 +122,20 @@ export default function GrowthScreen() {
           </View>
         </>
       ) : null}
+
+      <BottomSheet
+        visible={adding}
+        onClose={() => setAdding(false)}
+        title={t('sheet.log.growth')}
+        icon={<GrowthIcon color={TYPE_META.growth.color} size={20} />}
+      >
+        {adding ? <LogSheet type="growth" onClose={() => setAdding(false)} /> : null}
+      </BottomSheet>
     </ScreenScroll>
   );
+}
+
+function GrowthIcon(props: { color: string; size: number }) {
+  const { Icon } = TYPE_META.growth;
+  return <Icon {...props} />;
 }

@@ -73,7 +73,8 @@ export function AccessCard() {
   const { busy, run } = useStoreAction();
   if (!access || access === 'free') return null;
 
-  const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now) / DAY)) : null;
+  // A few minutes' slack: `now` ticks once a minute and clocks differ, so a fresh 14-day trial doesn't read 15.
+  const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now - 5 * 60_000) / DAY)) : null;
   const graceEnd = entitlement?.graceEndsAt ?? now;
   const until = t(new Date(graceEnd).toDateString() === new Date(now).toDateString() ? 'access.untilToday' : 'access.untilTomorrow', { time: formatTime(graceEnd) });
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {

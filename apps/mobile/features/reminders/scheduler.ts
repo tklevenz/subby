@@ -56,6 +56,13 @@ export async function notificationsAllowed(): Promise<boolean> {
   return (await Notifications.getPermissionsAsync()).granted;
 }
 
+/** Denied for good: the phone won't ask again, so only the system settings can allow them. Not "never asked". */
+export async function notificationsBlocked(): Promise<boolean> {
+  if (!Notifications) return false;
+  const p = await Notifications.getPermissionsAsync();
+  return !p.granted && !p.canAskAgain;
+}
+
 async function ensureChannel() {
   if (!Notifications || Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL, {

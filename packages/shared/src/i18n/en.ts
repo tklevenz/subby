@@ -270,6 +270,7 @@ export const en = {
   'home.asleep': 'asleep · since {time}',
   'home.tapWake': 'Tap to wake up',
   'home.wokeUpAfter': 'Woke up after {span}',
+  'home.sleepNotKept': 'Under a minute: sleep not kept',
   'home.discardTitle': 'Discard this sleep?',
   'home.discardText': "It's deleted, as if it never started.",
   'home.discard': 'Discard',
@@ -555,6 +556,8 @@ export const en = {
   'schedule.nextNap': 'Next nap',
   'schedule.nextSleep': 'Next sleep',
   'schedule.around': 'around {time}',
+  'schedule.anyTimeNow': 'any time now',
+  'schedule.pastWindow': 'the window just passed',
   'schedule.between': 'between {from} and {to}',
   'schedule.awakeSince': 'Awake since {time} · {basis}',
   'schedule.basisPersonal': "based on {name}'s last 7 days",
@@ -599,6 +602,7 @@ export const en = {
   'growth.beyondWho': 'WHO percentiles here cover 0–24 months.',
   'growth.preparing': 'Preparing…',
   'growth.share': 'Share chart',
+  'growth.add': 'Add a measurement',
   'growth.pointDate': '{date} · {age}',
 
   // Solids.

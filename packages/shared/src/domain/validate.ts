@@ -18,3 +18,10 @@ export function isCompletePayload(p: LogPayload): boolean {
       return true;
   }
 }
+
+/**
+ * A new solids feed needs a food. Only for logging new ones: entries imported from Baby Buddy have no food list
+ * and must stay editable.
+ */
+export const isEmptySolids = (p: LogPayload): boolean =>
+  p.type === 'feed' && p.method === 'solids' && !(p.foods ?? []).some((f) => f.trim().length > 0);

@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Minus, Pause, Plus } from '../icons';
 import {
   formatVolume,
+  isEmptySolids,
   isRunning,
   lastOfType,
   mlToOz,
@@ -185,6 +186,7 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
       <FoodPicker value={solids} onChange={(p) => setSolids((s) => ({ ...s, ...p }))} />
       <Button
         label={t('feedSheet.logSolids')}
+        disabled={isEmptySolids({ type: 'feed', method: 'solids', ...solids })}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'solids', ...solids }, { startedAt: at });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
