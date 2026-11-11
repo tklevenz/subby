@@ -1,5 +1,5 @@
 import { formatNumber, t } from '@subby/shared/i18n';
-import { DAY_MS } from '@subby/shared';
+import { DAY_MS, MINUTE_MS } from '@subby/shared';
 import { errorMessage } from '../features/errorMessage';
 import { useAsyncAction } from '../features/useAsyncAction';
 import React from 'react';
@@ -70,12 +70,12 @@ export function AccessCard() {
   const entitlement = useAccessStore((s) => s.entitlement);
   const pending = useSyncStore((s) => s.pending);
   const formatTime = useFormatTime();
-  const now = useNow(60_000);
+  const now = useNow(MINUTE_MS);
   const { busy, run } = useStoreAction();
   if (!access || access === 'free') return null;
 
   // A few minutes' slack: `now` ticks once a minute and clocks differ, so a fresh 14-day trial doesn't read 15.
-  const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now - 5 * 60_000) / DAY_MS)) : null;
+  const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now - 5 * MINUTE_MS) / DAY_MS)) : null;
   const graceEnd = entitlement?.graceEndsAt ?? now;
   const until = t(new Date(graceEnd).toDateString() === new Date(now).toDateString() ? 'access.untilToday' : 'access.untilTomorrow', { time: formatTime(graceEnd) });
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {

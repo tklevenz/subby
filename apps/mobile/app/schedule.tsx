@@ -3,14 +3,7 @@ import React, { useMemo } from 'react';
 import { SectionLabel } from '../components/ui';
 import { Text, View } from 'react-native';
 import { CloudSun, Moon, Sun } from '../components/icons';
-import {
-  addDays,
-  formatHoursMinutes,
-  predictNextSleep,
-  startOfDay,
-  suggestedSchedule,
-  type ScheduleItem,
-} from '@subby/shared';
+import { addDays, formatHoursMinutes, predictNextSleep, startOfDay, suggestedSchedule, type ScheduleItem, MINUTE_MS } from '@subby/shared';
 import { useLogQuery } from '../store/queries';
 import { useActiveChild } from '../store/useActiveChild';
 import { useFormatTime, useNow } from '../store/timeHelpers';
@@ -21,7 +14,7 @@ const SLEEP = ['sleep'] as const;
 
 export default function ScheduleScreen() {
   const child = useActiveChild();
-  const now = useNow(60_000);
+  const now = useNow(MINUTE_MS);
   const formatTime = useFormatTime();
   const logs = useLogQuery({ from: addDays(startOfDay(now), -8), types: SLEEP });
 
@@ -34,7 +27,7 @@ export default function ScheduleScreen() {
   const { next, schedule } = data;
   const asleep = logs?.some((l) => l.endedAt === null);
   const { norms } = schedule;
-  const wakeRange = `${formatHoursMinutes(norms.wakeMin * 60_000)}–${formatHoursMinutes(norms.wakeMax * 60_000)}`;
+  const wakeRange = `${formatHoursMinutes(norms.wakeMin * MINUTE_MS)}–${formatHoursMinutes(norms.wakeMax * MINUTE_MS)}`;
 
   return (
     <ScreenScroll>
@@ -113,7 +106,7 @@ export default function ScheduleScreen() {
 /** A nap length to the nearest 5 minutes: "1h", "1h 25m", "45m". */
 function roughLength(ms: number) {
   const min = Math.round(ms / 300_000) * 5;
-  return formatHoursMinutes(min * 60_000);
+  return formatHoursMinutes(min * MINUTE_MS);
 }
 
 function ItemRow({ item, now, formatTime }: { item: ScheduleItem; now: number; formatTime: (ms: number) => string }) {

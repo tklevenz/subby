@@ -4,7 +4,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { and, count, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { db, dbEncrypted, schema } from '../db/client';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { TIMED_LOG_TYPES, activeReminderCount } from '@subby/shared';
+import { TIMED_LOG_TYPES, activeReminderCount, MINUTE_MS } from '@subby/shared';
 import { notificationsAllowed, remindersAvailable } from './reminders/scheduler';
 import { isOfficialServer } from './sync/api';
 import { useSyncStore } from './sync/state';
@@ -13,7 +13,7 @@ import { backgroundStatus } from './sync/background';
 
 const when = (ms: number | null | undefined, now: number) => {
   if (!ms) return 'never';
-  const mins = Math.round((now - ms) / 60_000);
+  const mins = Math.round((now - ms) / MINUTE_MS);
   const ago = mins < 1 ? 'just now' : mins < 120 ? `${mins} min ago` : mins < 48 * 60 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
   return `${new Date(ms).toISOString()} (${ago})`;
 };

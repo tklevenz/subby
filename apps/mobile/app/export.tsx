@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { LOG_TYPES, logsToCsv, type LogType } from '@subby/shared';
+import { LOG_TYPES, logsToCsv, type LogType, DAY_MS } from '@subby/shared';
 import { TYPE_META } from '../components/logTypes';
 import { Button, Chip, FieldLabel, Segmented, Lead } from '../components/ui';
 import { fetchLogs } from '../store/queries';
@@ -57,7 +57,7 @@ export default function ExportScreen() {
     return run(
       async () => {
         try {
-          const from = range === 'all' ? undefined : Date.now() - Number(range) * 86_400_000;
+          const from = range === 'all' ? undefined : Date.now() - Number(range) * DAY_MS;
           const logs = await fetchLogs(child.id, { from, types: [...selected] });
           if (logs.length === 0) {
             Alert.alert(t('export.nothingTitle'), t('export.nothingText'));

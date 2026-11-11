@@ -76,7 +76,7 @@ export default function BackupScreen() {
             </>
           ) : null}
 
-          <Text className={`text-ink text-xl font-bold ${hasData ? 'mt-10' : ''}`}>{t('backup.restoreTitle')}</Text>
+          <ScreenTitle className={hasData ? 'mt-10' : ''}>{t('backup.restoreTitle')}</ScreenTitle>
           <Lead className="mt-2">
             {hasData
               ? t('backup.restoreMerge')

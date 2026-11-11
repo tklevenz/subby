@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabHeader from '../../components/TabHeader';
-import { addDays, averageNights, averageStats, dailyStats, dayRange, formatHoursMinutes, formatVolume, groupNights, nightsByDay, startOfDay, volumeIn, volumeUnit, type DayStats, HOUR_MS } from '@subby/shared';
+import { addDays, averageNights, averageStats, dailyStats, dayRange, formatHoursMinutes, formatVolume, groupNights, nightsByDay, startOfDay, volumeIn, volumeUnit, type DayStats, HOUR_MS, MINUTE_MS } from '@subby/shared';
 import BarChart, { type Bar } from '../../components/charts/BarChart';
 import { TYPE_META } from '../../components/logTypes';
 import { Card, Row, Segmented, Chevron } from '../../components/ui';
@@ -22,7 +22,7 @@ const one = (n: number) => formatNumber(n, { minimumFractionDigits: 1, maximumFr
 
 export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
-  const now = useNow(60_000);
+  const now = useNow(MINUTE_MS);
   const units = useSettingsStore((s) => s.units);
   const [range, setRange] = useState<(typeof RANGE_VALUES)[number]>('7');
   const count = Number(range);
@@ -168,7 +168,7 @@ export default function TrendsScreen() {
 
               {any('tummyMs') ? (
                 <Section title={t('trends.tummy')} color={TYPE_META.activity.color} stats={[[t('trends.perDay'), formatHoursMinutes(avg.tummyMs)]]}>
-                  <BarChart bars={bars((s) => [s.tummyMs / 60_000])} colors={[TYPE_META.activity.color]} formatValue={(v) => t('time.m', { m: v })} />
+                  <BarChart bars={bars((s) => [s.tummyMs / MINUTE_MS])} colors={[TYPE_META.activity.color]} formatValue={(v) => t('time.m', { m: v })} />
                 </Section>
               ) : null}
 

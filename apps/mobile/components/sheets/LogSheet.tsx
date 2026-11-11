@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { defaultNap, isCompletePayload, endBeforeStart, isEmptySolids, type LogPayload, type LogType } from '@subby/shared';
+import { defaultNap, isCompletePayload, endBeforeStart, isEmptySolids, type LogPayload, type LogType, MINUTE_MS } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlaps } from '../../features/sleepOverlap';
 import { usePayloadForm } from '../../features/usePayloadForm';
@@ -38,7 +38,7 @@ export default function LogSheet({
   const startOffsetMin = pastBreastfeed ? 15 : 0;
 
   // Timed types start now with no end: "Start timer" runs from the start; logging a past one needs an end.
-  const [startedAt, setStart] = useState(() => (initialStart ?? Date.now()) - startOffsetMin * 60_000);
+  const [startedAt, setStart] = useState(() => (initialStart ?? Date.now()) - startOffsetMin * MINUTE_MS);
   const [end, setEnd] = useState<number | null>(null);
   // Nap or night follows the start time (the usual bedtime, else the clock) until the toggle is used.
   const isNapAt = (t: number) => defaultNap(useLogStore.getState().logs, t);

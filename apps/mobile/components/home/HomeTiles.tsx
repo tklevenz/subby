@@ -118,11 +118,11 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   const updateLog = useLogStore((s) => s.updateLog);
   const softDeleteLog = useLogStore((s) => s.softDeleteLog);
   const open = useSheetStore((s) => s.open);
-  const minute = Math.floor(now / 60_000);
-  const prediction = useMemo(() => predictNextSleep(logs, child, minute * 60_000), [logs, child, minute]);
+  const minute = Math.floor(now / MINUTE_MS);
+  const prediction = useMemo(() => predictNextSleep(logs, child, minute * MINUTE_MS), [logs, child, minute]);
   // Awake in the night: how long they've slept tonight instead of a prediction.
   const tonight = useMemo(
-    () => (isNightWaking(logs, minute * 60_000) ? groupNights(logs, minute * 60_000).at(-1) : undefined),
+    () => (isNightWaking(logs, minute * MINUTE_MS) ? groupNights(logs, minute * MINUTE_MS).at(-1) : undefined),
     [logs, minute],
   );
 

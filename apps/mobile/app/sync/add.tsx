@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { MINUTE_MS } from '@subby/shared';
 import { errorMessage } from '../../features/errorMessage';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Share, Text, View, useWindowDimensions } from 'react-native';
@@ -86,7 +87,7 @@ export default function AddPhoneScreen() {
             </View>
             <Text className="text-ink-muted text-sm mt-4">
               {now < step.invite.expiresAt
-                ? t('add.worksFor', { count: Math.ceil((step.invite.expiresAt - now) / 60_000) })
+                ? t('add.worksFor', { count: Math.ceil((step.invite.expiresAt - now) / MINUTE_MS) })
                 : t('add.expired')}
             </Text>
           </View>

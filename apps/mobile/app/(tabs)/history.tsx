@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabHeader from '../../components/TabHeader';
 import { AngleDown, AngleLeft, AngleRight } from '../../components/icons';
 import CalendarSheet from '../../components/datetime/CalendarSheet';
-import { addDays, dailyStats, startOfDay } from '@subby/shared';
+import { addDays, dailyStats, startOfDay, MINUTE_MS } from '@subby/shared';
 import { DayLog, DayTotals } from '../../components/history/DayLog';
 import { useLogQuery } from '../../store/queries';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -16,7 +16,7 @@ import { colors } from '../../theme/colors';
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const [anchor, setAnchor] = useState(() => startOfDay(Date.now()));
-  const now = useNow(60_000);
+  const now = useNow(MINUTE_MS);
   const units = useSettingsStore((s) => s.units);
   const today = startOfDay(now);
   const days = useMemo(() => [anchor], [anchor]);
