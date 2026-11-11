@@ -351,7 +351,7 @@ export const en = {
   'logSheet.endTime': 'End time',
   'logSheet.setEnd': 'Set end time',
   'logSheet.clear': 'Clear',
-  'logSheet.endAfterStart': 'End must be after start.',
+  'logSheet.endBeforeStart': "End can't be before start.",
   'logSheet.needEnd': 'Set an end time to log a past one, or start a timer.',
   'logSheet.startTimer': 'Start timer',
   // Editors (one per log type).

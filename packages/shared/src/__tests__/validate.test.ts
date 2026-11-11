@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCompletePayload, isEmptySolids } from '../domain/validate';
+import { isCompletePayload, isEmptySolids, endBeforeStart } from '../domain/validate';
 
 describe('isCompletePayload', () => {
   it('rejects empty entries', () => {
@@ -27,5 +27,14 @@ describe('isEmptySolids', () => {
   it('leaves other feeds and types alone', () => {
     expect(isEmptySolids({ type: 'feed', method: 'bottle', amountMl: 120 })).toBe(false);
     expect(isEmptySolids({ type: 'sleep' })).toBe(false);
+  });
+});
+
+describe('endBeforeStart', () => {
+  it('only an end before the start is wrong', () => {
+    expect(endBeforeStart(1000, 999)).toBe(true);
+    expect(endBeforeStart(1000, 1000)).toBe(false);
+    expect(endBeforeStart(1000, 2000)).toBe(false);
+    expect(endBeforeStart(1000, null)).toBe(false); // a running timer
   });
 });

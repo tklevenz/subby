@@ -25,3 +25,9 @@ export function isCompletePayload(p: LogPayload): boolean {
  */
 export const isEmptySolids = (p: LogPayload): boolean =>
   p.type === 'feed' && p.method === 'solids' && !(p.foods ?? []).some((f) => f.trim().length > 0);
+
+/**
+ * A timed entry's end may not come before its start. The same moment is fine (a bottle, or an entry edited down to
+ * nothing): the log sheet and the edit screen share this rule.
+ */
+export const endBeforeStart = (startedAt: number, endedAt: number | null): boolean => endedAt !== null && endedAt < startedAt;

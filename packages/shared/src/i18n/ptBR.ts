@@ -318,7 +318,7 @@ export const ptBR: Translation = {
   'logSheet.endTime': 'Horário de fim',
   'logSheet.setEnd': 'Escolher horário de fim',
   'logSheet.clear': 'Limpar',
-  'logSheet.endAfterStart': 'O fim precisa ser depois do início.',
+  'logSheet.endBeforeStart': 'O fim não pode ser antes do início.',
   'logSheet.needEnd': 'Escolha um horário de fim para registrar algo passado, ou inicie um cronômetro.',
   'logSheet.startTimer': 'Iniciar cronômetro',
   'editor.method': 'Forma',

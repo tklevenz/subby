@@ -318,7 +318,7 @@ export const de: Translation = {
   'logSheet.endTime': 'Ende',
   'logSheet.setEnd': 'Ende wählen',
   'logSheet.clear': 'Leeren',
-  'logSheet.endAfterStart': 'Das Ende muss nach dem Beginn liegen.',
+  'logSheet.endBeforeStart': 'Das Ende darf nicht vor dem Beginn liegen.',
   'logSheet.needEnd': 'Wähle ein Ende, um etwas Vergangenes einzutragen, oder starte einen Timer.',
   'logSheet.startTimer': 'Timer starten',
   'editor.method': 'Art',

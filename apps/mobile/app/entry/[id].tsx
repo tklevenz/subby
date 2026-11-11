@@ -8,6 +8,7 @@ import {
   formatHoursMinutes,
   groupNights,
   isCompletePayload,
+  endBeforeStart,
   isNap,
   isSleepEntry,
   nightOf,
@@ -69,7 +70,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const instant = entry.endedAt === entry.startedAt && payload.type === 'feed' && payload.method !== 'breast';
   const timed = TIMED_LOG_TYPES.includes(entry.logType) && !instant;
   const running = timed && endedAt === null;
-  const invalid = endedAt !== null && endedAt < startedAt;
+  const invalid = endBeforeStart(startedAt, endedAt);
   const overlap = useSleepOverlap(entry.logType === 'sleep', startedAt, endedAt, entry.id);
   // Save lights up only once something changed (an unset field and a missing one compare equal).
   const changed = startedAt !== entry.startedAt || endedAt !== entry.endedAt || JSON.stringify(payload) !== JSON.stringify(entry.payload);
@@ -126,7 +127,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           ) : (
             <DateTimeField value={endedAt!} onChange={setEndedAt} maximumDate={new Date()} title={t('logSheet.endTime')} />
           )}
-          {invalid ? <ErrorText className="mt-2">{t('logSheet.endAfterStart')}</ErrorText> : null}
+          {invalid ? <ErrorText className="mt-2">{t('logSheet.endBeforeStart')}</ErrorText> : null}
           {!invalid && overlap ? <ErrorText className="mt-2">{overlap}</ErrorText> : null}
           {!invalid && !overlap && !running && endedAt !== null ? (
             <Text className="text-ink-muted text-sm mt-2">{formatHoursMinutes(endedAt - startedAt)}</Text>

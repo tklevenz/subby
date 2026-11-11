@@ -318,7 +318,7 @@ export const nl: Translation = {
   'logSheet.endTime': 'Eindtijd',
   'logSheet.setEnd': 'Eindtijd kiezen',
   'logSheet.clear': 'Wissen',
-  'logSheet.endAfterStart': 'Het einde moet na het begin liggen.',
+  'logSheet.endBeforeStart': 'Het einde mag niet voor het begin liggen.',
   'logSheet.needEnd': 'Kies een eindtijd om iets van eerder te loggen, of start een timer.',
   'logSheet.startTimer': 'Timer starten',
   'editor.method': 'Soort',

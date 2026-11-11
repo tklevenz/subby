@@ -318,7 +318,7 @@ export const es: Translation = {
   'logSheet.endTime': 'Hora de fin',
   'logSheet.setEnd': 'Elegir hora de fin',
   'logSheet.clear': 'Borrar',
-  'logSheet.endAfterStart': 'El fin debe ser posterior al inicio.',
+  'logSheet.endBeforeStart': 'El fin no puede ser anterior al inicio.',
   'logSheet.needEnd': 'Elige una hora de fin para registrar algo pasado, o inicia un temporizador.',
   'logSheet.startTimer': 'Iniciar temporizador',
   'editor.method': 'Tipo',

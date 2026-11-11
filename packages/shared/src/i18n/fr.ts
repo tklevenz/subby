@@ -318,7 +318,7 @@ export const fr: Translation = {
   'logSheet.endTime': 'Heure de fin',
   'logSheet.setEnd': 'Choisir l’heure de fin',
   'logSheet.clear': 'Effacer',
-  'logSheet.endAfterStart': 'La fin doit être après le début.',
+  'logSheet.endBeforeStart': 'La fin ne peut pas être avant le début.',
   'logSheet.needEnd': 'Choisissez une heure de fin pour noter un moment passé, ou lancez un minuteur.',
   'logSheet.startTimer': 'Lancer le minuteur',
   'editor.method': 'Mode',
