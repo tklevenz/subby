@@ -10,7 +10,7 @@ import { CommonFields } from './sheets/LogSheet';
 import { Button, FieldLabel, ErrorText } from './ui';
 import NightBar from './NightBar';
 import { Moon, Plus, Xmark } from './icons';
-import { useLogStore } from '../store/useLogStore';
+import { useLogStore, type LogPatch } from '../store/useLogStore';
 import { useSleepOverlap } from '../features/sleepOverlap';
 import { useFormatTime } from '../store/timeHelpers';
 import { colors } from '../theme/colors';
@@ -26,9 +26,8 @@ const NEW_WAKING_MS = 15 * MIN;
  * joined (their notes move to the first). Opened from any piece of the night.
  */
 export default function NightForm({ night }: { night: Night }) {
-  const updateLog = useLogStore((s) => s.updateLog);
-  const addLog = useLogStore((s) => s.addLog);
-  const softDeleteLog = useLogStore((s) => s.softDeleteLog);
+  const writeLogs = useLogStore((s) => s.writeLogs);
+  const deleteLogs = useLogStore((s) => s.deleteLogs);
   const formatTime = useFormatTime();
 
   const first = night.pieces[0]!;
@@ -74,13 +73,16 @@ export default function NightForm({ night }: { night: Night }) {
     const joined = night.pieces.slice(pieces.length);
     const notes = [payload.notes, ...joined.map((p) => p.payload.notes)].filter(Boolean).join('\n') || undefined;
     const firstPayload = { ...payload, notes };
+    // One transaction: a failure leaves the night as it was, and screens re-read once.
+    const update: { id: string; patch: LogPatch }[] = [];
+    const add: { payload: LogPayload; startedAt: number; endedAt: number }[] = [];
     for (const [i, { start, end }] of pieces.entries()) {
       const existing = night.pieces[i];
-      if (!existing) await addLog({ type: 'sleep', nap: false }, { startedAt: start, endedAt: end });
-      else if (i === 0) await updateLog(existing.id, { payload: firstPayload, startedAt: start, endedAt: end });
-      else if (existing.startedAt !== start || existing.endedAt !== end) await updateLog(existing.id, { startedAt: start, endedAt: end });
+      if (!existing) add.push({ payload: { type: 'sleep', nap: false }, startedAt: start, endedAt: end });
+      else if (i === 0) update.push({ id: existing.id, patch: { payload: firstPayload, startedAt: start, endedAt: end } });
+      else if (existing.startedAt !== start || existing.endedAt !== end) update.push({ id: existing.id, patch: { startedAt: start, endedAt: end } });
     }
-    for (const p of joined) await softDeleteLog(p.id);
+    await writeLogs({ add, update, remove: joined.map((p) => p.id) });
     router.back();
   });
 
@@ -91,7 +93,7 @@ export default function NightForm({ night }: { night: Night }) {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          for (const p of night.pieces) await softDeleteLog(p.id);
+          await deleteLogs(night.pieces.map((p) => p.id));
           router.back();
         },
       },

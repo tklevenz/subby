@@ -20,6 +20,12 @@ export type LogPatch = {
   endedAt?: number | null;
 };
 
+export type LogWrites = {
+  add?: { payload: LogPayload; startedAt: number; endedAt: number | null }[];
+  update?: { id: string; patch: LogPatch }[];
+  remove?: string[];
+};
+
 interface LogState {
   activeChildId: string | null;
   logs: LogEntry[];
@@ -39,11 +45,48 @@ interface LogState {
   /** Works for any entry, loaded or not. */
   updateLog: (id: string, patch: LogPatch) => Promise<void>;
   softDeleteLog: (id: string) => Promise<void>;
+  /** Several deletes at once (a night's pieces): one transaction, one `revision` bump. */
+  deleteLogs: (ids: string[]) => Promise<void>;
+  /** Adds, edits and deletes together, atomically: either all of them are written or none, and readers re-read once. */
+  writeLogs: (writes: LogWrites) => Promise<void>;
   /** An entry from memory, else from the database (e.g. older than the loaded window). */
   getLog: (id: string) => Promise<LogEntry | undefined>;
 }
 
 const photoOf = (p: LogPayload) => (p.type === 'note' ? p.photoUri : undefined);
+
+/** The entry as an edit leaves it. A new or removed photo drops the synced reference, so the next sync uploads the new one (or none). */
+function applyPatch(current: LogEntry, patch: LogPatch): LogEntry {
+  const updated: LogEntry = {
+    ...current,
+    payload: patch.payload ? ({ ...current.payload, ...patch.payload } as LogPayload) : current.payload,
+    startedAt: patch.startedAt ?? current.startedAt,
+    endedAt: patch.endedAt !== undefined ? patch.endedAt : current.endedAt,
+    updatedAt: Date.now(),
+    syncStatus: 'pending',
+  };
+  if (photoOf(current.payload) !== photoOf(updated.payload) && updated.payload.type === 'note') {
+    const { photoBlob: _, ...payload } = updated.payload;
+    updated.payload = payload;
+  }
+  return updated;
+}
+
+function newEntry(childId: string, payload: LogPayload, startedAt: number, endedAt: number | null): LogEntry {
+  return {
+    id: uuidv7(),
+    childId,
+    logType: payload.type,
+    startedAt,
+    endedAt,
+    updatedAt: Date.now(),
+    isDeleted: false,
+    syncStatus: 'pending',
+    importRef: null,
+    createdBy: null,
+    payload,
+  };
+}
 
 const byStartedDesc = (a: LogEntry, b: LogEntry) => b.startedAt - a.startedAt;
 
@@ -93,22 +136,9 @@ export const useLogStore = create<LogState>((set, get) => ({
   addLog: async (payload, times = {}) => {
     const childId = get().activeChildId;
     if (!childId) throw new Error('No active child'); // i18n-ignore
-    const now = Date.now();
-    const startedAt = times.startedAt ?? now;
+    const startedAt = times.startedAt ?? Date.now();
     const timed = TIMED_LOG_TYPES.includes(payload.type);
-    const entry: LogEntry = {
-      id: uuidv7(),
-      childId,
-      logType: payload.type,
-      startedAt,
-      endedAt: times.endedAt !== undefined ? times.endedAt : timed ? startedAt : null,
-      updatedAt: now,
-      isDeleted: false,
-      syncStatus: 'pending',
-      importRef: null,
-      createdBy: null,
-      payload,
-    };
+    const entry = newEntry(childId, payload, startedAt, times.endedAt !== undefined ? times.endedAt : timed ? startedAt : null);
 
     await db.insert(schema.logsTable).values(entry);
     set((state) => ({ logs: [entry, ...state.logs].sort(byStartedDesc), revision: state.revision + 1 }));
@@ -128,62 +158,61 @@ export const useLogStore = create<LogState>((set, get) => ({
     return get().updateLog(id, { ...patch, payload, endedAt: now });
   },
 
-  updateLog: async (id, patch) => {
-    const current = await get().getLog(id);
-    if (!current) return;
+  updateLog: (id, patch) => get().writeLogs({ update: [{ id, patch }] }),
 
-    const updated: LogEntry = {
-      ...current,
-      payload: patch.payload ? ({ ...current.payload, ...patch.payload } as LogPayload) : current.payload,
-      startedAt: patch.startedAt ?? current.startedAt,
-      endedAt: patch.endedAt !== undefined ? patch.endedAt : current.endedAt,
-      updatedAt: Date.now(),
-      syncStatus: 'pending',
-    };
-    // A new or removed photo: drop the synced reference so the next sync uploads the new one (or none).
-    if (photoOf(current.payload) !== photoOf(updated.payload) && updated.payload.type === 'note') {
-      const { photoBlob: _, ...payload } = updated.payload;
-      updated.payload = payload;
+  softDeleteLog: (id) => get().writeLogs({ remove: [id] }),
+
+  deleteLogs: (ids) => get().writeLogs({ remove: ids }),
+
+  writeLogs: async ({ add = [], update = [], remove = [] }) => {
+    const childId = get().activeChildId;
+    if (add.length > 0 && !childId) throw new Error('No active child'); // i18n-ignore
+    // Read first (entries outside the loaded window come from SQLite); the writes below are one synchronous transaction.
+    const edits: { before: LogEntry; after: LogEntry }[] = [];
+    for (const { id, patch } of update) {
+      const before = await get().getLog(id);
+      if (before) edits.push({ before, after: applyPatch(before, patch) });
     }
+    const removed = (await Promise.all(remove.map((id) => get().getLog(id)))).filter((l): l is LogEntry => l !== undefined);
+    const added = add.map((a) => newEntry(childId!, a.payload, a.startedAt, a.endedAt));
+    if (edits.length + removed.length + added.length === 0) return;
 
-    await db
-      .update(schema.logsTable)
-      .set({
-        payload: updated.payload,
-        startedAt: updated.startedAt,
-        endedAt: updated.endedAt,
-        updatedAt: updated.updatedAt,
-        syncStatus: 'pending',
-      })
-      .where(eq(schema.logsTable.id, id));
-    if (photoOf(current.payload) !== photoOf(updated.payload)) deletePhoto(photoOf(current.payload));
+    const t = schema.logsTable;
+    const now = Date.now();
+    db.transaction((tx) => {
+      for (const { after } of edits) {
+        tx.update(t)
+          .set({ payload: after.payload, startedAt: after.startedAt, endedAt: after.endedAt, updatedAt: after.updatedAt, syncStatus: 'pending' })
+          .where(eq(t.id, after.id))
+          .run();
+      }
+      for (const { id } of removed) {
+        tx.update(t)
+          // Only the id and type stay behind (for sync); nothing personal is kept in a deleted entry.
+          .set({ isDeleted: true, payload: sql`json_object('type', ${t.logType})`, updatedAt: now, syncStatus: 'pending' })
+          .where(eq(t.id, id))
+          .run();
+      }
+      for (const entry of added) tx.insert(t).values(entry).run();
+    });
+
+    for (const { before, after } of edits) {
+      if (photoOf(before.payload) !== photoOf(after.payload)) deletePhoto(photoOf(before.payload));
+    }
+    for (const entry of removed) deletePhoto(photoOf(entry.payload));
 
     set((state) => {
+      const touched = new Set([...edits.map((e) => e.after.id), ...removed.map((r) => r.id)]);
+      const others = state.logs.filter((l) => !touched.has(l.id));
       // Keep the in-memory window consistent: an entry may move into or out of it.
-      const others = state.logs.filter((l) => l.id !== id);
       // Running timers are always loaded, however old (see loadLogs).
-      const inWindow = updated.childId === state.activeChildId && (updated.startedAt >= state.loadedSince || (updated.endedAt === null && TIMED_LOG_TYPES.includes(updated.logType)));
+      const inWindow = ({ childId: c, startedAt, endedAt, logType }: LogEntry) =>
+        c === state.activeChildId && (startedAt >= state.loadedSince || (endedAt === null && TIMED_LOG_TYPES.includes(logType)));
       return {
-        logs: inWindow ? [...others, updated].sort(byStartedDesc) : others,
+        logs: [...others, ...edits.map((e) => e.after).filter(inWindow), ...added].sort(byStartedDesc),
         revision: state.revision + 1,
       };
     });
-  },
-
-  softDeleteLog: async (id: string) => {
-    const current = await get().getLog(id);
-    const now = Date.now();
-    await db
-      .update(schema.logsTable)
-      // Only the id and type stay behind (for sync); nothing personal is kept in a deleted entry.
-      .set({ isDeleted: true, payload: sql`json_object('type', ${schema.logsTable.logType})`, updatedAt: now, syncStatus: 'pending' })
-      .where(eq(schema.logsTable.id, id));
-    if (current) deletePhoto(photoOf(current.payload));
-
-    set((state) => ({
-      logs: state.logs.filter((log) => log.id !== id),
-      revision: state.revision + 1,
-    }));
   },
 
   getLog: async (id) =>
