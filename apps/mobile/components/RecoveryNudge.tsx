@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { DAY_MS } from '@subby/shared';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -9,7 +10,7 @@ import { Xmark } from './icons';
 import { colors } from '../theme/colors';
 
 /** How long after setting up sync Home starts suggesting a recovery key (the setup flow offers it first). */
-export const RECOVERY_NUDGE_AFTER_MS = 3 * 24 * 3_600_000;
+export const RECOVERY_NUDGE_AFTER_MS = 3 * DAY_MS;
 
 /**
  * Home: one quiet card when this phone is the family's only copy and there's no recovery key, a few days after

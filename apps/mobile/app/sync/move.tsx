@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -36,7 +37,7 @@ export default function MoveScreen() {
       );
       router.back();
     } catch (e) {
-      setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      setStep({ kind: 'error', message: errorMessage(e) });
     }
   };
 
@@ -47,7 +48,7 @@ export default function MoveScreen() {
     ]);
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'working' ? (
         <View className="items-center mt-24">
           <SubLoader />

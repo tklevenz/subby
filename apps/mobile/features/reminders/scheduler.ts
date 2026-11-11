@@ -3,17 +3,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import type * as NotificationsModule from 'expo-notifications';
 import { router } from 'expo-router';
-import {
-  REMINDER_ID_PREFIX,
-  activeReminderCount,
-  isNap,
-  isRunning,
-  type LogType,
-  medicationsDue,
-  planReminders,
-  predictNextSleep,
-  type ReminderChild,
-} from '@subby/shared';
+import { REMINDER_ID_PREFIX, activeReminderCount, isNap, isRunning, type LogType, medicationsDue, planReminders, predictNextSleep, type ReminderChild, DAY_MS } from '@subby/shared';
 import { optionalModule } from '../optionalModule';
 import { fetchLogs } from '../../store/queries';
 import { formatTimeShort } from '../../store/timeHelpers';
@@ -22,7 +12,6 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type Settings } from '../../store/useSettingsStore';
 
 const CHANNEL = 'reminders';
-const DAY = 86_400_000;
 
 /**
  * expo-notifications crashes on import in Expo Go on Android (missing native module since
@@ -83,8 +72,8 @@ export async function setRemindersEnabled(on: boolean) {
 async function reminderChild(id: string, name: string, now: number): Promise<ReminderChild> {
   const [recent, meds] = await Promise.all([
     // Includes running timers of any age.
-    fetchLogs(id, { from: now - 8 * DAY }),
-    fetchLogs(id, { from: now - 30 * DAY, types: ['medication'] }),
+    fetchLogs(id, { from: now - 8 * DAY_MS }),
+    fetchLogs(id, { from: now - 30 * DAY_MS, types: ['medication'] }),
   ]);
   const lastStart = (type: LogType) => recent.filter((l) => l.logType === type && !isRunning(l)).at(-1)?.startedAt ?? null;
   const child = useChildStore.getState().children.find((c) => c.id === id)!;

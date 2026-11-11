@@ -4,16 +4,8 @@ import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
 import { deletePhoto } from '../features/photos';
 import { deletedLogs } from '../db/tombstone';
-import {
-  TIMED_LOG_TYPES,
-  notePhoto,
-  pauseFeed,
-  type LogEntry,
-  type LogPayload,
-  type PayloadOf,
-} from '@subby/shared';
+import { DAY_MS, TIMED_LOG_TYPES, notePhoto, pauseFeed, type LogEntry, type LogPayload, type PayloadOf } from '@subby/shared';
 
-const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 30;
 
 export type LogPatch = {

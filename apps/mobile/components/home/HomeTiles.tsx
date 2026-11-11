@@ -4,27 +4,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AngleRight, Baby, CalendarDays, ClockRotateLeft, Moon, PoopDroplet, Xmark, type IconComponent } from '../icons';
-import {
-  activeSleep,
-  describeDiaper,
-  describeFeed,
-  formatDuration,
-  formatHoursMinutes,
-  formatElapsed,
-  groupNights,
-  defaultNap,
-  isNightWaking,
-  isRunning,
-  lastOfType,
-  lastWakeAt,
-  medicationsDue,
-  predictNextSleep,
-  pumpingDue,
-  startOfDay,
-  suggestedNextSide,
-  type Child,
-  type LogEntry,
-} from '@subby/shared';
+import { activeSleep, describeDiaper, describeFeed, formatDuration, formatHoursMinutes, formatElapsed, groupNights, defaultNap, isNightWaking, isRunning, lastOfType, lastWakeAt, medicationsDue, predictNextSleep, pumpingDue, startOfDay, suggestedNextSide, type Child, type LogEntry, HOUR_MS, MINUTE_MS } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';
@@ -55,7 +35,7 @@ type TileContent = {
 
 /** A tap on a big tile can be taken back for a few seconds: the tile is easy to hit by accident. */
 /** A sleep stopped sooner than this from the tile is taken as a mistap and not kept. */
-const ACCIDENTAL_SLEEP_MS = 60_000;
+const ACCIDENTAL_SLEEP_MS = MINUTE_MS;
 
 type UndoOffer = { label: string; undo: () => void; /** Sleep's: the bar carries the sub. */ sub?: boolean };
 const UNDO_MS = 5000;
@@ -352,7 +332,7 @@ function SleepSub({ large, asleep, height }: { large?: boolean; asleep: boolean;
 }
 
 /** How long a due row stays after its time: a medicine or pumping that has stopped shouldn't linger. */
-const DUE_FOR_MS = 12 * 3_600_000;
+const DUE_FOR_MS = 12 * HOUR_MS;
 
 type Due = { key: string; label: string; dueAt: number; Icon: IconComponent; color: string; bg: string; action: string; onPress: () => void };
 

@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../errorMessage';
 import * as Device from 'expo-device';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
@@ -210,7 +211,7 @@ async function runOnce(): Promise<boolean> {
     return restarted || Boolean(syncSettings()?.move);
   } catch (e) {
     const removed = isRemoved(e);
-    const message = removed ? t('sync.error.removed') : e instanceof Error ? e.message : String(e);
+    const message = removed ? t('sync.error.removed') : errorMessage(e);
     useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, progress: null, pending: await pendingCount() });
     throw e;
   }

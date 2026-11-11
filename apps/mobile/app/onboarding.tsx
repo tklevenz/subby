@@ -17,7 +17,6 @@ export default function Onboarding() {
 
   return (
     <ScreenScroll
-      className="flex-1 bg-ground"
       contentContainerStyle={{ paddingTop: insets.top + 32, paddingHorizontal: 16, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >

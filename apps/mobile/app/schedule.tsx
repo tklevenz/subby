@@ -37,7 +37,7 @@ export default function ScheduleScreen() {
   const wakeRange = `${formatHoursMinutes(norms.wakeMin * 60_000)}–${formatHoursMinutes(norms.wakeMax * 60_000)}`;
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll>
       <View className="bg-violet/10 border border-violet/40 rounded-2xl p-4">
         <Text className="text-violet-pale text-xs font-medium">
           {t(next?.kind === 'bedtime' ? 'schedule.bedtime' : next?.kind === 'nap' ? 'schedule.nextNap' : 'schedule.nextSleep')}

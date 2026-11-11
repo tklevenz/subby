@@ -3,20 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { Alert, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import {
-  TIMED_LOG_TYPES,
-  formatHoursMinutes,
-  groupNights,
-  isCompletePayload,
-  endBeforeStart,
-  isNap,
-  isSleepEntry,
-  nightOf,
-  pauseFeed,
-  type LogEntry,
-  type LogPayload,
-  type Night,
-} from '@subby/shared';
+import { TIMED_LOG_TYPES, formatHoursMinutes, groupNights, isCompletePayload, endBeforeStart, isNap, isSleepEntry, nightOf, pauseFeed, type LogEntry, type LogPayload, type Night, DAY_MS } from '@subby/shared';
 import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
 import { CommonFields } from '../../components/sheets/LogSheet';
@@ -29,7 +16,6 @@ import NightForm from '../../components/NightForm';
 import { useLogQuery } from '../../store/queries';
 import { useSingleFlight } from '../../components/useSingleFlight';
 
-const DAY = 86_400_000;
 
 /** Edit/backdate any log entry, including ones older than the loaded window. */
 export default function EntryScreen() {
@@ -47,7 +33,7 @@ export default function EntryScreen() {
 }
 
 function NightLoader({ entry }: { entry: LogEntry }) {
-  const rows = useLogQuery({ from: entry.startedAt - DAY, to: entry.startedAt + DAY, types: ['sleep'] });
+  const rows = useLogQuery({ from: entry.startedAt - DAY_MS, to: entry.startedAt + DAY_MS, types: ['sleep'] });
   // Found once: saving rewrites the pieces, and the form shouldn't switch nights under itself meanwhile.
   const [night, setNight] = useState<Night | null>();
   useEffect(() => {
@@ -101,7 +87,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const title = payload.type === 'activity' ? activityLabel(payload.kind) : TYPE_META[payload.type].label;
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title }} />
 
       <FieldLabel>{t(timed ? 'entry.started' : 'logSheet.time')}</FieldLabel>

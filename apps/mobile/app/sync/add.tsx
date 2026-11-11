@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Share, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -32,7 +33,7 @@ export default function AddPhoneScreen() {
     setStep({ kind: 'loading' });
     createInvite()
       .then((invite) => setStep({ kind: 'showing', invite }))
-      .catch((e: unknown) => setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
+      .catch((e: unknown) => setStep({ kind: 'error', message: errorMessage(e) }));
   }, []);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function AddPhoneScreen() {
       setStep({ kind: 'confirm', invite: showing, claimant: res.claimant, code: claimCode(showing, res.claimant) });
       return true;
     },
-    (e) => setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) }),
+    (e) => setStep({ kind: 'error', message: errorMessage(e) }),
     showing,
   );
 
@@ -61,14 +62,14 @@ export default function AddPhoneScreen() {
       await approveClaim(claimant);
       setStep({ kind: 'done' });
     } catch (e) {
-      setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e), retry: claimant });
+      setStep({ kind: 'error', message: errorMessage(e), retry: claimant });
     }
   };
 
   const size = Math.min(width - 64, 320);
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll>
       {step.kind === 'loading' || step.kind === 'approving' ? (
         <View className="items-center mt-24">
           <PeriscopeLoader />

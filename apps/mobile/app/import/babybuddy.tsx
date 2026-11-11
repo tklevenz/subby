@@ -1,4 +1,5 @@
 import { formatNumber, t, type MessageKey } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useMemo, useRef, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { Text, View } from 'react-native';
@@ -97,7 +98,7 @@ export default function BabyBuddyImport() {
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: t('bb.title'), headerShown: true, gestureEnabled: step.kind !== 'running' }} />
 
       {step.kind === 'connect' ? (
@@ -140,7 +141,7 @@ export default function BabyBuddyImport() {
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setStep({ kind: 'done', result });
             } catch (e) {
-              setStep({ kind: 'done', result: { imported: 0, skipped: 0, excluded: 0, cancelled: false, failed: [{ ref: 'import', reason: e instanceof Error ? e.message : String(e) }] } });
+              setStep({ kind: 'done', result: { imported: 0, skipped: 0, excluded: 0, cancelled: false, failed: [{ ref: 'import', reason: errorMessage(e) }] } });
             } finally {
               await useChildStore.getState().hydrate();
               const active = useSettingsStore.getState().activeChildId;

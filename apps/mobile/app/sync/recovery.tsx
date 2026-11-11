@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -31,13 +32,13 @@ export default function RecoveryKeyScreen() {
       await setRecoveryKey(words.join(' '));
       setStep({ kind: 'done' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
       setStep({ kind: 'check', words });
     }
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'intro' ? (
         <>
           {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">{t('recovery.syncOn')}</Text> : null}

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { ScreenScroll } from './ScreenScroll';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking } from '@subby/shared';
+import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking, MINUTE_MS } from '@subby/shared';
 import DateTimeField from './DateTimeField';
 import { PayloadEditor } from './editors';
 import { CommonFields } from './sheets/LogSheet';
@@ -16,9 +16,8 @@ import { useFormatTime } from '../store/timeHelpers';
 import { colors } from '../theme/colors';
 import { useSingleFlight } from './useSingleFlight';
 
-const MIN = 60_000;
 /** A new waking: this long, in the middle of the night's longest stretch. */
-const NEW_WAKING_MS = 15 * MIN;
+const NEW_WAKING_MS = 15 * MINUTE_MS;
 
 /**
  * A finished night as one: bedtime, wake-up and the wakings between. Saving turns it back into sleep pieces,
@@ -62,8 +61,8 @@ export default function NightForm({ night }: { night: Night }) {
   const addWaking = () => {
     const stretches = pieces ?? [{ start: bedtime, end: wakeUp }];
     const longest = stretches.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a));
-    if (longest.end - longest.start < NEW_WAKING_MS + 2 * MIN) return;
-    const mid = Math.round((longest.start + longest.end - NEW_WAKING_MS) / 2 / (5 * MIN)) * 5 * MIN;
+    if (longest.end - longest.start < NEW_WAKING_MS + 2 * MINUTE_MS) return;
+    const mid = Math.round((longest.start + longest.end - NEW_WAKING_MS) / 2 / (5 * MINUTE_MS)) * 5 * MINUTE_MS;
     setWakings((cur) => [...cur, { start: mid, end: mid + NEW_WAKING_MS }].sort((a, b) => a.start - b.start));
   };
 
@@ -103,7 +102,7 @@ export default function NightForm({ night }: { night: Night }) {
   const longest = Math.max(0, ...(pieces ?? []).map((p) => p.end - p.start));
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: t(nap ? 'night.titleSleep' : 'night.titleNight') }} />
 
       {pieces ? (

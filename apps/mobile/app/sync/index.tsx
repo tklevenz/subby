@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useState } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -20,7 +21,7 @@ import { ScreenScroll } from '../../components/ScreenScroll';
 export default function SyncScreen() {
   const sync = useSettingsStore((s) => s.sync);
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       {sync ? <Status /> : <SetUp />}
     </ScreenScroll>
   );
@@ -40,7 +41,7 @@ function SetUp() {
       // The family now lives on one phone only: offer the recovery key right away (it can be skipped).
       router.push({ pathname: '/sync/recovery', params: { after: 'setup' } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -108,7 +109,7 @@ function Status() {
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: () => deleteFamilyOnServer().catch((e: unknown) => Alert.alert(t('syncScreen.deleteFailed'), e instanceof Error ? e.message : String(e))),
+          onPress: () => deleteFamilyOnServer().catch((e: unknown) => Alert.alert(t('syncScreen.deleteFailed'), errorMessage(e))),
         },
       ],
     );
@@ -210,7 +211,7 @@ function Phones() {
   const rename = async () => {
     setEditing(false);
     if (name.trim() && name.trim() !== nameOf(sync.deviceId)) {
-      await pushDeviceName(name.trim()).catch((e: unknown) => Alert.alert(t('syncScreen.renameFailed'), e instanceof Error ? e.message : String(e)));
+      await pushDeviceName(name.trim()).catch((e: unknown) => Alert.alert(t('syncScreen.renameFailed'), errorMessage(e)));
     }
   };
 
@@ -224,7 +225,7 @@ function Phones() {
           text: t('syncScreen.remove'),
           style: 'destructive',
           onPress: () =>
-            removeDevice(id).catch((e: unknown) => Alert.alert(t('syncScreen.removeFailed'), e instanceof Error ? e.message : String(e))),
+            removeDevice(id).catch((e: unknown) => Alert.alert(t('syncScreen.removeFailed'), errorMessage(e))),
         },
       ],
     );

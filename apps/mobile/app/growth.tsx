@@ -1,4 +1,5 @@
 import { formatDate, t } from '@subby/shared/i18n';
+import { errorMessage } from '../features/errorMessage';
 import React, { useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -62,14 +63,14 @@ export default function GrowthScreen() {
       const uri = await captureRef(chartRef, { format: 'png', quality: 1, result: 'tmpfile' });
       await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: t('growth.shareTitle', { name: child.name, chart: title(measure) }) });
     } catch (e) {
-      Alert.alert(t('growth.shareFailed'), e instanceof Error ? e.message : String(e));
+      Alert.alert(t('growth.shareFailed'), errorMessage(e));
     } finally {
       setSharing(false);
     }
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll>
       <Segmented options={measures()} value={measure} onChange={setMeasure} />
 
       {!sex ? (

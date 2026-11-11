@@ -1,4 +1,5 @@
 import { formatNumber, t } from '@subby/shared/i18n';
+import { errorMessage } from '../features/errorMessage';
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -45,7 +46,7 @@ export default function BackupScreen() {
       await nextFrame();
       await work();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -63,7 +64,7 @@ export default function BackupScreen() {
     });
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       {busy ? <Busy label={busy} progress={progress} /> : null}
 
       {!busy && step.kind === 'home' ? (

@@ -1,6 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { Platform } from 'react-native';
-import { familyAlerts, type LogEntry } from '@subby/shared';
+import { familyAlerts, type LogEntry, DAY_MS } from '@subby/shared';
 import { fetchLogs } from '../../store/queries';
 import { formatTimeShort } from '../../store/timeHelpers';
 import { useChildStore } from '../../store/useChildStore';
@@ -8,7 +8,6 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { Notifications, notificationsAllowed } from './scheduler';
 
 const CHANNEL = 'family';
-const DAY = 86_400_000;
 
 /** An entry the sync pulled that another phone wrote. */
 export type PulledLog = { before: LogEntry | null; after: LogEntry; deviceId: string };
@@ -23,7 +22,7 @@ export async function notifyFamily(pulled: PulledLog[]) {
   const children = useChildStore.getState().children;
   const now = Date.now();
   const ids = [...new Set(pulled.filter((p) => p.after.logType === 'sleep').map((p) => p.after.childId))];
-  const sleeps = new Map(await Promise.all(ids.map(async (id) => [id, await fetchLogs(id, { from: now - 8 * DAY, types: ['sleep'] })] as const)));
+  const sleeps = new Map(await Promise.all(ids.map(async (id) => [id, await fetchLogs(id, { from: now - 8 * DAY_MS, types: ['sleep'] })] as const)));
 
   const alerts = familyAlerts({
     changes: pulled.map((p) => ({ before: p.before, after: p.after, by: sync?.names?.[p.deviceId] ?? t('family.anotherPhone') })),

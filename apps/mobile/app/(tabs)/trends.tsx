@@ -5,20 +5,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabHeader from '../../components/TabHeader';
 import { AngleRight } from '../../components/icons';
-import {
-  addDays,
-  averageNights,
-  averageStats,
-  dailyStats,
-  dayRange,
-  formatHoursMinutes,
-  formatVolume,
-  groupNights,
-  mlToOz,
-  nightsByDay,
-  startOfDay,
-  type DayStats,
-} from '@subby/shared';
+import { addDays, averageNights, averageStats, dailyStats, dayRange, formatHoursMinutes, formatVolume, groupNights, mlToOz, nightsByDay, startOfDay, type DayStats, HOUR_MS } from '@subby/shared';
 import BarChart, { type Bar } from '../../components/charts/BarChart';
 import { TYPE_META } from '../../components/logTypes';
 import { Card, Row, Segmented } from '../../components/ui';
@@ -33,7 +20,6 @@ const ranges = () => RANGE_VALUES.map((value) => ({ value, label: t('trends.days
 /** An average with one decimal, in the app's language ("1.5", "1,5"). */
 const one = (n: number) => formatNumber(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-const H = 3_600_000;
 
 export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
@@ -94,9 +80,9 @@ export default function TrendsScreen() {
                 ]}
               >
                 <BarChart
-                  bars={bars((s) => [s.nightMs / H, s.napMs / H])}
+                  bars={bars((s) => [s.nightMs / HOUR_MS, s.napMs / HOUR_MS])}
                   colors={[colors.violetDeep, colors.violetSoft]}
-                  average={avg.sleepMs / H}
+                  average={avg.sleepMs / HOUR_MS}
                   formatValue={(v) => `${v}h`}
                 />
               </Section>
@@ -119,9 +105,9 @@ export default function TrendsScreen() {
                 <View className="mt-4">
                   <Text className="text-ink-muted text-xs mb-1">{t('trends.longest')}</Text>
                   <BarChart
-                    bars={nightBars((n) => n.longestMs / H)}
+                    bars={nightBars((n) => n.longestMs / HOUR_MS)}
                     colors={[colors.violetDeep]}
-                    average={avgNight.longestMs / H}
+                    average={avgNight.longestMs / HOUR_MS}
                     formatValue={(v) => `${v}h`}
                   />
                 </View>

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { errorMessage } from './errorMessage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { and, count, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { db, dbEncrypted, schema } from '../db/client';
@@ -21,7 +22,7 @@ const safely = async <T,>(f: () => Promise<T>, fallback: string): Promise<T | st
   try {
     return await f();
   } catch (e) {
-    return `${fallback} (${e instanceof Error ? e.message : String(e)})`;
+    return `${fallback} (${errorMessage(e)})`;
   }
 };
 

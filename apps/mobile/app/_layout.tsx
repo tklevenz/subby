@@ -1,4 +1,5 @@
 import '../global.css';
+import { errorMessage } from '../features/errorMessage';
 import { t } from '@subby/shared/i18n';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -37,7 +38,7 @@ export default function RootLayout() {
   useEffect(() => {
     appReady()
       .then(() => setReady(true))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(errorMessage(e)))
       .finally(() => SplashScreen.hideAsync().catch(() => {}));
   }, []);
 

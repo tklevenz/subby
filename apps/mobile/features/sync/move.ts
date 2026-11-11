@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../errorMessage';
 import { uuidv7 } from 'uuidv7';
 import {
   RECOVERY_SIGNER,
@@ -131,7 +132,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     useSyncStore.setState({ movedTo: move.server });
   } catch (e) {
     // Not "removed": that's about the old family, which this phone is still in.
-    const why = e instanceof Error ? e.message : String(e);
+    const why = errorMessage(e);
     throw new Error(t('sync.error.followFailed', { server: serverLabel(move.server), why }));
   }
 }

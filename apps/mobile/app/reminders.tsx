@@ -70,7 +70,7 @@ export default function RemindersScreen() {
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll>
       {!remindersAvailable ? (
         <View className="rounded-xl border border-amber/40 bg-amber/10 p-3 mb-4">
           <Text className="text-amber-pale text-sm leading-5">

@@ -1,4 +1,6 @@
 import { formatNumber, t } from '@subby/shared/i18n';
+import { DAY_MS } from '@subby/shared';
+import { errorMessage } from '../features/errorMessage';
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -10,7 +12,6 @@ import { sessionFor, useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime, useNow } from '../store/timeHelpers';
 
-const DAY = 24 * 60 * 60 * 1000;
 
 /** A phone's access in the phone list (hosted only). */
 export const accessLabel = (access: SyncAccess): string | undefined => (access === 'free' ? undefined : t(`access.${access}`));
@@ -26,7 +27,7 @@ function useStoreAction() {
       await action(sessionFor(settings));
       syncNow().catch(() => {});
     } catch (e) {
-      Alert.alert(t('access.failed'), e instanceof Error ? e.message : String(e));
+      Alert.alert(t('access.failed'), errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -75,7 +76,7 @@ export function AccessCard() {
   if (!access || access === 'free') return null;
 
   // A few minutes' slack: `now` ticks once a minute and clocks differ, so a fresh 14-day trial doesn't read 15.
-  const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now - 5 * 60_000) / DAY)) : null;
+  const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now - 5 * 60_000) / DAY_MS)) : null;
   const graceEnd = entitlement?.graceEndsAt ?? now;
   const until = t(new Date(graceEnd).toDateString() === new Date(now).toDateString() ? 'access.untilToday' : 'access.untilTomorrow', { time: formatTime(graceEnd) });
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {

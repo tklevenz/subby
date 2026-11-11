@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../features/errorMessage';
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
@@ -65,7 +66,7 @@ export default function ExportScreen() {
       file.write(logsToCsv(logs, child.name));
       await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: t('export.dialog') });
     } catch (e) {
-      Alert.alert(t('export.failed'), e instanceof Error ? e.message : String(e));
+      Alert.alert(t('export.failed'), errorMessage(e));
     } finally {
       // The share sheet has its own copy by now; don't leave plaintext data in the cache.
       try {
@@ -76,7 +77,7 @@ export default function ExportScreen() {
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScreenScroll>
       <Lead>
         {t('export.lead', { name: child.name })}
       </Lead>

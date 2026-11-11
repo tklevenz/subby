@@ -1,11 +1,11 @@
 import { formatDate, t } from '@subby/shared/i18n';
+import { DAY_MS } from '@subby/shared';
 import { Platform } from 'react-native';
 import { INACTIVE_DELETE_DAYS, INACTIVE_WARN_DAYS } from '@subby/shared/sync';
 import { Notifications } from '../reminders/scheduler';
 
 const ID = 'kl-sync:inactive';
 const CHANNEL = 'sync';
-const DAY = 86_400_000;
 let plannedAt = 0;
 
 /**
@@ -18,10 +18,10 @@ let plannedAt = 0;
 export async function planInactivityWarning(inactiveDays: number | null | undefined, now = Date.now()) {
   if (!Notifications) return;
   if (!inactiveDays) return cancelInactivityWarning();
-  if (now - plannedAt < DAY) return;
+  if (now - plannedAt < DAY_MS) return;
   plannedAt = now;
   const warnDays = inactiveDays - (INACTIVE_DELETE_DAYS - INACTIVE_WARN_DAYS);
-  const deletes = formatDate(now + inactiveDays * DAY, { day: 'numeric', month: 'long', year: 'numeric' });
+  const deletes = formatDate(now + inactiveDays * DAY_MS, { day: 'numeric', month: 'long', year: 'numeric' });
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL, { name: 'Subby Sync', importance: Notifications.AndroidImportance.DEFAULT });
   }
@@ -31,7 +31,7 @@ export async function planInactivityWarning(inactiveDays: number | null | undefi
       title: t('sync.inactive.title'),
       body: t('sync.inactive.body', { date: deletes }),
     },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: now + warnDays * DAY, channelId: CHANNEL },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: now + warnDays * DAY_MS, channelId: CHANNEL },
   });
 }
 

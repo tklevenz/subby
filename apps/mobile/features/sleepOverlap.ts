@@ -1,10 +1,10 @@
 import { t } from '@subby/shared/i18n';
-import { overlappingSleep, startOfDay } from '@subby/shared';
+import { overlappingSleep, startOfDay, DAY_MS } from '@subby/shared';
 import { useLogQuery } from '../store/queries';
 import { useLogStore } from '../store/useLogStore';
 import { formatDayLabel, useFormatTime } from '../store/timeHelpers';
 
-const WEEK = 7 * 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
 
 /**
  * The sleep a new or edited sleep [start, end) would overlap (end null: still going), with a message to show,
@@ -13,7 +13,7 @@ const WEEK = 7 * 86_400_000;
  */
 export function useSleepOverlap(check: boolean, start: number, end: number | null, exclude?: string | string[]): string | null {
   const formatTime = useFormatTime();
-  const nearby = useLogQuery({ from: startOfDay(start) - WEEK, types: ['sleep'] });
+  const nearby = useLogQuery({ from: startOfDay(start) - WEEK_MS, types: ['sleep'] });
   const loaded = useLogStore((s) => s.logs);
   if (!check) return null;
   const other = overlappingSleep([...(nearby ?? []), ...loaded], start, end, exclude);

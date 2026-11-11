@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -34,7 +35,7 @@ export default function RecoverScreen() {
     try {
       await recoverFamily(server, words, local, defaultDeviceName());
     } catch (e) {
-      setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      setStep({ kind: 'error', message: errorMessage(e) });
       return;
     }
     // The phone is in the family now: a failed first sync is retried by the next one, never by recovering again
@@ -47,7 +48,7 @@ export default function RecoverScreen() {
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'enter' ? (
         <>
           <Text className="text-ink text-xl font-bold">{t('recover.title')}</Text>
@@ -133,7 +134,7 @@ function LostPhones({ ids }: { ids: string[] }) {
       await removeDevices([...chosen]);
       router.replace('/');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
       setBusy(false);
     }
   };

@@ -18,7 +18,7 @@ export default function EditChildScreen() {
   const updateChild = useChildStore((s) => s.updateChild);
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: child ? t('childEdit.title', { name: child.name }) : t('childEdit.child') }} />
       {child ? (
         <>

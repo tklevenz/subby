@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -47,7 +48,7 @@ function ChildCard({
 
 /** Shows the report first; it only leaves the phone if the person shares it (to support, by email). */
 async function showDiagnostics() {
-  const text = await diagnostics().catch((e: unknown) => t('settings.diagFailed', { error: e instanceof Error ? e.message : String(e) }));
+  const text = await diagnostics().catch((e: unknown) => t('settings.diagFailed', { error: errorMessage(e) }));
   Alert.alert(t('settings.diagTitle'), t('settings.diagNote', { report: text }), [
     { text: t('common.close'), style: 'cancel' },
     { text: t('settings.share'), onPress: () => void Share.share({ message: text }) },

@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { errorMessage } from '../../features/errorMessage';
 import React, { useRef, useState } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -24,7 +25,7 @@ const POLL_MS = 2000;
 /** The new phone: scan (or paste) the code from a phone in the family, compare codes, then download. */
 export default function JoinScreen() {
   const [step, setStep] = useState<Step>({ kind: 'scan' });
-  const fail = (e: unknown) => setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+  const fail = (e: unknown) => setStep({ kind: 'error', message: errorMessage(e) });
 
   const claim = async (text: string) => {
     setStep({ kind: 'claiming' });
@@ -72,7 +73,7 @@ export default function JoinScreen() {
   };
 
   return (
-    <ScreenScroll className="flex-1 bg-ground" contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScreenScroll keyboardShouldPersistTaps="handled">
       {step.kind === 'scan' ? <Scan onCode={claim} /> : null}
 
       {step.kind === 'claiming' || step.kind === 'finishing' ? <Busy label={t(step.kind === 'claiming' ? 'join.checking' : 'join.joining')} /> : null}
