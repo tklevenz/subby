@@ -1,7 +1,8 @@
 import { t } from '@subby/shared/i18n';
+import { confirmDestructive } from './confirmDestructive';
 import React, { useState } from 'react';
 import { ScreenScroll } from './ScreenScroll';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking, MINUTE_MS } from '@subby/shared';
 import DateTimeField from './DateTimeField';
@@ -86,17 +87,15 @@ export default function NightForm({ night }: { night: Night }) {
   });
 
   const confirmDelete = () =>
-    Alert.alert(t('night.deleteTitle'), night.pieces.length > 1 ? t('night.deleteWhole') : t('night.deleteSleep'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          await deleteLogs(night.pieces.map((p) => p.id));
-          router.back();
-        },
+    confirmDestructive({
+      title: t('night.deleteTitle'),
+      text: night.pieces.length > 1 ? t('night.deleteWhole') : t('night.deleteSleep'),
+      action: t('common.delete'),
+      onConfirm: async () => {
+        await deleteLogs(night.pieces.map((p) => p.id));
+        router.back();
       },
-    ]);
+    });
 
   const asleep = (pieces ?? []).reduce((a, p) => a + p.end - p.start, 0);
   const longest = Math.max(0, ...(pieces ?? []).map((p) => p.end - p.start));

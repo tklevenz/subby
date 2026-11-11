@@ -1,5 +1,6 @@
 import { formatNumber, t, type MessageKey } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
+import { useAsyncAction } from '../../features/useAsyncAction';
 import React, { useMemo, useRef, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { Text, View } from 'react-native';
@@ -78,24 +79,19 @@ export default function BabyBuddyImport() {
   const [step, setStep] = useState<Step>({ kind: 'connect' });
   const [url, setUrl] = useState(settings.bbUrl ?? '');
   const [token, setToken] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, busy, error, setError } = useAsyncAction();
   const cancelled = useRef(false);
 
-  const connect = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const client = new BBClient(url, token);
-      const preview = await previewImport(client, settings.units);
-      await settings.set('bbUrl', client.baseUrl);
-      setStep({ kind: 'review', client, preview });
-    } catch (e) {
-      setError(e instanceof BBError ? e.message : t('bb.unexpected', { error: String(e) }));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const connect = () =>
+    run(
+      async () => {
+        const client = new BBClient(url, token);
+        const preview = await previewImport(client, settings.units);
+        await settings.set('bbUrl', client.baseUrl);
+        setStep({ kind: 'review', client, preview });
+      },
+      (e) => setError(e instanceof BBError ? e.message : t('bb.unexpected', { error: String(e) })),
+    );
 
   return (
     <ScreenScroll keyboardShouldPersistTaps="handled">

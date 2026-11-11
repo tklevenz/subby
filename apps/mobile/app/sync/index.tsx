@@ -1,5 +1,7 @@
 import { t } from '@subby/shared/i18n';
+import { confirmDestructive } from '../../components/confirmDestructive';
 import { errorMessage } from '../../features/errorMessage';
+import { useAsyncAction } from '../../features/useAsyncAction';
 import React, { useState } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -31,22 +33,14 @@ export default function SyncScreen() {
 function SetUp() {
   const child = useActiveChild();
   const { server, ready, custom, field, toggle } = useServerChoice();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, busy, error } = useAsyncAction();
 
-  const start = async () => {
-    setBusy(true);
-    setError(null);
-    try {
+  const start = () =>
+    run(async () => {
       await setUpSync(server, defaultDeviceName());
       // The family now lives on one phone only: offer the recovery key right away (it can be skipped).
       router.push({ pathname: '/sync/recovery', params: { after: 'setup' } });
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   return (
     <>
@@ -92,28 +86,20 @@ function Status() {
 
   const lastPhone = members.length <= 1;
   const confirmOff = () =>
-    Alert.alert(
-      t('syncScreen.offTitle'),
-      lastPhone ? t('syncScreen.offLast') : t('syncScreen.offLeave'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('syncScreen.turnOff'), style: 'destructive', onPress: () => turnOffSync() },
-      ],
-    );
+    confirmDestructive({
+      title: t('syncScreen.offTitle'),
+      text: lastPhone ? t('syncScreen.offLast') : t('syncScreen.offLeave'),
+      action: t('syncScreen.turnOff'),
+      onConfirm: () => turnOffSync(),
+    });
 
   const confirmDelete = () =>
-    Alert.alert(
-      t('syncScreen.deleteTitle'),
-      t('syncScreen.deleteText'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => deleteFamilyOnServer().catch((e: unknown) => Alert.alert(t('syncScreen.deleteFailed'), errorMessage(e))),
-        },
-      ],
-    );
+    confirmDestructive({
+      title: t('syncScreen.deleteTitle'),
+      text: t('syncScreen.deleteText'),
+      action: t('common.delete'),
+      onConfirm: () => deleteFamilyOnServer().catch((e: unknown) => Alert.alert(t('syncScreen.deleteFailed'), errorMessage(e))),
+    });
 
   if (removed) {
     return (
@@ -217,19 +203,12 @@ function Phones() {
   };
 
   const confirmRemove = (id: string) =>
-    Alert.alert(
-      t('syncScreen.removeTitle', { name: nameOf(id) }),
-      t('syncScreen.removeText'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('syncScreen.remove'),
-          style: 'destructive',
-          onPress: () =>
-            removeDevice(id).catch((e: unknown) => Alert.alert(t('syncScreen.removeFailed'), errorMessage(e))),
-        },
-      ],
-    );
+    confirmDestructive({
+      title: t('syncScreen.removeTitle', { name: nameOf(id) }),
+      text: t('syncScreen.removeText'),
+      action: t('syncScreen.remove'),
+      onConfirm: () => removeDevice(id).catch((e: unknown) => Alert.alert(t('syncScreen.removeFailed'), errorMessage(e))),
+    });
 
   return (
     <>

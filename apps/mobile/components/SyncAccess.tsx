@@ -1,7 +1,8 @@
 import { formatNumber, t } from '@subby/shared/i18n';
 import { DAY_MS } from '@subby/shared';
 import { errorMessage } from '../features/errorMessage';
-import React, { useState } from 'react';
+import { useAsyncAction } from '../features/useAsyncAction';
+import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { SyncAccess } from '@subby/shared/sync';
@@ -18,19 +19,17 @@ export const accessLabel = (access: SyncAccess): string | undefined => (access =
 
 /** Runs a purchase-like call, then syncs, so what waited goes up right away. */
 function useStoreAction() {
-  const [busy, setBusy] = useState(false);
-  const run = async (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => {
+  const { run: runAction, busy } = useAsyncAction();
+  const run = (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => {
     const settings = useSettingsStore.getState().sync;
-    if (!settings || busy) return;
-    setBusy(true);
-    try {
-      await action(sessionFor(settings));
-      syncNow().catch(() => {});
-    } catch (e) {
-      Alert.alert(t('access.failed'), errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
+    if (!settings) return Promise.resolve(false);
+    return runAction(
+      async () => {
+        await action(sessionFor(settings));
+        syncNow().catch(() => {});
+      },
+      (e) => Alert.alert(t('access.failed'), errorMessage(e)),
+    );
   };
   return { busy, run };
 }

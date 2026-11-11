@@ -1,6 +1,7 @@
 import { t } from '@subby/shared/i18n';
+import { confirmDestructive } from '../confirmDestructive';
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Minus, Pause, Plus } from '../icons';
 import {
@@ -99,10 +100,7 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
             label={t('home.discard')}
             variant="ghost"
             onPress={() =>
-              Alert.alert(t('feedSheet.discardTitle'), undefined, [
-                { text: t('feedSheet.keep'), style: 'cancel' },
-                { text: t('home.discard'), style: 'destructive', onPress: () => softDeleteLog(running.id) },
-              ])
+              confirmDestructive({ title: t('feedSheet.discardTitle'), action: t('home.discard'), cancel: t('feedSheet.keep'), onConfirm: () => softDeleteLog(running.id) })
             }
           />
         </>

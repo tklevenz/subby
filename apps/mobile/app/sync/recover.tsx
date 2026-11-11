@@ -1,5 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
+import { useAsyncAction } from '../../features/useAsyncAction';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -95,8 +96,7 @@ export default function RecoverScreen() {
 function LostPhones({ ids }: { ids: string[] }) {
   const names = useSettingsStore((s) => s.sync?.names ?? {});
   const [chosen, setChosen] = useState(() => new Set(ids));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { run, busy, error } = useAsyncAction();
   const toggle = (id: string) =>
     setChosen((prev) => {
       const next = new Set(prev);
@@ -105,17 +105,11 @@ function LostPhones({ ids }: { ids: string[] }) {
       return next;
     });
 
-  const remove = async () => {
-    setBusy(true);
-    setError(null);
-    try {
+  const remove = () =>
+    run(async () => {
       await removeDevices([...chosen]);
       router.replace('/');
-    } catch (e) {
-      setError(errorMessage(e));
-      setBusy(false);
-    }
-  };
+    });
 
   if (busy) {
     return (

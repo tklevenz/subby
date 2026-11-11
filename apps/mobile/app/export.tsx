@@ -1,5 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../features/errorMessage';
+import { useAsyncAction } from '../features/useAsyncAction';
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
@@ -27,7 +28,7 @@ export default function ExportScreen() {
   const [range, setRange] = useState<ReturnType<typeof ranges>[number]['value']>('all');
   const [counts, setCounts] = useState<Partial<Record<LogType, number>>>({});
   const [selected, setSelected] = useState<Set<LogType> | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { run, busy } = useAsyncAction();
 
   const childId = child?.id;
   useEffect(() => {
@@ -49,31 +50,32 @@ export default function ExportScreen() {
       return next;
     });
 
-  const exportCsv = async () => {
-    if (!selected?.size) return;
-    setBusy(true);
+  const exportCsv = () => {
+    if (!selected?.size) return Promise.resolve(false);
     const slug = child.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'child';
     const file = new File(Paths.cache, `subby-${slug}-${toIsoDate(Date.now())}.csv`);
-    try {
-      const from = range === 'all' ? undefined : Date.now() - Number(range) * 86_400_000;
-      const logs = await fetchLogs(child.id, { from, types: [...selected] });
-      if (logs.length === 0) {
-        Alert.alert(t('export.nothingTitle'), t('export.nothingText'));
-        return;
-      }
-      if (file.exists) file.delete();
-      file.create();
-      file.write(logsToCsv(logs, child.name));
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: t('export.dialog') });
-    } catch (e) {
-      Alert.alert(t('export.failed'), errorMessage(e));
-    } finally {
-      // The share sheet has its own copy by now; don't leave plaintext data in the cache.
-      try {
-        if (file.exists) file.delete();
-      } catch {}
-      setBusy(false);
-    }
+    return run(
+      async () => {
+        try {
+          const from = range === 'all' ? undefined : Date.now() - Number(range) * 86_400_000;
+          const logs = await fetchLogs(child.id, { from, types: [...selected] });
+          if (logs.length === 0) {
+            Alert.alert(t('export.nothingTitle'), t('export.nothingText'));
+            return;
+          }
+          if (file.exists) file.delete();
+          file.create();
+          file.write(logsToCsv(logs, child.name));
+          await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text', dialogTitle: t('export.dialog') });
+        } finally {
+          // The share sheet has its own copy by now; don't leave plaintext data in the cache.
+          try {
+            if (file.exists) file.delete();
+          } catch {}
+        }
+      },
+      (e) => Alert.alert(t('export.failed'), errorMessage(e)),
+    );
   };
 
   return (

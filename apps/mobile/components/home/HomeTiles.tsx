@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { confirmDestructive } from '../confirmDestructive';
 import { Chevron } from '../ui';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
@@ -155,10 +156,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
         offerUndo({ label: t('home.wokeUpAfter', { span: formatHoursMinutes(sleptMs) }), undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
       },
       onDiscard: () =>
-        Alert.alert(t('home.discardTitle'), t('home.discardText'), [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('home.discard'), style: 'destructive', onPress: () => softDeleteLog(sleeping.id) },
-        ]),
+        confirmDestructive({ title: t('home.discardTitle'), text: t('home.discardText'), action: t('home.discard'), onConfirm: () => softDeleteLog(sleeping.id) }),
     };
   } else {
     const lines: string[] = [];

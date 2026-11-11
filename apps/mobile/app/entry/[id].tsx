@@ -1,7 +1,8 @@
 import { t } from '@subby/shared/i18n';
+import { confirmDestructive } from '../../components/confirmDestructive';
 import React, { useEffect, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { TIMED_LOG_TYPES, formatHoursMinutes, groupNights, isCompletePayload, endBeforeStart, isNap, isSleepEntry, nightOf, pauseFeed, type LogEntry, type LogPayload, type Night, DAY_MS } from '@subby/shared';
 import DateTimeField from '../../components/DateTimeField';
@@ -72,17 +73,15 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   });
 
   const confirmDelete = () =>
-    Alert.alert(t('entry.deleteTitle'), t('entry.deleteText'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          await softDeleteLog(entry.id);
-          router.back();
-        },
+    confirmDestructive({
+      title: t('entry.deleteTitle'),
+      text: t('entry.deleteText'),
+      action: t('common.delete'),
+      onConfirm: async () => {
+        await softDeleteLog(entry.id);
+        router.back();
       },
-    ]);
+    });
 
   const title = payload.type === 'activity' ? activityLabel(payload.kind) : TYPE_META[payload.type].label;
 
