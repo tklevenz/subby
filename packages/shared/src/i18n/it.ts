@@ -295,6 +295,8 @@ export const it: Translation = {
   'feedSheet.offerLeft': 'L’ultima poppata è finita a destra. Offri prima il sinistro.',
   'feedSheet.offerRight': 'L’ultima poppata è finita a sinistra. Offri prima il destro.',
   'feedSheet.tapSide': 'Tocca un lato per avviare il timer.',
+  'feedSheet.tapToPause': 'tocca per mettere in pausa',
+  'feedSheet.suggested': 'consigliato',
   'feedSheet.discardTitle': 'Scartare questo pasto?',
   'feedSheet.keep': 'Tieni',
   'feedSheet.pastFeed': 'Registra invece un pasto passato',

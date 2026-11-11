@@ -295,6 +295,8 @@ export const fr: Translation = {
   'feedSheet.offerLeft': 'La dernière tétée s’est finie à droite. Proposez d’abord le sein gauche.',
   'feedSheet.offerRight': 'La dernière tétée s’est finie à gauche. Proposez d’abord le sein droit.',
   'feedSheet.tapSide': 'Touchez un côté pour lancer le minuteur.',
+  'feedSheet.tapToPause': 'touchez pour mettre en pause',
+  'feedSheet.suggested': 'suggéré',
   'feedSheet.discardTitle': 'Abandonner ce repas ?',
   'feedSheet.keep': 'Garder',
   'feedSheet.pastFeed': 'Noter plutôt un repas passé',

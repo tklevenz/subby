@@ -295,6 +295,8 @@ export const de: Translation = {
   'feedSheet.offerLeft': 'Letzte Mahlzeit endete rechts. Leg zuerst links an.',
   'feedSheet.offerRight': 'Letzte Mahlzeit endete links. Leg zuerst rechts an.',
   'feedSheet.tapSide': 'Tippe auf eine Seite, um den Timer zu starten.',
+  'feedSheet.tapToPause': 'Tippen zum Pausieren',
+  'feedSheet.suggested': 'empfohlen',
   'feedSheet.discardTitle': 'Diese Mahlzeit verwerfen?',
   'feedSheet.keep': 'Behalten',
   'feedSheet.pastFeed': 'Stattdessen eine vergangene Mahlzeit eintragen',

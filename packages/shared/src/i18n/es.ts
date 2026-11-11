@@ -295,6 +295,8 @@ export const es: Translation = {
   'feedSheet.offerLeft': 'La última toma terminó en el derecho. Ofrece primero el izquierdo.',
   'feedSheet.offerRight': 'La última toma terminó en el izquierdo. Ofrece primero el derecho.',
   'feedSheet.tapSide': 'Toca un lado para iniciar el temporizador.',
+  'feedSheet.tapToPause': 'toca para pausar',
+  'feedSheet.suggested': 'sugerido',
   'feedSheet.discardTitle': '¿Descartar esta toma?',
   'feedSheet.keep': 'Conservar',
   'feedSheet.pastFeed': 'Registrar una toma pasada',

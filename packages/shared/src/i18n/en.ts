@@ -328,6 +328,8 @@ export const en = {
   'feedSheet.offerLeft': 'Last feed ended on the right. Offer left first.',
   'feedSheet.offerRight': 'Last feed ended on the left. Offer right first.',
   'feedSheet.tapSide': 'Tap a side to start the timer.',
+  'feedSheet.tapToPause': 'tap to pause',
+  'feedSheet.suggested': 'suggested',
   'feedSheet.discardTitle': 'Discard this feed?',
   'feedSheet.keep': 'Keep',
   'feedSheet.pastFeed': 'Log a past feed instead',

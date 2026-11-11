@@ -295,6 +295,8 @@ export const nl: Translation = {
   'feedSheet.offerLeft': 'De laatste voeding eindigde rechts. Bied eerst links aan.',
   'feedSheet.offerRight': 'De laatste voeding eindigde links. Bied eerst rechts aan.',
   'feedSheet.tapSide': 'Tik op een kant om de timer te starten.',
+  'feedSheet.tapToPause': 'tik om te pauzeren',
+  'feedSheet.suggested': 'aanbevolen',
   'feedSheet.discardTitle': 'Deze voeding weggooien?',
   'feedSheet.keep': 'Bewaren',
   'feedSheet.pastFeed': 'Een eerdere voeding loggen',

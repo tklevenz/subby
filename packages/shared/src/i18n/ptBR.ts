@@ -295,6 +295,8 @@ export const ptBR: Translation = {
   'feedSheet.offerLeft': 'A última mamada terminou no peito direito. Ofereça o esquerdo primeiro.',
   'feedSheet.offerRight': 'A última mamada terminou no peito esquerdo. Ofereça o direito primeiro.',
   'feedSheet.tapSide': 'Toque em um lado para iniciar o cronômetro.',
+  'feedSheet.tapToPause': 'toque para pausar',
+  'feedSheet.suggested': 'sugerido',
   'feedSheet.discardTitle': 'Descartar esta mamada?',
   'feedSheet.keep': 'Manter',
   'feedSheet.pastFeed': 'Registrar uma mamada anterior',

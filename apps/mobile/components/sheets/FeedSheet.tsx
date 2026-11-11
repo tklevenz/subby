@@ -45,7 +45,7 @@ function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: n
       <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{mmss(secs)}</Text>
       <View className="flex-row items-center mt-1 h-4">
         {active ? <Pause color={colors.cyanPale} size={12} /> : null}
-        <Text className="text-xs text-cyan-pale ml-1">{active ? 'tap to pause' : hint ? 'suggested' : ''}</Text>
+        <Text className="text-xs text-cyan-pale ml-1">{active ? t('feedSheet.tapToPause') : hint ? t('feedSheet.suggested') : ''}</Text>
       </View>
     </Pressable>
   );
