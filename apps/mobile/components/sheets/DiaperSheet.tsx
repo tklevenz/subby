@@ -41,6 +41,8 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
   }, [logged, onClose]);
 
   const once = useSingleFlight();
+  // Undo has its own guard: a tap on it while a color is being saved must still count.
+  const onceUndo = useSingleFlight();
   const log = once(async (condition: Condition) => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setLogged(await addLog({ type: 'diaper', condition }));
@@ -80,7 +82,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
     await updateLog(logged.id, { payload });
     setLogged({ ...logged, payload });
   });
-  const undo = once(async () => {
+  const undo = onceUndo(async () => {
     await softDeleteLog(logged.id);
     onClose();
   });
