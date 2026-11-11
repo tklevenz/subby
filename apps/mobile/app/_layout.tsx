@@ -44,9 +44,10 @@ export default function RootLayout() {
   useReminderSync(ready);
   useSyncEngine(ready);
 
+  const activeChildId = activeChild?.id;
   useEffect(() => {
-    if (activeChild) loadLogs(activeChild.id);
-  }, [activeChild?.id, loadLogs]);
+    if (activeChildId) void loadLogs(activeChildId);
+  }, [activeChildId, loadLogs]);
 
   if (!ready) {
     return (

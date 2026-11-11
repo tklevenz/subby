@@ -52,7 +52,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
 
   const once = useSingleFlight();
   const log = once(async (condition: Condition) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setLogged(await addLog({ type: 'diaper', condition }));
   });
 
@@ -85,7 +85,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
   const p = logged.payload;
   const label = KINDS.find((k) => k.condition === p.condition)?.label ?? t('type.diaper');
   const setColor = async (color: DiaperColor) => {
-    Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     const payload = { ...p, color: p.color === color ? undefined : color };
     await updateLog(logged.id, { payload });
     setLogged({ ...logged, payload });

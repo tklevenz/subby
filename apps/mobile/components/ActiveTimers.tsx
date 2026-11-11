@@ -35,7 +35,7 @@ export default function ActiveTimers() {
             <Pressable
               hitSlop={10}
               onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 await stopTimer(t.id);
                 // Pumped amount is only known at the end: go straight to the editor.
                 if (t.payload.type === 'pumping') router.push(`/entry/${t.id}`);

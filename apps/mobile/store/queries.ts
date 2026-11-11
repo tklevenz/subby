@@ -42,7 +42,7 @@ export function useLogQuery(q: LogQuery): LogEntry[] | null {
   useEffect(() => {
     if (!childId) return;
     let alive = true;
-    fetchLogs(childId, q).then((rows) => alive && setData({ key, rows }));
+    void fetchLogs(childId, q).then((rows) => alive && setData({ key, rows }));
     return () => {
       alive = false;
     };

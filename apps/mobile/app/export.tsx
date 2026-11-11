@@ -28,13 +28,14 @@ export default function ExportScreen() {
   const [selected, setSelected] = useState<Set<LogType> | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const childId = child?.id;
   useEffect(() => {
-    if (!child) return;
-    countChildLogs(child.id).then((c) => {
+    if (!childId) return;
+    void countChildLogs(childId).then((c) => {
       setCounts(c);
       setSelected((s) => s ?? new Set(LOG_TYPES.filter((type) => c[type])));
     });
-  }, [child?.id]);
+  }, [childId]);
 
   if (!child) return null;
 

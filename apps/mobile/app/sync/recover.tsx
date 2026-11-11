@@ -25,7 +25,7 @@ export default function RecoverScreen() {
 
   const start = async () => {
     if (await hasLocalData()) setStep({ kind: 'choose' });
-    else run('merge');
+    else void run('merge');
   };
 
   const run = async (local: 'merge' | 'replace') => {

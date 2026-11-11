@@ -37,7 +37,7 @@ export default function EntryScreen() {
   const [entry, setEntry] = useState<LogEntry | null | undefined>(undefined);
 
   useEffect(() => {
-    useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
+    void useLogStore.getState().getLog(id).then((e) => setEntry(e ?? null));
   }, [id]);
 
   if (entry === undefined) return <View className="items-center mt-10"><SubSpinner size={36} /></View>;

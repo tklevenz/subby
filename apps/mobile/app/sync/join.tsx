@@ -44,7 +44,7 @@ export default function JoinScreen() {
       const status = await joinStatus(waiting);
       if (status === 'approved') {
         if (await hasLocalData()) setStep({ kind: 'choose', join: waiting });
-        else finish(waiting, 'merge');
+        else void finish(waiting, 'merge');
         return true;
       }
       if (status === 'expired') {

@@ -39,7 +39,7 @@ export default function WheelColumn({
   const select = (i: number) => {
     if (i === current.current) return;
     current.current = i;
-    Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     onChange(i);
   };
 

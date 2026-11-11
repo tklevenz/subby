@@ -91,14 +91,14 @@ export default function LogSheet({
   const once = useSingleFlight();
   const save = once(async () => {
     await addLog(payload, { startedAt, endedAt });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
   });
 
   // A timer from the chosen start time (now unless changed), e.g. for a nap that began a few minutes ago.
   const start = once(async () => {
     await startTimer(payload, startedAt);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
   });
 

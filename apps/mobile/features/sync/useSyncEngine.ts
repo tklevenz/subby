@@ -19,9 +19,9 @@ export function useSyncEngine(ready: boolean) {
     const start = () => {
       if (!useSettingsStore.getState().sync) return;
       useSyncStore.setState((s) => (s.phase === 'off' ? { phase: 'idle' } : s));
-      pendingCount().then((pending) => useSyncStore.setState({ pending }));
+      void pendingCount().then((pending) => useSyncStore.setState({ pending }));
       requestSync(0);
-      openLive();
+      void openLive();
       setUpBackgroundSync().catch((e: unknown) => console.warn('Background sync setup failed', e)); // i18n-ignore
     };
     start();

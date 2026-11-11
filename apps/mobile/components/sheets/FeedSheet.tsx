@@ -61,7 +61,7 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
 
   const once = useSingleFlight();
   const tap = once(async (side: Side) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const t = Date.now();
     if (running) await updateLog(running.id, { payload: toggleSide(running.payload, side, t) });
     else await startTimer(toggleSide({ type: 'feed', method: 'breast' }, side, t), t);
@@ -91,7 +91,7 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
             label={t('common.done')}
             onPress={once(async () => {
               await stopTimer(running.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               onDone();
             })}
           />
@@ -168,7 +168,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
         label={t('feedSheet.logBottle', { amount: formatVolume(amountMl, units) })}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'bottle', milkType, amountMl }, { startedAt: at });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onDone();
         })}
       />
@@ -192,7 +192,7 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
         disabled={isEmptySolids({ type: 'feed', method: 'solids', ...solids })}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'solids', ...solids }, { startedAt: at });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onDone();
         })}
       />

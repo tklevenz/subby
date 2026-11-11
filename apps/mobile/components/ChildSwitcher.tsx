@@ -19,8 +19,8 @@ export default function ChildSwitcher() {
   const [open, setOpen] = useState(false);
 
   const choose = (id: string) => {
-    Haptics.selectionAsync();
-    setSetting('activeChildId', id);
+    void Haptics.selectionAsync();
+    void setSetting('activeChildId', id);
     setOpen(false);
   };
 

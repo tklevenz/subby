@@ -19,7 +19,7 @@ export function Chip({
   return (
     <Pressable
       onPress={() => {
-        Haptics.selectionAsync();
+        void Haptics.selectionAsync();
         onPress();
       }}
       className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full border ${
@@ -102,7 +102,7 @@ export function Button({
     <Pressable
       disabled={disabled}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
       className={`${bg} rounded-xl py-3.5 px-5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}

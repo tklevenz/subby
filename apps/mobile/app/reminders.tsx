@@ -50,7 +50,7 @@ export default function RemindersScreen() {
   const [upcoming, setUpcoming] = useState<Awaited<ReturnType<typeof upcomingReminders>>>([]);
 
   const refresh = useCallback(() => {
-    notificationsBlocked().then(setBlocked);
+    void notificationsBlocked().then(setBlocked);
     // The scheduler re-plans ~1 s after a change.
     setTimeout(() => upcomingReminders().then(setUpcoming), 1500);
   }, []);

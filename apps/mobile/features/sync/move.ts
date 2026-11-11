@@ -176,7 +176,7 @@ async function switchTo(
     photosFamily: next.familyId,
     logSeen: { length: next.entries.length, head: verifyDeviceLog(next.entries).head },
   });
-  openLive();
+  void openLive();
   setUpBackgroundSync().catch((e: unknown) => console.warn('[sync] background setup after the move failed', e));
   requestSync(0);
 }

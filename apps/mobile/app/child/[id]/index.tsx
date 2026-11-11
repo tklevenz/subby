@@ -68,7 +68,7 @@ function Profile({ child }: { child: Child }) {
   // Read straight from the database: this child may not be the active one.
   useEffect(() => {
     let alive = true;
-    Promise.all([
+    void Promise.all([
       fetchLogs(child.id, { types: ['growth', 'milestone'] }),
       fetchLogs(child.id, { types: ['feed'], where: HAS_FOODS }),
     ]).then(([rows, solids]) => {

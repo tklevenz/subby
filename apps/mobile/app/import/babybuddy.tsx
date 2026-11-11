@@ -137,7 +137,7 @@ export default function BabyBuddyImport() {
                 onProgress: (progress) => setStep({ kind: 'running', progress }),
                 isCancelled: () => cancelled.current,
               });
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setStep({ kind: 'done', result });
             } catch (e) {
               setStep({ kind: 'done', result: { imported: 0, skipped: 0, excluded: 0, cancelled: false, failed: [{ ref: 'import', reason: e instanceof Error ? e.message : String(e) }] } });

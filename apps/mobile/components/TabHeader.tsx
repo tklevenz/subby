@@ -13,7 +13,7 @@ function LogButton({ at }: { at?: number }) {
   return (
     <Pressable
       onPress={() => {
-        Haptics.selectionAsync();
+        void Haptics.selectionAsync();
         open({ kind: 'add', at });
       }}
       hitSlop={8}

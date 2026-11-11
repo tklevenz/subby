@@ -19,7 +19,7 @@ export default function AddLogSheet({ at }: { at?: number }) {
             <Pressable
               key={key}
               onPress={() => {
-                Haptics.selectionAsync();
+                void Haptics.selectionAsync();
                 if (at === undefined) open(request);
                 else if (request.kind === 'log') open({ ...request, at });
                 else open({ kind: 'log', type: 'feed', at }); // the feed tile's own sheet

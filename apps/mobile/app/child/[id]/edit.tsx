@@ -45,7 +45,7 @@ function DeleteChild({ child }: { child: Child }) {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (open) countChildLogs(child.id).then(setCounts);
+    if (open) void countChildLogs(child.id).then(setCounts);
   }, [open, child.id]);
 
   if (!open) {

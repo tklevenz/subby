@@ -81,7 +81,7 @@ export default function HomeTiles({ child }: { child: Child }) {
   const content = useTileContent(logs, child, now, offerUndo);
 
   const longPress = (tile: HomeTile) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     if (tile === top) {
       Alert.alert(t('home.topTile', { tile: label(tile) }), t('home.topTileHint'));
       return;
@@ -114,7 +114,7 @@ export default function HomeTiles({ child }: { child: Child }) {
           </Text>
           <Pressable
             onPress={() => {
-              Haptics.selectionAsync();
+              void Haptics.selectionAsync();
               clearTimeout(offerTimer.current);
               setOffer(null);
               offer.undo();
@@ -161,7 +161,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       active: true,
       entryId: sleeping.id,
       onPress: async () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const sleptMs = Date.now() - sleeping.startedAt;
         // Under a minute is a mistap on the big tile (or a change of mind), not a sleep: it isn't kept, so it
         // can't count as a nap or move the prediction. Undo brings the running sleep back.
@@ -197,7 +197,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       hint: t('home.tapSleep'),
       entryId: logs.find((l) => l.logType === 'sleep' && l.endedAt !== null)?.id,
       onPress: async () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Nap or night from the usual bedtime (else the clock); editable afterwards.
         const entry = await startTimer({ type: 'sleep', nap: defaultNap(logs, Date.now()) });
         offerUndo({ label: t('home.sleepStarted'), undo: () => softDeleteLog(entry.id), sub: true });
@@ -387,7 +387,7 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
       dueAt: pump.dueAt,
       action: t('home.start'),
       onPress: async () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const entry = await startTimer({ type: 'pumping' });
         offerUndo({ label: t('home.pumpingStarted'), undo: () => softDeleteLog(entry.id) });
       },
