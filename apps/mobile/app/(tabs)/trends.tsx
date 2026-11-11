@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabHeader from '../../components/TabHeader';
-import { addDays, averageNights, averageStats, dailyStats, dayRange, formatHoursMinutes, formatVolume, groupNights, mlToOz, nightsByDay, startOfDay, type DayStats, HOUR_MS } from '@subby/shared';
+import { addDays, averageNights, averageStats, dailyStats, dayRange, formatHoursMinutes, formatVolume, groupNights, nightsByDay, startOfDay, volumeIn, volumeUnit, type DayStats, HOUR_MS } from '@subby/shared';
 import BarChart, { type Bar } from '../../components/charts/BarChart';
 import { TYPE_META } from '../../components/logTypes';
 import { Card, Row, Segmented, Chevron } from '../../components/ui';
@@ -50,7 +50,7 @@ export default function TrendsScreen() {
       values: [nights?.[i] ? value(nights[i]!) : 0],
     }));
 
-  const volume = (ml: number) => (units === 'metric' ? ml : mlToOz(ml));
+  const volume = (ml: number) => volumeIn(ml, units);
   const any = (k: keyof DayStats) => stats?.some((s) => (s[k] as number) > 0) ?? false;
 
   return (
@@ -131,7 +131,7 @@ export default function TrendsScreen() {
                       bars={bars((s) => [volume(s.bottleMl)])}
                       colors={[colors.cyanStrong]}
                       average={volume(avg.bottleMl)}
-                      formatValue={(v) => `${formatNumber(v)} ${units === 'metric' ? 'ml' : 'oz'}`}
+                      formatValue={(v) => `${formatNumber(v)} ${volumeUnit(units)}`}
                     />
                   </View>
                 ) : null}
@@ -158,7 +158,7 @@ export default function TrendsScreen() {
                   bars={bars((s) => [volume(s.pumpedMl)])}
                   colors={[TYPE_META.pumping.color]}
                   average={volume(avg.pumpedMl)}
-                  formatValue={(v) => `${formatNumber(v)} ${units === 'metric' ? 'ml' : 'oz'}`}
+                  formatValue={(v) => `${formatNumber(v)} ${volumeUnit(units)}`}
                 />
               </Section>
             ) : null}

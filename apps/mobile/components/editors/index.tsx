@@ -7,14 +7,8 @@ import {
   MEDICATION_UNITS,
   medicationUnit,
   MILESTONES,
-  cToF,
-  cmToIn,
-  fToC,
-  gToLb,
-  inToCm,
-  lbToG,
-  mlToOz,
-  ozToMl,
+  MEASURES,
+  type Measure,
   recentMedications,
   type LogPayload,
   type PayloadOf,
@@ -35,14 +29,11 @@ type EditorProps<T extends LogPayload['type']> = {
   onChange: (patch: Partial<PayloadOf<T>>) => void;
 };
 
-const id = (n: number) => n;
-
-/** Volume field in ml, shown as oz for imperial users. */
-function VolumeField({ value, onChange }: { value?: number; onChange: (ml?: number) => void }) {
+/** A quantity entered in the phone's unit system (ml or oz, kg or lb, cm or in, °C or °F); the value is canonical. */
+function MeasureField({ measure, value, onChange }: { measure: Measure; value?: number; onChange: (canonical?: number) => void }) {
   const units = useSettingsStore((s) => s.units);
-  return units === 'metric'
-    ? <UnitNumberField value={value} onChange={onChange} toDisplay={id} fromDisplay={id} suffix="ml" decimals={0} />
-    : <UnitNumberField value={value} onChange={onChange} toDisplay={mlToOz} fromDisplay={ozToMl} suffix="oz" />;
+  const m = MEASURES[measure][units];
+  return <UnitNumberField value={value} onChange={onChange} toDisplay={m.to} fromDisplay={m.from} suffix={m.suffix} decimals={m.decimals} />;
 }
 
 function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
@@ -82,7 +73,7 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
             onChange={(milkType) => onChange({ milkType })}
           />
           <FieldLabel>{t('feedSheet.amount')}</FieldLabel>
-          <VolumeField value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
+          <MeasureField measure="volume" value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
         </>
       ) : null}
       {p.method === 'breast' ? (
@@ -179,52 +170,34 @@ function PumpingEditor({ payload: p, onChange }: EditorProps<'pumping'>) {
   return (
     <View>
       <FieldLabel>{t('editor.left')}</FieldLabel>
-      <VolumeField value={p.leftMl} onChange={(v) => setSide('leftMl', v)} />
+      <MeasureField measure="volume" value={p.leftMl} onChange={(v) => setSide('leftMl', v)} />
       <FieldLabel>{t('editor.right')}</FieldLabel>
-      <VolumeField value={p.rightMl} onChange={(v) => setSide('rightMl', v)} />
+      <MeasureField measure="volume" value={p.rightMl} onChange={(v) => setSide('rightMl', v)} />
       <FieldLabel>{t('editor.total')}</FieldLabel>
-      <VolumeField value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
+      <MeasureField measure="volume" value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
     </View>
   );
 }
 
 function GrowthEditor({ payload: p, onChange }: EditorProps<'growth'>) {
-  const metric = useSettingsStore((s) => s.units) === 'metric';
   return (
     <View>
       <FieldLabel>{t('editor.weight')}</FieldLabel>
-      {metric ? (
-        <UnitNumberField value={p.weightG} onChange={(weightG) => onChange({ weightG })} toDisplay={(g) => g / 1000} fromDisplay={(kg) => kg * 1000} suffix="kg" decimals={3} />
-      ) : (
-        <UnitNumberField value={p.weightG} onChange={(weightG) => onChange({ weightG })} toDisplay={gToLb} fromDisplay={lbToG} suffix="lb" decimals={2} />
-      )}
+      <MeasureField measure="weight" value={p.weightG} onChange={(weightG) => onChange({ weightG })} />
       <FieldLabel>{t('editor.height')}</FieldLabel>
-      {metric ? (
-        <UnitNumberField value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} toDisplay={id} fromDisplay={id} suffix="cm" />
-      ) : (
-        <UnitNumberField value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} toDisplay={cmToIn} fromDisplay={inToCm} suffix="in" />
-      )}
+      <MeasureField measure="length" value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} />
       <FieldLabel>{t('editor.head')}</FieldLabel>
-      {metric ? (
-        <UnitNumberField value={p.headCm} onChange={(headCm) => onChange({ headCm })} toDisplay={id} fromDisplay={id} suffix="cm" />
-      ) : (
-        <UnitNumberField value={p.headCm} onChange={(headCm) => onChange({ headCm })} toDisplay={cmToIn} fromDisplay={inToCm} suffix="in" />
-      )}
+      <MeasureField measure="length" value={p.headCm} onChange={(headCm) => onChange({ headCm })} />
     </View>
   );
 }
 
 function TemperatureEditor({ payload: p, onChange }: EditorProps<'temperature'>) {
-  const metric = useSettingsStore((s) => s.units) === 'metric';
   const set = (celsius?: number) => celsius !== undefined && onChange({ celsius });
   return (
     <View>
       <FieldLabel>{t('editor.temperature')}</FieldLabel>
-      {metric ? (
-        <UnitNumberField value={p.celsius} onChange={set} toDisplay={id} fromDisplay={id} suffix="°C" />
-      ) : (
-        <UnitNumberField value={p.celsius} onChange={set} toDisplay={cToF} fromDisplay={fToC} suffix="°F" />
-      )}
+      <MeasureField measure="temperature" value={p.celsius} onChange={set} />
     </View>
   );
 }

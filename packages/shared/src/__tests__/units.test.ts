@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cToF, fToC, formatTemperature, formatVolume, formatWeight, mlToOz, ozToMl } from '../domain/units';
+import { MEASURES, cToF, fToC, formatTemperature, formatVolume, formatWeight, mlToOz, ozToMl, volumeIn, volumeUnit } from '../domain/units';
 
 describe('units', () => {
   it('round-trips conversions', () => {
@@ -26,5 +26,23 @@ describe('formatDose', () => {
     expect(formatDose(2, 'tablets')).toBe('2 tablets');
     expect(formatDose(2.5, 'ml')).toBe('2.5 ml');
     expect(formatDose(1)).toBe('1');
+  });
+});
+
+describe('MEASURES', () => {
+  it('converts every quantity to the display unit and back', () => {
+    for (const measure of Object.values(MEASURES)) {
+      for (const m of Object.values(measure)) expect(m.from(m.to(37.5))).toBeCloseTo(37.5);
+    }
+    expect(MEASURES.weight.metric.to(3500)).toBe(3.5);
+    expect(MEASURES.weight.imperial.suffix).toBe('lb');
+    expect(MEASURES.temperature.imperial.to(37)).toBeCloseTo(98.6);
+  });
+
+  it('names the volume unit and converts to it', () => {
+    expect(volumeUnit('metric')).toBe('ml');
+    expect(volumeUnit('imperial')).toBe('oz');
+    expect(volumeIn(120, 'metric')).toBe(120);
+    expect(volumeIn(29.5735, 'imperial')).toBeCloseTo(1);
   });
 });

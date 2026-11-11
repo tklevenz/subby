@@ -22,6 +22,37 @@ const round = (n: number, digits: number) => {
   return Math.round(n * f) / f;
 };
 
+/** The unit volumes are shown in. */
+export const volumeUnit = (system: UnitSystem): string => (system === 'metric' ? 'ml' : 'oz');
+
+/** A volume in ml, as a number in the display unit (not rounded). */
+export const volumeIn = (ml: number, system: UnitSystem): number => (system === 'metric' ? ml : mlToOz(ml));
+
+export type Measure = 'volume' | 'weight' | 'length' | 'temperature';
+
+/**
+ * How each quantity is entered in each system: canonical value (ml, g, cm, °C) to display number and back, the unit
+ * label and the decimals shown. Heights and head size are both `length`.
+ */
+export const MEASURES: Record<Measure, Record<UnitSystem, { to: (canonical: number) => number; from: (shown: number) => number; suffix: string; decimals: number }>> = {
+  volume: {
+    metric: { to: (n) => n, from: (n) => n, suffix: 'ml', decimals: 0 },
+    imperial: { to: mlToOz, from: ozToMl, suffix: 'oz', decimals: 1 },
+  },
+  weight: {
+    metric: { to: (g) => g / 1000, from: (kg) => kg * 1000, suffix: 'kg', decimals: 3 },
+    imperial: { to: gToLb, from: lbToG, suffix: 'lb', decimals: 2 },
+  },
+  length: {
+    metric: { to: (n) => n, from: (n) => n, suffix: 'cm', decimals: 1 },
+    imperial: { to: cmToIn, from: inToCm, suffix: 'in', decimals: 1 },
+  },
+  temperature: {
+    metric: { to: (n) => n, from: (n) => n, suffix: '°C', decimals: 1 },
+    imperial: { to: cToF, from: fToC, suffix: '°F', decimals: 1 },
+  },
+};
+
 export function formatVolume(ml: number, system: UnitSystem): string {
   return system === 'metric' ? `${formatNumber(Math.round(ml))} ml` : `${formatNumber(round(mlToOz(ml), 1))} oz`;
 }

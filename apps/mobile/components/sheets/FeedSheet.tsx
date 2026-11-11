@@ -10,7 +10,6 @@ import {
   isEmptySolids,
   isRunning,
   lastOfType,
-  mlToOz,
   ozToMl,
   sideSeconds,
   suggestedNextSide,
@@ -156,7 +155,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
           <Minus color={colors.inkMuted} size={18} />
         </Pressable>
         <Text className="text-lg font-bold text-ink w-24 text-center">
-          {metric ? `${Math.round(amountMl)} ml` : `${Math.round(mlToOz(amountMl) * 2) / 2} oz`}
+          {formatVolume(amountMl, units)}
         </Text>
         <Pressable onPress={() => setAmountMl((a) => a + step)} className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center">
           <Plus color={colors.inkMuted} size={18} />
