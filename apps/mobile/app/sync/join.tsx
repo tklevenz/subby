@@ -1,5 +1,5 @@
 import { t } from '@subby/shared/i18n';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -7,6 +7,7 @@ import { claimInvite, defaultDeviceName, finishJoin, hasLocalData, joinStatus, t
 import { syncNow, useSyncStore } from '../../features/sync/engine';
 import { Button, FieldLabel, TextField, ErrorText, Lead, SectionLabel } from '../../components/ui';
 import { PeriscopeLoader, SubLoader } from '../../components/brand/loaders';
+import { usePoll } from '../../features/usePoll';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Step =
@@ -34,26 +35,26 @@ export default function JoinScreen() {
   };
 
   // Wait for the other phone to confirm the code.
-  useEffect(() => {
-    if (step.kind !== 'waiting') return;
-    const timer = setInterval(async () => {
-      try {
-        const status = await joinStatus(step.join);
-        if (status === 'approved') {
-          clearInterval(timer);
-          if (await hasLocalData()) setStep({ kind: 'choose', join: step.join });
-          else finish(step.join, 'merge');
-        } else if (status === 'expired') {
-          clearInterval(timer);
-          fail(new Error(t('join.expired')));
-        }
-      } catch (e) {
-        clearInterval(timer);
-        fail(e);
+  const waiting = step.kind === 'waiting' ? step.join : null;
+  usePoll(
+    waiting !== null,
+    POLL_MS,
+    async () => {
+      if (!waiting) return true;
+      const status = await joinStatus(waiting);
+      if (status === 'approved') {
+        if (await hasLocalData()) setStep({ kind: 'choose', join: waiting });
+        else finish(waiting, 'merge');
+        return true;
       }
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [step]);
+      if (status === 'expired') {
+        fail(new Error(t('join.expired')));
+        return true;
+      }
+    },
+    fail,
+    waiting,
+  );
 
   const finish = async (join: Join, local: 'merge' | 'replace') => {
     setStep({ kind: 'finishing' });

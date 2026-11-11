@@ -1,5 +1,5 @@
 import { t } from '@subby/shared/i18n';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Share, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import type { InviteResponse } from '@subby/shared/sync';
@@ -8,6 +8,7 @@ import QrCode from '../../components/QrCode';
 import { Button, ErrorText, Lead } from '../../components/ui';
 import { useNow } from '../../store/timeHelpers';
 import { PeriscopeLoader } from '../../components/brand/loaders';
+import { usePoll } from '../../features/usePoll';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Claimant = NonNullable<InviteResponse['claimant']>;
@@ -27,8 +28,6 @@ export default function AddPhoneScreen() {
   const { width } = useWindowDimensions();
   const [step, setStep] = useState<Step>({ kind: 'loading' });
   const now = useNow(1000);
-  const active = useRef(true);
-
   const start = useCallback(() => {
     setStep({ kind: 'loading' });
     createInvite()
@@ -38,27 +37,23 @@ export default function AddPhoneScreen() {
 
   useEffect(() => {
     start();
-    return () => {
-      active.current = false;
-    };
   }, [start]);
 
   // Wait for the new phone to scan the code and send its keys.
-  useEffect(() => {
-    if (step.kind !== 'showing') return;
-    const timer = setInterval(async () => {
-      try {
-        const res = await inviteStatus(step.invite.inviteId);
-        if (!active.current || res.status !== 'claimed' || !res.claimant) return;
-        clearInterval(timer);
-        setStep({ kind: 'confirm', invite: step.invite, claimant: res.claimant, code: claimCode(step.invite, res.claimant) });
-      } catch (e) {
-        clearInterval(timer);
-        setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
-      }
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [step]);
+  const showing = step.kind === 'showing' ? step.invite : null;
+  usePoll(
+    showing !== null,
+    POLL_MS,
+    async () => {
+      if (!showing) return true;
+      const res = await inviteStatus(showing.inviteId);
+      if (res.status !== 'claimed' || !res.claimant) return;
+      setStep({ kind: 'confirm', invite: showing, claimant: res.claimant, code: claimCode(showing, res.claimant) });
+      return true;
+    },
+    (e) => setStep({ kind: 'error', message: e instanceof Error ? e.message : String(e) }),
+    showing,
+  );
 
   const approve = async (claimant: Claimant) => {
     setStep({ kind: 'approving' });
