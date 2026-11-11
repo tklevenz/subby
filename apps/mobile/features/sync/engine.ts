@@ -242,13 +242,15 @@ export async function refreshMembers(api: SyncSession, settings: SyncSettings) {
   let { entries } = await api.log();
   // The server lost entries this phone verified (it was restored from a backup): give them back as they were
   // signed. The server checks they continue its log; anything else still fails below.
-  const saved = syncSettings();
-  const lost = entriesToRestore(entries, saved?.log);
+  const lost = entriesToRestore(entries, syncSettings()?.log);
   if (lost) {
     console.warn(`[sync] the server lost ${lost.length} phone list entries; giving them back`);
     await api.restoreLog(lost);
     ({ entries } = await api.log());
   }
+  // Read after the last await: another call (a rename's key refresh) may have seen, and saved, a longer log meanwhile,
+  // and checking against an older copy would let this one save a shorter log over it.
+  const saved = syncSettings();
   assertLogContinues(entries, saved?.logSeen ?? settings.logSeen);
   const state = verifyDeviceLog(entries);
   if (saved?.logSeen?.length !== entries.length || saved?.log?.length !== entries.length) {
