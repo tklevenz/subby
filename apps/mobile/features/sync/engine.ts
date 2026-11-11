@@ -14,8 +14,6 @@ import {
   fromBase64,
   newSymmetricKey,
   openFamilyKey,
-  seal,
-  toBase64,
   verifyDeviceLog,
   withinEpoch,
   type DeviceLogEntry,
@@ -28,7 +26,7 @@ import { deletePhoto } from '../photos';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
-import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
+import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
 import { notifyFamily, type PulledLog } from '../reminders/family';
 import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, bodyToChild, bodyToLog, childToBody, childTombstone, logToBody, validBody, scrubbedPayload, type ChildBody, type LogBody } from './records';
@@ -98,7 +96,7 @@ export async function setUpSync(serverInput: string, deviceName: string) {
   const familyKey = newSymmetricKey();
   // The create entry commits to the first family key, so every phone can check the key it's given.
   const entry = appendEntry(null, 0, { id: deviceId, keys: identity }, { type: 'create', deviceId, keys, familyKey: { epoch: 1, key: familyKey } }, Date.now());
-  await createFamily(server, { familyId, entry, sealedKey: toBase64(seal(identity.box.publicKey, familyKey)) });
+  await createFamily(server, { familyId, entry, sealedKey: sealTo(identity.box.publicKey, familyKey) });
 
   saveFamilyKeys(new Map([[1, familyKey]]));
   // Everything on this phone goes up, including deletions made before sync existed, and photos to this family.
@@ -139,7 +137,7 @@ export async function turnOffSync() {
 export async function deleteFamilyOnServer() {
   const settings = syncSettings();
   if (!settings) return;
-  await sessionFor(settings).request('DELETE', '/v1/families/me');
+  await sessionFor(settings).deleteFamily();
   await forgetSync();
 }
 
@@ -163,7 +161,7 @@ async function leaveFamily(settings: SyncSettings) {
   const { entries, state } = await refreshMembers(api, settings);
   const me = { id: settings.deviceId, keys: deviceIdentity() };
   const entry = appendEntry(state, entries.length, me, { type: 'remove', deviceId: settings.deviceId }, Date.now());
-  await api.request('POST', '/v1/families/me/log', { entry });
+  await api.appendLog(entry);
 }
 
 // --- one sync run -----------------------------------------------------------------------------------------
@@ -262,7 +260,7 @@ async function pushUnlessLocked(api: SyncSession, settings: SyncSettings, keys: 
   try {
     return await pushAll(api, settings, keys);
   } catch (e) {
-    if (!(e instanceof SyncHttpError && e.status === 402)) throw e;
+    if (!isHttpError(e, 402)) throw e;
     await refreshEntitlement(api);
     return { applied: false, tooLarge: 0 };
   }
@@ -270,7 +268,7 @@ async function pushUnlessLocked(api: SyncSession, settings: SyncSettings, keys: 
 
 /** A removed device can't log in any more (its sessions and membership are gone). */
 export const isRemoved = (e: unknown) =>
-  e instanceof SyncHttpError && (e.status === 401 || (e.status === 404 && /unknown device/i.test(e.message)));
+  isHttpError(e, 401) || (isHttpError(e, 404) && /unknown device/i.test(e.message));
 
 /**
  * Verifies the signed device log (a server can't add phones on its own, nor serve an older log than this phone
@@ -337,10 +335,7 @@ async function heal(api: SyncSession, settings: SyncSettings, entries: DeviceLog
     const member = recipient === RECOVERY_SIGNER ? state.recovery : state.members.get(recipient);
     const held = epochs.filter((e) => keys.has(e));
     if (!member || !held.length) continue;
-    await api.request('POST', '/v1/keys/grant', {
-      recipient,
-      keys: held.map((epoch) => ({ epoch, sealed: toBase64(seal(member.boxKey, keys.get(epoch)!)) })),
-    });
+    await api.grant(recipient, sealEpochs(member.boxKey, held.map((epoch): [number, Uint8Array] => [epoch, keys.get(epoch)!])));
     changed = true;
   }
   if (state.rotationDue) {
@@ -348,7 +343,7 @@ async function heal(api: SyncSession, settings: SyncSettings, entries: DeviceLog
       await rotateKeys(api, settings, entries, state, keys);
     } catch (e) {
       // Another phone rotated at the same moment: its epoch counts.
-      if (!(e instanceof SyncHttpError && (e.status === 400 || e.status === 409))) throw e;
+      if (!isHttpError(e, 400, 409)) throw e;
     }
     changed = true;
   }
@@ -367,18 +362,18 @@ export async function rotateKeys(api: SyncSession, settings: SyncSettings, entri
   const epoch = state.epoch + 1;
   const key = newSymmetricKey();
   const sealed: Record<string, string> = {};
-  for (const [id, m] of state.members) sealed[id] = toBase64(seal(m.boxKey, key));
-  if (state.recovery) sealed[RECOVERY_SIGNER] = toBase64(seal(state.recovery.boxKey, key));
+  for (const [id, m] of state.members) sealed[id] = sealTo(m.boxKey, key);
+  if (state.recovery) sealed[RECOVERY_SIGNER] = sealTo(state.recovery.boxKey, key);
   const current: Keys = { keys, epoch: state.epoch, missing: [], closedAt: state.closedAt };
   for (let attempt = 1; ; attempt++) {
     if (await pullAll(api, settings, current, syncSettings()?.lastSeq ?? 0)) await reloadStores();
     const closedSeq = syncSettings()?.lastSeq ?? 0;
     const entry = appendEntry(state, entries.length, me, { type: 'epoch', deviceId: me.id, familyKey: { epoch, key }, closedSeq }, Date.now());
     try {
-      await api.request('POST', '/v1/keys/rotate', { entry, sealed });
+      await api.rotate(entry, sealed);
       break;
     } catch (e) {
-      if (!(e instanceof SyncHttpError && e.status === 409) || attempt === 3) throw e;
+      if (!isHttpError(e, 409) || attempt === 3) throw e;
     }
   }
   keys.set(epoch, key);

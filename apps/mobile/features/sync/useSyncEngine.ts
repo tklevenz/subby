@@ -7,7 +7,7 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { closeLive, openLive, pendingCount, requestSync, useSyncStore } from './engine';
 import { setUpBackgroundSync, stopBackgroundSync } from './background';
-import { isOfficialServer } from './api';
+import { serverLabel } from './api';
 
 /**
  * Keeps this phone in sync while the app runs: on start, on every local write (debounced), when the app
@@ -57,7 +57,7 @@ export function useSyncEngine(ready: boolean) {
     unsubs.push(
       useSyncStore.subscribe((s) => {
         if (s.phase !== 'idle' || !s.movedTo) return;
-        const to = isOfficialServer(s.movedTo) ? 'Subby Sync' : s.movedTo.replace(/^https?:\/\//, '');
+        const to = serverLabel(s.movedTo);
         useSyncStore.setState({ movedTo: null });
         Alert.alert(t('sync.moved.title'), t('sync.moved.body', { server: to }));
       }),

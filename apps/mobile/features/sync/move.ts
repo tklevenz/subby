@@ -1,11 +1,10 @@
 import { t } from '@subby/shared/i18n';
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import {
   RECOVERY_SIGNER,
   appendEntry,
   assertLogContinues,
-  encryptFile,
   fromBase64,
   movedFamilyLog,
   newSymmetricKey,
@@ -19,7 +18,7 @@ import {
 import { sealRecord, type MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
-import { checkServer, createFamily, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
+import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealTo, serverLabel, SyncSession } from './api';
 import { deviceIdentity, saveFamilyKeys } from './keystore';
 import { setUpBackgroundSync } from './background';
 import { uploadPhotosAsTheyAre } from './photos';
@@ -70,18 +69,18 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
   try {
     await createFamily(server, { familyId, entry: log[0]!, sealedKey: toBase64(seal(me.keys.box.publicKey, familyKey)) });
   } catch (e) {
-    if (e instanceof SyncHttpError && e.status === 409) throw new Error(t('sync.error.alreadyThere'));
+    if (isHttpError(e, 409)) throw new Error(t('sync.error.alreadyThere'));
     throw e;
   }
   const api = new SyncSession(server, me.id, me.keys);
   try {
-    for (const entry of log.slice(1)) await api.request('POST', '/v1/families/me/log', { entry });
+    for (const entry of log.slice(1)) await api.appendLog(entry);
     const newState = verifyDeviceLog(log);
     for (const [id, m] of newState.members) {
-      if (id !== me.id) await api.request('POST', '/v1/keys/grant', { recipient: id, keys: [{ epoch: 1, sealed: toBase64(seal(m.boxKey, familyKey)) }] });
+      if (id !== me.id) await api.grant(id, [{ epoch: 1, sealed: sealTo(m.boxKey, familyKey) }]);
     }
     if (newState.recovery) {
-      await api.request('POST', '/v1/keys/grant', { recipient: RECOVERY_SIGNER, keys: [{ epoch: 1, sealed: toBase64(seal(newState.recovery.boxKey, familyKey)) }] });
+      await api.grant(RECOVERY_SIGNER, [{ epoch: 1, sealed: sealTo(newState.recovery.boxKey, familyKey) }]);
     }
     await uploadPhotosAsTheyAre(api, (done) => onStep(t('sync.move.photos', { count: done })));
 
@@ -90,7 +89,7 @@ export async function moveToServer(serverInput: string, onStep: (label: string) 
     await oldApi.push([sealRecord(oldKeys.get(oldEpoch)!, oldEpoch, { id: familyId, kind: 'moved', updatedAt: Date.now(), deviceId: me.id, deleted: false }, moved)]);
   } catch (e) {
     // Nothing points at the new family yet: take it down again, so a retry starts clean.
-    await api.request('DELETE', '/v1/families/me').catch(() => {});
+    await api.deleteFamily().catch(() => {});
     throw e;
   }
 
@@ -147,7 +146,7 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
   } catch (e) {
     // Not "removed": that's about the old family, which this phone is still in.
     const why = e instanceof Error ? e.message : String(e);
-    throw new Error(t('sync.error.followFailed', { server: move.server.replace(/^https?:\/\//, ''), why }));
+    throw new Error(t('sync.error.followFailed', { server: serverLabel(move.server), why }));
   }
 }
 
@@ -187,7 +186,7 @@ async function leave(oldApi: SyncSession, entries: DeviceLogEntry[], me: { id: s
     const { entries: latest } = await oldApi.log().catch(() => ({ entries }));
     const state = verifyDeviceLog(latest);
     if (!state.members.has(me.id)) return;
-    await oldApi.request('POST', '/v1/families/me/log', { entry: appendEntry(state, latest.length, me, { type: 'remove', deviceId: me.id }, Date.now()) });
+    await oldApi.appendLog(appendEntry(state, latest.length, me, { type: 'remove', deviceId: me.id }, Date.now()));
   } catch (e) {
     console.warn('[sync] couldn’t leave the old family', e);
   }

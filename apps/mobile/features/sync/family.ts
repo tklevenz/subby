@@ -7,7 +7,6 @@ import {
   openFamilyKey,
   pairingCode,
   recoveryIdentity,
-  seal,
   toBase64,
   verifyDeviceLog,
 } from '@subby/shared/crypto';
@@ -22,7 +21,6 @@ import {
   sealRecord,
   type InviteQr,
   type InviteResponse,
-  type KeysResponse,
 } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deleteAllPhotos } from '../photos';
@@ -30,7 +28,7 @@ import { forgetPhotoUploads } from './photos';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { checkServer, normalizeServerUrl, SyncHttpError, SyncSession } from './api';
+import { call, checkServer, isHttpError, normalizeServerUrl, sealEpochs, SyncSession } from './api';
 import { deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys, saveSync, sessionFor, syncSettings } from './engine';
 
@@ -80,10 +78,9 @@ export async function approveClaim(claimant: NonNullable<InviteResponse['claiman
   const keys = { sign: fromBase64(claimant.signKey), box: fromBase64(claimant.boxKey) };
   if (!state.members.has(claimant.deviceId)) {
     const entry = appendEntry(state, entries.length, me, { type: 'add', deviceId: claimant.deviceId, keys }, Date.now());
-    await api.request('POST', '/v1/families/me/log', { entry });
+    await api.appendLog(entry);
   }
-  const sealed = [...loadFamilyKeys()].map(([epoch, key]) => ({ epoch, sealed: toBase64(seal(keys.box, key)) }));
-  await api.request('POST', '/v1/keys/grant', { recipient: claimant.deviceId, keys: sealed });
+  await api.grant(claimant.deviceId, sealEpochs(keys.box, loadFamilyKeys()));
   await saveSync({ knownDevices: [...(settings.knownDevices ?? []), claimant.deviceId] });
   requestSync(0);
 }
@@ -108,7 +105,7 @@ export async function removeDevices(deviceIds: string[]) {
   for (const deviceId of deviceIds) {
     if (deviceId === me.id || !after.members.has(deviceId)) continue;
     const entry = appendEntry(after, log.length, me, { type: 'remove', deviceId }, Date.now());
-    await api.request('POST', '/v1/families/me/log', { entry });
+    await api.appendLog(entry);
     log.push(entry);
     after = verifyDeviceLog(log);
   }
@@ -143,11 +140,10 @@ export async function setRecoveryKey(words: string) {
   const alreadySet = state.recovery && toBase64(state.recovery.signKey) === toBase64(keys.sign);
   if (!alreadySet) {
     const entry = appendEntry(state, entries.length, me, { type: 'setRecovery', deviceId: RECOVERY_SIGNER, keys }, Date.now());
-    await api.request('POST', '/v1/families/me/log', { entry });
+    await api.appendLog(entry);
   }
   const { keys: familyKeys } = await refreshKeys(api);
-  const sealed = [...familyKeys].map(([epoch, key]) => ({ epoch, sealed: toBase64(seal(keys.box, key)) }));
-  await api.request('POST', '/v1/keys/grant', { recipient: RECOVERY_SIGNER, keys: sealed });
+  await api.grant(RECOVERY_SIGNER, sealEpochs(keys.box, familyKeys));
   await refreshMembers(api, settings);
   // Replacing earlier words owes a new epoch (the old words must not read on); the sync run starts it.
   requestSync(0);
@@ -165,7 +161,7 @@ export async function recoverFamily(serverInput: string, words: string, local: '
   try {
     await rec.login();
   } catch (e) {
-    if (e instanceof SyncHttpError && e.status === 404) throw new Error(t('sync.error.recoveryNoFamily'));
+    if (isHttpError(e, 404)) throw new Error(t('sync.error.recoveryNoFamily'));
     throw e;
   }
   const { entries } = await rec.log();
@@ -180,11 +176,8 @@ export async function recoverFamily(serverInput: string, words: string, local: '
   const deviceId = uuidv7();
   const keys = { sign: identity.sign.publicKey, box: identity.box.publicKey };
   const entry = appendEntry(state, entries.length, { id: RECOVERY_SIGNER, keys: recovery }, { type: 'add', deviceId, keys }, Date.now());
-  await rec.request('POST', '/v1/families/me/log', { entry });
-  await rec.request('POST', '/v1/keys/grant', {
-    recipient: deviceId,
-    keys: familyKeys.map((k) => ({ epoch: k.epoch, sealed: toBase64(seal(keys.box, k.key)) })),
-  });
+  await rec.appendLog(entry);
+  await rec.grant(deviceId, sealEpochs(keys.box, familyKeys.map((k): [number, Uint8Array] => [k.epoch, k.key])));
   await completeJoin(server, deviceId, () => {}, local, name);
 }
 
@@ -201,31 +194,32 @@ export async function claimInvite(text: string): Promise<Join> {
   const secret = fromBase64(qr.k);
   const sign = identity.sign.publicKey;
   const box = identity.box.publicKey;
-  const res = await fetch(`${qr.s}/v1/invites/${qr.i}/claim`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await call(qr.s, 'POST', `/v1/invites/${qr.i}/claim`, {
       claimKey: toBase64(claimKeyOf(secret)),
       deviceId,
       signKey: toBase64(sign),
       boxKey: toBase64(box),
       mac: claimMac(secret, deviceId, sign, box),
-    }),
-  });
-  if (res.status === 404) throw new Error(t('sync.error.codeInvalid'));
-  if (res.status === 409) throw new Error(t('sync.error.codeUsed'));
-  if (!res.ok) throw new Error(t('sync.error.codeRefused', { status: String(res.status) }));
+    });
+  } catch (e) {
+    if (isHttpError(e, 404)) throw new Error(t('sync.error.codeInvalid'));
+    if (isHttpError(e, 409)) throw new Error(t('sync.error.codeUsed'));
+    if (isHttpError(e) && e.status > 0) throw new Error(t('sync.error.codeRefused', { status: String(e.status) }));
+    throw e;
+  }
   return { qr, deviceId, code: pairingCode(fromBase64(qr.p), sign, secret) };
 }
 
 export async function joinStatus(join: Join): Promise<InviteResponse['status']> {
-  const res = await fetch(`${join.qr.s}/v1/invites/${join.qr.i}/status`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ claimKey: toBase64(claimKeyOf(fromBase64(join.qr.k))) }),
-  });
-  if (!res.ok) throw new Error(t('sync.error.connectionLost'));
-  return ((await res.json()) as InviteResponse).status;
+  try {
+    const res = await call<InviteResponse>(join.qr.s, 'POST', `/v1/invites/${join.qr.i}/status`, { claimKey: toBase64(claimKeyOf(fromBase64(join.qr.k))) });
+    return res.status;
+  } catch (e) {
+    // "Can't reach" says so itself; any other refusal means the connection to the server went wrong.
+    if (isHttpError(e) && e.status > 0) throw new Error(t('sync.error.connectionLost'));
+    throw e;
+  }
 }
 
 /** Whether this phone has its own children or entries (decides whether to ask what to do with them). */
@@ -252,6 +246,10 @@ export function finishJoin(join: Join, local: 'merge' | 'replace', name: string)
   );
 }
 
+/** How long a joining phone waits for the inviting phone to hand it the keys (about 20 s). */
+const KEY_WAIT_ATTEMPTS = 10;
+const KEY_WAIT_MS = 2000;
+
 /** Logs in as the newly added phone, checks the device log, takes the keys and sets up local data. */
 async function completeJoin(
   server: string,
@@ -271,9 +269,9 @@ async function completeJoin(
   // Each key must match the family's commitment in the log; the server can't slip in its own. If the inviting
   // phone's grant failed, its next sync grants them, so wait a little before giving up.
   let keys = new Map<number, Uint8Array>();
-  for (let attempt = 0; attempt < 10 && !keys.has(state.epoch); attempt++) {
-    if (attempt) await new Promise((r) => setTimeout(r, 2000));
-    const res = await session.request<KeysResponse>('GET', '/v1/keys');
+  for (let attempt = 0; attempt < KEY_WAIT_ATTEMPTS && !keys.has(state.epoch); attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, KEY_WAIT_MS));
+    const res = await session.keys();
     keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(identity, state, k.epoch, fromBase64(k.sealed))]));
   }
   if (!keys.has(state.epoch)) throw new Error(t('sync.error.noFamilyKey'));

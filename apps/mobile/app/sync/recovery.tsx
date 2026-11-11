@@ -9,6 +9,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { Button, FieldLabel, SECRET_INPUT, TextField, ErrorText, Lead } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
 import { ScreenScroll } from '../../components/ScreenScroll';
+import { serverLabel } from '../../features/sync/api';
 
 type Step = { kind: 'intro' } | { kind: 'words'; words: string[] } | { kind: 'check'; words: string[] } | { kind: 'saving' } | { kind: 'done' };
 
@@ -125,7 +126,7 @@ function ServerNote() {
   return (
     <Text className="text-ink-soft text-sm leading-5 mt-4">
       {t('recovery.serverNote')}
-      <Text className="text-ink font-semibold">{server.replace(/^https?:\/\//, '')}</Text>
+      <Text className="text-ink font-semibold">{serverLabel(server)}</Text>
     </Text>
   );
 }

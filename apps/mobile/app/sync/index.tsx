@@ -12,7 +12,7 @@ import { useServerChoice } from '../../components/ServerChoice';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
 import { accessLabel, AccessCard, AccessDevTools, GiftSlot, PhotoStorage } from '../../components/SyncAccess';
 import { PRICE, useAccessStore } from '../../features/sync/access';
-import { isOfficialServer } from '../../features/sync/api';
+import { serverLabel } from '../../features/sync/api';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
 /** Sync between phones: set up or join, status, the family's phones, turning it off. */
@@ -135,7 +135,7 @@ function Status() {
           }
         />
         <Row label={t('syncScreen.lastSynced')} value={sync.lastSyncedAt ? formatTime(sync.lastSyncedAt) : t('syncScreen.notYet')} />
-        <Row label={t('syncScreen.server')} value={isOfficialServer(sync.server) ? 'Subby Sync' : sync.server.replace(/^https?:\/\//, '')} />
+        <Row label={t('syncScreen.server')} value={serverLabel(sync.server)} />
         <PhotoStorage />
         <Row label={t('syncScreen.move')} onPress={() => router.push('/sync/move')} right={<Chevron />} />
       </Card>

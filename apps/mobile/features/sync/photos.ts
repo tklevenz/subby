@@ -5,7 +5,7 @@ import { decryptFile, encryptFile, encryptedFileSize, fromBase64, newSymmetricKe
 import { MAX_BLOB_BYTES } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletePhoto, photoSize, readPhotoBytes, savePhotoBytes } from '../photos';
-import { SyncHttpError, type SyncSession } from './api';
+import { isHttpError, type SyncSession } from './api';
 import { needsPhotoUpload } from './records';
 
 /**
@@ -117,7 +117,7 @@ async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null |
   } catch (e) {
     // The server won't keep it (the family's photo allowance is full, or it's over that server's own limit): the
     // photo stays on this phone and the entry syncs without it, like one that's too large.
-    if (e instanceof SyncHttpError && (e.status === 403 || e.status === 413)) {
+    if (isHttpError(e, 403, 413)) {
       console.warn(`[sync] the server refused a photo (${e.status}); it stays on this phone`);
       return TOO_LARGE;
     }
@@ -226,7 +226,7 @@ export async function uploadPhotosAsTheyAre(api: SyncSession, onProgress: (done:
     try {
       await api.putBlob(blob.id, encryptFile(fromBase64(blob.key), data));
     } catch (e) {
-      if (!(tolerant && e instanceof SyncHttpError && [403, 409, 413].includes(e.status))) throw e;
+      if (!(tolerant && isHttpError(e, 403, 409, 413))) throw e;
     }
     onProgress(++done);
   }

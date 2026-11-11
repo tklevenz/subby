@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import { create } from 'zustand';
 import * as Crypto from 'expo-crypto';
 import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess } from '@subby/shared/sync';
-import { SyncHttpError, checkServer, type SyncSession } from './api';
+import { isHttpError, checkServer, type SyncSession } from './api';
 
 /**
  * Whether this phone may write to the family on the server (PROJECT.md §3), for the unlock screens and the engine.
@@ -41,7 +41,7 @@ export async function refreshEntitlement(api: SyncSession) {
     const testPurchases = entitlement.access !== 'free' ? Boolean((await checkServer(api.server)).testPurchases) : false;
     useAccessStore.setState({ entitlement, testPurchases });
   } catch (e) {
-    if (e instanceof SyncHttpError && e.status === 404) {
+    if (isHttpError(e, 404)) {
       useAccessStore.setState({ entitlement: FREE, testPurchases: false });
       return;
     }

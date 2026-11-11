@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/engine';
 import { moveToServer } from '../../features/sync/move';
-import { isOfficialServer } from '../../features/sync/api';
+import { isOfficialServer, serverLabel } from '../../features/sync/api';
 import { PRICE } from '../../features/sync/access';
 import { Button, ErrorText, Lead } from '../../components/ui';
 import { SubLoader } from '../../components/brand/loaders';
@@ -14,7 +14,6 @@ import { ScreenScroll } from '../../components/ScreenScroll';
 
 type Step = { kind: 'choose' } | { kind: 'working'; label: string } | { kind: 'error'; message: string };
 
-const host = (server: string) => (isOfficialServer(server) ? 'Subby Sync' : server.replace(/^https?:\/\//, ''));
 
 /** Moves the family to another server (Subby Sync or your own); the other phones follow by themselves. */
 export default function MoveScreen() {
@@ -25,7 +24,7 @@ export default function MoveScreen() {
   const [step, setStep] = useState<Step>({ kind: 'choose' });
 
   if (!sync) return null;
-  const from = host(sync.server);
+  const from = serverLabel(sync.server);
 
   const run = async () => {
     setStep({ kind: 'working', label: t('move.ready') });
@@ -33,7 +32,7 @@ export default function MoveScreen() {
       await moveToServer(server, (label) => setStep({ kind: 'working', label }));
       Alert.alert(
         t('move.moved'),
-        t(members > 1 ? 'move.movedOthers' : 'move.movedAlone', { server: host(server) }),
+        t(members > 1 ? 'move.movedOthers' : 'move.movedAlone', { server: serverLabel(server) }),
       );
       router.back();
     } catch (e) {
@@ -42,7 +41,7 @@ export default function MoveScreen() {
   };
 
   const confirm = () =>
-    Alert.alert(t('move.confirmTitle', { server: host(server) }), t('move.confirmText', { from }), [
+    Alert.alert(t('move.confirmTitle', { server: serverLabel(server) }), t('move.confirmText', { from }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('move.move'), onPress: run },
     ]);
