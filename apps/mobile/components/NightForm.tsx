@@ -109,9 +109,9 @@ export default function NightForm({ night }: { night: Night }) {
         <View className="bg-violet/10 border border-violet/40 rounded-2xl p-4">
           <View className="flex-row items-center">
             <Moon color={colors.violetStrong} size={14} />
-            <Text className="text-violet-pale text-[13px] ml-2">{formatHoursMinutes(wakeUp - bedtime)} in bed</Text>
+            <Text className="text-violet-pale text-[13px] ml-2">{t('night.inBed', { span: formatHoursMinutes(wakeUp - bedtime) })}</Text>
           </View>
-          <Text className="text-ink text-[28px] leading-[32px] font-bold mt-1.5">{formatHoursMinutes(asleep)} asleep</Text>
+          <Text className="text-ink text-[28px] leading-[32px] font-bold mt-1.5">{t('night.asleep', { span: formatHoursMinutes(asleep) })}</Text>
           <View className="mt-2.5">
             <NightBar stretches={pieces} />
           </View>

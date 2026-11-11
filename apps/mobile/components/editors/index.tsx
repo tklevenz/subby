@@ -333,7 +333,7 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
               className={`flex-row items-center px-3 py-2.5 rounded-xl border ${selected ? 'bg-orange/20 border-orange-strong/60' : 'bg-raised border-line-strong'}`}
             >
               <Text className={`flex-1 ${done ? 'text-ink-faint line-through' : 'text-ink'}`}>{m.label}</Text>
-              <Text className="text-ink-faint text-xs">~{m.months} mo</Text>
+              <Text className="text-ink-faint text-xs">{t('editor.milestoneAge', { count: m.months })}</Text>
             </Pressable>
           );
         })}

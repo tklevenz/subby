@@ -324,6 +324,7 @@ export const en = {
   'diaperSheet.oneTap': 'One tap logs it. Add a color after if you like.',
   'diaperSheet.color': 'Color (optional)',
   'diaperSheet.closes': 'Closes by itself after a few seconds',
+  'diaperSheet.logged': '{kind} logged',
   'feedSheet.feedingFor': 'Feeding for {span}. Tap the other side to switch.',
   'feedSheet.offerLeft': 'Last feed ended on the right. Offer left first.',
   'feedSheet.offerRight': 'Last feed ended on the left. Offer right first.',
@@ -444,6 +445,9 @@ export const en = {
   'night.backAsleep': 'Back asleep',
   'night.removeWaking': 'Remove this waking',
   'night.addWaking': 'Add a waking',
+  'night.inBed': '{span} in bed',
+  'night.asleep': '{span} asleep',
+  'editor.milestoneAge': { one: '~{count} mo', other: '~{count} mo' },
 
   // Edit an entry.
   'entry.notFound': 'Entry not found',

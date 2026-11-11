@@ -291,6 +291,7 @@ export const nl: Translation = {
   'diaperSheet.oneTap': 'Eén tik is genoeg. Voeg daarna eventueel een kleur toe.',
   'diaperSheet.color': 'Kleur (optioneel)',
   'diaperSheet.closes': 'Sluit vanzelf na een paar seconden',
+  'diaperSheet.logged': '{kind} gelogd',
   'feedSheet.feedingFor': 'Al {span} aan het voeden. Tik op de andere kant om te wisselen.',
   'feedSheet.offerLeft': 'De laatste voeding eindigde rechts. Bied eerst links aan.',
   'feedSheet.offerRight': 'De laatste voeding eindigde links. Bied eerst rechts aan.',
@@ -408,6 +409,9 @@ export const nl: Translation = {
   'night.backAsleep': 'Weer in slaap',
   'night.removeWaking': 'Deze wakkere periode verwijderen',
   'night.addWaking': 'Wakkere periode toevoegen',
+  'night.inBed': '{span} in bed',
+  'night.asleep': '{span} geslapen',
+  'editor.milestoneAge': { one: '~{count} mnd', other: '~{count} mnd' },
 
   'entry.notFound': 'Item niet gevonden',
   'entry.deleteTitle': 'Item verwijderen',

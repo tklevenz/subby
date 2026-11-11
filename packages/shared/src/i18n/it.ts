@@ -291,6 +291,7 @@ export const it: Translation = {
   'diaperSheet.oneTap': 'Basta un tocco per registrarlo. Aggiungi il colore dopo, se vuoi.',
   'diaperSheet.color': 'Colore (facoltativo)',
   'diaperSheet.closes': 'Si chiude in automatico dopo qualche secondo',
+  'diaperSheet.logged': 'Registrato: {kind}',
   'feedSheet.feedingFor': 'In poppata da {span}. Tocca l’altro lato per cambiare.',
   'feedSheet.offerLeft': 'L’ultima poppata è finita a destra. Offri prima il sinistro.',
   'feedSheet.offerRight': 'L’ultima poppata è finita a sinistra. Offri prima il destro.',
@@ -408,6 +409,9 @@ export const it: Translation = {
   'night.backAsleep': 'Di nuovo a nanna',
   'night.removeWaking': 'Togli questo risveglio',
   'night.addWaking': 'Aggiungi un risveglio',
+  'night.inBed': '{span} a letto',
+  'night.asleep': '{span} di sonno',
+  'editor.milestoneAge': { one: '~{count} mese', other: '~{count} mesi' },
 
   'entry.notFound': 'Voce non trovata',
   'entry.deleteTitle': 'Elimina voce',

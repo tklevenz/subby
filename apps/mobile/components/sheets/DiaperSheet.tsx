@@ -98,10 +98,10 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
           <Check color={colors.greenSoft} size={20} />
         </View>
         <View className="flex-1 ml-3">
-          <Text className="text-ink text-base font-semibold">{label} logged</Text>
+          <Text className="text-ink text-base font-semibold">{t('diaperSheet.logged', { kind: label })}</Text>
           <Text className="text-ink-muted text-xs">
             {formatTime(logged.startedAt)}
-            {p.color ? ` · ${p.color.charAt(0).toUpperCase() + p.color.slice(1)}` : ''}
+            {p.color ? ` · ${t(`diaperColor.${p.color}`)}` : ''}
           </Text>
         </View>
         <Pressable
