@@ -4,6 +4,7 @@ import {
   Easing,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -15,7 +16,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Xmark } from './icons';
 import { colors } from '../theme/colors';
 
-/** Slide-up modal sheet with drag handle, title row and scrollable body. */
+/** Drag this far down (or flick faster than FLICK_VELOCITY) to close; less springs back. */
+const CLOSE_DISTANCE = 120;
+const FLICK_VELOCITY = 0.8;
+
+/**
+ * Slide-up modal sheet with drag handle, title row and scrollable body. The handle and title row drag it down to
+ * close; the body doesn't, so scrolling and the wheels never fight the gesture.
+ */
 export default function BottomSheet({
   visible,
   onClose,
@@ -44,6 +52,25 @@ export default function BottomSheet({
   const dismiss = () =>
     Animated.timing(slideY, { toValue: height, duration: 220, useNativeDriver: true }).start(() => onClose());
 
+  // Claims the touch at its start: asked only on a move, the strip never got it (seen on Android, New
+  // Architecture). The ✕ still gets its taps, since the deepest view is asked first. A plain tap on the strip
+  // just springs back. Refs: the responder is made once, `dismiss` changes.
+  const dismissRef = useRef(dismiss);
+  dismissRef.current = dismiss;
+  const drag = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => slideY.setValue(Math.max(0, g.dy)),
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > CLOSE_DISTANCE || g.vy > FLICK_VELOCITY) dismissRef.current();
+        else Animated.timing(slideY, { toValue: 0, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      },
+      onPanResponderTerminate: () =>
+        Animated.timing(slideY, { toValue: 0, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(),
+    }),
+  ).current;
+
   return (
     <Modal transparent animationType="none" visible={visible} statusBarTranslucent onRequestClose={dismiss}>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -53,18 +80,20 @@ export default function BottomSheet({
           style={{ transform: [{ translateY: slideY }], maxHeight: height * 0.9 }}
           className="bg-surface border-t border-line-strong/50 rounded-t-2xl"
         >
-          <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1.5 bg-raised-top rounded-full" />
-          </View>
-
-          <View className="flex-row items-center justify-between px-5 pb-2">
-            <View className="flex-row items-center">
-              {icon}
-              <Text className="text-lg font-bold text-ink ml-2">{title}</Text>
+          <View {...drag.panHandlers}>
+            <View className="items-center pt-3 pb-1">
+              <View className="w-10 h-1.5 bg-raised-top rounded-full" />
             </View>
-            <Pressable onPress={dismiss} hitSlop={10}>
-              <Xmark color={colors.inkMuted} size={22} />
-            </Pressable>
+
+            <View className="flex-row items-center justify-between px-5 pb-2">
+              <View className="flex-row items-center">
+                {icon}
+                <Text className="text-lg font-bold text-ink ml-2">{title}</Text>
+              </View>
+              <Pressable onPress={dismiss} hitSlop={10}>
+                <Xmark color={colors.inkMuted} size={22} />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView
