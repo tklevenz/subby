@@ -2,6 +2,7 @@ import { t } from '@subby/shared/i18n';
 import { confirmDestructive } from '../confirmDestructive';
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { savedFeedback } from '../savedFeedback';
 import * as Haptics from 'expo-haptics';
 import { Minus, Pause, Plus } from '../icons';
 import {
@@ -92,8 +93,7 @@ function BreastTab({ running, onDone }: { running: RunningFeed | undefined; onDo
             label={t('common.done')}
             onPress={once(async () => {
               await stopTimer(running.id);
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              onDone();
+              savedFeedback(onDone);
             })}
           />
           <Button
@@ -166,8 +166,7 @@ function BottleTab({ onDone }: { onDone: () => void }) {
         label={t('feedSheet.logBottle', { amount: formatVolume(amountMl, units) })}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'bottle', milkType, amountMl }, { startedAt: at });
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onDone();
+          savedFeedback(onDone);
         })}
       />
     </View>
@@ -190,8 +189,7 @@ function SolidsTab({ onDone }: { onDone: () => void }) {
         disabled={isEmptySolids({ type: 'feed', method: 'solids', ...solids })}
         onPress={once(async () => {
           await addLog({ type: 'feed', method: 'solids', ...solids }, { startedAt: at });
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onDone();
+          savedFeedback(onDone);
         })}
       />
     </View>

@@ -7,7 +7,8 @@ import { Stack, router } from 'expo-router';
 import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking, MINUTE_MS } from '@subby/shared';
 import DateTimeField from './DateTimeField';
 import { PayloadEditor } from './editors';
-import { CommonFields } from './sheets/LogSheet';
+import { CommonFields } from './editors/CommonFields';
+import { usePayloadForm } from '../features/usePayloadForm';
 import { Button, FieldLabel, ErrorText } from './ui';
 import NightBar from './NightBar';
 import { Moon, Plus, Xmark } from './icons';
@@ -36,9 +37,7 @@ export default function NightForm({ night }: { night: Night }) {
   // Pieces that touch (edited to meet) make a waking of no length: left out, so saving joins them.
   const [initialWakings] = useState(() => night.wakings.filter((w) => w.end > w.start));
   const [wakings, setWakings] = useState<Waking[]>(initialWakings);
-  const [payload, setPayload] = useState<PayloadOf<'sleep'>>(first.payload);
-  // The editors are shared by every type; this one only ever gets a sleep's fields.
-  const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...(p as Partial<PayloadOf<'sleep'>>) }));
+  const { payload, patch, changed: payloadChanged } = usePayloadForm<PayloadOf<'sleep'>>(first.payload);
 
   const pieces = nightPieces(bedtime, wakeUp, wakings);
   const ids = night.pieces.map((p) => p.id);
@@ -56,7 +55,7 @@ export default function NightForm({ night }: { night: Night }) {
     bedtime !== night.start ||
     wakeUp !== night.end ||
     JSON.stringify(wakings) !== JSON.stringify(initialWakings) ||
-    JSON.stringify(payload) !== JSON.stringify(first.payload);
+    payloadChanged;
 
   const setWaking = (i: number, w: Partial<Waking>) => setWakings((cur) => cur.map((x, j) => (j === i ? { ...x, ...w } : x)));
   const addWaking = () => {

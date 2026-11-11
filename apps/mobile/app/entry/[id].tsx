@@ -4,12 +4,14 @@ import React, { useEffect, useState } from 'react';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { TIMED_LOG_TYPES, formatHoursMinutes, groupNights, isCompletePayload, endBeforeStart, isNap, isSleepEntry, nightOf, pauseFeed, type LogEntry, type LogPayload, type Night, DAY_MS } from '@subby/shared';
+import { TIMED_LOG_TYPES, groupNights, isCompletePayload, endBeforeStart, isNap, isSleepEntry, nightOf, pauseFeed, type LogEntry, type LogPayload, type Night, DAY_MS } from '@subby/shared';
 import DateTimeField from '../../components/DateTimeField';
 import { PayloadEditor } from '../../components/editors';
-import { CommonFields } from '../../components/sheets/LogSheet';
+import { CommonFields } from '../../components/editors/CommonFields';
+import { EndTimeNote } from '../../components/editors/EndTimeNote';
+import { usePayloadForm } from '../../features/usePayloadForm';
 import { TYPE_META, activityLabel } from '../../components/logTypes';
-import { Button, FieldLabel, ErrorText, LoaderBlock } from '../../components/ui';
+import { Button, FieldLabel, LoaderBlock } from '../../components/ui';
 import { useLogStore } from '../../store/useLogStore';
 import { useSleepOverlap } from '../../features/sleepOverlap';
 import { SubSpinner } from '../../components/brand/loaders';
@@ -50,7 +52,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const updateLog = useLogStore((s) => s.updateLog);
   const softDeleteLog = useLogStore((s) => s.softDeleteLog);
 
-  const [payload, setPayload] = useState<LogPayload>(entry.payload);
+  const { payload, patch, changed: payloadChanged } = usePayloadForm<LogPayload>(entry.payload);
   const [startedAt, setStartedAt] = useState(entry.startedAt);
   const [endedAt, setEndedAt] = useState<number | null>(entry.endedAt);
   // A bottle or solids feed logged as a moment (it ends when it starts): moving its time moves both.
@@ -59,10 +61,8 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const running = timed && endedAt === null;
   const invalid = endBeforeStart(startedAt, endedAt);
   const overlap = useSleepOverlap(entry.logType === 'sleep', startedAt, endedAt, entry.id);
-  // Save lights up only once something changed (an unset field and a missing one compare equal).
-  const changed = startedAt !== entry.startedAt || endedAt !== entry.endedAt || JSON.stringify(payload) !== JSON.stringify(entry.payload);
-
-  const patch = (p: Partial<LogPayload>) => setPayload((cur) => ({ ...cur, ...p }) as LogPayload);
+  // Save lights up only once something changed.
+  const changed = startedAt !== entry.startedAt || endedAt !== entry.endedAt || payloadChanged;
 
   const once = useSingleFlight();
   const save = once(async () => {
@@ -112,11 +112,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
           ) : (
             <DateTimeField value={endedAt!} onChange={setEndedAt} maximumDate={new Date()} title={t('logSheet.endTime')} />
           )}
-          {invalid ? <ErrorText className="mt-2">{t('logSheet.endBeforeStart')}</ErrorText> : null}
-          {!invalid && overlap ? <ErrorText className="mt-2">{overlap}</ErrorText> : null}
-          {!invalid && !overlap && !running && endedAt !== null ? (
-            <Text className="text-ink-muted text-sm mt-2">{formatHoursMinutes(endedAt - startedAt)}</Text>
-          ) : null}
+          <EndTimeNote startedAt={startedAt} endedAt={endedAt} overlap={overlap} />
         </>
       ) : null}
 
