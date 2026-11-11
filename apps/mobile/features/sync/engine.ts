@@ -456,7 +456,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
           tx.update(schema.logsTable).set({ syncStatus: 'synced' }).where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.updatedAt, at))).run();
         }
       });
-      if (newer.length) applied = applyOpened(openedNewer.filter((o) => (newer as SyncRecord[]).includes(o.record)), settings.deviceId) || applied;
+      if (newer.length) applied = (await applyOpened(openedNewer.filter((o) => (newer as SyncRecord[]).includes(o.record)), settings.deviceId)) || applied;
       done += chunk.length;
       useSyncStore.setState({ progress: { label: t('sync.progress.uploading'), done } });
     }
@@ -495,7 +495,7 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       return false;
     });
     if (page.records.length) {
-      applied = applyPage(genuine, keys, settings.deviceId) || applied;
+      applied = (await applyPage(genuine, keys, settings.deviceId)) || applied;
       done += page.records.length;
       if (since === 0 || page.more) useSyncStore.setState({ progress: { label: t('sync.progress.downloading'), done } });
     }
@@ -539,7 +539,7 @@ export const quietNextRun = () => {
 };
 
 /** Decrypts, checks and applies one page (see `openAll` and `applyOpened`). */
-function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): boolean {
+async function applyPage(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>, ownDeviceId: string): Promise<boolean> {
   return applyOpened(openAll(records, keys), ownDeviceId);
 }
 
@@ -573,9 +573,9 @@ function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Array>): 
 }
 
 /** Applies opened records in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
-function applyOpened(opened: Opened[], ownDeviceId: string): boolean {
-  applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
-  noteMove(opened.filter((o) => o.record.kind === 'moved'), ownDeviceId);
+async function applyOpened(opened: Opened[], ownDeviceId: string): Promise<boolean> {
+  await applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
+  await noteMove(opened.filter((o) => o.record.kind === 'moved'), ownDeviceId);
   const photos: (string | null | undefined)[] = [];
   let changed = false;
 
@@ -643,23 +643,23 @@ export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? 
 /** A phone's display name, as its encrypted `device` record (id = that phone's device id). */
 export type DeviceBody = { name: string };
 
-function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]) {
+async function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]) {
   if (!records.length) return;
   const names = { ...syncSettings()?.names };
   for (const { record, body } of records) {
     if (record.deleted) delete names[record.id];
     else names[record.id] = (body as DeviceBody).name;
   }
-  saveSync({ names });
+  await saveSync({ names });
 }
 
 /** Another phone moved the family to another server: remember where, and follow on the next round (`followMove`). */
-function noteMove(records: Opened[], ownDeviceId: string) {
+async function noteMove(records: Opened[], ownDeviceId: string) {
   const current = syncSettings();
   for (const { record, body } of records) {
     const moved = body as MovedBody | null;
     if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.from !== record.deviceId || moved.familyId === current.familyId) continue;
-    saveSync({ move: moved });
+    await saveSync({ move: moved });
   }
 }
 
