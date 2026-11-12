@@ -207,6 +207,7 @@ export const en = {
   'common.edit': 'Edit',
   'common.undo': 'Undo',
   'common.ok': 'OK',
+  'common.openSettings': 'Open Settings',
 
   // Tabs.
   'tabs.home': 'Home',
@@ -414,6 +415,8 @@ export const en = {
   'photo.shareTitle': 'Share photo',
   'photo.notAvailable': 'Saving is not available here',
   'photo.fileName': 'Subby photo {day}',
+  'photo.cameraOff': 'Camera access is off',
+  'photo.cameraOffText': 'To take a photo, allow Subby to use the camera in Settings. You can still choose one from your library.',
   'photoMenu.take': 'Take photo',
   'photoMenu.choose': 'Choose from library',
   'photoMenu.remove': 'Remove photo',
@@ -1007,6 +1010,7 @@ export const en = {
   'join.scanNew': 'Scan a new code',
   'join.howTo': 'On a phone that already syncs, open Settings → Sync → Add a phone, and scan the code it shows.',
   'join.cameraOnly': 'The camera is only used to read the code.',
+  'join.cameraBlocked': 'Camera access is off for Subby. Allow it in Settings, or paste the code below.',
   'join.allowCamera': 'Allow camera',
   'join.paste': 'Or paste the code',
   'join.useCode': 'Use this code',

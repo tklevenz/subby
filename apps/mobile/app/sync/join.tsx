@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
-import React, { useRef, useState, useSyncExternalStore } from 'react';
-import { AppState, Text, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { AppState, Linking, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimInvite, finishJoin, hasLocalData, joinStatus, type Join } from '../../features/sync/family';
@@ -114,8 +114,14 @@ function useAppActive(): boolean {
 
 function Scan({ onCode }: { onCode: (text: string) => void }) {
   const { width } = useWindowDimensions();
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const active = useAppActive();
+  // Back from the system settings (Android keeps the app running; iOS restarts it): read the permission again.
+  useEffect(() => {
+    if (active) void getPermission();
+  }, [active, getPermission]);
+  // Denied for good: the phone won't ask again, so only the system settings can allow it.
+  const blocked = permission !== null && !permission.granted && !permission.canAskAgain;
   const [pasted, setPasted] = useState('');
   const scanned = useRef(false);
   const size = Math.min(width - 32, 360);
@@ -140,8 +146,12 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
           />
         ) : permission?.granted ? null : (
           <View className="w-full px-6">
-            <Text className="text-ink-soft text-center">{t('join.cameraOnly')}</Text>
-            <Button label={t('join.allowCamera')} onPress={requestPermission} />
+            <Text className="text-ink-soft text-center">{t(blocked ? 'join.cameraBlocked' : 'join.cameraOnly')}</Text>
+            {blocked ? (
+              <Button label={t('common.openSettings')} onPress={() => void Linking.openSettings()} />
+            ) : (
+              <Button label={t('join.allowCamera')} onPress={requestPermission} />
+            )}
           </View>
         )}
       </View>

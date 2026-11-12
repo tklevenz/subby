@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
@@ -27,6 +28,21 @@ const MAX_AVATAR_EDGE = 512;
  * Let the user take or choose a photo and keep a shrunk copy in the app. `square` crops for avatars.
  * Returns null when cancelled or permission is denied.
  */
+/**
+ * Asks for the camera if the phone still can. Denied for good, it offers the system settings instead (choosing
+ * from the library needs no permission). A denial just now stays quiet.
+ */
+async function cameraAllowed(): Promise<boolean> {
+  const current = await ImagePicker.getCameraPermissionsAsync();
+  if (current.granted) return true;
+  if (current.canAskAgain) return (await ImagePicker.requestCameraPermissionsAsync()).granted;
+  Alert.alert(t('photo.cameraOff'), t('photo.cameraOffText'), [
+    { text: t('common.cancel'), style: 'cancel' },
+    { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+  ]);
+  return false;
+}
+
 export async function pickPhoto(source: 'camera' | 'library', square = false): Promise<string | null> {
   const opts: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images'],
@@ -34,7 +50,7 @@ export async function pickPhoto(source: 'camera' | 'library', square = false): P
     quality: 1,
     ...(square ? { allowsEditing: true, aspect: [1, 1] as [number, number] } : {}),
   };
-  if (source === 'camera' && !(await ImagePicker.requestCameraPermissionsAsync()).granted) return null;
+  if (source === 'camera' && !(await cameraAllowed())) return null;
   const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
   const asset = !res.canceled ? res.assets[0] : undefined;
   if (!asset) return null;
