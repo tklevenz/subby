@@ -30,7 +30,7 @@
     "eslint": "^9.0.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.72.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts"
