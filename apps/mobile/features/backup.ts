@@ -103,14 +103,16 @@ export async function previewRestore(contents: BackupContents): Promise<RestoreP
   const logs = await db
     .select({ id: schema.logsTable.id, updatedAt: schema.logsTable.updatedAt, isDeleted: schema.logsTable.isDeleted })
     .from(schema.logsTable);
-  return planRestore(contents.backup, { children: versions(children), logs: versions(logs) });
+  return planRestore(contents.backup, { children: versions(children), logs: versions(logs) }, Date.now());
 }
 
 /**
  * Applies a restore plan: newer rows from the backup replace or add to this phone's, newer deletions delete.
+ * With `revive`, what was deleted here since the backup comes back too (a deleted child with its entries).
  * Everything changed is marked for sync, so other phones get it too.
  */
-export async function restoreBackup(contents: BackupContents, plan: RestorePlan) {
+export async function restoreBackup(contents: BackupContents, plan: RestorePlan, revive: boolean) {
+  if (revive) plan = { ...plan, children: [...plan.children, ...plan.revive.children], logs: [...plan.logs, ...plan.revive.logs] };
   const { photos } = contents;
   // Photos first (new files, so a failed restore only leaves unused files, which are removed).
   const written: string[] = [];

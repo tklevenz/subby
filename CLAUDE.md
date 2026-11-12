@@ -76,7 +76,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
     - An optional passphrase encrypts it: `KLBK` header with scrypt parameters and salt, then `encryptFile`. The parameters are read from the header and bounded (≤ 64 MiB of scrypt memory).
     - Reading unzips only `backup.json` and `photos/<n>.<ext>`, and refuses a zip that would inflate past its size + 64 MiB.
     - `readBackup` validates each row and skips (and counts) bad ones; payloads are checked with `LenientPayloadSchema` (log.schema: each known field's primitive type and required fields, no value checks, unknown fields pass).
-    - `planRestore` uses newest-edit-wins, like sync, after keeping one version per row (the newest, live or deleted).
+    - `planRestore` uses newest-edit-wins, like sync, after keeping one version per row (the newest, live or deleted). What was deleted here since the backup is offered separately (`plan.revive`, dated after the deletion so sync spreads it; an entry only with its child, so a deleted child comes back with its entries), and only restored when the person turns on "Bring them back" in the preview (off by default: with sync it comes back on every phone).
   - `babybuddy`: Baby Buddy record types, `mapRecord` (BB → payload), `detectUnits` (BB stores no units; e.g. weight may be g or kg), `bbRef` import refs.
 
 ### `apps/mobile`

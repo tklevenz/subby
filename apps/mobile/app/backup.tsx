@@ -5,11 +5,12 @@ import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { BackupContents, RestorePlan } from '@subby/shared/domain/backup';
 import { pickBackup, previewRestore, restoreBackup, saveBackup, savesToDownloads, unlockBackup } from '../features/backup';
-import { Button, FieldLabel, TextField, ErrorText, Lead, ScreenTitle, LoaderBlock } from '../components/ui';
+import { Button, FieldLabel, TextField, ErrorText, Hint, Lead, ScreenTitle, LoaderBlock, Toggle } from '../components/ui';
 import { formatDayInline, useFormatTime } from '../store/timeHelpers';
 import { SubLoader, SubProgress } from '../components/brand/loaders';
 import { ScreenScroll } from '../components/ScreenScroll';
 import { useChildStore } from '../store/useChildStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 const MIN_PASSPHRASE = 8;
 
@@ -20,7 +21,7 @@ const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() 
 type Step =
   | { kind: 'home' }
   | { kind: 'locked'; bytes: Uint8Array; name: string }
-  | { kind: 'preview'; contents: BackupContents; plan: RestorePlan; name: string }
+  | { kind: 'preview'; contents: BackupContents; plan: RestorePlan; name: string; revive: boolean }
   | { kind: 'done'; message: string };
 
 /**
@@ -53,7 +54,7 @@ export default function BackupScreen() {
   };
 
   const open = async (contents: BackupContents, name: string) =>
-    setStep({ kind: 'preview', contents, plan: await previewRestore(contents), name });
+    setStep({ kind: 'preview', contents, plan: await previewRestore(contents), name, revive: false });
 
   const choose = () =>
     run(t('backup.reading'), async () => {
@@ -104,9 +105,10 @@ export default function BackupScreen() {
           step={step}
           error={error}
           onCancel={() => setStep({ kind: 'home' })}
+          onRevive={(revive) => setStep({ ...step, revive })}
           onRestore={() =>
             run(t('backup.restoring'), async () => {
-              const r = await restoreBackup(step.contents, step.plan);
+              const r = await restoreBackup(step.contents, step.plan, step.revive);
               setStep({
                 kind: 'done',
                 message: restoredMessage(r),
@@ -223,16 +225,20 @@ function Preview({
   error,
   onCancel,
   onRestore,
+  onRevive,
 }: {
   step: Extract<Step, { kind: 'preview' }>;
   error: string | null;
   onCancel: () => void;
   onRestore: () => void;
+  onRevive: (revive: boolean) => void;
 }) {
   const formatTime = useFormatTime();
   const { backup, photos, invalid } = step.contents;
   const { plan } = step;
-  const changes = plan.children.length + plan.logs.length + plan.deletions.length;
+  const revivable = plan.revive.children.length + plan.revive.logs.length;
+  const changes = plan.children.length + plan.logs.length + plan.deletions.length + (step.revive ? revivable : 0);
+  const syncing = useSettingsStore((s) => s.sync !== null);
   return (
     <>
       <ScreenTitle>{t('backup.restoreThis')}</ScreenTitle>
@@ -247,27 +253,50 @@ function Preview({
       </Lead>
 
       <View className="bg-surface rounded-2xl border border-line px-4 py-3 mt-4">
-        <Line label={t('backup.addChildren')} value={plan.children.length} />
-        <Line label={t('backup.addEntries')} value={plan.logs.length} />
-        {plan.deletions.length ? <Line label={t('backup.deletions')} value={plan.deletions.length} /> : null}
-        <Line label={t('backup.unchanged')} value={plan.unchanged} />
+        <Line label={t('backup.addChildren')} value={formatNumber(plan.children.length + (step.revive ? plan.revive.children.length : 0))} />
+        <Line label={t('backup.addEntries')} value={formatNumber(plan.logs.length + (step.revive ? plan.revive.logs.length : 0))} />
+        {plan.deletions.length ? <Line label={t('backup.deletions')} value={formatNumber(plan.deletions.length)} /> : null}
+        <Line label={t('backup.unchanged')} value={formatNumber(plan.unchanged)} />
+        {revivable ? (
+          <Line
+            label={t('backup.deletedHere')}
+            value={[
+              ...(plan.revive.children.length ? [count(plan.revive.children.length, 'children')] : []),
+              ...(plan.revive.logs.length ? [count(plan.revive.logs.length, 'entries')] : []),
+            ].join(', ')}
+          />
+        ) : null}
       </View>
+      {/* Deleted since the backup: kept deleted unless asked, since with sync they'd come back on every phone. */}
+      {revivable ? (
+        <View className="bg-surface rounded-2xl border border-line px-4 py-3 mt-3">
+          <View className="flex-row items-center">
+            <Text className="flex-1 text-ink">{t('backup.bringBack')}</Text>
+            <Toggle value={step.revive} onValueChange={onRevive} />
+          </View>
+          {syncing ? <Hint>{t('backup.bringBackSync')}</Hint> : null}
+        </View>
+      ) : null}
       {invalid ? (
         <Text className="text-amber-soft text-xs mt-2 ml-1">{t('backup.invalid', { items: count(invalid, 'items') })}</Text>
       ) : null}
       {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
 
-      {changes ? <Button label={t('backup.restore')} onPress={onRestore} /> : <Text className="text-ink-muted mt-4">{t('backup.nothingNew')}</Text>}
-      <Button label={t(changes ? 'common.cancel' : 'common.back')} variant="ghost" onPress={onCancel} />
+      {changes || revivable ? (
+        <Button label={t('backup.restore')} onPress={onRestore} disabled={!changes} />
+      ) : (
+        <Text className="text-ink-muted mt-4">{t('backup.nothingNew')}</Text>
+      )}
+      <Button label={t(changes || revivable ? 'common.cancel' : 'common.back')} variant="ghost" onPress={onCancel} />
     </>
   );
 }
 
-function Line({ label, value }: { label: string; value: number }) {
+function Line({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row py-1">
       <Text className="flex-1 text-ink-soft">{label}</Text>
-      <Text className="text-ink font-semibold">{formatNumber(value)}</Text>
+      <Text className="text-ink font-semibold">{value}</Text>
     </View>
   );
 }

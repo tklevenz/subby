@@ -114,16 +114,18 @@ describe('backup', () => {
       children: new Map([[child.id, { updatedAt: t - 1, isDeleted: false }]]), // older here: restored
       logs: new Map([
         [note.id, { updatedAt: note.updatedAt, isDeleted: false }], // same: unchanged
-        [feed.id, { updatedAt: deletedHere.updatedAt, isDeleted: true }], // deleted here later: stays deleted
+        [feed.id, { updatedAt: deletedHere.updatedAt, isDeleted: true }], // deleted here later: only on request
         [gone.id, { updatedAt: gone.updatedAt - 1, isDeleted: false }], // deleted in the backup later: deleted
       ]),
-    });
+    }, t + 9000);
     expect(plan.children.map((c) => c.id)).toEqual([child.id]);
     expect(plan.logs).toEqual([]);
     expect(plan.deletions.map((d) => d.id)).toEqual([gone.id]);
-    expect(plan.unchanged).toBe(2);
+    expect(plan.unchanged).toBe(1);
+    expect(plan.revive.children).toEqual([]);
+    expect(plan.revive.logs.map((l) => [l.id, l.updatedAt])).toEqual([[feed.id, t + 9000]]);
 
-    const fresh = planRestore(backup, { children: new Map(), logs: new Map() });
+    const fresh = planRestore(backup, { children: new Map(), logs: new Map() }, t);
     expect([fresh.children.length, fresh.logs.length, fresh.deletions.length, fresh.unchanged]).toEqual([1, 2, 0, 0]);
   });
 
@@ -133,12 +135,35 @@ describe('backup', () => {
     const tomb = (updatedAt: number) => ({ kind: 'log' as const, id: live.id, updatedAt });
     const local = { children: new Map(), logs: new Map([[live.id, { updatedAt: live.updatedAt - 10, isDeleted: false }]]) };
     // A newer tombstone wins over the entry: deleted, not restored.
-    const deleted = planRestore({ ...backup, deleted: [tomb(live.updatedAt + 1)] }, local);
+    const deleted = planRestore({ ...backup, deleted: [tomb(live.updatedAt + 1)] }, local, t);
     expect(deleted.logs.map((l) => l.id)).not.toContain(live.id);
     expect(deleted.deletions.map((d) => d.id)).toEqual([live.id]);
     // An older one loses: restored, not deleted afterwards.
-    const restored = planRestore({ ...backup, deleted: [tomb(live.updatedAt - 1)], logs: [...backup.logs, { ...live, updatedAt: live.updatedAt - 5 }] }, local);
+    const restored = planRestore({ ...backup, deleted: [tomb(live.updatedAt - 1)], logs: [...backup.logs, { ...live, updatedAt: live.updatedAt - 5 }] }, local, t);
     expect(restored.logs.filter((l) => l.id === live.id)).toEqual([live]);
     expect(restored.deletions).toEqual([]);
+  });
+
+  it('offers a child deleted since the backup, with its entries, dated after the deletion', () => {
+    const { backup } = readBackup(build());
+    const deletedAt = t + 5000;
+    const tomb = { updatedAt: deletedAt, isDeleted: true };
+    // Deleting a child here turned it and every entry into tombstones.
+    const local = { children: new Map([[child.id, tomb]]), logs: new Map([[note.id, tomb], [feed.id, tomb], [gone.id, tomb]]) };
+    // A clock behind the deletion still dates them after it, so sync doesn't let the deletion win again.
+    const plan = planRestore(backup, local, deletedAt - 60_000);
+    expect(plan.revive.children.map((c) => [c.id, c.updatedAt])).toEqual([[child.id, deletedAt + 1]]);
+    expect(plan.revive.logs.map((l) => l.id).sort()).toEqual([note.id, feed.id].sort());
+    expect([plan.children.length, plan.logs.length, plan.deletions.length, plan.unchanged]).toEqual([0, 0, 0, 1]);
+  });
+
+  it("doesn't offer an entry whose child stays deleted", () => {
+    const { backup } = readBackup(build());
+    const tomb = { updatedAt: t + 5000, isDeleted: true };
+    // The child was deleted in the backup too (no live copy), so its entries have nowhere to go.
+    const withoutChild = { ...backup, children: [] };
+    const plan = planRestore(withoutChild, { children: new Map([[child.id, tomb]]), logs: new Map([[note.id, tomb], [feed.id, tomb]]) }, t + 9000);
+    expect(plan.revive).toEqual({ children: [], logs: [] });
+    expect(plan.unchanged).toBe(2);
   });
 });

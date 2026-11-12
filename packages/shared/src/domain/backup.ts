@@ -222,6 +222,12 @@ export type RestorePlan = {
   deletions: BackupTombstone[];
   /** Rows whose local copy is the same or newer (deletions only count where this phone has the row). */
   unchanged: number;
+  /**
+   * Rows deleted here since the backup, offered to bring back (only if the person asks: with sync they come back
+   * on every phone). Each carries a fresh `updatedAt`, newer than the deletion here, so sync spreads them. Entries
+   * only come with their child: one whose child stays deleted isn't offered.
+   */
+  revive: { children: BackupChild[]; logs: BackupLog[] };
 };
 
 /**
@@ -250,19 +256,41 @@ function latestOnly(backup: Backup): Backup {
   };
 }
 
-/** What a restore would change, given the local versions (live and deleted rows) by id. */
+type LocalVersion = { updatedAt: number; isDeleted: boolean };
+
+/**
+ * What a restore would change, given the local versions (live and deleted rows) by id. `now` dates the rows a
+ * restore would bring back (`revive`).
+ */
 export function planRestore(
   backup: Backup,
-  local: { children: ReadonlyMap<string, { updatedAt: number; isDeleted: boolean }>; logs: ReadonlyMap<string, { updatedAt: number; isDeleted: boolean }> },
+  local: { children: ReadonlyMap<string, LocalVersion>; logs: ReadonlyMap<string, LocalVersion> },
+  now: number,
 ): RestorePlan {
-  const plan: RestorePlan = { children: [], logs: [], deletions: [], unchanged: 0 };
+  const plan: RestorePlan = { children: [], logs: [], deletions: [], unchanged: 0, revive: { children: [], logs: [] } };
   backup = latestOnly(backup);
+  // Deleted here, and the deletion is the same version or newer: the backup's copy can only come back on request.
+  const deletedSince = (row: LocalVersion | undefined): row is LocalVersion => row !== undefined && row.isDeleted;
+  const fresh = <T extends { updatedAt: number }>(row: T, deletion: LocalVersion): T => ({ ...row, updatedAt: Math.max(now, deletion.updatedAt + 1) });
+
+  // Children that are live after a plain restore; with `revive`, the revived ones too.
+  const liveChildren = new Set<string>();
+  const revivedChildren = new Set<string>();
+  for (const [id, c] of local.children) if (!c.isDeleted) liveChildren.add(id);
   for (const c of backup.children) {
-    if (backupWins(local.children.get(c.id), c)) plan.children.push(c);
-    else plan.unchanged++;
+    const row = local.children.get(c.id);
+    if (backupWins(row, c)) {
+      plan.children.push(c);
+      liveChildren.add(c.id);
+    } else if (deletedSince(row)) {
+      plan.revive.children.push(fresh(c, row));
+      revivedChildren.add(c.id);
+    } else plan.unchanged++;
   }
   for (const l of backup.logs) {
-    if (backupWins(local.logs.get(l.id), l)) plan.logs.push(l);
+    const row = local.logs.get(l.id);
+    if (backupWins(row, l)) plan.logs.push(l);
+    else if (deletedSince(row) && (liveChildren.has(l.childId) || revivedChildren.has(l.childId))) plan.revive.logs.push(fresh(l, row));
     else plan.unchanged++;
   }
   for (const t of backup.deleted) {
