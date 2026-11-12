@@ -20,8 +20,9 @@ export default function HistoryScreen() {
   const units = useSettingsStore((s) => s.units);
   const today = startOfDay(now);
   const days = useMemo(() => [anchor], [anchor]);
-  // A day also reads the two before it: last night's sleep and the sleep before the first wake window.
-  const logs = useLogQuery({ from: addDays(anchor, -2), to: addDays(anchor, 1) });
+  // A day also reads the two before it (last night's sleep, the sleep before the first wake window) and the one
+  // after: the rest of a night that started this evening, so its block shows the whole night with every waking.
+  const logs = useLogQuery({ from: addDays(anchor, -2), to: addDays(anchor, 2) });
   const stats = useMemo(() => (logs ? dailyStats(logs, days, now) : null), [logs, days, now]);
   const [picking, setPicking] = useState(false);
   // The + logs on the day shown: another day at the current time of day (never later than now).
