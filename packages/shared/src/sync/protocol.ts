@@ -134,6 +134,12 @@ export const InviteStatusSchema = z.object({ claimKey: b64 });
 export const MAX_RECORD_DATA = 256 * 1024;
 export const MAX_PUSH = 500;
 /**
+ * The newest edit wins, by the writing phone's clock. A record dated further ahead of the server's clock than this
+ * is refused (reported stale, not stored): a phone whose clock runs ahead would otherwise win over every later edit.
+ * It stays pending on that phone until its clock is right again (see `clock.ts`).
+ */
+export const MAX_CLOCK_AHEAD_MS = 24 * 60 * 60 * 1000;
+/**
  * The server's request body limit. MAX_PUSH records of MAX_RECORD_DATA each wouldn't fit, so clients also split a
  * push by size (`pushChunks`).
  */
@@ -195,6 +201,8 @@ export type PullResponse = {
   seq: number;
   more: boolean;
   restored?: { gen: number; seq: number };
+  /** The server's clock (epoch ms), so a phone can tell its own is off (older servers leave it out). */
+  time?: number;
 };
 
 // --- push (hosted) -------------------------------------------------------------------------------------

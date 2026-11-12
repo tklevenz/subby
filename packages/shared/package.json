@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules",
-    "test": "vitest run"
+    "test": "TZ=Europe/Berlin vitest run"
   },
   "dependencies": {
     "@noble/ciphers": "^2.4.0",

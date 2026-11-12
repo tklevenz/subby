@@ -20,6 +20,7 @@ import { accessLabel, AccessCard, AccessDevTools, GiftSlot, PhotoStorage } from 
 import { PRICE, useAccessStore } from '../../features/sync/access';
 import { serverLabel } from '../../features/sync/api';
 import { ScreenScroll } from '../../components/ScreenScroll';
+import { clockOffText } from '../../components/SyncStopped';
 
 /** Sync between phones: set up or join, status, the family's phones, turning it off. */
 export default function SyncScreen() {
@@ -69,8 +70,8 @@ function SetUp() {
 function Status() {
   const sync = useSettingsStore((s) => s.sync)!;
   // Only the fields shown, so a change to the others (lastError, movedTo) doesn't re-render the screen.
-  const { phase, error, pending: waiting, progress, removed, identityLost, tooLarge, members } = useSyncStore(
-    useShallow((s) => ({ phase: s.phase, error: s.error, pending: s.pending, progress: s.progress, removed: s.removed, identityLost: s.identityLost, tooLarge: s.tooLarge, members: s.members })),
+  const { phase, error, pending: waiting, progress, removed, identityLost, tooLarge, clockOff, members } = useSyncStore(
+    useShallow((s) => ({ phase: s.phase, error: s.error, pending: s.pending, progress: s.progress, removed: s.removed, identityLost: s.identityLost, tooLarge: s.tooLarge, clockOff: s.clockOff, members: s.members })),
   );
   // Entries too large to sync stay pending; they're reported on their own, not as "waiting".
   const pending = Math.max(0, waiting - tooLarge);
@@ -136,6 +137,7 @@ function Status() {
         <Row label={t('syncScreen.move')} onPress={() => router.push('/sync/move')} right={<Chevron />} />
       </Card>
       {phase === 'error' && error ? <ErrorText className="mt-3 ml-1">{error}</ErrorText> : null}
+      {clockOff !== null ? <WarningText className="mt-3 ml-1">{clockOffText(clockOff)}</WarningText> : null}
       {tooLarge ? (
         <WarningText className="mt-3 ml-1">
           {t('syncScreen.tooLarge', { count: tooLarge })}

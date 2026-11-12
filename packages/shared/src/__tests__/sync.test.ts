@@ -136,3 +136,23 @@ describe('invite code', () => {
     expect(() => decodeInviteQr('https://example.com')).toThrow('Not a Subby code');
   });
 });
+
+describe('clock offset', async () => {
+  const { clockOff, clockOffset, CLOCK_WARN_MS } = await import('../sync');
+  it('measures against the middle of the round trip', () => {
+    expect(clockOffset(10_000, 11_000, 10_500)).toBe(0);
+    expect(clockOffset(10_000, 11_000, 10_500 - 3_600_000)).toBe(3_600_000); // an hour ahead
+    expect(clockOffset(10_000, 11_000, 10_500 + 60_000)).toBe(-60_000); // a minute behind
+  });
+  it("says nothing when the server didn't, or the answer was too slow to tell", () => {
+    expect(clockOffset(10_000, 11_000, undefined)).toBeNull();
+    expect(clockOffset(10_000, 50_000, 0)).toBeNull();
+    expect(clockOffset(10_000, 9_000, 0)).toBeNull();
+  });
+  it('warns only past a few minutes, either way', () => {
+    expect(clockOff(null)).toBeNull();
+    expect(clockOff(CLOCK_WARN_MS)).toBeNull();
+    expect(clockOff(-CLOCK_WARN_MS - 1)).toBe(-CLOCK_WARN_MS - 1);
+    expect(clockOff(3_600_000)).toBe(3_600_000);
+  });
+});

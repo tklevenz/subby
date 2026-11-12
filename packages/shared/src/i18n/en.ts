@@ -851,6 +851,7 @@ export const en = {
   'sync.error.removed': 'This phone is no longer in the family',
   'sync.error.identityLost': 'This phone has to join the family again',
   'sync.removedBody': 'Sync stopped on this phone. Everything on it stays here.',
+  'sync.clockOff': "This phone's clock is off by {span}. Set the date and time to automatic, or changes may get lost when syncing.",
   'home.syncStoppedOpen': 'See what to do',
   'sync.error.noKey': 'Missing the current family key',
   'sync.error.notSetUp': 'Sync is not set up on this phone',

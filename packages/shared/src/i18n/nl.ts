@@ -796,6 +796,7 @@ export const nl: Translation = {
   'sync.error.removed': 'Deze telefoon hoort niet meer bij het gezin',
   'sync.error.identityLost': 'Deze telefoon moet opnieuw bij de familie komen',
   'sync.removedBody': 'Synchronisatie is gestopt op deze telefoon. Alles erop blijft hier.',
+  'sync.clockOff': "De klok van deze telefoon loopt {span} verkeerd. Zet datum en tijd op automatisch, anders kunnen wijzigingen verloren gaan bij het synchroniseren.",
   'home.syncStoppedOpen': 'Bekijk wat je kunt doen',
   'sync.error.noKey': 'De huidige gezinssleutel ontbreekt',
   'sync.error.notSetUp': 'Synchronisatie is niet ingesteld op deze telefoon',

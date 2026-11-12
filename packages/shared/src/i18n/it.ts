@@ -796,6 +796,7 @@ export const it: Translation = {
   'sync.error.removed': 'Questo telefono non fa più parte della famiglia',
   'sync.error.identityLost': 'Questo telefono deve unirsi di nuovo alla famiglia',
   'sync.removedBody': 'La sincronizzazione si è fermata su questo telefono. Tutto ciò che contiene resta qui.',
+  'sync.clockOff': "L’orologio di questo telefono è sfasato di {span}. Imposta data e ora in automatico, altrimenti alcune modifiche potrebbero andare perse durante la sincronizzazione.",
   'home.syncStoppedOpen': 'Vedi cosa fare',
   'sync.error.noKey': 'Manca la chiave attuale della famiglia',
   'sync.error.notSetUp': 'La sincronizzazione non è configurata su questo telefono',

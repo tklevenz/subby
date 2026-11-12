@@ -62,6 +62,7 @@ export async function diagnostics(now = Date.now()): Promise<string> {
       `Last background run: ${s.sync.lastBackground ? `${when(s.sync.lastBackground.at, now)}, ${s.sync.lastBackground.via}, ${s.sync.lastBackground.ok ? 'ok' : 'failed'}` : 'none yet'}`,
       `Last error: ${sync.lastError ? `${sync.lastError.message}, ${when(sync.lastError.at, now)}` : 'none since the app started'}`,
       `Waiting to upload: ${sync.pending}${sync.tooLarge ? `, too large for the server: ${sync.tooLarge}` : ''}`,
+      `Clock: ${sync.clockOff === null ? 'ok' : `${Math.round(sync.clockOff / 60_000)} min ${sync.clockOff > 0 ? 'ahead' : 'behind'}`}`,
       `Pulled up to: ${s.sync.lastSeq}${s.sync.restoreGen ? `, server restores seen: ${s.sync.restoreGen}` : ''}`,
       `Phones in the family: ${sync.members.length}, recovery key: ${sync.hasRecovery ? 'yes' : 'no'}`,
       `Push: ${s.sync.push ? (s.sync.pushToken ? 'on, registered' : 'on, not registered') : 'off'}`,

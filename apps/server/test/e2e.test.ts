@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@subby/shared/crypto';
-import { openRecord, type EntitlementResponse } from '@subby/shared/sync';
+import { MAX_CLOCK_AHEAD_MS, openRecord, type EntitlementResponse, type PullResponse } from '@subby/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
@@ -312,6 +312,28 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(openRecord(a.familyKeys, older.newer[0])).toEqual({ v: 'new' });
     const pulled = await a.pull();
     expect(pulled.filter((p) => p.record.id === id).at(-1)!.body).toEqual({ v: 'new' });
+  });
+
+  it("refuses edits dated far ahead (a phone's clock running fast) and tells phones its own time", async () => {
+    const { a, b } = await pairedFamily();
+    const id = randomUUID();
+    const now = Date.now();
+    await a.push([a.seal('log', id, { v: 'right' }, { updatedAt: now })]);
+    // A year ahead: it would beat every later edit, so it's refused like a stale one and stays on that phone.
+    const ahead = await b.push([b.seal('log', id, { v: 'ahead' }, { updatedAt: now + 365 * 24 * 3_600_000 })]);
+    expect(ahead).toMatchObject({ accepted: [], stale: [id] });
+    expect(openRecord(b.familyKeys, ahead.newer[0]!)).toEqual({ v: 'right' });
+    // A new record dated ahead is refused too; a few hours ahead still syncs.
+    const fresh = randomUUID();
+    expect((await b.push([b.seal('log', fresh, { v: 'x' }, { updatedAt: now + MAX_CLOCK_AHEAD_MS + 60_000 })])).stale).toEqual([fresh]);
+    expect((await b.push([b.seal('log', fresh, { v: 'x' }, { updatedAt: now + 3 * 3_600_000 })])).accepted).toEqual([fresh]);
+    // Fixed: dated now, it goes through.
+    expect((await b.push([b.seal('log', id, { v: 'fixed' }, { updatedAt: Date.now() + 1 })])).accepted).toEqual([id]);
+
+    const before = Date.now();
+    const page = await a.request<PullResponse>('GET', '/v1/sync/pull?since=0');
+    expect(page.time).toBeGreaterThanOrEqual(before);
+    expect(page.time).toBeLessThanOrEqual(Date.now());
   });
 
   it('deletes data on the server: tombstones carry only a sealed empty body', async () => {

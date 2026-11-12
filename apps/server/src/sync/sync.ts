@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, Inject, Injectable, Post, Query, UseGuards } from '@nestjs/common';
 import { and, asc, eq, gt, inArray } from 'drizzle-orm';
-import { PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@subby/shared/sync';
+import { MAX_CLOCK_AHEAD_MS, PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { parse, queryInt } from '../common/validate';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
@@ -59,8 +59,11 @@ export class SyncService {
       let seq = family.seq;
       const accepted: SyncRecord[] = [];
       const stale: string[] = [];
+      // Dated far ahead: the phone's clock is wrong, and the edit would win over every later one. Refused like a
+      // stale one; it stays pending on the phone, which dates it again once its clock is right.
+      const latest = Date.now() + MAX_CLOCK_AHEAD_MS;
       for (const r of records) {
-        if (!serverAccepts(stored.get(r.id) ?? null, r)) {
+        if (r.updatedAt > latest || !serverAccepts(stored.get(r.id) ?? null, r)) {
           stale.push(r.id);
           continue;
         }
@@ -112,7 +115,7 @@ export class SyncService {
     // Nothing new: the family's latest seq, which is below `since` if this server lost data the phone has.
     const seq = page.at(-1)?.seq ?? Math.min(since, family?.seq ?? since);
     const restored = family?.restoreGen ? { gen: family.restoreGen, seq: family.restoredSeq ?? 0 } : undefined;
-    return { records: page, seq, more: rows.length > limit, ...(restored ? { restored } : {}) };
+    return { records: page, seq, more: rows.length > limit, ...(restored ? { restored } : {}), time: Date.now() };
   }
 }
 

@@ -56,8 +56,9 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD.
     - Tombstones carry a sealed empty body: no content stays on the server, but a server can't delete on its own. `openRecord` throws `UnsealedRecordError` for one without data (older apps sent those); phones skip them.
   - `merge`: last-writer-wins with a device-id tie-break, the same rule on server and client.
+  - `clock`: last-writer-wins goes by phone clocks, so a wrong one loses edits. Pulls carry the server's `time`; `clockOffset`/`clockOff` (> 5 min) set `useSyncStore.clockOff`, shown on Home (`SyncStopped`) and the Sync screen. The server refuses records dated more than `MAX_CLOCK_AHEAD_MS` (a day) ahead as stale; the app re-dates pending rows from the future before pushing (`redateFutureEdits`).
   - Plan: `~/.claude/plans/let-s-analyze-the-current-precious-scroll.md` (Phase 2).
-- `src/domain/`: pure, RN-free helpers. Put new business logic here and test it with vitest (`src/__tests__`).
+- `src/domain/`: pure, RN-free helpers. Put new business logic here and test it with vitest (`src/__tests__`). The tests run with `TZ=Europe/Berlin` (package.json), so `dst.test.ts` and other DST cases cross real clock changes on any machine. Time rules: store epoch ms, measure durations as differences, step days with `addDays`/`startOfDay` (never + 24 h), read habits off the wall clock.
   - `units` (`formatDose`: "1 drop"), `time` (`formatDuration` for live timers, with seconds; `formatSpan` for finished entries, no seconds from a minute up; a zero part is dropped: "2h"), `summary`, `validate` (`isCompletePayload` gates Save).
   - `feedTimer`: breastfeeding L/R timer state lives in the feed payload (`timerSide`, `timerSideSince`); `toggleSide`/`pauseFeed`.
   - `recent` (food/medication suggestions, `medicationsDue` (with the last dose, to log the next like it), `pumpingDue` (the pumping reminder's time)), `milestones` (bundled checklist).

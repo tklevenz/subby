@@ -796,6 +796,7 @@ export const de: Translation = {
   'sync.error.removed': 'Dieses Handy gehört nicht mehr zur Familie',
   'sync.error.identityLost': 'Dieses Handy muss der Familie neu beitreten',
   'sync.removedBody': 'Sync wurde auf diesem Handy beendet. Alles darauf bleibt hier.',
+  'sync.clockOff': "Die Uhr dieses Handys geht um {span} falsch. Stell Datum und Uhrzeit auf automatisch, sonst können beim Synchronisieren Änderungen verloren gehen.",
   'home.syncStoppedOpen': 'Was jetzt zu tun ist',
   'sync.error.noKey': 'Der aktuelle Familienschlüssel fehlt',
   'sync.error.notSetUp': 'Sync ist auf diesem Handy nicht eingerichtet',

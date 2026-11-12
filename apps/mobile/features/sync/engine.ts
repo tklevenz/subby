@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../errorMessage';
 import * as Device from 'expo-device';
-import { and, count, eq, notInArray } from 'drizzle-orm';
+import { and, count, eq, gt, notInArray } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { uuidv7 } from 'uuidv7';
 import type { Child, LogEntry } from '@subby/shared';
@@ -20,7 +20,7 @@ import {
   type DeviceLogState,
   type RestoreFloor,
 } from '@subby/shared/crypto';
-import { MAX_RECORD_DATA, pageContinues, pushChunks, serverWentBack, settlePush, sealRecord, type SyncRecord } from '@subby/shared/sync';
+import { MAX_RECORD_DATA, clockOff, clockOffset, pageContinues, pushChunks, serverWentBack, settlePush, sealRecord, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
@@ -377,6 +377,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     const skip = [...tooLarge, ...held];
     return skip.length ? [notInArray(t.id, skip)] : [];
   };
+  if (await redateFutureEdits()) applied = true;
 
   for (;;) {
     // Children first, so a fresh device sees a child before its entries.
@@ -434,6 +435,20 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
 }
 
 /**
+ * Edits made while this phone's clock ran ahead, now that it's right again: dated now, so the server takes them
+ * (it refuses ones dated far ahead) and they don't win over every later edit. Returns whether any were.
+ */
+async function redateFutureEdits() {
+  const now = Date.now();
+  let changed = false;
+  for (const table of [schema.childrenTable, schema.logsTable]) {
+    const res = await db.update(table).set({ updatedAt: now }).where(and(eq(table.syncStatus, 'pending'), gt(table.updatedAt, now)));
+    if (res.changes) changed = true;
+  }
+  return changed;
+}
+
+/**
  * Pulls every page since `since` and applies it. Returns whether anything changed locally. Records that can't be
  * genuine are skipped: a seq outside the page asked for, or one of an old epoch past the seq the log closed it at
  * (written with a key a removed phone still has, and stored by a server that shouldn't have).
@@ -443,8 +458,11 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
   let applied = false;
   let again = false;
   let done = 0;
-  for (;;) {
+  for (let first = true; ; first = false) {
+    const sentAt = Date.now();
     const page = await api.pull(seq);
+    // The newest edit wins by phone clocks: a clock that's off loses this phone's edits, or others'. Say so.
+    if (first) useSyncStore.setState({ clockOff: clockOff(clockOffset(sentAt, Date.now(), page.time)) });
     const gen = page.restored?.gen ?? 0;
     const seenGen = syncSettings()?.restoreGen ?? 0;
     // Restored from a backup (or behind this phone without saying so): the server gets back what it lost, and

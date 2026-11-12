@@ -22,6 +22,8 @@ export type SyncStatus = {
   hasRecovery: boolean;
   /** Local changes too large for the server, left unsynced (a very long note). */
   tooLarge: number;
+  /** How far this phone's clock is off the server's (ms, positive: ahead), when it's enough to lose edits. */
+  clockOff: number | null;
   /** The family just moved to this server (this phone followed): shown once. */
   movedTo: string | null;
   /** The last run that failed, kept after later runs succeed (for diagnostics). */
@@ -41,6 +43,7 @@ export const INITIAL_STATUS: SyncStatus = {
   identityLost: false,
   hasRecovery: false,
   tooLarge: 0,
+  clockOff: null,
   movedTo: null,
   lastError: null,
 };

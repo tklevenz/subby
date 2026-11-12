@@ -796,6 +796,7 @@ export const ptBR: Translation = {
   'sync.error.removed': 'Este celular não faz mais parte da família',
   'sync.error.identityLost': 'Este celular precisa entrar na família de novo',
   'sync.removedBody': 'A sincronização parou neste celular. Tudo o que está nele continua aqui.',
+  'sync.clockOff': "O relógio deste celular está com {span} de diferença. Coloque a data e a hora no automático, senão alterações podem se perder ao sincronizar.",
   'home.syncStoppedOpen': 'Ver o que fazer',
   'sync.error.noKey': 'Falta a chave atual da família',
   'sync.error.notSetUp': 'A sincronização não está configurada neste celular',
