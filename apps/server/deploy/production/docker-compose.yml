@@ -36,7 +36,7 @@ services:
       TEST_PURCHASES: "0"
       NODE_OPTIONS: --max-old-space-size=320
     volumes:
-      # The Firebase service-account key for push (FCM_SERVICE_ACCOUNT=/secrets/firebase.json).
+      # The push keys: Firebase (FCM_SERVICE_ACCOUNT=/secrets/firebase.json) and APNs (APNS_KEY=/secrets/apns.p8).
       - ./secrets:/secrets:ro
     # No published port: only Caddy, on the compose network, reaches the server.
     depends_on:

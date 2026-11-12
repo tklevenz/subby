@@ -75,8 +75,7 @@ export class FamiliesService {
       await this.afterDelete(auth.familyId, deleted);
       return result;
     }
-    // iOS tokens are APNs tokens: not sent to yet (like every push).
-    if (wake?.platform === 'android') this.push.wakeRemoved(wake);
+    if (wake) this.push.wakeRemoved(wake);
     if (entry.type === 'remove') this.live.closeDevice(auth.familyId, entry.deviceId);
     this.live.publish(auth.familyId, { type: 'log', index: entry.index });
     return result;

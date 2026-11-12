@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { serviceAccountFrom, type GoogleServiceAccount } from './common/google';
 import { APPLE_ROOT_CA_G3 } from './purchases/appleRoot';
+import type { ApnsConfig } from './push/apns';
 
 export type Config = {
   databaseUrl: string;
@@ -10,8 +11,10 @@ export type Config = {
   migrationsFolder: string;
   /** Where encrypted files (photos) go: a local folder, or S3-compatible object storage. */
   blobs: BlobStoreConfig;
-  /** Background "sync now" pings through Firebase Cloud Messaging. On by default for hosted. */
+  /** Background "sync now" pings through Firebase Cloud Messaging (Android). On by default for hosted. */
   push: { kind: 'none' } | FcmConfig;
+  /** The same through Apple's push service (iOS), when an APNs key is given (`APNS_KEY`). */
+  apns?: ApnsConfig | null;
   /** Per-client request limits (`common/rateLimit.ts`). On unless RATE_LIMIT=off. */
   rateLimit: boolean;
   /**
@@ -88,6 +91,20 @@ function pushConfig(env: NodeJS.ProcessEnv, mode: Config['mode']): Config['push'
   };
 }
 
+/** An APNs auth key: `APNS_KEY` (path to the .p8), `APNS_KEY_ID` and `APNS_TEAM_ID`; all or none. */
+function apnsConfig(env: NodeJS.ProcessEnv): ApnsConfig | null {
+  if (!env.APNS_KEY) return null;
+  if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID) throw new Error('APNS_KEY_ID and APNS_TEAM_ID are required with APNS_KEY');
+  return {
+    keyId: env.APNS_KEY_ID,
+    teamId: env.APNS_TEAM_ID,
+    privateKey: readFileSync(env.APNS_KEY, 'utf8'),
+    topic: env.APNS_TOPIC || 'baby.subby.app',
+    url: env.APNS_URL || 'https://api.push.apple.com',
+    sandboxUrl: env.APNS_SANDBOX_URL || 'https://api.sandbox.push.apple.com',
+  };
+}
+
 export type BlobStoreConfig =
   | { kind: 'disk'; dir: string }
   | { kind: 's3'; bucket: string; region: string; endpoint?: string; accessKeyId?: string; secretAccessKey?: string };
@@ -122,6 +139,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, migrationsFolder: string): Co
     migrationsFolder,
     blobs: blobStoreConfig(env),
     push: pushConfig(env, mode),
+    apns: apnsConfig(env),
     rateLimit: env.RATE_LIMIT !== 'off',
     trustProxy: trustProxy(env.TRUST_PROXY),
     stores: storesConfig(env),

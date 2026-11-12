@@ -7,6 +7,7 @@ import { DB, schema, type Db } from '../db/db';
 import { parse } from '../common/validate';
 import { Metrics } from '../common/metrics';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
+import { ApnsSender } from './apns';
 import type { AuthContext } from '../auth/auth.service';
 
 /** Writes within this window become one ping per phone. */
@@ -15,14 +16,16 @@ const COALESCE_MS = 2000;
 /**
  * Wakes the family's other phones with a content-free "sync now" push when new data arrives, so they sync (and
  * re-plan reminders) in the background. The ping carries no data; the phone pulls the encrypted records itself.
- * Sent straight to Firebase Cloud Messaging, which sees the push token and the timing. Only phones running an app
- * built with the same Firebase project can be reached (so the official app needs the official server).
+ * Sent straight to Firebase Cloud Messaging (Android) or Apple's push service (iOS, a background push), which see
+ * the push token and the timing. Only phones running an app built with the same Firebase project, or the same
+ * Apple team and bundle id, can be reached (so the official app needs the official server).
  */
 @Injectable()
 export class PushService implements OnModuleDestroy {
   /** Per family: the devices that wrote since the last ping, and the pending timer. */
   private readonly pending = new Map<string, { writers: Set<string>; timer: NodeJS.Timeout }>();
   private readonly auth: GoogleAuth | null;
+  private readonly apns: ApnsSender | null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -31,19 +34,26 @@ export class PushService implements OnModuleDestroy {
   ) {
     const fcm = config.push;
     this.auth = fcm.kind === 'fcm' ? new GoogleAuth(fcm, 'https://www.googleapis.com/auth/firebase.messaging') : null;
+    this.apns = config.apns ? new ApnsSender(config.apns) : null;
   }
 
   get enabled() {
-    return this.config.push.kind === 'fcm';
+    return this.auth !== null || this.apns !== null;
+  }
+
+  /** Whether tokens of this platform can be sent to. */
+  private reaches(platform: string) {
+    return platform === 'ios' ? this.apns !== null : this.auth !== null;
   }
 
   onModuleDestroy() {
+    this.apns?.close();
     for (const { timer } of this.pending.values()) clearTimeout(timer);
     this.pending.clear();
   }
 
   async register(auth: AuthContext, token: string, platform: 'android' | 'ios') {
-    if (!this.enabled) return; // nothing would be sent, so don't keep the token
+    if (!this.reaches(platform)) return; // nothing would be sent, so don't keep the token
     const row = { deviceId: auth.deviceId, familyId: auth.familyId, token, platform, updatedAt: Date.now() };
     await this.db.insert(schema.pushTokens).values(row).onConflictDoUpdate({ target: schema.pushTokens.deviceId, set: row });
   }
@@ -76,19 +86,11 @@ export class PushService implements OnModuleDestroy {
 
   /** Sends now (also used by tests instead of waiting for the coalescing window). Returns how many were sent. */
   async send(familyId: string, skipDevice: string | null) {
-    const fcm = this.config.push;
-    if (fcm.kind !== 'fcm') return 0;
-    // iOS tokens are APNs tokens: not sent to yet.
+    if (!this.enabled) return 0;
     const tokens = await this.db
-      .select({ deviceId: schema.pushTokens.deviceId, token: schema.pushTokens.token })
+      .select({ deviceId: schema.pushTokens.deviceId, token: schema.pushTokens.token, platform: schema.pushTokens.platform })
       .from(schema.pushTokens)
-      .where(
-        and(
-          eq(schema.pushTokens.familyId, familyId),
-          eq(schema.pushTokens.platform, 'android'),
-          ...(skipDevice ? [ne(schema.pushTokens.deviceId, skipDevice)] : []),
-        ),
-      );
+      .where(and(eq(schema.pushTokens.familyId, familyId), ...(skipDevice ? [ne(schema.pushTokens.deviceId, skipDevice)] : [])));
     return this.deliver(tokens);
   }
 
@@ -96,20 +98,28 @@ export class PushService implements OnModuleDestroy {
    * Wakes a phone that another one just removed (its token is already gone from the table), so it syncs, finds
    * out and tells its owner, instead of only noticing whenever it next runs. Nothing about the family is sent.
    */
-  wakeRemoved(token: { deviceId: string; token: string }) {
-    if (this.config.push.kind !== 'fcm') return;
+  wakeRemoved(token: PushToken) {
+    if (!this.reaches(token.platform)) return;
     void this.deliver([token]).catch((e: unknown) => {
       this.metrics.count('push_error');
       console.warn('Push failed', e);
     });
   }
 
-  private async deliver(tokens: { deviceId: string; token: string }[]) {
-    const fcm = this.config.push;
-    if (fcm.kind !== 'fcm' || !tokens.length) return 0;
-    const access = await this.auth!.token();
+  private async deliver(all: PushToken[]) {
+    // Tokens of a platform this server can't send to (iOS without an APNs key, Android without FCM) stay.
+    const tokens = all.filter((t) => this.reaches(t.platform));
+    if (!tokens.length) return 0;
     const results = await Promise.all(
       tokens.map(async (t) => {
+        if (t.platform === 'ios') {
+          const res = await this.apns!.wake(t.token);
+          if (!res.sent && !res.gone) console.warn(`APNs answered ${res.status} ${res.reason ?? ''}`);
+          return { ...t, sent: res.sent, gone: !res.sent && res.gone };
+        }
+        const fcm = this.config.push;
+        if (fcm.kind !== 'fcm') return { ...t, sent: false, gone: false };
+        const access = await this.auth!.token();
         // Data-only and high priority: nothing is shown, and Android lets the app run its task right away.
         const res = await fetch(fcm.sendUrl, {
           method: 'POST',
@@ -132,6 +142,8 @@ export class PushService implements OnModuleDestroy {
     return results.filter((r) => r.sent).length;
   }
 }
+
+type PushToken = { deviceId: string; token: string; platform: string };
 
 @Controller('v1/push')
 @UseGuards(DeviceGuard)

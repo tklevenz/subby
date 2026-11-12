@@ -1,5 +1,6 @@
 import { createVerify, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
+import { createServer as createHttp2Server, type Http2Server } from 'node:http2';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +65,41 @@ describe.skipIf(!reachable)('sync server', () => {
   let pushServer: Server;
   let pushUrl = '';
 
+  /**
+   * A stand-in for APNs (cleartext HTTP/2), production and sandbox: checks the ES256 provider token and records
+   * background pushes. Tokens containing "sandbox" are only known in the sandbox, "gone" ones are unregistered (410).
+   */
+  const apnsKey = generateKeyPairSync('ec', { namedCurve: 'P-256', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+  const apnsPushed: { to: string; sandbox: boolean; headers: Record<string, unknown>; body: unknown }[] = [];
+  const apnsServers: Http2Server[] = [];
+  const fakeApns = async (sandbox: boolean) => {
+    const server = createHttp2Server((req, res) => {
+      let raw = '';
+      req.on('data', (c: Buffer) => (raw += c.toString()));
+      req.on('end', () => {
+        const [head, claims, sig] = String(req.headers.authorization ?? '').replace(/^bearer /, '').split('.');
+        const valid =
+          Boolean(sig) &&
+          createVerify('SHA256').update(`${head}.${claims}`).verify({ key: apnsKey.publicKey, dsaEncoding: 'ieee-p1363' }, sig!, 'base64url') &&
+          (JSON.parse(Buffer.from(claims!, 'base64url').toString()) as { iss: string }).iss === 'TEAM123456' &&
+          (JSON.parse(Buffer.from(head!, 'base64url').toString()) as { kid: string }).kid === 'KEY1234567';
+        const token = decodeURIComponent(req.url.replace('/3/device/', ''));
+        const answer = (status: number, reason?: string) => {
+          res.statusCode = status;
+          res.end(reason ? JSON.stringify({ reason }) : '');
+        };
+        if (!valid) return answer(403, 'InvalidProviderToken');
+        if (token.includes('sandbox') !== sandbox) return answer(400, 'BadDeviceToken');
+        apnsPushed.push({ to: token, sandbox, headers: { ...req.headers }, body: JSON.parse(raw) });
+        if (token.includes('gone')) return answer(410, 'Unregistered');
+        answer(200);
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    apnsServers.push(server);
+    return `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  };
+
   beforeAll(async () => {
     pushServer = createServer((req, res) => {
       let raw = '';
@@ -89,6 +125,8 @@ describe.skipIf(!reachable)('sync server', () => {
       });
     });
     await new Promise<void>((resolve) => pushServer.listen(0, '127.0.0.1', resolve));
+    const apnsUrl = await fakeApns(false);
+    const apnsSandboxUrl = await fakeApns(true);
     const address = pushServer.address() as { port: number };
     pushUrl = `http://127.0.0.1:${address.port}`;
     await admin.unsafe(`create database ${dbName}`);
@@ -112,6 +150,7 @@ describe.skipIf(!reachable)('sync server', () => {
         tokenUri: `${pushUrl}/token`,
         sendUrl: `${pushUrl}/send`,
       },
+      apns: { keyId: 'KEY1234567', teamId: 'TEAM123456', privateKey: apnsKey.privateKey, topic: 'baby.subby.app', url: apnsUrl, sandboxUrl: apnsSandboxUrl },
     });
     await app.listen({ port: 0, host: '127.0.0.1' });
     url = await app.getUrl();
@@ -120,6 +159,7 @@ describe.skipIf(!reachable)('sync server', () => {
 
   afterAll(async () => {
     pushServer?.close();
+    for (const s of apnsServers) s.close();
     await app?.close();
     await db?.end();
     await admin.unsafe(`drop database if exists ${dbName} with (force)`);
@@ -719,11 +759,40 @@ describe.skipIf(!reachable)('sync server', () => {
       expect(pushed.some((m) => m.to === tokenD)).toBe(false);
     });
 
-    it('keeps iOS tokens but sends only to Android ones (no APNs yet)', async () => {
+    it('wakes iPhones with a content-free background push through APNs', async () => {
       const { a, b } = await pairedFamily();
-      await register(b, `apns-${randomUUID()}`, 'ios');
+      const tokenB = `apns-${randomUUID()}`;
+      await register(b, tokenB, 'ios');
+      await a.push([a.seal('log', randomUUID(), { secret: 'Zebediah' })]);
+      await until(() => apnsPushed.some((m) => m.to === tokenB), 5000);
+      const toB = apnsPushed.filter((m) => m.to === tokenB);
+      expect(toB).toHaveLength(1);
+      expect(toB[0]).toMatchObject({
+        sandbox: false,
+        headers: { 'apns-push-type': 'background', 'apns-priority': '5', 'apns-topic': 'baby.subby.app' },
+        body: { aps: { 'content-available': 1 }, kind: 'sync' },
+      });
+      expect(JSON.stringify(toB)).not.toMatch(/Zebediah/);
+    });
+
+    it('tries the sandbox for tokens of development builds, and drops unregistered ones', async () => {
+      const { a, b } = await pairedFamily();
+      const dev = `apns-sandbox-${randomUUID()}`;
+      await register(b, dev, 'ios');
+      expect(await app.get(PushService).send(a.familyId, a.deviceId)).toBe(1);
+      expect(apnsPushed.filter((m) => m.to === dev).map((m) => m.sandbox)).toEqual([true]);
+      expect(await tokensOf(a.familyId)).toEqual([dev]);
+      await register(b, `apns-gone-${randomUUID()}`, 'ios');
       expect(await app.get(PushService).send(a.familyId, a.deviceId)).toBe(0);
-      expect(await tokensOf(a.familyId)).toHaveLength(1);
+      expect(await tokensOf(a.familyId)).toEqual([]);
+    });
+
+    it('wakes a removed iPhone too', async () => {
+      const { a, b } = await pairedFamily();
+      const tokenB = `apns-${randomUUID()}`;
+      await register(b, tokenB, 'ios');
+      await a.removeDevice(b.deviceId);
+      await until(() => apnsPushed.some((m) => m.to === tokenB), 5000);
     });
 
     it('a phone can replace or remove its token', async () => {

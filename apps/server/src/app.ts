@@ -39,7 +39,7 @@ class InfoController {
       service: 'subby-sync',
       protocol: PROTOCOL_VERSION,
       mode: this.config.mode,
-      push: this.config.push.kind !== 'none',
+      push: this.config.push.kind !== 'none' || Boolean(this.config.apns),
       // Dev builds of the app offer the pretend store only when the server takes it.
       testPurchases: this.config.mode === 'hosted' && this.config.stores.test,
     };

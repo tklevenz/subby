@@ -39,6 +39,10 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       PUSH: ${PUSH:-}
       FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      APNS_KEY: ${APNS_KEY:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_TOPIC: ${APNS_TOPIC:-}
       RATE_LIMIT: ${RATE_LIMIT:-}
       GOOGLE_PLAY_SERVICE_ACCOUNT: ${GOOGLE_PLAY_SERVICE_ACCOUNT:-}
       GOOGLE_PLAY_PACKAGE: ${GOOGLE_PLAY_PACKAGE:-}
@@ -49,7 +53,8 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
       - blobs:/data
-      # Put the Firebase service-account key here for PUSH=fcm (FCM_SERVICE_ACCOUNT=/secrets/firebase.json).
+      # Put the Firebase service-account key here for PUSH=fcm (FCM_SERVICE_ACCOUNT=/secrets/firebase.json),
+      # and the APNs key for iOS push (APNS_KEY=/secrets/apns.p8).
       - ./secrets:/secrets:ro
     ports:
       # With the https profile, set HTTP_BIND=127.0.0.1 so plain HTTP isn't reachable from outside (Caddy talks

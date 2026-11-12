@@ -135,6 +135,7 @@ A slot belongs to the family, so it covers its phones through reinstalls and re-
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | for `BLOB_STORE=s3`, any S3-compatible storage |
 | `PUSH` | `none` (`fcm` when hosted) | background "sync now" pings via Firebase Cloud Messaging |
 | `FCM_SERVICE_ACCOUNT` | | for `PUSH=fcm`: path to the Firebase service-account key (`/secrets/firebase.json`, from `./secrets`) |
+| `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID` | | iOS push: path to an APNs auth key (`/secrets/apns.p8`), its key id and the team id. `APNS_TOPIC` (`baby.subby.app`) is the app's bundle id |
 | `RATE_LIMIT` | `on` | per-client request limits (429 past them; generous, to stop scripts) or `off` |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT` | | hosted only: a Google service account with access to the app in the Play Console, for checking purchases and refunds (`/secrets/play.json`) |
 | `GOOGLE_PLAY_PACKAGE`, `APPLE_BUNDLE_ID` | `baby.subby.app` | hosted only: the app whose purchases count |
@@ -146,7 +147,9 @@ A slot belongs to the family, so it covers its phones through reinstalls and re-
 Without push, phones sync while the app is open, and in the background as often as the phone allows (roughly
 every 15 minutes or more). Push only reaches app builds made with the same Firebase project as the key, so the
 store app can't be pushed to from a self-hosted server; if you build the app yourself with your own
-`google-services.json`, `PUSH=fcm` with your project's key works. iOS (APNs) isn't sent to yet.
+`google-services.json`, `PUSH=fcm` with your project's key works. iPhones are reached the same way with an APNs key
+from the team that signs the app (a background push, which iOS may delay or skip when the phone is saving power);
+development builds get sandbox tokens, which the server tries when production doesn't know a token.
 
 ## Development
 
