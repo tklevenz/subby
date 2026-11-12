@@ -850,6 +850,8 @@ export const en = {
   'sync.error.newerApp': 'This server needs a newer version of the app',
   'sync.error.removed': 'This phone is no longer in the family',
   'sync.error.identityLost': 'This phone has to join the family again',
+  'sync.removedBody': 'Sync stopped on this phone. Everything on it stays here.',
+  'home.syncStoppedOpen': 'See what to do',
   'sync.error.noKey': 'Missing the current family key',
   'sync.error.notSetUp': 'Sync is not set up on this phone',
   'sync.error.codeInvalid': 'This code is not valid',

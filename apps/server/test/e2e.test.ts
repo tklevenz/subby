@@ -699,6 +699,26 @@ describe.skipIf(!reachable)('sync server', () => {
       expect(await tokensOf(a.familyId)).toHaveLength(0);
     });
 
+    it('wakes a phone another phone removed, so it finds out, but not one that leaves', async () => {
+      const { a, b } = await pairedFamily();
+      const tokenA = `fcm-a-${randomUUID()}`;
+      const tokenB = `fcm-b-${randomUUID()}`;
+      await register(a, tokenA);
+      await register(b, tokenB);
+      await a.removeDevice(b.deviceId);
+      await until(() => pushed.some((m) => m.to === tokenB), 5000);
+      expect(pushed.filter((m) => m.to === tokenB)[0]).toMatchObject({ data: { kind: 'sync' } });
+      expect(await tokensOf(a.familyId)).toEqual([tokenA]);
+
+      const { a: c, b: d } = await pairedFamily();
+      const tokenD = `fcm-d-${randomUUID()}`;
+      await register(d, tokenD);
+      await d.append({ type: 'remove', deviceId: d.deviceId }); // leaving: it removes itself
+      await c.push([c.seal('log', randomUUID(), {})]); // something else is sent meanwhile
+      await new Promise((r) => setTimeout(r, 300));
+      expect(pushed.some((m) => m.to === tokenD)).toBe(false);
+    });
+
     it('keeps iOS tokens but sends only to Android ones (no APNs yet)', async () => {
       const { a, b } = await pairedFamily();
       await register(b, `apns-${randomUUID()}`, 'ios');

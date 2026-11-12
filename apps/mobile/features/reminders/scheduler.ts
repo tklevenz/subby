@@ -201,12 +201,14 @@ export function useReminderSync(ready: boolean) {
     ];
     const appState = AppState.addEventListener('change', (state) => state === 'active' && scheduleReminderSync());
     const tap = Notifications.addNotificationResponseReceivedListener(async (res) => {
-      const { childId, entryId } = res.notification.request.content.data ?? {};
+      const { childId, entryId, route } = res.notification.request.content.data ?? {};
       if (typeof childId === 'string' && useChildStore.getState().children.some((c) => c.id === childId)) {
         await useSettingsStore.getState().set('activeChildId', childId);
       }
       // Forgotten-timer reminders open the entry so it can be stopped or corrected.
       if (typeof entryId === 'string') router.push(`/entry/${entryId}`);
+      // This phone was removed from the family: the Sync screen says what happened.
+      if (route === '/sync') router.push('/sync');
     });
     return () => {
       unsubs.forEach((u) => u());

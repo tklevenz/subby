@@ -795,6 +795,8 @@ export const ptBR: Translation = {
   'sync.error.newerApp': 'Este servidor precisa de uma versão mais nova do app',
   'sync.error.removed': 'Este celular não faz mais parte da família',
   'sync.error.identityLost': 'Este celular precisa entrar na família de novo',
+  'sync.removedBody': 'A sincronização parou neste celular. Tudo o que está nele continua aqui.',
+  'home.syncStoppedOpen': 'Ver o que fazer',
   'sync.error.noKey': 'Falta a chave atual da família',
   'sync.error.notSetUp': 'A sincronização não está configurada neste celular',
   'sync.error.codeInvalid': 'Este código não é válido',

@@ -28,7 +28,8 @@ import { useLogStore } from '../../store/useLogStore';
 import { activeChildOf } from '../../store/useActiveChild';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
-import { notifyFamily } from '../reminders/family';
+import { notifyFamily, notifyRemoved } from '../reminders/family';
+import { requestNotifications } from '../reminders/scheduler';
 import { IdentityLostError, clearSyncSecrets, deviceIdentity, ensureDeviceIdentity, hasDeviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, childToBody, logToBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
@@ -54,6 +55,15 @@ export async function pendingCount(): Promise<number> {
 
 // --- setup / leave ----------------------------------------------------------------------------------------
 
+/**
+ * Sync brings messages no reminder switch asks for (removed from the family, the inactivity warning, family
+ * alerts once turned on), so permission is asked when sync starts here: set up, joined or recovered. Only asks
+ * if the phone still can; the flow doesn't wait for the answer.
+ */
+export function askForSyncNotifications() {
+  void requestNotifications().catch(() => {});
+}
+
 /** Creates a new family on the server with this phone as its first device, then uploads everything. */
 export async function setUpSync(serverInput: string, deviceName: string) {
   const server = normalizeServerUrl(serverInput);
@@ -77,6 +87,7 @@ export async function setUpSync(serverInput: string, deviceName: string) {
     .set('sync', newSyncSettings({ server, familyId, deviceId, knownDevices: [deviceId], logSeen: { length: 1, head: verifyDeviceLog([entry]).head } }));
   await pushDeviceName(deviceName);
   requestSync(0);
+  askForSyncNotifications();
 }
 
 /** Stops syncing on this phone. Local data stays; this phone's keys are forgotten. */
@@ -204,6 +215,10 @@ async function runOnce(): Promise<boolean> {
     const removed = !identityLost && isRemoved(e);
     const message = removed ? t('sync.error.removed') : errorMessage(e);
     useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, identityLost, progress: null, pending: await pendingCount() });
+    if (removed && !syncSettings()?.removedNotified) {
+      await notifyRemoved().catch((n) => console.warn('Removed notification failed', n)); // i18n-ignore
+      await saveSync({ removedNotified: true });
+    }
     throw e;
   }
 }

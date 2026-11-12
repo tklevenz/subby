@@ -795,6 +795,8 @@ export const nl: Translation = {
   'sync.error.newerApp': 'Deze server heeft een nieuwere versie van de app nodig',
   'sync.error.removed': 'Deze telefoon hoort niet meer bij het gezin',
   'sync.error.identityLost': 'Deze telefoon moet opnieuw bij de familie komen',
+  'sync.removedBody': 'Synchronisatie is gestopt op deze telefoon. Alles erop blijft hier.',
+  'home.syncStoppedOpen': 'Bekijk wat je kunt doen',
   'sync.error.noKey': 'De huidige gezinssleutel ontbreekt',
   'sync.error.notSetUp': 'Synchronisatie is niet ingesteld op deze telefoon',
   'sync.error.codeInvalid': 'Deze code is niet geldig',

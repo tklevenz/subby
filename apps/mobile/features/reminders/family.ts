@@ -48,3 +48,19 @@ export async function notifyFamily(pulled: PulledLog[]) {
     }
   }
 }
+
+/**
+ * Another phone removed this one from the family (found out by a sync run, often right away: the server wakes
+ * the removed phone). Says so once, even with family alerts off: sync stopped, and the person should know why.
+ */
+export async function notifyRemoved() {
+  if (!Notifications || !(await notificationsAllowed())) return;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(CHANNEL, { name: t('channel.family'), importance: Notifications.AndroidImportance.HIGH });
+  }
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'kl-sync:removed',
+    content: { title: t('sync.error.removed'), body: t('sync.removedBody'), data: { route: '/sync' } },
+    trigger: Platform.OS === 'android' ? { channelId: CHANNEL } : null,
+  });
+}

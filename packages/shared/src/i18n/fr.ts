@@ -795,6 +795,8 @@ export const fr: Translation = {
   'sync.error.newerApp': 'Ce serveur nécessite une version plus récente de l’app',
   'sync.error.removed': 'Ce téléphone ne fait plus partie de la famille',
   'sync.error.identityLost': 'Ce téléphone doit rejoindre à nouveau la famille',
+  'sync.removedBody': 'La synchronisation s’est arrêtée sur ce téléphone. Tout ce qu’il contient y reste.',
+  'home.syncStoppedOpen': 'Voir quoi faire',
   'sync.error.noKey': 'La clé actuelle de la famille est manquante',
   'sync.error.notSetUp': 'La synchronisation n’est pas configurée sur ce téléphone',
   'sync.error.codeInvalid': 'Ce code n’est pas valide',

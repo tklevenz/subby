@@ -6,6 +6,7 @@ import { RECOVERY, type AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';
 import { BlobsService } from '../blobs/blobs';
 import { lockFamily } from '../db/lock';
+import { PushService } from '../push/push';
 
 export { lockFamily };
 
@@ -24,6 +25,7 @@ export class FamiliesService {
     @Inject(DB) private readonly db: Db,
     @Inject(LiveBus) private readonly live: LiveBus,
     @Inject(BlobsService) private readonly blobs: BlobsService,
+    @Inject(PushService) private readonly push: PushService,
   ) {}
 
   /** The first device creates the family: its self-signed `create` entry and its sealed epoch-1 key. */
@@ -56,18 +58,25 @@ export class FamiliesService {
     if (entry.signer !== auth.deviceId) throw new ForbiddenException('Entries must be signed by the caller');
     // An epoch comes with its sealed keys (POST /v1/keys/rotate), so nobody is left without the new key.
     if (entry.type === 'epoch' || entry.type === 'create') throw new BadRequestException(`"${entry.type}" entries can't be appended here`);
-    const { result, deleted } = await this.db.transaction(async (tx) => {
+    const { result, deleted, wake } = await this.db.transaction(async (tx) => {
       await lockFamily(tx, auth.familyId);
       await appendVerified(tx, auth.familyId, entry);
+      // Removed by another phone (or the recovery key), not leaving: its push token, read before it's dropped.
+      const wake =
+        entry.type === 'remove' && entry.signer !== entry.deviceId
+          ? (await tx.select({ deviceId: schema.pushTokens.deviceId, token: schema.pushTokens.token, platform: schema.pushTokens.platform }).from(schema.pushTokens).where(eq(schema.pushTokens.deviceId, entry.deviceId)))[0]
+          : undefined;
       await this.apply(tx, auth.familyId, entry);
       // The last phone left: nobody can sync any more, so nothing of the family stays (recovery words included).
       const remaining = entry.type === 'remove' ? await tx.$count(schema.devices, and(eq(schema.devices.familyId, auth.familyId), eq(schema.devices.active, true))) : 1;
-      return { result: { index: entry.index }, deleted: remaining === 0 ? await deleteRows(tx, auth.familyId) : null };
+      return { result: { index: entry.index }, deleted: remaining === 0 ? await deleteRows(tx, auth.familyId) : null, wake };
     });
     if (deleted) {
       await this.afterDelete(auth.familyId, deleted);
       return result;
     }
+    // iOS tokens are APNs tokens: not sent to yet (like every push).
+    if (wake?.platform === 'android') this.push.wakeRemoved(wake);
     if (entry.type === 'remove') this.live.closeDevice(auth.familyId, entry.deviceId);
     this.live.publish(auth.familyId, { type: 'log', index: entry.index });
     return result;

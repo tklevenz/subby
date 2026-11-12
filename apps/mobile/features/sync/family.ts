@@ -31,7 +31,7 @@ import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { call, checkServer, isHttpError, normalizeServerUrl, sealEpochs, SyncSession } from './api';
 import { deviceIdentity, ensureDeviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
-import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys } from './engine';
+import { askForSyncNotifications, pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys } from './engine';
 import { newSyncSettings, saveSync, sessionFor, syncSettings } from './state';
 
 const member = () => {
@@ -298,4 +298,5 @@ async function completeJoin(
     .set('sync', newSyncSettings({ server, familyId, deviceId, knownDevices: [...state.members.keys()], logSeen: { length: entries.length, head: state.head } }));
   await pushDeviceName(name);
   requestSync(0);
+  askForSyncNotifications();
 }

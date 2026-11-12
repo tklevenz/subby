@@ -89,8 +89,24 @@ export class PushService implements OnModuleDestroy {
           ...(skipDevice ? [ne(schema.pushTokens.deviceId, skipDevice)] : []),
         ),
       );
-    if (!tokens.length) return 0;
+    return this.deliver(tokens);
+  }
 
+  /**
+   * Wakes a phone that another one just removed (its token is already gone from the table), so it syncs, finds
+   * out and tells its owner, instead of only noticing whenever it next runs. Nothing about the family is sent.
+   */
+  wakeRemoved(token: { deviceId: string; token: string }) {
+    if (this.config.push.kind !== 'fcm') return;
+    void this.deliver([token]).catch((e: unknown) => {
+      this.metrics.count('push_error');
+      console.warn('Push failed', e);
+    });
+  }
+
+  private async deliver(tokens: { deviceId: string; token: string }[]) {
+    const fcm = this.config.push;
+    if (fcm.kind !== 'fcm' || !tokens.length) return 0;
     const access = await this.auth!.token();
     const results = await Promise.all(
       tokens.map(async (t) => {
