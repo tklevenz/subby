@@ -1,3 +1,4 @@
+import { createPrivateKey } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { serviceAccountFrom, type GoogleServiceAccount } from './common/google';
 import { APPLE_ROOT_CA_G3 } from './purchases/appleRoot';
@@ -78,31 +79,61 @@ export type FcmConfig = {
   sendUrl: string;
 };
 
+/**
+ * A push key that doesn't load (missing, unreadable, not a key) turns that push off with an error in the log, and
+ * the server starts anyway: without push, phones still sync when opened and in the background. A crash loop would
+ * stop sync for everyone.
+ */
+function withoutBrokenKey<T>(what: string, load: () => T, off: T): T {
+  try {
+    return load();
+  } catch (e) {
+    console.error(`${what} is off: ${(e as Error).message}`);
+    return off;
+  }
+}
+
 function pushConfig(env: NodeJS.ProcessEnv, mode: Config['mode']): Config['push'] {
   const kind = env.PUSH || (mode === 'hosted' ? 'fcm' : 'none');
   if (kind === 'none') return { kind };
   if (kind !== 'fcm') throw new Error(`PUSH must be "fcm" or "none", got "${kind}"`);
-  if (!env.FCM_SERVICE_ACCOUNT) throw new Error('FCM_SERVICE_ACCOUNT (the path to a Firebase service-account key) is required with PUSH=fcm');
-  const account = serviceAccountFrom(env.FCM_SERVICE_ACCOUNT, JSON.parse(readFileSync(env.FCM_SERVICE_ACCOUNT, 'utf8')));
-  return {
-    kind,
-    ...account,
-    sendUrl: `https://fcm.googleapis.com/v1/projects/${account.projectId}/messages:send`,
-  };
+  return withoutBrokenKey<Config['push']>(
+    'Android push (PUSH=fcm)',
+    () => {
+      if (!env.FCM_SERVICE_ACCOUNT) throw new Error('FCM_SERVICE_ACCOUNT (the path to a Firebase service-account key) is required with PUSH=fcm');
+      const account = serviceAccountFrom(env.FCM_SERVICE_ACCOUNT, JSON.parse(readFileSync(env.FCM_SERVICE_ACCOUNT, 'utf8')) as Record<string, string | undefined>);
+      createPrivateKey(account.privateKey);
+      return { kind, ...account, sendUrl: `https://fcm.googleapis.com/v1/projects/${account.projectId}/messages:send` };
+    },
+    { kind: 'none' },
+  );
 }
 
 /** An APNs auth key: `APNS_KEY` (path to the .p8), `APNS_KEY_ID` and `APNS_TEAM_ID`; all or none. */
 function apnsConfig(env: NodeJS.ProcessEnv): ApnsConfig | null {
-  if (!env.APNS_KEY) return null;
-  if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID) throw new Error('APNS_KEY_ID and APNS_TEAM_ID are required with APNS_KEY');
-  return {
-    keyId: env.APNS_KEY_ID,
-    teamId: env.APNS_TEAM_ID,
-    privateKey: readFileSync(env.APNS_KEY, 'utf8'),
-    topic: env.APNS_TOPIC || 'baby.subby.app',
-    url: env.APNS_URL || 'https://api.push.apple.com',
-    sandboxUrl: env.APNS_SANDBOX_URL || 'https://api.sandbox.push.apple.com',
-  };
+  const path = env.APNS_KEY;
+  if (!path) return null;
+  return withoutBrokenKey<ApnsConfig | null>(
+    'iOS push (APNS_KEY)',
+    () => {
+      if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID) throw new Error('APNS_KEY_ID and APNS_TEAM_ID are required with APNS_KEY');
+      const privateKey = readFileSync(path, 'utf8');
+      try {
+        createPrivateKey(privateKey);
+      } catch (e) {
+        throw new Error(`${path} isn't a usable .p8 key (${(e as Error).message})`);
+      }
+      return {
+        keyId: env.APNS_KEY_ID,
+        teamId: env.APNS_TEAM_ID,
+        privateKey,
+        topic: env.APNS_TOPIC || 'baby.subby.app',
+        url: env.APNS_URL || 'https://api.push.apple.com',
+        sandboxUrl: env.APNS_SANDBOX_URL || 'https://api.sandbox.push.apple.com',
+      };
+    },
+    null,
+  );
 }
 
 export type BlobStoreConfig =

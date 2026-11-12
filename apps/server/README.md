@@ -149,7 +149,8 @@ every 15 minutes or more). Push only reaches app builds made with the same Fireb
 store app can't be pushed to from a self-hosted server; if you build the app yourself with your own
 `google-services.json`, `PUSH=fcm` with your project's key works. iPhones are reached the same way with an APNs key
 from the team that signs the app (a background push, which iOS may delay or skip when the phone is saving power);
-development builds get sandbox tokens, which the server tries when production doesn't know a token.
+development builds get sandbox tokens, which the server tries when production doesn't know a token. A push key that
+doesn't load is reported in the log (`iOS push (APNS_KEY) is off: …`), and the server starts without that push.
 
 ## Development
 
