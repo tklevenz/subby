@@ -8,7 +8,29 @@ import { downloads } from '../modules/subby-downloads';
 
 const photosDir = () => new Directory(Paths.document, 'photos');
 
-/** Copy a picked image into the app's document dir so it outlives the picker cache. */
+/**
+ * A stored photo reference (`photoUri` on children and notes) is the file's name in the photos folder, never a full
+ * path: iOS moves the app's folder when the app is reinstalled or updated, so a stored path would point at nothing
+ * (that once made a re-joining iPad sync every photo away). References from before this, full paths, use their last
+ * part. Only names we made: no other folder, no "..".
+ */
+function photoName(ref: string): string | null {
+  const name = ref.split('?')[0]!.split('/').pop() ?? '';
+  return /^[\w.-]+$/.test(name) && !name.startsWith('.') ? name : null;
+}
+
+/** The file of a stored photo reference, wherever the app's folder is now. */
+function photoFileOf(ref: string): File | null {
+  const name = photoName(ref);
+  return name ? new File(photosDir(), name) : null;
+}
+
+/** The URI to show or share a stored photo reference with (an `Image` source, the share sheet). */
+export function photoFile(ref: string): string {
+  return photoFileOf(ref)?.uri ?? '';
+}
+
+/** Copy a picked image into the app's photos folder so it outlives the picker cache; returns its reference. */
 export async function persistPhoto(uri: string): Promise<string> {
   const dir = photosDir();
   dir.create({ idempotent: true, intermediates: true });
@@ -17,7 +39,7 @@ export async function persistPhoto(uri: string): Promise<string> {
   const ext = /\.([a-z0-9]{1,5})$/i.exec(last)?.[1]?.toLowerCase() ?? 'jpg';
   const dest = new File(dir, `${Date.now()}.${ext}`);
   await new File(uri).copy(dest);
-  return dest.uri;
+  return dest.name;
 }
 
 /** Longest edge kept: plenty for a phone screen, and keeps photo sync (and the hosted allowance) small. */
@@ -92,14 +114,15 @@ async function shrinkPhoto(asset: { uri: string; width: number; height: number }
 const imageType = (uri: string) => (/\.png$/i.test(uri) ? 'image/png' : 'image/jpeg');
 
 /** Opens the share sheet for a photo (iOS's has "Save Image"). */
-export const sharePhoto = (uri: string) => Sharing.shareAsync(uri, { mimeType: imageType(uri), dialogTitle: t('photo.shareTitle') });
+export const sharePhoto = (ref: string) => Sharing.shareAsync(photoFile(ref), { mimeType: imageType(ref), dialogTitle: t('photo.shareTitle') });
 
 /** Whether `savePhoto` can save straight to the phone (Android's Downloads folder). */
 export const canSavePhoto = downloads !== null;
 
 /** Saves a copy to the public Downloads folder (Android); returns the saved name. */
-export async function savePhoto(uri: string): Promise<string> {
+export async function savePhoto(ref: string): Promise<string> {
   if (!downloads) throw new Error(t('photo.notAvailable'));
+  const uri = photoFile(ref);
   const ext = /\.png$/i.test(uri) ? 'png' : 'jpg';
   const d = new Date();
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -107,18 +130,18 @@ export async function savePhoto(uri: string): Promise<string> {
 }
 
 /** A photo's size in bytes; null when the file is gone. */
-export function photoSize(uri: string): number | null {
-  const file = new File(uri);
-  return file.exists ? file.size : null;
+export function photoSize(ref: string): number | null {
+  const file = photoFileOf(ref);
+  return file?.exists ? file.size : null;
 }
 
 /** A photo's bytes (for encrypting and uploading it); null when the file is gone. */
-export async function readPhotoBytes(uri: string): Promise<Uint8Array | null> {
-  const file = new File(uri);
-  return file.exists ? file.bytes() : null;
+export async function readPhotoBytes(ref: string): Promise<Uint8Array | null> {
+  const file = photoFileOf(ref);
+  return file?.exists ? file.bytes() : null;
 }
 
-/** Saves a downloaded photo into the app's photos dir and returns its uri. */
+/** Saves a downloaded or restored photo into the app's photos folder and returns its reference. */
 export function savePhotoBytes(name: string, data: Uint8Array): string {
   const dir = photosDir();
   dir.create({ idempotent: true, intermediates: true });
@@ -126,16 +149,14 @@ export function savePhotoBytes(name: string, data: Uint8Array): string {
   if (file.exists) file.delete();
   file.create();
   file.write(data);
-  return file.uri;
+  return file.name;
 }
 
-/** Delete a photo we own (inside the app's photos dir); anything else is left alone. */
-export function deletePhoto(uri: string | null | undefined) {
-  // Only our own photos folder (with its trailing slash, so "photos-other/" doesn't match), and no "..".
-  const dir = photosDir().uri;
-  if (!uri || !uri.startsWith(dir.endsWith('/') ? dir : `${dir}/`) || uri.includes('..')) return;
+/** Delete a photo we own (by its reference, always inside the app's photos folder). */
+export function deletePhoto(ref: string | null | undefined) {
+  const file = ref ? photoFileOf(ref) : null;
+  if (!file) return;
   try {
-    const file = new File(uri);
     if (file.exists) file.delete();
   } catch {
     // A missing file shouldn't block deleting the data that referenced it.

@@ -31,6 +31,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { colors } from '../../../theme/colors';
 import { ScreenScroll } from '../../../components/ScreenScroll';
 import { growthMeasures } from '../../../features/growthMeasures';
+import { photoFile } from '../../../features/photos';
 
 const STORY_PAGE = 12;
 
@@ -129,7 +130,7 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
   return (
     <View style={{ height, backgroundColor: bg }} className="overflow-hidden">
       {showPhoto ? (
-        <Image source={{ uri: child.photoUri! }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onError={() => setFailed(child.photoUri)} />
+        <Image source={{ uri: photoFile(child.photoUri!) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onError={() => setFailed(child.photoUri)} />
       ) : (
         <Pressable onPress={onPhoto} className="flex-1 items-center justify-center">
           <Text style={{ color: fg, fontSize: 120, fontWeight: '700', opacity: 0.5 }}>{child.name.trim().charAt(0).toUpperCase() || '?'}</Text>

@@ -21,6 +21,10 @@ export function clientApplies(
 ): boolean {
   if (local === null) return true;
   if (!local.pending) return incoming.updatedAt >= local.updatedAt;
+  // The same millisecond from another phone is the same edit, copied: this phone re-joining with its data, or a
+  // restored backup. The server's copy is taken, so it isn't pushed back (as the newest phone it would win the tie,
+  // with this phone's device-local gaps, such as photos it can't upload).
+  if (incoming.updatedAt === local.updatedAt) return incoming.deviceId !== ownDeviceId;
   return compareVersions(incoming, { updatedAt: local.updatedAt, deviceId: ownDeviceId }) > 0;
 }
 

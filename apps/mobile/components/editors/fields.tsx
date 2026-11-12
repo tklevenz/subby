@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUpFromBracket, Camera, Download, ImageIcon, ShareNodes, Xmark } from '../icons';
-import { canSavePhoto, pickPhoto, savePhoto, sharePhoto } from '../../features/photos';
+import { canSavePhoto, photoFile, pickPhoto, savePhoto, sharePhoto } from '../../features/photos';
 import { TextField } from '../ui';
 import { colors } from '../../theme/colors';
 
@@ -82,7 +82,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
   const [ratio, setRatio] = useState<number>();
   useEffect(() => {
     setRatio(undefined);
-    if (value) Image.getSize(value, (w, h) => setRatio(w / h), () => {});
+    if (value) Image.getSize(photoFile(value), (w, h) => setRatio(w / h), () => {});
   }, [value]);
 
   const pick = async (camera: boolean) => {
@@ -98,7 +98,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
       <View>
         {/* Shown at its own shape, up to square for portrait photos; tap for the whole photo. */}
         <Pressable onPress={() => setViewing(true)} accessibilityRole="imagebutton" accessibilityLabel={t('fields.viewPhoto')}>
-          <Image source={{ uri: value }} className="w-full rounded-xl" style={{ aspectRatio: Math.max(ratio ?? 4 / 3, 1) }} resizeMode="cover" />
+          <Image source={{ uri: photoFile(value) }} className="w-full rounded-xl" style={{ aspectRatio: Math.max(ratio ?? 4 / 3, 1) }} resizeMode="cover" />
         </Pressable>
         <Pressable
           onPress={() => {
@@ -166,7 +166,7 @@ function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () =>
     <Modal transparent animationType="fade" visible={!!uri} statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1 bg-scrim">
         <Pressable onPress={onClose} accessibilityLabel={t('fields.closePhoto')} className="flex-1">
-          {uri ? <Image source={{ uri }} style={{ flex: 1 }} resizeMode="contain" /> : null}
+          {uri ? <Image source={{ uri: photoFile(uri) }} style={{ flex: 1 }} resizeMode="contain" /> : null}
         </Pressable>
         <Pressable
           onPress={onClose}

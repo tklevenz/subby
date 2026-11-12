@@ -24,7 +24,6 @@ import {
 } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deleteAllPhotos } from '../photos';
-import { forgetPhotoUploads } from './photos';
 import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
@@ -288,14 +287,13 @@ async function completeJoin(
     useLogStore.setState({ logs: [], activeChildId: null });
     await useChildStore.getState().hydrate();
   } else {
+    // Everything goes up, except what the family already has: the first run pulls first (`merging`).
     await markAllPending();
-    // This phone's photos belong to its old family (if any); they upload to this one.
-    await forgetPhotoUploads();
   }
 
   await useSettingsStore
     .getState()
-    .set('sync', newSyncSettings({ server, familyId, deviceId, knownDevices: [...state.members.keys()], logSeen: { length: entries.length, head: state.head } }));
+    .set('sync', { ...newSyncSettings({ server, familyId, deviceId, knownDevices: [...state.members.keys()], logSeen: { length: entries.length, head: state.head } }), ...(local === 'merge' ? { merging: true } : {}) });
   await pushDeviceName(name);
   requestSync(0);
   askForSyncNotifications();

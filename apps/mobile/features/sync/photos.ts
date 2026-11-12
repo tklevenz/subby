@@ -20,14 +20,18 @@ const childHas = (field: 'photoBlob' | 'photoUri', set = true) => (set ? isNotNu
 /**
  * Photo references point at blobs on one server, for one family. A phone starting or joining another family
  * (a new server, or setting sync up again) forgets them, so its photos upload to the new family. With
- * `onlyLocal`, only rows whose photo file is on this phone are touched (they're the ones it can re-upload).
+ * `onlyLocal`, only rows whose photo file is on this phone are touched (they're the ones it can re-upload); with
+ * `onlyPending`, only rows waiting to be pushed.
  */
-export async function forgetPhotoUploads({ onlyLocal = false } = {}) {
-  await db.update(c).set({ photoBlob: null }).where(childHas(onlyLocal ? 'photoUri' : 'photoBlob'));
+export async function forgetPhotoUploads({ onlyLocal = false, onlyPending = false } = {}) {
+  await db
+    .update(c)
+    .set({ photoBlob: null })
+    .where(and(childHas(onlyLocal ? 'photoUri' : 'photoBlob'), ...(onlyPending ? [eq(c.syncStatus, 'pending')] : [])));
   await db
     .update(l)
     .set({ payload: sql`json_remove(${l.payload}, '$.photoBlob')` })
-    .where(and(eq(l.logType, 'note'), noteHas('photoBlob'), ...(onlyLocal ? [noteHas('photoUri')] : [])));
+    .where(and(eq(l.logType, 'note'), noteHas('photoBlob'), ...(onlyLocal ? [noteHas('photoUri')] : []), ...(onlyPending ? [eq(l.syncStatus, 'pending')] : [])));
 }
 
 /**

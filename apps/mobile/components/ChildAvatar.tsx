@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import type { Child } from '@subby/shared';
 import { colors, type ColorName } from '../theme/colors';
+import { photoFile } from '../features/photos';
 
 // Six fill/initial pairs (avatar1Bg/avatar1Ink …); picked per child so siblings differ.
 const SLOTS = 6;
@@ -35,7 +36,7 @@ export default function ChildAvatar({
     <View style={style}>
       {showPhoto ? (
         <Image
-          source={{ uri: child.photoUri! }}
+          source={{ uri: photoFile(child.photoUri!) }}
           style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
           onError={() => setFailed(child.photoUri)}
         />

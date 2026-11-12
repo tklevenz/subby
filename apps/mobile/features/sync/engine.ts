@@ -196,9 +196,18 @@ async function runOnce(): Promise<boolean> {
     }
     // A phone without an unlock (hosted, after the trial) still pulls; its own changes wait, pending, until it's unlocked.
     await refreshEntitlement(api);
+    // Just joined with its own data: take what the family already has before pushing the rest (see `merging`).
+    let merged = false;
+    if (settings.merging) {
+      const first = await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq);
+      merged = first.applied;
+      restarted ||= first.again;
+      await forgetPhotoUploads({ onlyPending: true });
+      await saveSync({ merging: undefined });
+    }
     const pushed = canWrite() ? await pushUnlessLocked(api, settings, keys) : { applied: false, tooLarge: 0 };
     const pulled = await pullAll(api, settings, keys, syncSettings()?.lastSeq ?? settings.lastSeq);
-    const applied = pulled.applied || pushed.applied;
+    const applied = pulled.applied || pushed.applied || merged;
     restarted ||= pulled.again;
     const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: t('sync.progress.photos'), done } }));
     // Phones set up before names existed (or whose name record was lost) name themselves once.

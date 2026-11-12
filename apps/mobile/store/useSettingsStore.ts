@@ -39,6 +39,12 @@ export type SyncSettings = {
   knownDevices?: string[];
   /** Whether the server wakes this phone with push when others write (hosted Subby Sync does). */
   push?: boolean;
+  /**
+   * Joined with this phone's own data kept: the first run pulls before it pushes, so rows the family already has
+   * (the same version) are taken from the server instead of pushed back, then forgets the photo references of what's
+   * left to push (they belong to another family, or none). Cleared once that pull is complete.
+   */
+  merging?: boolean;
   /** The family this phone's photo references belong to; differs (or is missing) after moving to another family. */
   photosFamily?: string;
   /** The push token (FCM on Android) last registered with the server (re-registered when it changes). */

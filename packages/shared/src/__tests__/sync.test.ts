@@ -58,9 +58,10 @@ describe('merge', () => {
     expect(clientApplies({ updatedAt: 11, pending: false }, incoming, 'me')).toBe(false);
     expect(clientApplies({ updatedAt: 9, pending: true }, incoming, 'me')).toBe(true);
     expect(clientApplies({ updatedAt: 12, pending: true }, incoming, 'me')).toBe(false);
-    // Same millisecond: the same device-id tie-break the server uses.
-    expect(clientApplies({ updatedAt: 10, pending: true }, incoming, 'zzz')).toBe(false);
+    // Same millisecond from another phone: the same edit, copied (a re-join, a restore); the server's copy wins.
+    expect(clientApplies({ updatedAt: 10, pending: true }, incoming, 'zzz')).toBe(true);
     expect(clientApplies({ updatedAt: 10, pending: true }, incoming, 'aaa')).toBe(true);
+    expect(clientApplies({ updatedAt: 10, pending: true }, incoming, incoming.deviceId)).toBe(false);
   });
 });
 
