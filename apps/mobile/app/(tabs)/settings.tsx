@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from '../../components/icons';
 import { activeReminderCount, formatAge } from '@subby/shared';
-import { remindersAvailable, requestNotifications, setRemindersEnabled } from '../../features/reminders/scheduler';
+import { remindersAvailable, requestNotifications, useNotificationsBlocked } from '../../features/reminders/scheduler';
 import ChildAvatar from '../../components/ChildAvatar';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useChildStore } from '../../store/useChildStore';
@@ -63,7 +63,9 @@ export default function SettingsScreen() {
   const clock = useSettingsStore((s) => s.clock);
   const syncing = useSettingsStore((s) => s.sync !== null);
   const reminders = useSettingsStore((s) => s.reminders);
-  const reminderCount = activeReminderCount(reminders);
+  // Reminders that are set up, whether or not they're paused.
+  const reminderCount = activeReminderCount({ ...reminders, enabled: true });
+  const notificationsOff = useNotificationsBlocked();
   const familyAlerts = useSettingsStore((s) => s.familyAlerts);
   const setFamilyAlerts = async (patch: Partial<typeof familyAlerts>) => {
     if (patch.enabled && !(await requestNotifications())) return;
@@ -115,18 +117,16 @@ export default function SettingsScreen() {
       <Card>
         <Row
           label={t('settings.reminders')}
-          right={<Toggle value={reminders.enabled} onValueChange={setRemindersEnabled} disabled={!remindersAvailable} />}
-        />
-        <Row
-          label={t('settings.chooseReminders')}
           value={
             !remindersAvailable
               ? t('settings.needsDevBuild')
-              : !reminders.enabled
-                ? t('settings.paused')
-                : reminderCount
-                  ? t('settings.remindersOn', { count: reminderCount })
-                  : t('settings.none')
+              : !reminderCount
+                ? t('settings.remindersOff')
+                : !reminders.enabled
+                  ? t('settings.paused')
+                  : notificationsOff
+                    ? t('settings.remindersBlocked')
+                    : t('settings.remindersOn', { count: reminderCount })
           }
           onPress={() => router.push('/reminders')}
           right={<Chevron />}

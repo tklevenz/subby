@@ -1,8 +1,8 @@
 import { t, formatClock } from '@subby/shared/i18n';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import type * as NotificationsModule from 'expo-notifications';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { REMINDER_ID_PREFIX, activeReminderCount, isNap, isRunning, type LogType, medicationsDue, planReminders, predictNextSleep, type ReminderChild, DAY_MS } from '@subby/shared';
 import { optionalModule } from '../optionalModule';
 import { fetchLogs } from '../../store/queries';
@@ -40,6 +40,20 @@ export async function notificationsBlocked(): Promise<boolean> {
   if (!Notifications) return false;
   const p = await Notifications.getPermissionsAsync();
   return !p.granted && !p.canAskAgain;
+}
+
+/** `notificationsBlocked`, re-read when the screen gets focus and when the app comes back (from the system settings). */
+export function useNotificationsBlocked(): boolean {
+  const [blocked, setBlocked] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      const check = () => void notificationsBlocked().then(setBlocked);
+      check();
+      const sub = AppState.addEventListener('change', (s) => s === 'active' && check());
+      return () => sub.remove();
+    }, []),
+  );
+  return blocked;
 }
 
 async function ensureChannel() {

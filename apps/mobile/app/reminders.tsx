@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Linking, Text, View } from 'react-native';
-import { FORGOTTEN_TIMER_MIN, type ReminderSettings } from '@subby/shared';
+import { FORGOTTEN_TIMER_MIN, activeReminderCount, type ReminderSettings } from '@subby/shared';
 import { Card, Segmented, Toggle, SectionLabel, Notice } from '../components/ui';
 import {
   notificationsBlocked,
@@ -32,6 +32,7 @@ export default function RemindersScreen() {
   const reminders = useSettingsStore((s) => s.reminders);
   const setSetting = useSettingsStore((s) => s.set);
   const formatTime = useFormatTime();
+  const anySet = activeReminderCount({ ...reminders, enabled: true }) > 0;
   // Only once the phone won't ask again: before the first switch, it simply asks.
   const [blocked, setBlocked] = useState(false);
   const [upcoming, setUpcoming] = useState<Awaited<ReturnType<typeof upcomingReminders>>>([]);
@@ -81,15 +82,18 @@ export default function RemindersScreen() {
         </Notice>
       ) : null}
 
-      <View className="bg-surface border border-line rounded-2xl p-4 mb-5 flex-row items-center">
-        <View className="flex-1 pr-3">
-          <Text className="text-ink text-base font-semibold">{t('reminders.allow')}</Text>
-          <Text className="text-ink-muted text-xs mt-1 leading-4">{t('reminders.allowHint')}</Text>
+      {/* Pausing only means something once a reminder is set up. */}
+      {anySet ? (
+        <View className="bg-surface border border-line rounded-2xl p-4 mb-5 flex-row items-center">
+          <View className="flex-1 pr-3">
+            <Text className="text-ink text-base font-semibold">{t('reminders.allow')}</Text>
+            <Text className="text-ink-muted text-xs mt-1 leading-4">{t('reminders.allowHint')}</Text>
+          </View>
+          <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(replanAndRefresh)} disabled={!remindersAvailable} />
         </View>
-        <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(replanAndRefresh)} disabled={!remindersAvailable} />
-      </View>
+      ) : null}
 
-      <View style={{ opacity: reminders.enabled ? 1 : 0.5 }}>
+      <View style={{ opacity: reminders.enabled || !anySet ? 1 : 0.5 }}>
         <IntervalSection
           title={t('reminders.feeding')}
           description={t('reminders.feedingText')}
