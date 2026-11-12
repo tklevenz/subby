@@ -4,6 +4,7 @@ import { groupNights, isSleepEntry, nightOf } from './nights';
 import { isNightWaking } from './prediction';
 import { isNap } from './stats';
 import { formatHoursMinutes } from './time';
+import { formatDose } from './units';
 
 /** Device-local: what this phone hears about when another phone in the family logs. Not a reminder: its own switch. */
 export type FamilyAlertSettings = {
@@ -13,9 +14,11 @@ export type FamilyAlertSettings = {
   wakeUps: boolean;
   /** Bedtime and the morning too, not only naps. Night wakings never notify. */
   nights: boolean;
+  /** A dose of medication is logged (on its own: no sleep alerts needed), so nobody gives it twice. */
+  medications: boolean;
 };
 
-export const DEFAULT_FAMILY_ALERTS: FamilyAlertSettings = { enabled: false, wakeUps: true, nights: false };
+export const DEFAULT_FAMILY_ALERTS: FamilyAlertSettings = { enabled: false, wakeUps: true, nights: false, medications: false };
 
 /** Presented right away (not scheduled), so kept apart from the reminder ids the scheduler replaces. */
 export const FAMILY_ALERT_ID_PREFIX = 'kl-family:';
@@ -31,12 +34,15 @@ const MIN = 60_000;
 /** Older news isn't worth a notification: a sleep logged afterwards, or a pull hours late (no push). */
 export const FAMILY_ALERT_RECENT_MS = 10 * MIN;
 const DAY = 86_400_000;
+/** A dose given longer ago than this isn't news, even when logged just now. */
+const MED_RECENT_MS = 12 * 60 * MIN;
 
 const isRunning = (l: LogEntry) => !l.isDeleted && l.endedAt === null;
 
 /**
  * The notifications to show or withdraw for entries pulled from other phones. One per sleep (its id), so a
- * wake-up replaces "asleep", and an undone or deleted sleep takes its notification away. `sleeps(childId)` is
+ * wake-up replaces "asleep", and an undone or deleted sleep takes its notification away. One per new dose of
+ * medication (withdrawn if it's deleted); edits to a dose don't notify again. `sleeps(childId)` is
  * the child's recent sleeps after the pull (night wakings are told apart by them).
  */
 export function familyAlerts(input: {
@@ -54,6 +60,27 @@ export function familyAlerts(input: {
   const out: FamilyAlert[] = [];
 
   for (const { before, after, by } of changes) {
+    if (after.logType === 'medication') {
+      const id = `${FAMILY_ALERT_ID_PREFIX}medication:${after.id}`;
+      if (after.isDeleted) {
+        out.push({ kind: 'dismiss', id });
+        continue;
+      }
+      const p = after.payload;
+      const name = input.childName(after.childId);
+      // Only a dose just logged (not one an old pull brings, or an edit) given in the last 12 hours.
+      if (p.type !== 'medication' || !name || before !== null || !input.allowed || !settings.medications) continue;
+      if (now - after.updatedAt > FAMILY_ALERT_RECENT_MS || now - after.startedAt > MED_RECENT_MS) continue;
+      const time = formatTime(after.startedAt);
+      out.push({
+        kind: 'show',
+        id,
+        title: t('family.medGiven', { name, medication: p.name }),
+        body: p.dose !== undefined ? t('family.medDoseAt', { dose: formatDose(p.dose, p.unit), time, phone: by }) : t('family.medAt', { time, phone: by }),
+        childId: after.childId,
+      });
+      continue;
+    }
     if (after.logType !== 'sleep' || after.startedAt < now - DAY) continue;
     const id = `${FAMILY_ALERT_ID_PREFIX}sleep:${after.id}`;
     if (after.isDeleted || !isSleepEntry(after)) {

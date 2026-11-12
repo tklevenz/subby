@@ -18,6 +18,10 @@ export const REVIEW_KEYS: readonly string[] = [
   'home.overdue',
   'home.dueAt',
   'home.dueTomorrow',
+  'family.medGiven',
+  'family.medDoseAt',
+  'family.medAt',
+  'settings.familyMeds',
   // Deleting and leaving: what's gone and what stays.
   'childEdit.',
   'entry.deleteTitle',

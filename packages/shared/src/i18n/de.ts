@@ -59,6 +59,9 @@ export const de: Translation = {
   'family.wokeUp': '{name} ist aufgewacht',
   'family.napped': 'Nickerchen: {span} · eingetragen auf {phone}',
   'family.slept': '{span} geschlafen · eingetragen auf {phone}',
+  'family.medGiven': "{name} hat {medication} bekommen",
+  'family.medDoseAt': "{dose} um {time} · eingetragen auf {phone}",
+  'family.medAt': "Um {time} · eingetragen auf {phone}",
 
   'story.born': 'Geboren',
   'story.measured': 'Gemessen: {parts}',
@@ -468,6 +471,7 @@ export const de: Translation = {
   'settings.familySleep': 'Wenn ein anderes Handy Schlaf einträgt',
   'settings.familyWake': 'Und beim Aufwachen',
   'settings.familyNights': 'Auch Schlafenszeit und Morgen',
+  'settings.familyMeds': "Wenn ein anderes Handy ein Medikament einträgt",
   'settings.familyNoteNaps': 'Nickerchen, nie nächtliche Wachphasen. Jedes Handy entscheidet selbst, so kann das von Oma und Opa still bleiben.',
   'settings.familyNoteNights': 'Nickerchen, Schlafenszeit und Aufwachen am Morgen, nie nächtliche Wachphasen. Jedes Handy entscheidet selbst, so kann das von Oma und Opa still bleiben.',
   'settings.familyNoPush': ' Dieser Server sendet keine Push-Nachrichten, sie kommen also nur an, während Subby offen ist.',

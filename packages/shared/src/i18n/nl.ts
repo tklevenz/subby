@@ -59,6 +59,9 @@ export const nl: Translation = {
   'family.wokeUp': '{name} is wakker',
   'family.napped': 'Dutje van {span} · gelogd op {phone}',
   'family.slept': '{span} geslapen · gelogd op {phone}',
+  'family.medGiven': "{name} heeft {medication} gekregen",
+  'family.medDoseAt': "{dose} om {time} · gelogd op {phone}",
+  'family.medAt': "Om {time} · gelogd op {phone}",
 
   'story.born': 'Geboren',
   'story.measured': 'Gemeten: {parts}',
@@ -468,6 +471,7 @@ export const nl: Translation = {
   'settings.familySleep': 'Als een andere telefoon slaap logt',
   'settings.familyWake': 'En bij wakker worden',
   'settings.familyNights': 'Ook bedtijd en ochtend',
+  'settings.familyMeds': "Als een andere telefoon een medicijn logt",
   'settings.familyNoteNaps': 'Dutjes, nooit wakker worden ’s nachts. Elke telefoon kiest zelf, dus die van opa en oma kan stil blijven.',
   'settings.familyNoteNights': 'Dutjes, bedtijd en ochtend, nooit wakker worden ’s nachts. Elke telefoon kiest zelf, dus die van opa en oma kan stil blijven.',
   'settings.familyNoPush': ' Deze server stuurt geen pushmeldingen, dus ze komen alleen aan terwijl Subby open is.',

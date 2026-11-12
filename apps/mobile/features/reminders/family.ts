@@ -12,11 +12,12 @@ const CHANNEL = 'family';
 export type PulledLog = { before: LogEntry | null; after: LogEntry; deviceId: string };
 
 /**
- * After a pull: shows (or withdraws) "fell asleep" / "woke up" for sleeps logged on other phones, if this phone
- * asked for them (`settings.familyAlerts`). Runs headless too, when a push wakes the app.
+ * After a pull: shows (or withdraws) "fell asleep" / "woke up" for sleeps, and "got <medication>" for doses,
+ * logged on other phones, if this phone asked for them (`settings.familyAlerts`). Runs headless too, when a push
+ * wakes the app.
  */
 export async function notifyFamily(pulled: PulledLog[]) {
-  if (!Notifications || !pulled.some((p) => p.after.logType === 'sleep')) return;
+  if (!Notifications || !pulled.some((p) => p.after.logType === 'sleep' || p.after.logType === 'medication')) return;
   const { familyAlerts: settings, clock, sync } = useSettingsStore.getState();
   const children = useChildStore.getState().children;
   const now = Date.now();

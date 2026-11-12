@@ -74,10 +74,10 @@ These block tickets further down.
   - Setup copy: sharing costs, the app alone is free, self-hosting is free. [P1, S6]
 - [x] **A4 Server-side warnings** (inactivity, storage full) shown on the Sync screen. Done 2026-11-11: each sync schedules a local notification for 11 months later (`features/sync/inactivity.ts`, when the entitlement has `inactiveDays`), so only a phone that really stopped syncing gets it; it says gifted unlocks go too. The Sync screen shows "Photos on the server: x of 2 GB" and a note when nearly (90 %) or completely full. [S3, S4] Before hosted sync opens: the website promises the month-11 warning.
 - [x] **A5 Default server.** Done 2026-11-06: setting up and recovering use `https://sync.subby.baby`; the address field only shows after "Use your own server".
-- [ ] **A6 Small UX leftovers.**
+- [x] **A6 Small UX leftovers.**
   - ~~"Discard changes?" when leaving an editor with edits.~~ Done 2026-11-12 (`useConfirmDiscard`: entry, night and child forms).
-  - "waking" → "night waking" in NightForm (unanswered suggestion).
-  - "Medication given on another phone" notification (suggested, undecided).
+  - ~~"waking" → "night waking" in NightForm~~: decided 2026-11-12 to keep "waking".
+  - ~~"Medication given on another phone" notification~~: done 2026-11-12 (Settings → its own switch under the sleep ones, off by default; a new dose logged in the last 10 min and given in the last 12 h; a deleted dose is withdrawn).
 - [x] **A7 iOS bring-up** (if D6): prebuild, run on a device, SQLCipher, notifications, background task, the share sheet for backups, the camera/QR flow. [D6] Done 2026-11-12 on an iPad (iPadOS 27.2.1): SQLCipher, notifications, the background task (periodic run seen in diagnostics), backup share sheet and restore, camera/QR join, photos; minimum iOS 17.0. iPhone layout looked over on the iPhone 17e simulator (the smallest current size) with a seeded month: everything fits; fixed the "(tabs)" back title (chevron-only back buttons), a close button on iOS modals, and History's night block cut at midnight (also Android).
 - [x] **A8 S-15: iOS keychain `THIS_DEVICE_ONLY`**, plus an "identity lost → re-join" flow, because `deviceIdentity()` silently creates a new seed today. [A7] Done 2026-11-12: identity and family keys are device-only, a missing identity shows "This phone has to join the family again" (checked on the simulator: data kept, no new seed).
 - [x] **A9 APNs push**: server sender (`node:http2`, ES256 `.p8` JWT, background push), iOS token path, e2e fake. [A7, Apple account] Done 2026-11-12: key on the production server, a Pixel write woke the iPad in the background (diagnostics: push, ok); development builds go through the sandbox fallback.

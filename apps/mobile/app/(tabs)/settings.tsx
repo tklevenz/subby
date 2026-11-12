@@ -71,7 +71,7 @@ export default function SettingsScreen() {
   const notificationsOff = useNotificationsBlocked();
   const familyAlerts = useSettingsStore((s) => s.familyAlerts);
   const setFamilyAlerts = async (patch: Partial<typeof familyAlerts>) => {
-    if (patch.enabled && !(await requestNotifications())) return;
+    if ((patch.enabled || patch.medications) && !(await requestNotifications())) return;
     await setSetting('familyAlerts', { ...familyAlerts, ...patch });
   };
   const setSetting = useSettingsStore((s) => s.set);
@@ -148,6 +148,10 @@ export default function SettingsScreen() {
                 <Row label={t('settings.familyNights')} right={<Toggle value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
               </>
             ) : null}
+            <Row
+              label={t('settings.familyMeds')}
+              right={<Toggle value={familyAlerts.medications} onValueChange={(medications) => setFamilyAlerts({ medications })} disabled={!remindersAvailable} />}
+            />
           </Card>
           <Text className="text-ink-ghost text-xs mt-2 mx-1 leading-5">
             {t(familyAlerts.nights ? 'settings.familyNoteNights' : 'settings.familyNoteNaps')}

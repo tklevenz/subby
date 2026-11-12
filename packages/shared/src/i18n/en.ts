@@ -71,6 +71,9 @@ export const en = {
   'family.wokeUp': '{name} woke up',
   'family.napped': 'Napped {span} · logged on {phone}',
   'family.slept': 'Slept {span} · logged on {phone}',
+  'family.medGiven': "{name} got {medication}",
+  'family.medDoseAt': "{dose} at {time} · logged on {phone}",
+  'family.medAt': "At {time} · logged on {phone}",
 
   // A child's story of firsts.
   'story.born': 'Born',
@@ -507,6 +510,7 @@ export const en = {
   'settings.familySleep': 'When another phone logs a sleep',
   'settings.familyWake': 'And when they wake up',
   'settings.familyNights': 'Bedtime and morning too',
+  'settings.familyMeds': "When another phone logs medication",
   'settings.familyNoteNaps': "Naps, never night wakings. Each phone chooses for itself, so a grandparent's can stay quiet.",
   'settings.familyNoteNights': "Naps, bedtime and the morning, never night wakings. Each phone chooses for itself, so a grandparent's can stay quiet.",
   'settings.familyNoPush': " This server doesn't send pushes, so they only arrive while Subby is open.",

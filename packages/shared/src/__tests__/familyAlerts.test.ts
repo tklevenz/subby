@@ -33,7 +33,7 @@ describe('familyAlerts', () => {
       { kind: 'show', id: id(nap), title: 'Emma woke up', body: 'Napped 1h 20m · logged on Pixel 10', childId: nap.childId },
     ]);
     // Without wake-ups, the "asleep" one goes away instead.
-    expect(run([{ before: nap, after: up, by: 'x' }], at(0, 15, 3), [up], { enabled: true, wakeUps: false, nights: false })).toEqual([
+    expect(run([{ before: nap, after: up, by: 'x' }], at(0, 15, 3), [up], { enabled: true, wakeUps: false, nights: false, medications: false })).toEqual([
       { kind: 'dismiss', id: id(nap) },
     ]);
   });
@@ -50,7 +50,7 @@ describe('familyAlerts', () => {
   });
 
   it('tells about nights only when asked, and never about night wakings', () => {
-    const nights = { enabled: true, wakeUps: true, nights: true };
+    const nights = { enabled: true, wakeUps: true, nights: true, medications: false };
     const past = history(0);
     const bed = entry({ type: 'sleep', nap: false }, at(0, 19, 30), null);
     expect(run([{ before: null, after: bed, by: 'x' }], at(0, 19, 31), [...past, bed])).toEqual([]);
@@ -71,5 +71,31 @@ describe('familyAlerts', () => {
     expect(run([{ before: second, after: morning, by: 'x' }], at(1, 6, 36), [...past, first, morning], nights)).toEqual([
       { kind: 'show', id: id(bed), title: 'Emma woke up', body: 'Slept 10h 40m · logged on x', childId: bed.childId },
     ]);
+  });
+});
+
+describe('medication given on another phone', () => {
+  const settings = { ...DEFAULT_FAMILY_ALERTS, medications: true };
+  const medRun = (changes: PulledChange[], now: number, s = settings) =>
+    familyAlerts({ changes, settings: s, allowed: true, sleeps: () => [], childName: () => 'Emma', now, formatTime: hhmm });
+  const dose = (startedAt: number, loggedAt = startedAt) => ({ ...entry({ type: 'medication', name: 'Paracetamol', dose: 2.5, unit: 'ml' }, startedAt), updatedAt: loggedAt });
+  const medId = (e: LogEntry) => `${FAMILY_ALERT_ID_PREFIX}medication:${e.id}`;
+
+  it('tells about a new dose, with or without sleep alerts on', () => {
+    const d = dose(at(0, 14, 5));
+    expect(medRun([{ before: null, after: d, by: 'Pixel 9' }], at(0, 14, 6))).toEqual([
+      { kind: 'show', id: medId(d), title: 'Emma got Paracetamol', body: '2.5 ml at 14:05 · logged on Pixel 9', childId: d.childId },
+    ]);
+    const plain = { ...entry({ type: 'medication', name: 'Vitamin D' }, at(0, 8, 40)), updatedAt: at(0, 8, 41) };
+    expect(medRun([{ before: null, after: plain, by: 'Pixel 9' }], at(0, 8, 42))[0]).toMatchObject({ title: 'Emma got Vitamin D', body: 'At 08:40 · logged on Pixel 9' });
+  });
+
+  it('stays quiet when off, for edits, old news and doses long ago; a deleted dose is withdrawn', () => {
+    const d = dose(at(0, 14, 5));
+    expect(medRun([{ before: null, after: d, by: 'x' }], at(0, 14, 6), DEFAULT_FAMILY_ALERTS)).toEqual([]);
+    expect(medRun([{ before: d, after: { ...d, updatedAt: at(0, 14, 7) }, by: 'x' }], at(0, 14, 8))).toEqual([]);
+    expect(medRun([{ before: null, after: d, by: 'x' }], at(0, 14, 30))).toEqual([]); // the pull came late
+    expect(medRun([{ before: null, after: dose(at(0, 1), at(0, 14, 5)), by: 'x' }], at(0, 14, 6))).toEqual([]); // backdated 13 h
+    expect(medRun([{ before: d, after: { ...d, isDeleted: true }, by: 'x' }], at(0, 14, 9))).toEqual([{ kind: 'dismiss', id: medId(d) }]);
   });
 });

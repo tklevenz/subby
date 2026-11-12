@@ -59,6 +59,9 @@ export const es: Translation = {
   'family.wokeUp': '{name} se ha despertado',
   'family.napped': 'Siesta de {span} · registrada en {phone}',
   'family.slept': 'Durmió {span} · registrado en {phone}',
+  'family.medGiven': "{name} recibió {medication}",
+  'family.medDoseAt': "{dose} a las {time} · registrado en {phone}",
+  'family.medAt': "A las {time} · registrado en {phone}",
 
   'story.born': 'Nacimiento',
   'story.measured': 'Medidas: {parts}',
@@ -468,6 +471,7 @@ export const es: Translation = {
   'settings.familySleep': 'Cuando otro teléfono registra un sueño',
   'settings.familyWake': 'Y cuando se despierta',
   'settings.familyNights': 'También al acostarse y por la mañana',
+  'settings.familyMeds': "Cuando otro teléfono registra un medicamento",
   'settings.familyNoteNaps': 'Siestas, nunca despertares nocturnos. Cada teléfono elige por sí mismo, así el de los abuelos puede quedarse en silencio.',
   'settings.familyNoteNights': 'Siestas, hora de dormir y mañana, nunca despertares nocturnos. Cada teléfono elige por sí mismo, así el de los abuelos puede quedarse en silencio.',
   'settings.familyNoPush': ' Este servidor no envía notificaciones push, así que solo llegan con Subby abierta.',

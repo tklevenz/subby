@@ -59,6 +59,9 @@ export const ptBR: Translation = {
   'family.wokeUp': '{name} acordou',
   'family.napped': 'Soneca de {span} · registrado em {phone}',
   'family.slept': 'Dormiu {span} · registrado em {phone}',
+  'family.medGiven': "{name} recebeu {medication}",
+  'family.medDoseAt': "{dose} às {time} · registrado em {phone}",
+  'family.medAt': "Às {time} · registrado em {phone}",
 
   'story.born': 'Nascimento',
   'story.measured': 'Medidas: {parts}',
@@ -468,6 +471,7 @@ export const ptBR: Translation = {
   'settings.familySleep': 'Quando outro celular registra um sono',
   'settings.familyWake': 'E quando acorda',
   'settings.familyNights': 'Também na hora de dormir e ao acordar',
+  'settings.familyMeds': "Quando outro celular registra um medicamento",
   'settings.familyNoteNaps': 'Sonecas, nunca despertares noturnos. Cada celular escolhe por si, então o dos avós pode ficar em silêncio.',
   'settings.familyNoteNights': 'Sonecas, hora de dormir e despertar pela manhã, nunca despertares noturnos. Cada celular escolhe por si, então o dos avós pode ficar em silêncio.',
   'settings.familyNoPush': ' Este servidor não envia notificações push, então elas só chegam com o Subby aberto.',
