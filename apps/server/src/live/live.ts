@@ -3,7 +3,10 @@ import { WebSocketGateway, type OnGatewayConnection, type OnGatewayDisconnect } 
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket } from 'ws';
 import type { LiveMessage } from '@subby/shared/sync';
+import proxyAddr from '@fastify/proxy-addr';
 import { AuthService, RECOVERY } from '../auth/auth.service';
+import { CONFIG, type Config } from '../config';
+import { LIVE_LIMIT, RateLimiter } from '../common/rateLimit';
 
 /** Connected app sockets per family. In memory: one server instance (use Postgres LISTEN/NOTIFY to scale out). */
 @Injectable()
@@ -52,11 +55,19 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   private readonly heartbeat = setInterval(() => this.ping(), 30_000);
   private readonly alive = new WeakMap<WebSocket, boolean>();
   private readonly all = new Set<WebSocket>();
+  /** Upgrades don't pass Fastify's hooks, so the per-IP limit for opening sockets lives here. */
+  private readonly limiter = new RateLimiter();
+  private readonly clientIp: (req: IncomingMessage) => string;
 
   constructor(
     @Inject(AuthService) private readonly auth: AuthService,
     @Inject(LiveBus) private readonly bus: LiveBus,
-  ) {}
+    @Inject(CONFIG) private readonly config: Config,
+  ) {
+    // The client's IP as Fastify sees it (`request.ip`): behind the proxies TRUST_PROXY names, X-Forwarded-For.
+    const trust = config.trustProxy ? proxyAddr.compile(config.trustProxy.split(',').map((v) => v.trim())) : null;
+    this.clientIp = (req) => (trust ? proxyAddr(req, trust) : (req.socket.remoteAddress ?? ''));
+  }
 
   // Nest drops the promise this returns: an error here (the database unreachable for a moment) must be caught, or
   // it's an unhandled rejection, which ends the whole process.
@@ -70,6 +81,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   }
 
   private async connect(socket: WebSocket, req: IncomingMessage) {
+    // Before the token's database lookup: a script opening sockets in a loop is stopped here.
+    if (this.config.rateLimit && this.limiter.take(`live:${this.clientIp(req)}`, LIVE_LIMIT)) return socket.close(1013, 'Too many connections, try again later');
     const token = new URL(req.url ?? '', 'http://localhost').searchParams.get('token') ?? undefined;
     const auth = await this.auth.authenticate(token);
     if (!auth || auth.deviceId === RECOVERY) return socket.close(4401, 'Unauthorized');

@@ -10,6 +10,10 @@
 		Referrer-Policy no-referrer
 		-Server
 	}
+	# The server's largest body is a photo (MAX_BLOB_BYTES, 20 MiB); anything bigger stops here.
+	request_body {
+		max_size 24MB
+	}
 	reverse_proxy server:8787
 }
 

@@ -23,7 +23,8 @@ export class DeviceGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthedRequest>();
-    const auth = await this.auth.authenticate(bearer(req.headers.authorization));
+    // The body gate (common/bodyGate.ts) already looked up the session of a request with a body.
+    const auth = req.auth ?? (await this.auth.authenticate(bearer(req.headers.authorization)));
     if (!auth) throw new UnauthorizedException();
     if (auth.deviceId === RECOVERY && !this.allowRecovery) throw new ForbiddenException('Not allowed with the recovery key');
     req.auth = auth;

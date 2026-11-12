@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@subby/shared/crypto';
+import { WebSocket as WsClient } from 'ws';
+import { OPEN_BODY_LIMIT } from '../src/common/bodyGate';
 import { MAX_CLOCK_AHEAD_MS, openRecord, type EntitlementResponse, type PullResponse } from '@subby/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
@@ -1376,6 +1378,39 @@ describe.skipIf(!reachable)('sync server', () => {
     });
   });
 
+  describe('bodies before a session', () => {
+    it('refuses a body on a member route without a valid session, before reading it', async () => {
+      const big = 'x'.repeat(8 * 1024 * 1024);
+      for (const authorization of [undefined, 'Bearer not-a-token']) {
+        const res = await fetch(`${url}/v1/sync/push`, { method: 'POST', headers: { 'content-type': 'application/json', ...(authorization ? { authorization } : {}) }, body: big });
+        expect(res.status).toBe(401);
+      }
+      const blob = await fetch(`${url}/v1/blobs/${randomUUID()}`, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(1024 * 1024) });
+      expect(blob.status).toBe(401);
+    });
+
+    it('caps bodies on the open routes, with or without a length', async () => {
+      const body = JSON.stringify({ pad: 'x'.repeat(OPEN_BODY_LIMIT) });
+      const sized = await fetch(`${url}/v1/auth/challenge`, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+      expect(sized.status).toBe(413);
+      // Chunked: no content-length, counted as it arrives.
+      const chunked = await fetch(`${url}/v1/families`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: new ReadableStream({ start: (c) => (c.enqueue(new TextEncoder().encode(body)), c.close()) }),
+        duplex: 'half',
+      } as RequestInit);
+      expect(chunked.status).toBe(413);
+      // Small ones still reach the route (and fail its own validation).
+      expect((await fetch(`${url}/v1/auth/challenge`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(400);
+    });
+
+    it('lets members and the recovery key through as before', async () => {
+      const { a } = await pairedFamily();
+      expect((await a.push([a.seal('log', randomUUID(), {})])).accepted).toHaveLength(1);
+    });
+  });
+
   describe('rate limits', () => {
     it('answers 429 past the limit, per client IP as told by a trusted proxy', async () => {
       const limited = await createApp({
@@ -1402,6 +1437,17 @@ describe.skipIf(!reachable)('sync server', () => {
         expect((await challenge('203.0.113.2')).status).toBe(400);
         // Other routes have their own budget.
         expect((await fetch(`${base}/v1/info`, { headers: { 'x-forwarded-for': '203.0.113.1' } })).status).toBe(200);
+
+        // Live sockets: upgrades skip Fastify's hooks, so the gateway counts them per client IP itself.
+        const open = (ip: string) =>
+          new Promise<number>((resolve) => {
+            const ws = new WsClient(`${base.replace(/^http/, 'ws')}/v1/live?token=x`, { headers: { 'x-forwarded-for': ip } });
+            ws.on('close', (code) => resolve(code));
+            ws.on('error', () => {});
+          });
+        for (let i = 0; i < 30; i++) expect(await open('203.0.113.7')).toBe(4401); // through the limit, then no session
+        expect(await open('203.0.113.7')).toBe(1013);
+        expect(await open('203.0.113.8')).toBe(4401);
       } finally {
         await limited.close();
       }

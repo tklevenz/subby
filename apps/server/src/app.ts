@@ -23,6 +23,7 @@ import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
 import { PurchasesController, PurchasesService } from './purchases/purchases';
 import { installRateLimits } from './common/rateLimit';
+import { installBodyGate } from './common/bodyGate';
 import { Metrics } from './common/metrics';
 import { MAX_BLOB_BYTES, MAX_REQUEST_BYTES } from '@subby/shared/sync';
 
@@ -124,6 +125,7 @@ export async function createApp(config: Config) {
   const metrics = app.get(Metrics);
   metrics.install(fastify);
   if (config.rateLimit) installRateLimits(fastify);
+  installBodyGate(fastify, app.get(AuthService));
   // Encrypted files arrive as raw bytes.
   fastify.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_BLOB_BYTES + 1 }, (_req, body, done) => done(null, body));
   app.useWebSocketAdapter(new WsAdapter(app));

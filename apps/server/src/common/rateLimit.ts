@@ -25,16 +25,24 @@ export const RULES: { name: string; method: string; path: RegExp; limit: Limit }
 /** Everything else (sync push and pull pages, keys, the log, blob downloads). */
 export const DEFAULT_LIMIT: Limit = { burst: 600, perMinute: 600 };
 
-export function ruleFor(method: string, url: string): { name: string; limit: Limit } {
-  // Matched on the decoded path, as the router routes it: /v1/f%61milies is /v1/families.
-  let path = url.split('?')[0]!;
+/** A request's path as the router routes it: decoded (/v1/f%61milies is /v1/families), without the query. */
+export function routedPath(url: string): string {
+  const path = url.split('?')[0]!;
   try {
-    path = decodeURIComponent(path);
+    return decodeURIComponent(path);
   } catch {
     // Not valid percent-encoding: the router refuses it too.
+    return path;
   }
+}
+
+export function ruleFor(method: string, url: string): { name: string; limit: Limit } {
+  const path = routedPath(url);
   return RULES.find((r) => r.method === method && r.path.test(path)) ?? { name: 'default', limit: DEFAULT_LIMIT };
 }
+
+/** Opening a live socket (`/v1/live`): an app keeps one, reconnecting when it comes back or changes networks. */
+export const LIVE_LIMIT: Limit = { burst: 30, perMinute: 30 };
 
 /** Bounded: past `maxKeys`, the least recently used client is forgotten (it starts again with a full bucket). */
 export class RateLimiter {
