@@ -59,6 +59,7 @@ export async function diagnostics(now = Date.now()): Promise<string> {
     lines.push(
       `Sync: ${sync.phase}${sync.progress ? ` (${sync.progress.label})` : ''}, server: ${isOfficialServer(s.sync.server) ? 'Subby Sync' : 'own server'}`,
       `Last synced: ${when(s.sync.lastSyncedAt, now)}`,
+      `Last background run: ${s.sync.lastBackground ? `${when(s.sync.lastBackground.at, now)}, ${s.sync.lastBackground.via}, ${s.sync.lastBackground.ok ? 'ok' : 'failed'}` : 'none yet'}`,
       `Last error: ${sync.lastError ? `${sync.lastError.message}, ${when(sync.lastError.at, now)}` : 'none since the app started'}`,
       `Waiting to upload: ${sync.pending}${sync.tooLarge ? `, too large for the server: ${sync.tooLarge}` : ''}`,
       `Pulled up to: ${s.sync.lastSeq}${s.sync.restoreGen ? `, server restores seen: ${s.sync.restoreGen}` : ''}`,

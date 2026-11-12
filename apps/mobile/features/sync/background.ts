@@ -29,17 +29,24 @@ export async function backgroundSync() {
   await replanReminders();
 }
 
-// Task definitions must run when the JS bundle loads, including headless background launches.
-TaskManager?.defineTask(SYNC_TASK, async () => {
+/** A run started by the system, noted for diagnostics. */
+async function backgroundRun(via: 'periodic' | 'push'): Promise<boolean> {
+  let ok = true;
   try {
     await backgroundSync();
-    return BackgroundTask!.BackgroundTaskResult.Success;
   } catch {
-    return BackgroundTask!.BackgroundTaskResult.Failed;
+    ok = false;
   }
-});
+  await saveSync({ lastBackground: { at: Date.now(), via, ok } }).catch(() => {});
+  return ok;
+}
+
+// Task definitions must run when the JS bundle loads, including headless background launches.
+TaskManager?.defineTask(SYNC_TASK, async () =>
+  (await backgroundRun('periodic')) ? BackgroundTask!.BackgroundTaskResult.Success : BackgroundTask!.BackgroundTaskResult.Failed,
+);
 TaskManager?.defineTask(PUSH_TASK, async () => {
-  await backgroundSync().catch(() => {});
+  await backgroundRun('push');
 });
 
 /**

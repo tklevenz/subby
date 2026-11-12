@@ -57,6 +57,8 @@ export type SyncSettings = {
   since?: number;
   /** The Home card suggesting a recovery key was dismissed (per family: joining another one shows it again). */
   recoveryNudgeDismissed?: boolean;
+  /** The last sync run started by the system in the background (diagnostics: whether it ever runs on this phone). */
+  lastBackground?: { at: number; via: 'periodic' | 'push'; ok: boolean };
 };
 
 export type HomeTile = 'sleep' | 'feed' | 'diaper';
