@@ -6,6 +6,7 @@ import { appReady } from '../startup';
 import { optionalModule } from '../optionalModule';
 import { replanReminders } from '../reminders/scheduler';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import type { RegisterPushResponse } from '@subby/shared/sync';
 import { checkServer } from './api';
 import { syncNow } from './engine';
 import { saveSync, sessionFor, syncSettings } from './state';
@@ -61,7 +62,8 @@ export async function setUpBackgroundSync() {
   }
 
   const { push = false } = await checkServer(settings.server);
-  if (push !== settings.push) await saveSync({ push });
+  // Push on means the server can wake this phone: it sends pushes and kept this phone's token (below).
+  if (!push && settings.push) await saveSync({ push: false });
   if (!push || !Notifications) return;
   if (!(await TaskManager.isTaskRegisteredAsync(PUSH_TASK))) await Notifications.registerTaskAsync(PUSH_TASK);
 
@@ -71,11 +73,16 @@ export async function setUpBackgroundSync() {
   try {
     token = String((await Notifications.getDevicePushTokenAsync()).data);
   } catch {
+    if (!settings.push) await saveSync({ push: true }); // pushes, but this build has no token (no google-services.json)
     return;
   }
-  if (token === settings.pushToken) return;
-  await sessionFor(settings).request('PUT', '/v1/push/token', { token, platform: Platform.OS === 'ios' ? 'ios' : 'android' });
-  await saveSync({ pushToken: token });
+  if (token === settings.pushToken && settings.push) return;
+  // A server that can't send to this platform (an iPhone, without an APNs key) doesn't keep it: asked again next time.
+  const { kept = true } = await sessionFor(settings).request<Partial<RegisterPushResponse>>('PUT', '/v1/push/token', {
+    token,
+    platform: Platform.OS === 'ios' ? 'ios' : 'android',
+  });
+  await saveSync({ push: kept, pushToken: kept ? token : undefined });
 }
 
 /** Turning sync off: nothing left to do in the background. */

@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, HttpCode, Inject, Injectable, Put, UseGuards, type OnModuleDestroy } from '@nestjs/common';
 import { and, eq, inArray, ne } from 'drizzle-orm';
-import { RegisterPushSchema } from '@subby/shared/sync';
+import { RegisterPushSchema, type RegisterPushResponse } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { GoogleAuth } from '../common/google';
 import { DB, schema, type Db } from '../db/db';
@@ -52,10 +52,12 @@ export class PushService implements OnModuleDestroy {
     this.pending.clear();
   }
 
+  /** Keeps the token if this server can send to its platform; returns whether it did. */
   async register(auth: AuthContext, token: string, platform: 'android' | 'ios') {
-    if (!this.reaches(platform)) return; // nothing would be sent, so don't keep the token
+    if (!this.reaches(platform)) return false; // nothing would be sent, so don't keep the token
     const row = { deviceId: auth.deviceId, familyId: auth.familyId, token, platform, updatedAt: Date.now() };
     await this.db.insert(schema.pushTokens).values(row).onConflictDoUpdate({ target: schema.pushTokens.deviceId, set: row });
+    return true;
   }
 
   async unregister(auth: AuthContext) {
@@ -150,12 +152,12 @@ type PushToken = { deviceId: string; token: string; platform: string };
 export class PushController {
   constructor(@Inject(PushService) private readonly push: PushService) {}
 
-  /** Registers (or replaces) this phone's push token. Accepted on every server; only hosted ones send. */
+  /** Registers (or replaces) this phone's push token. Accepted on every server; kept where it can be sent to. */
   @Put('token')
-  @HttpCode(204)
-  async register(@Auth() auth: AuthContext, @Body() body: unknown) {
+  @HttpCode(200)
+  async register(@Auth() auth: AuthContext, @Body() body: unknown): Promise<RegisterPushResponse> {
     const { token, platform } = parse(RegisterPushSchema, body);
-    await this.push.register(auth, token, platform);
+    return { kept: await this.push.register(auth, token, platform) };
   }
 
   @Delete('token')

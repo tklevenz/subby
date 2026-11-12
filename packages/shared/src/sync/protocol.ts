@@ -201,6 +201,11 @@ export type PullResponse = {
 
 /** PUT /v1/push/token: this phone's own push token (FCM on Android, APNs on iOS). `GET /v1/info` says whether the server sends pushes. */
 export const RegisterPushSchema = z.object({ token: z.string().min(1).max(4096), platform: z.enum(['android', 'ios']).default('android') });
+/**
+ * Whether the server kept the token: only if it can send to that platform (an iPhone on a server without an APNs
+ * key isn't kept, and registers again later). Older servers answer 204 with no body: kept.
+ */
+export type RegisterPushResponse = { kept: boolean };
 
 // --- payments (hosted Subby Sync only; PROJECT.md §3) ---------------------------------------------------
 

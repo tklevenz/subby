@@ -795,6 +795,12 @@ describe.skipIf(!reachable)('sync server', () => {
       await until(() => apnsPushed.some((m) => m.to === tokenB), 5000);
     });
 
+    it('says whether it kept a token, so a phone asks again once its platform can be reached', async () => {
+      const { a } = await pairedFamily();
+      expect(await register(a, `fcm-${randomUUID()}`)).toEqual({ kept: true });
+      expect(await register(a, `apns-${randomUUID()}`, 'ios')).toEqual({ kept: true });
+    });
+
     it('a phone can replace or remove its token', async () => {
       const { a } = await pairedFamily();
       await register(a, 'fcm-one');
