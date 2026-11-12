@@ -78,9 +78,9 @@ These block tickets further down.
   - "Discard changes?" when leaving an editor with edits.
   - "waking" → "night waking" in NightForm (unanswered suggestion).
   - "Medication given on another phone" notification (suggested, undecided).
-- [ ] **A7 iOS bring-up** (if D6): prebuild, run on a device, SQLCipher, notifications, background task, the share sheet for backups, the camera/QR flow. [D6]
+- [x] **A7 iOS bring-up** (if D6): prebuild, run on a device, SQLCipher, notifications, background task, the share sheet for backups, the camera/QR flow. [D6] Done 2026-11-12 on an iPad (iPadOS 27.2.1): SQLCipher, notifications, the background task (periodic run seen in diagnostics), backup share sheet and restore, camera/QR join, photos; minimum iOS 17.0. Layout on iPhone screens still to look over (A15 left iOS open).
 - [x] **A8 S-15: iOS keychain `THIS_DEVICE_ONLY`**, plus an "identity lost → re-join" flow, because `deviceIdentity()` silently creates a new seed today. [A7] Done 2026-11-12: identity and family keys are device-only, a missing identity shows "This phone has to join the family again" (checked on the simulator: data kept, no new seed).
-- [ ] **A9 APNs push**: server sender (`node:http2`, ES256 `.p8` JWT, background push), iOS token path, e2e fake. [A7, Apple account] Server and e2e done 2026-11-12 (sandbox fallback, no app change needed); device test needs the APNs key on the server.
+- [x] **A9 APNs push**: server sender (`node:http2`, ES256 `.p8` JWT, background push), iOS token path, e2e fake. [A7, Apple account] Done 2026-11-12: key on the production server, a Pixel write woke the iPad in the background (diagnostics: push, ok); development builds go through the sandbox fallback.
 - [x] ~~**A10 Crash reporting**~~: not needed (D9).
 - [ ] **A11 About / legal in Settings**: version, licenses (MIT/AGPL, Font Awesome credit already there), privacy policy and terms links, source code link. [L1, L2]
 - [ ] **A13 Move to another server** (Sync screen; official ↔ self-hosted, either way), without re-pairing. Built 2026-11-06 (shared log checks, app, server, e2e between two servers); not yet tried on phones.
