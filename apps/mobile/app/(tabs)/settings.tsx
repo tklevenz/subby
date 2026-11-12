@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +54,9 @@ async function showDiagnostics() {
     { text: t('settings.share'), onPress: () => void Share.share({ message: text }) },
   ]);
 }
+
+const PRIVACY_URL = 'https://subby.baby/privacy/'; // i18n-ignore
+const SOURCE_URL = 'https://github.com/tklevenz/subby'; // i18n-ignore
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -191,6 +194,13 @@ export default function SettingsScreen() {
       <SectionLabel>{t('settings.help')}</SectionLabel>
       <Card>
         <Row label={t('settings.diagnostics')} onPress={showDiagnostics} right={<Chevron />} />
+      </Card>
+
+      <SectionLabel>{t('settings.about')}</SectionLabel>
+      <Card>
+        <Row label={t('settings.privacy')} onPress={() => void Linking.openURL(PRIVACY_URL)} right={<Chevron />} />
+        <Row label={t('settings.sourceCode')} onPress={() => void Linking.openURL(SOURCE_URL)} right={<Chevron />} />
+        <Row label={t('settings.licenses')} onPress={() => router.push('/licenses')} right={<Chevron />} />
       </Card>
 
       <View className="mt-10 items-center">

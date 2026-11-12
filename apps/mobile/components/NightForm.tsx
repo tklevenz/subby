@@ -1,5 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { confirmDestructive } from './confirmDestructive';
+import { useConfirmDiscard } from './useConfirmDiscard';
 import React, { useRef, useState } from 'react';
 import { ScreenScroll } from './ScreenScroll';
 import { Pressable, Text, View } from 'react-native';
@@ -59,6 +60,7 @@ export default function NightForm({ night }: { night: Night }) {
     wakeUp !== night.end ||
     JSON.stringify(wakings) !== JSON.stringify(initialWakings) ||
     payloadChanged;
+  const leave = useConfirmDiscard(changed);
 
   const setWaking = (i: number, w: Partial<Waking>) => setRows((cur) => cur.map((x, j) => (j === i ? { ...x, ...w } : x)));
   const addWaking = () => {
@@ -85,6 +87,7 @@ export default function NightForm({ night }: { night: Night }) {
       else if (existing.startedAt !== start || existing.endedAt !== end) update.push({ id: existing.id, patch: { startedAt: start, endedAt: end } });
     }
     await writeLogs({ add, update, remove: joined.map((p) => p.id) });
+    leave();
     router.back();
   });
 
@@ -95,6 +98,7 @@ export default function NightForm({ night }: { night: Night }) {
       action: t('common.delete'),
       onConfirm: async () => {
         await deleteLogs(night.pieces.map((p) => p.id));
+        leave();
         router.back();
       },
     });

@@ -98,6 +98,7 @@ export default function RootLayout() {
           <Stack.Screen name="growth" options={header(t('screen.growth'))} />
           <Stack.Screen name="solids" options={header(t('screen.solids'))} />
           <Stack.Screen name="export" options={header(t('screen.export'))} />
+          <Stack.Screen name="licenses" options={header(t('screen.licenses'))} />
           <Stack.Screen name="schedule" options={header(t('screen.schedule'))} />
           <Stack.Screen name="child/new" options={header(t('screen.addChild'), { modal: true })} />
           <Stack.Screen name="child/[id]/index" options={{ headerShown: false }} />

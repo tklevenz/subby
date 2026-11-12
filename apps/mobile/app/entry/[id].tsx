@@ -18,6 +18,7 @@ import { SubSpinner } from '../../components/brand/loaders';
 import NightForm from '../../components/NightForm';
 import { useLogQuery } from '../../store/queries';
 import { useSingleFlight } from '../../components/useSingleFlight';
+import { useConfirmDiscard } from '../../components/useConfirmDiscard';
 
 
 /** Edit/backdate any log entry, including ones older than the loaded window. */
@@ -67,12 +68,14 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const overlap = useSleepOverlap(entry.logType === 'sleep', startedAt, endedAt, entry.id);
   // Save lights up only once something changed.
   const changed = startedAt !== entry.startedAt || endedAt !== entry.endedAt || payloadChanged;
+  const leave = useConfirmDiscard(changed);
 
   const once = useSingleFlight();
   const save = once(async () => {
     // Stopping a running breastfeed here: fold the running side's time into its total.
     const stopped = entry.endedAt === null && endedAt !== null && payload.type === 'feed';
     await updateLog(entry.id, { payload: stopped ? pauseFeed(payload, endedAt) : payload, startedAt, endedAt });
+    leave();
     router.back();
   });
 
@@ -83,6 +86,7 @@ function EntryForm({ entry }: { entry: LogEntry }) {
       action: t('common.delete'),
       onConfirm: async () => {
         await softDeleteLog(entry.id);
+        leave();
         router.back();
       },
     });

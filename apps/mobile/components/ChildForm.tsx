@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { useConfirmDiscard } from './useConfirmDiscard';
 import React, { useState } from 'react';
 import { Pressable, View, Text } from 'react-native';
 import { Camera } from './icons';
@@ -36,6 +37,9 @@ export default function ChildForm({
   const [sex, setSex] = useState<Child['sex']>(initial?.sex ?? null);
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photoUri ?? null);
   const [menu, setMenu] = useState(false);
+  const leave = useConfirmDiscard(
+    name !== (initial?.name ?? '') || birthDate !== (initial?.birthDate ?? toIsoDate(Date.now())) || sex !== (initial?.sex ?? null) || photoUri !== (initial?.photoUri ?? null),
+  );
 
   return (
     <View>
@@ -66,7 +70,10 @@ export default function ChildForm({
       <Button
         label={submitLabel}
         disabled={name.trim().length === 0}
-        onPress={() => onSubmit({ name: name.trim(), birthDate, sex, photoUri })}
+        onPress={() => {
+          leave();
+          onSubmit({ name: name.trim(), birthDate, sex, photoUri });
+        }}
       />
     </View>
   );
