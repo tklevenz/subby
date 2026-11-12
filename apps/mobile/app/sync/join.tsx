@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
-import React, { useRef, useState } from 'react';
-import { Text, View, useWindowDimensions } from 'react-native';
+import React, { useRef, useState, useSyncExternalStore } from 'react';
+import { AppState, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimInvite, finishJoin, hasLocalData, joinStatus, type Join } from '../../features/sync/family';
@@ -100,9 +100,22 @@ export default function JoinScreen() {
   );
 }
 
+/** Whether the app is in the foreground. iOS makes the app `inactive` while the
+ *  camera permission alert dismisses; a camera started then stays black. */
+function useAppActive(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const sub = AppState.addEventListener('change', onChange);
+      return () => sub.remove();
+    },
+    () => AppState.currentState === 'active',
+  );
+}
+
 function Scan({ onCode }: { onCode: (text: string) => void }) {
   const { width } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
+  const active = useAppActive();
   const [pasted, setPasted] = useState('');
   const scanned = useRef(false);
   const size = Math.min(width - 32, 360);
@@ -114,7 +127,7 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
       </Lead>
 
       <View style={{ width: size, height: size }} className="self-center rounded-2xl overflow-hidden bg-raised mt-6 items-center justify-center">
-        {permission?.granted ? (
+        {permission?.granted && active ? (
           <CameraView
             style={{ width: size, height: size }}
             facing="back"
@@ -125,7 +138,7 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
               onCode(data);
             }}
           />
-        ) : (
+        ) : permission?.granted ? null : (
           <View className="w-full px-6">
             <Text className="text-ink-soft text-center">{t('join.cameraOnly')}</Text>
             <Button label={t('join.allowCamera')} onPress={requestPermission} />
