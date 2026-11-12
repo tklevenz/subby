@@ -88,18 +88,6 @@ export async function turnOffSync() {
   await forgetSync();
 }
 
-/**
- * Deletes the family and everything the server holds for it (records, photos, keys, recovery key), then turns
- * sync off here. Every phone keeps its own data; the others see it like being removed. Throws if the server
- * can't be reached, so nothing is forgotten here while the data is still there.
- */
-export async function deleteFamilyOnServer() {
-  const settings = syncSettings();
-  if (!settings) return;
-  await sessionFor(settings).deleteFamily();
-  await forgetSync();
-}
-
 /** After switching servers (a move): the next request logs in to the new one, and live reconnects there. */
 export function forgetSession() {
   closeLive();

@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { useActiveChild } from '../../store/useActiveChild';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
-import { defaultDeviceName, deleteFamilyOnServer, pushDeviceName, setUpSync, syncNow, turnOffSync } from '../../features/sync/engine';
+import { defaultDeviceName, pushDeviceName, setUpSync, syncNow, turnOffSync } from '../../features/sync/engine';
 import { useShallow } from 'zustand/react/shallow';
 import { useSyncStore } from '../../features/sync/state';
 import { progressLabel } from '../../components/SyncSteps';
@@ -97,14 +97,6 @@ function Status() {
       onConfirm: () => turnOffSync(),
     });
 
-  const confirmDelete = () =>
-    confirmDestructive({
-      title: t('syncScreen.deleteTitle'),
-      text: t('syncScreen.deleteText'),
-      action: t('common.delete'),
-      onConfirm: () => deleteFamilyOnServer().catch((e: unknown) => Alert.alert(t('syncScreen.deleteFailed'), errorMessage(e))),
-    });
-
   if (removed) {
     return (
       <>
@@ -153,7 +145,6 @@ function Status() {
 
       <View className="mt-4">
         <Button label={t('syncScreen.turnOffHere')} variant="dangerQuiet" onPress={confirmOff} />
-        {!lastPhone ? <Button label={t('syncScreen.deleteFamily')} variant="dangerQuiet" onPress={confirmDelete} /> : null}
       </View>
       <AccessDevTools />
     </>

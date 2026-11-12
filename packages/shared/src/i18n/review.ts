@@ -29,8 +29,6 @@ export const REVIEW_KEYS: readonly string[] = [
   'syncScreen.offTitle',
   'syncScreen.offLast',
   'syncScreen.offLeave',
-  'syncScreen.deleteTitle',
-  'syncScreen.deleteText',
   'syncScreen.removeTitle',
   'syncScreen.removeText',
   'syncScreen.removedText',
