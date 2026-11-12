@@ -20,8 +20,12 @@ function hasClientFor(file, pkg) {
 }
 
 module.exports = ({ config }) => {
-  const plugins = [...config.plugins];
-  if (process.env.SUBBY_ALLOW_HTTP === '1') plugins.push(['expo-build-properties', { android: { usesCleartextTraffic: true } }]);
+  // app.json's expo-build-properties entry (the iOS minimum) gets the cleartext switch merged in.
+  const plugins = config.plugins.map((p) =>
+    Array.isArray(p) && p[0] === 'expo-build-properties' && process.env.SUBBY_ALLOW_HTTP === '1'
+      ? [p[0], { ...p[1], android: { ...p[1]?.android, usesCleartextTraffic: true } }]
+      : p,
+  );
   const googleServices = process.env.GOOGLE_SERVICES_JSON ?? './google-services.json';
   const googleServicesPath = path.resolve(__dirname, googleServices);
   let android = config.android;

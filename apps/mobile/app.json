@@ -98,7 +98,15 @@
           }
         }
       ],
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

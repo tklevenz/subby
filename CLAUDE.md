@@ -81,6 +81,7 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
 
 ### `apps/mobile`
 - **Config:**
+  - Minimum iOS 17.0 (`expo-build-properties` `ios.deploymentTarget` in `app.json`): the pods are built for Xcode's recommended minimum (17.0 with Xcode 27), so the app can't claim 16.4. Raise it with the Xcode toolchain.
   - `app.json`: name Subby; icons and splash from `assets/` (see below); plugins `expo-router`, `expo-splash-screen`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), `expo-notifications`, `expo-background-task`. No system date picker (see `DateTimeField`).
   - **Brand assets:** `assets/brand/*.svg` are the sources; the PNGs in `assets/` are rendered from them at their declared size (we used `@resvg/resvg-js`, outside the repo). Re-render after editing an SVG, then prebuild. `icon` (full bleed, iOS rounds it), `adaptive-icon` + `adaptive-icon-monochrome` (Android, framed inside the safe zone), `splash-icon` (same framing, so Android 12+'s round mask doesn't clip it), `notification-icon` (white, tinted `#FFC93C`), `tile` (rounded, for in-app use).
   - The native splash stays up until the database is open (`SplashScreen.preventAutoHideAsync` in `_layout`, hidden after `appReady()`), so there's no spinner at start.
