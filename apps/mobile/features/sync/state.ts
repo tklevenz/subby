@@ -16,6 +16,8 @@ export type SyncStatus = {
   newDevices: string[];
   /** Another phone removed this one from the family: it can only turn sync off. */
   removed: boolean;
+  /** This phone's sync identity is gone (a restored backup, a new phone): it can only turn sync off and join again. */
+  identityLost: boolean;
   /** Whether the family has a recovery key (from the verified device log). */
   hasRecovery: boolean;
   /** Local changes too large for the server, left unsynced (a very long note). */
@@ -36,6 +38,7 @@ export const INITIAL_STATUS: SyncStatus = {
   members: [],
   newDevices: [],
   removed: false,
+  identityLost: false,
   hasRecovery: false,
   tooLarge: 0,
   movedTo: null,

@@ -69,8 +69,8 @@ function SetUp() {
 function Status() {
   const sync = useSettingsStore((s) => s.sync)!;
   // Only the fields shown, so a change to the others (lastError, movedTo) doesn't re-render the screen.
-  const { phase, error, pending: waiting, progress, removed, tooLarge, members } = useSyncStore(
-    useShallow((s) => ({ phase: s.phase, error: s.error, pending: s.pending, progress: s.progress, removed: s.removed, tooLarge: s.tooLarge, members: s.members })),
+  const { phase, error, pending: waiting, progress, removed, identityLost, tooLarge, members } = useSyncStore(
+    useShallow((s) => ({ phase: s.phase, error: s.error, pending: s.pending, progress: s.progress, removed: s.removed, identityLost: s.identityLost, tooLarge: s.tooLarge, members: s.members })),
   );
   // Entries too large to sync stay pending; they're reported on their own, not as "waiting".
   const pending = Math.max(0, waiting - tooLarge);
@@ -96,6 +96,17 @@ function Status() {
       action: t('syncScreen.turnOff'),
       onConfirm: () => turnOffSync(),
     });
+
+  // A restored backup or a new phone: the data came along, this phone's place in the family didn't.
+  if (identityLost) {
+    return (
+      <>
+        <ScreenTitle>{t('sync.error.identityLost')}</ScreenTitle>
+        <Lead className="mt-2">{t('syncScreen.identityLostText')}</Lead>
+        <Button label={t('syncScreen.joinAgain')} onPress={() => void turnOffSync().then(() => router.push('/sync/join'))} />
+      </>
+    );
+  }
 
   if (removed) {
     return (

@@ -159,7 +159,8 @@ Roadmap: see `PROJECT.md` §5. The feature-parity plan (Huckleberry + Baby Buddy
   - The API key is never persisted. Only `settings.bbUrl` is remembered.
   - Opt-in tests that hit real data (kept outside the repo): `BB_DUMP=<all.json> pnpm --filter @subby/shared test`, `BB_URL=… BB_TOKEN=… npx vitest run client` in `apps/mobile`.
 - **Sync (`features/sync/`, the client of `apps/server`):**
-  - `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore. It installs `expo-crypto` as the shared crypto's random source on import.
+  - `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`: never in an iOS backup or on another phone; `kl.dbKey` stays `AFTER_FIRST_UNLOCK`, so a restored backup brings the data). It installs `expo-crypto` as the shared crypto's random source on import.
+    - `deviceIdentity()` never makes up a seed: a missing one throws `IdentityLostError`, and a run sets `useSyncStore.identityLost` (Sync screen: "This phone has to join the family again", Join again = turn sync off, keep the data, open Join). Only setting up, joining and recovering call `ensureDeviceIdentity()`. Tested on the simulator by deleting the `cku` items from its keychain db (`simctl keychain reset` would take the database key too).
   - `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401.
   - `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
     - `isValidBody` checks every pulled body before `applyPage` writes it; malformed records are skipped.

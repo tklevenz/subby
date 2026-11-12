@@ -79,7 +79,7 @@ These block tickets further down.
   - "waking" → "night waking" in NightForm (unanswered suggestion).
   - "Medication given on another phone" notification (suggested, undecided).
 - [ ] **A7 iOS bring-up** (if D6): prebuild, run on a device, SQLCipher, notifications, background task, the share sheet for backups, the camera/QR flow. [D6]
-- [ ] **A8 S-15: iOS keychain `THIS_DEVICE_ONLY`**, plus an "identity lost → re-join" flow, because `deviceIdentity()` silently creates a new seed today. [A7]
+- [x] **A8 S-15: iOS keychain `THIS_DEVICE_ONLY`**, plus an "identity lost → re-join" flow, because `deviceIdentity()` silently creates a new seed today. [A7] Done 2026-11-12: identity and family keys are device-only, a missing identity shows "This phone has to join the family again" (checked on the simulator: data kept, no new seed).
 - [ ] **A9 APNs push**: server sender (`node:http2`, ES256 `.p8` JWT, background push), iOS token path, e2e fake. [A7, Apple account]
 - [x] ~~**A10 Crash reporting**~~: not needed (D9).
 - [ ] **A11 About / legal in Settings**: version, licenses (MIT/AGPL, Font Awesome credit already there), privacy policy and terms links, source code link. [L1, L2]

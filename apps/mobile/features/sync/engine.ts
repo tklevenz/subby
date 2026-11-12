@@ -29,7 +29,7 @@ import { activeChildOf } from '../../store/useActiveChild';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
 import { notifyFamily } from '../reminders/family';
-import { clearSyncSecrets, deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
+import { IdentityLostError, clearSyncSecrets, deviceIdentity, ensureDeviceIdentity, hasDeviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, childToBody, logToBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
 import { canWrite, forgetAccess, refreshEntitlement, useAccessStore } from './access';
@@ -59,7 +59,7 @@ export async function setUpSync(serverInput: string, deviceName: string) {
   const server = normalizeServerUrl(serverInput);
   await checkServer(server);
 
-  const identity = deviceIdentity();
+  const identity = ensureDeviceIdentity();
   const deviceId = uuidv7();
   const familyId = uuidv7();
   const keys = { sign: identity.sign.publicKey, box: identity.box.publicKey };
@@ -163,6 +163,7 @@ async function runOnce(): Promise<boolean> {
       await followMove(settings, settings.move);
       return true;
     }
+    if (!hasDeviceIdentity()) throw new IdentityLostError();
     const api = sessionFor(settings);
     let { entries, state } = await refreshMembers(api, settings);
     let keys = await refreshKeys(api, state);
@@ -195,13 +196,14 @@ async function runOnce(): Promise<boolean> {
     if (applied || photos) await reloadStores();
     await notifyFamily(takePulledLogs()).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
     await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e)); // i18n-ignore
-    useSyncStore.setState({ phase: 'idle', error: null, removed: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
+    useSyncStore.setState({ phase: 'idle', error: null, removed: false, identityLost: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
     // A pulled `moved` record: the next round follows it.
     return restarted || Boolean(syncSettings()?.move);
   } catch (e) {
-    const removed = isRemoved(e);
+    const identityLost = e instanceof IdentityLostError;
+    const removed = !identityLost && isRemoved(e);
     const message = removed ? t('sync.error.removed') : errorMessage(e);
-    useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, progress: null, pending: await pendingCount() });
+    useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, identityLost, progress: null, pending: await pendingCount() });
     throw e;
   }
 }

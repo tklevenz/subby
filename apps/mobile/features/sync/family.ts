@@ -30,7 +30,7 @@ import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { call, checkServer, isHttpError, normalizeServerUrl, sealEpochs, SyncSession } from './api';
-import { deviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
+import { deviceIdentity, ensureDeviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { pushDeviceName, refreshKeys, refreshMembers, requestSync, rotateKeys } from './engine';
 import { newSyncSettings, saveSync, sessionFor, syncSettings } from './state';
 
@@ -172,7 +172,7 @@ export async function recoverFamily(serverInput: string, words: string, local: '
   const res = await rec.keys();
   const familyKeys = res.keys.map((k) => ({ epoch: k.epoch, key: openFamilyKey(recovery, state, k.epoch, fromBase64(k.sealed)) }));
 
-  const identity = deviceIdentity();
+  const identity = ensureDeviceIdentity();
   const deviceId = uuidv7();
   const keys = { sign: identity.sign.publicKey, box: identity.box.publicKey };
   const entry = appendEntry(state, entries.length, { id: RECOVERY_SIGNER, keys: recovery }, { type: 'add', deviceId, keys }, Date.now());
@@ -189,7 +189,7 @@ export type Join = { qr: InviteQr; deviceId: string; code: string };
 export async function claimInvite(text: string): Promise<Join> {
   const qr = decodeInviteQr(text);
   await checkServer(qr.s);
-  const identity = deviceIdentity();
+  const identity = ensureDeviceIdentity();
   const deviceId = uuidv7();
   const secret = fromBase64(qr.k);
   const sign = identity.sign.publicKey;

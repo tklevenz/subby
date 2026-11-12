@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import * as SecureStore from 'expo-secure-store';
 import { getRandomBytes } from 'expo-crypto';
 import { bytesToHex, hexToBytes, identityFromSeed, setRandomSource, type IdentityKeys } from '@subby/shared/crypto';
@@ -7,17 +8,35 @@ setRandomSource((length) => getRandomBytes(length));
 
 const IDENTITY = 'kl.sync.identity';
 const FAMILY_KEYS = 'kl.sync.familyKeys';
-// Same policy as the database key (db/client.ts): readable after first unlock, in encrypted iOS backups.
-const OPTIONS: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK };
+// Readable after first unlock (background sync), and never in an iOS backup or on another phone: a restored
+// backup brings the data (the database key is in encrypted backups), but this phone's place in the family stays
+// here, so two phones can't share one identity. Android keeps SecureStore out of its backups anyway.
+const OPTIONS: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
 
-/** This device's sync identity (signing + box key pairs), created on first use from a stored seed. */
-export function deviceIdentity(): IdentityKeys {
-  let seed = SecureStore.getItem(IDENTITY, OPTIONS);
-  if (!seed) {
-    seed = bytesToHex(getRandomBytes(32));
-    SecureStore.setItem(IDENTITY, seed, OPTIONS);
+/**
+ * Sync is set up, but this phone's identity is gone (restored from a backup or moved to a new phone, or the
+ * keychain was cleared). The family can't be reached with it any more: this phone joins again.
+ */
+export class IdentityLostError extends Error {
+  constructor() {
+    super(t('sync.error.identityLost'));
+    this.name = 'IdentityLostError';
   }
+}
+
+export const hasDeviceIdentity = () => SecureStore.getItem(IDENTITY, OPTIONS) !== null;
+
+/** This device's sync identity (signing + box key pairs). Never made up here: a missing one is lost. */
+export function deviceIdentity(): IdentityKeys {
+  const seed = SecureStore.getItem(IDENTITY, OPTIONS);
+  if (!seed) throw new IdentityLostError();
   return identityFromSeed(hexToBytes(seed));
+}
+
+/** The identity to start or join a family with: this phone's, or a new one. */
+export function ensureDeviceIdentity(): IdentityKeys {
+  if (!hasDeviceIdentity()) SecureStore.setItem(IDENTITY, bytesToHex(getRandomBytes(32)), OPTIONS);
+  return deviceIdentity();
 }
 
 /** Family keys by epoch. Every epoch is kept so older records stay readable. */
