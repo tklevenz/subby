@@ -5,7 +5,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Header,
   HttpCode,
   Inject,
   Injectable,
@@ -13,6 +12,7 @@ import {
   Param,
   ParseUUIDPipe,
   Put,
+  StreamableFile,
   UseGuards,
   type OnModuleDestroy,
   type OnModuleInit,
@@ -20,11 +20,12 @@ import {
 import { and, eq, inArray, isNull, lt, notInArray, or } from 'drizzle-orm';
 import { MAX_BLOB_BYTES, UNLINKED_BLOB_TTL_MS, type SyncRecord } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
-import { lockFamily } from '../db/lock';
+import { familyTransaction } from '../db/lock';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { Entitlements, notUnlocked } from '../sync/entitlements';
 import { BLOB_STORE, type BlobStore } from './store';
+import { logError } from '../common/errors';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -46,7 +47,7 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.timer = setInterval(() => void this.sweep().catch((e: unknown) => console.warn('Blob sweep failed', e)), SWEEP_EVERY_MS);
+    this.timer = setInterval(() => void this.sweep().catch((e: unknown) => logError('Blob sweep failed', e)), SWEEP_EVERY_MS);
     this.timer.unref();
   }
 
@@ -59,8 +60,7 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
     // Row first, claiming the id: a second upload under the same id (another family's too) gets a conflict before it
     // can touch the stored file. A failed write takes the row back; until the file is there, a read finds nothing.
     // The allowance check and the claim happen under the family's lock, so uploads at once can't all pass it.
-    const claimed = await this.db.transaction(async (tx) => {
-      await lockFamily(tx, auth.familyId);
+    const claimed = await familyTransaction(this.db, auth.familyId, async (tx) => {
       if (!(await this.entitlements.canStore(auth.familyId, data.length, tx))) throw new ForbiddenException('No storage left for this family');
       return tx
         .insert(schema.blobs)
@@ -82,45 +82,48 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
       .select({ id: schema.blobs.id })
       .from(schema.blobs)
       .where(and(eq(schema.blobs.id, id), eq(schema.blobs.familyId, auth.familyId)));
-    const data = row ? await this.store.get(id) : null;
-    if (!data) throw new NotFoundException('No such file');
-    return data;
+    const blob = row ? await this.store.get(id) : null;
+    if (!blob) throw new NotFoundException('No such file');
+    return blob;
   }
 
   /**
    * Inside a push transaction: links each accepted record's listed blobs to it and drops the ones it no
-   * longer lists. Returns the ids to delete from storage once the transaction has committed.
+   * longer lists (one version per record). Returns the ids to delete from storage once the transaction has committed.
    */
   async link(tx: Tx, familyId: string, accepted: SyncRecord[]): Promise<string[]> {
-    const dropped: string[] = [];
-    for (const r of accepted) {
-      const keep = r.deleted ? [] : r.blobs;
-      if (keep === undefined) continue; // an older app: leave this record's blobs alone
-      if (keep.length) {
-        await tx
-          .update(schema.blobs)
-          .set({ recordId: r.id })
-          // Only unlinked uploads, or this record's own: a record can't take over (and later delete) another's photo.
-          .where(and(eq(schema.blobs.familyId, familyId), inArray(schema.blobs.id, keep), or(isNull(schema.blobs.recordId), eq(schema.blobs.recordId, r.id))));
-      }
-      const gone = await tx
-        .delete(schema.blobs)
-        .where(
-          and(
-            eq(schema.blobs.familyId, familyId),
-            eq(schema.blobs.recordId, r.id),
-            ...(keep.length ? [notInArray(schema.blobs.id, keep)] : []),
-          ),
-        )
-        .returning({ id: schema.blobs.id });
-      dropped.push(...gone.map((b) => b.id));
+    // A record without `blobs` comes from an older app: its blobs are left alone.
+    const listing = accepted.filter((r) => r.deleted || r.blobs !== undefined);
+    if (!listing.length) return [];
+    const withPhotos = listing.filter((r) => !r.deleted && r.blobs!.length);
+    const without = listing.filter((r) => r.deleted || !r.blobs!.length).map((r) => r.id);
+    // Few records have photos; each claims its own.
+    for (const r of withPhotos) {
+      await tx
+        .update(schema.blobs)
+        .set({ recordId: r.id })
+        // Only unlinked uploads, or this record's own: a record can't take over (and later delete) another's photo.
+        .where(and(eq(schema.blobs.familyId, familyId), inArray(schema.blobs.id, r.blobs!), or(isNull(schema.blobs.recordId), eq(schema.blobs.recordId, r.id))));
     }
-    return dropped;
+    // Everything the records no longer list, in one statement.
+    const gone = await tx
+      .delete(schema.blobs)
+      .where(
+        and(
+          eq(schema.blobs.familyId, familyId),
+          or(
+            ...(without.length ? [inArray(schema.blobs.recordId, without)] : []),
+            ...withPhotos.map((r) => and(eq(schema.blobs.recordId, r.id), notInArray(schema.blobs.id, r.blobs!))),
+          ),
+        ),
+      )
+      .returning({ id: schema.blobs.id });
+    return gone.map((b) => b.id);
   }
 
   /** Deletes stored files whose rows are gone. Failures only leave orphan files behind. */
   async deleteFiles(ids: string[]) {
-    for (const id of ids) await this.store.delete(id).catch((e: unknown) => console.warn("Couldn't delete a photo file", e));
+    for (const id of ids) await this.store.delete(id).catch((e: unknown) => logError("Couldn't delete a photo file", e));
   }
 
   /** Removes uploads that no record listed within the grace period (abandoned or rejected pushes). */
@@ -152,10 +155,9 @@ export class BlobsController {
   }
 
   @Get(':id')
-  @Header('content-type', 'application/octet-stream')
   async get(@Auth() auth: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    const data = await this.blobs.get(auth, id.toLowerCase());
-    // A view, not a copy (photos are up to 20 MB).
-    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+    const { body, size } = await this.blobs.get(auth, id.toLowerCase());
+    // Streamed from disk or the bucket. A failure halfway is logged without its message (it names the file).
+    return new StreamableFile(body, { type: 'application/octet-stream', length: size }).setErrorLogger((e) => logError('Sending a photo failed', e));
   }
 }

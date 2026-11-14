@@ -18,9 +18,10 @@ import { z } from 'zod';
 import { PurchaseSchema, productKind, type EntitlementResponse } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
-import { lockFamily } from '../db/lock';
+import { familyTransaction } from '../db/lock';
 import { parse } from '../common/validate';
 import { Metrics } from '../common/metrics';
+import { logError } from '../common/errors';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
 import { LiveBus } from '../live/live';
@@ -77,8 +78,7 @@ export class PurchasesService {
       throw new ForbiddenException('This purchase was made on another phone');
     }
 
-    const movedFrom = await this.db.transaction(async (tx) => {
-      await lockFamily(tx, auth.familyId);
+    const movedFrom = await familyTransaction(this.db, auth.familyId, async (tx) => {
       const [existing] = await tx.select().from(schema.purchases).where(eq(schema.purchases.id, verified.id));
       if (existing?.revoked) throw new ForbiddenException('This purchase was refunded');
       if (existing && existing.kind !== kind) throw new BadRequestException('This purchase is for another product');
@@ -102,7 +102,7 @@ export class PurchasesService {
     });
 
     // Stored first, so a failure here only means the store is told again next time.
-    await store.finish(purchase.product, purchase.token, kind).catch((e: unknown) => console.warn('Couldn’t finish a purchase with the store', e));
+    await store.finish(purchase.product, purchase.token, kind).catch((e: unknown) => logError('Couldn’t finish a purchase with the store', e));
     this.live.publish(auth.familyId, { type: 'entitlement' });
     if (movedFrom) await this.notifyDevices([movedFrom]);
     return this.entitlements.forDevice(auth.familyId, auth.deviceId);

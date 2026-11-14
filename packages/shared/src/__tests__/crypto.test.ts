@@ -152,6 +152,26 @@ describe('device log', () => {
     expect(() => verifyDeviceLog([log[0], swapped])).toThrow('bad signature');
   });
 
+  it("skips only a trusted prefix's signatures (the server's stored log), still replaying its rules", () => {
+    const log = push(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) }), phoneB, { type: 'remove', deviceId: phoneA.id });
+    // A bad signature in the trusted part passes, one after it doesn't.
+    const badSig = (e: DeviceLogEntry) => ({ ...e, sig: toBase64(new Uint8Array(64)) });
+    const tampered = [log[0]!, badSig(log[1]!), log[2]!];
+    expect(() => verifyDeviceLog(tampered)).toThrow('bad signature');
+    expect(() => verifyDeviceLog(tampered, { trusted: 1 })).toThrow('bad signature');
+    // (The chain hashes the signature too, so the next entry no longer links: rebuild it on the tampered one.)
+    expect(verifyDeviceLog([log[0]!, badSig(log[1]!)], { trusted: 2 }).members.has(phoneB.id)).toBe(true);
+    // The rules still hold in the trusted part.
+    expect(() => verifyDeviceLog([log[0]!, log[2]!], { trusted: 2 })).toThrow();
+  });
+
+  it("never lets a device use the recovery key's id", () => {
+    const sneaky = { id: RECOVERY_SIGNER, keys: newIdentity() };
+    const log = push([], sneaky, { type: 'create', deviceId: RECOVERY_SIGNER, keys: keysOf(sneaky.keys), familyKey: { epoch: 1, key: key1 } });
+    expect(() => verifyDeviceLog(log)).toThrow("recovery key’s id");
+    expect(() => verifyDeviceLog(push(created, phoneA, { type: 'add', deviceId: RECOVERY_SIGNER, keys: keysOf(phoneB.keys) }))).toThrow("recovery key’s id");
+  });
+
   it('never re-admits a removed device id', () => {
     let log = push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: keysOf(phoneB.keys) });
     log = push(log, phoneA, { type: 'remove', deviceId: phoneB.id });

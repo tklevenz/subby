@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf node_modules dist",
-    "smoke": "tsx test/smoke.ts"
+    "smoke": "tsx test/smoke.ts",
+    "runtime-lock": "node scripts/runtime-deps.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1167.0",

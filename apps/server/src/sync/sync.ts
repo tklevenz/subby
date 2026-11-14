@@ -1,11 +1,11 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, Inject, Injectable, Post, Query, UseGuards } from '@nestjs/common';
-import { and, asc, eq, gt, inArray } from 'drizzle-orm';
-import { MAX_CLOCK_AHEAD_MS, PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@subby/shared/sync';
+import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
+import { MAX_CLOCK_AHEAD_MS, MAX_FAMILY_DATA_BYTES, MAX_FAMILY_RECORDS, PushSchema, serverAccepts, type PullResponse, type PushResponse, type SyncRecord } from '@subby/shared/sync';
 import { DB, schema, type Db } from '../db/db';
 import { parse, queryInt } from '../common/validate';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.service';
-import { lockFamily } from '../families/families.service';
+import { familyTransaction } from '../db/lock';
 import { LiveBus } from '../live/live';
 import { Entitlements, notUnlocked } from './entitlements';
 import { BlobsService } from '../blobs/blobs';
@@ -31,54 +31,113 @@ export class SyncService {
   /** Stores each record if it is newer than the server's copy; every accepted record gets the next seq. */
   async push(auth: AuthContext, records: SyncRecord[]): Promise<PushResponse> {
     // A phone without an unlock may still tell its family it moved elsewhere (leaving is always free): one small
-    // `moved` record, nothing else.
-    const onlyMoved = records.length === 1 && records[0]!.kind === 'moved' && (records[0]!.data?.length ?? 0) <= MOVED_MAX_CHARS;
-    if (!onlyMoved && !(await this.entitlements.canSync(auth.familyId, auth.deviceId))) throw notUnlocked();
+    // `moved` record, nothing else, and only while it has no other (checked below), so it can't keep writing.
+    const movedOnly = records.length === 1 && records[0]!.kind === 'moved' && (records[0]!.data?.length ?? 0) <= MOVED_MAX_CHARS;
+    const unlocked = await this.entitlements.canSync(auth.familyId, auth.deviceId);
+    if (!movedOnly && !unlocked) throw notUnlocked();
     for (const r of records) {
       if (r.deviceId !== auth.deviceId) throw new ForbiddenException('Records must be written as the calling device');
       // Tombstones carry a sealed empty body (older apps sent none); everything else needs its data.
       if (!r.deleted && r.data === null) throw new BadRequestException(`Record ${r.id} has no data`);
     }
 
-    const result = await this.db.transaction(async (tx) => {
-      const family = await lockFamily(tx, auth.familyId);
+    const result = await familyTransaction(this.db, auth.familyId, async (tx, family) => {
       // New data (deletions too) must use the current key, so a rotation actually locks removed devices out of new writes.
       const old = records.find((r) => r.epoch !== family.currentEpoch);
       if (old) throw new BadRequestException(`Record ${old.id} uses epoch ${old.epoch}; current is ${family.currentEpoch}`);
 
+      // A phone's one way out: its `moved` record, while it has no other live one (a retry of the same is fine).
+      const leaving =
+        movedOnly &&
+        !(
+          await tx
+            .select({ id: schema.records.id })
+            .from(schema.records)
+            .where(
+              and(
+                eq(schema.records.familyId, auth.familyId),
+                eq(schema.records.kind, 'moved'),
+                eq(schema.records.deviceId, auth.deviceId),
+                eq(schema.records.deleted, false),
+                ne(schema.records.id, records[0]!.id),
+              ),
+            )
+            .limit(1)
+        ).length;
+      if (!unlocked && !leaving) throw notUnlocked();
+
       const ids = [...new Set(records.map((r) => r.id))];
-      const stored = new Map(
+      const before = new Map(
         (
           await tx
-            .select({ id: schema.records.id, updatedAt: schema.records.updatedAt, deviceId: schema.records.deviceId })
+            .select({
+              id: schema.records.id,
+              updatedAt: schema.records.updatedAt,
+              deviceId: schema.records.deviceId,
+              size: sql<number>`coalesce(length(${schema.records.data}), 0)`.mapWith(Number),
+            })
             .from(schema.records)
             .where(and(eq(schema.records.familyId, auth.familyId), inArray(schema.records.id, ids)))
         ).map((s) => [s.id, s]),
       );
+      const current = new Map<string, Pick<SyncRecord, 'updatedAt' | 'deviceId'>>(before);
 
-      let seq = family.seq;
       const accepted: SyncRecord[] = [];
       const stale: string[] = [];
       // Dated far ahead: the phone's clock is wrong, and the edit would win over every later one. Refused like a
       // stale one; it stays pending on the phone, which dates it again once its clock is right.
       const latest = Date.now() + MAX_CLOCK_AHEAD_MS;
       for (const r of records) {
-        if (r.updatedAt > latest || !serverAccepts(stored.get(r.id) ?? null, r)) {
+        if (r.updatedAt > latest || !serverAccepts(current.get(r.id) ?? null, r)) {
           stale.push(r.id);
           continue;
         }
-        seq += 1;
-        const { blobs: _, ...record } = r;
-        const row = { ...record, familyId: auth.familyId, seq };
-        await tx
-          .insert(schema.records)
-          .values(row)
-          .onConflictDoUpdate({ target: [schema.records.familyId, schema.records.id], set: row });
-        stored.set(r.id, r);
+        current.set(r.id, r);
         accepted.push(r);
       }
-      if (seq !== family.seq) await tx.update(schema.families).set({ seq }).where(eq(schema.families.id, auth.familyId));
-      const dropped = await this.blobs.link(tx, auth.familyId, accepted);
+      // The version each id ends up with (a push may carry an id twice), written in one statement.
+      const final = new Map<string, SyncRecord>();
+      for (const r of accepted) {
+        final.delete(r.id);
+        final.set(r.id, r);
+      }
+      let seq = family.seq;
+      const rows = [...final.values()].map(({ blobs: _, ...r }) => ({ ...r, familyId: auth.familyId, seq: ++seq }));
+
+      // The family's caps: only what grows it is refused, so deleting and editing always work.
+      let addedRecords = 0;
+      let addedBytes = 0;
+      for (const r of rows) {
+        const was = before.get(r.id);
+        if (!was) addedRecords++;
+        addedBytes += (r.data?.length ?? 0) - (was?.size ?? 0);
+      }
+      const full =
+        (addedRecords > 0 && family.recordCount + addedRecords > MAX_FAMILY_RECORDS) || (addedBytes > 0 && family.dataBytes + addedBytes > MAX_FAMILY_DATA_BYTES);
+      if (full && !leaving) throw new ForbiddenException('This family has no room left on the server');
+
+      if (rows.length) {
+        await tx
+          .insert(schema.records)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [schema.records.familyId, schema.records.id],
+            set: {
+              kind: sql`excluded.kind`,
+              epoch: sql`excluded.epoch`,
+              updatedAt: sql`excluded.updated_at`,
+              deviceId: sql`excluded.device_id`,
+              deleted: sql`excluded.deleted`,
+              data: sql`excluded.data`,
+              seq: sql`excluded.seq`,
+            },
+          });
+        await tx
+          .update(schema.families)
+          .set({ seq, recordCount: sql`${schema.families.recordCount} + ${addedRecords}`, dataBytes: sql`${schema.families.dataBytes} + ${addedBytes}` })
+          .where(eq(schema.families.id, auth.familyId));
+      }
+      const dropped = await this.blobs.link(tx, auth.familyId, [...final.values()]);
       // The versions that beat this push, so the phone can apply them without pulling everything again.
       const newer = stale.length
         ? (await tx.select().from(schema.records).where(and(eq(schema.records.familyId, auth.familyId), inArray(schema.records.id, stale)))).map(

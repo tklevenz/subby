@@ -5,8 +5,10 @@ import type { WebSocket } from 'ws';
 import type { LiveMessage } from '@subby/shared/sync';
 import proxyAddr from '@fastify/proxy-addr';
 import { AuthService, RECOVERY } from '../auth/auth.service';
+import { bearer } from '../auth/auth.guard';
 import { CONFIG, type Config } from '../config';
-import { LIVE_LIMIT, RateLimiter } from '../common/rateLimit';
+import { LIVE_LIMIT, RateLimiter, clientKey } from '../common/rateLimit';
+import { logError } from '../common/errors';
 
 /** Connected app sockets per family. In memory: one server instance (use Postgres LISTEN/NOTIFY to scale out). */
 @Injectable()
@@ -48,7 +50,7 @@ export class LiveBus {
 
 const MAX_SOCKETS_PER_DEVICE = 4;
 
-/** `/v1/live?token=…`: server → app notifications while the app is open. */
+/** `/v1/live` (the token in `Authorization: Bearer …`, or `?token=…`): server → app notifications while the app is open. */
 // Apps never send anything but pongs: a small message limit (ws allows 100 MB by default).
 @WebSocketGateway({ path: '/v1/live', maxPayload: 4096 })
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
@@ -75,15 +77,16 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     try {
       await this.connect(socket, req);
     } catch (e) {
-      console.warn('[live] connection failed', e);
+      logError('[live] connection failed', e);
       socket.close(1011, 'Try again');
     }
   }
 
   private async connect(socket: WebSocket, req: IncomingMessage) {
     // Before the token's database lookup: a script opening sockets in a loop is stopped here.
-    if (this.config.rateLimit && this.limiter.take(`live:${this.clientIp(req)}`, LIVE_LIMIT)) return socket.close(1013, 'Too many connections, try again later');
-    const token = new URL(req.url ?? '', 'http://localhost').searchParams.get('token') ?? undefined;
+    if (this.config.rateLimit && this.limiter.take(`live:${clientKey(this.clientIp(req))}`, LIVE_LIMIT)) return socket.close(1013, 'Too many connections, try again later');
+    // In the Authorization header, or `?token=` from older apps (URLs end up in proxy logs).
+    const token = bearer(req.headers.authorization) ?? new URL(req.url ?? '', 'http://localhost').searchParams.get('token') ?? undefined;
     const auth = await this.auth.authenticate(token);
     if (!auth || auth.deviceId === RECOVERY) return socket.close(4401, 'Unauthorized');
     // Gone while we checked the token: its close already fired, so it must not be tracked (it would never leave).

@@ -150,8 +150,12 @@ const keysOf = (e: DeviceLogEntry): Member => {
 /**
  * Replays the log and returns the current members. Throws on any broken link, bad signature or rule
  * violation, so a server can't insert, drop or reorder entries without every client noticing.
+ *
+ * `trusted`: the server only. Its first `trusted` entries were verified when they were stored, so their signatures
+ * aren't checked again (the slow part); they're still replayed for the state, the chain and the rules. Phones never
+ * pass it: they verify everything the server hands them.
  */
-export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
+export function verifyDeviceLog(entries: DeviceLogEntry[], { trusted = 0 }: { trusted?: number } = {}): DeviceLogState {
   const members = new Map<string, Member>();
   const removed = new Set<string>();
   let recovery: Member | null = null;
@@ -181,7 +185,7 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
     } else {
       signerKey = members.get(e.signer)?.signKey ?? fail('signer is not a member');
     }
-    if (!verify(signerKey!, canonical(e), fromBase64(e.sig))) fail('bad signature');
+    if (i >= trusted && !verify(signerKey!, canonical(e), fromBase64(e.sig))) fail('bad signature');
 
     const startsEpoch = e.type === 'create' || e.type === 'epoch';
     if (startsEpoch) {
@@ -207,6 +211,8 @@ export function verifyDeviceLog(entries: DeviceLogEntry[]): DeviceLogState {
         break;
       case 'create':
       case 'add':
+        // The recovery key's id names it as a signer and recipient; a phone with that id would be mistaken for it.
+        if (e.deviceId === RECOVERY_SIGNER) fail('a device can’t use the recovery key’s id');
         if (members.has(e.deviceId) || removed.has(e.deviceId)) fail('device id already used');
         members.set(e.deviceId, keysOf(e));
         break;

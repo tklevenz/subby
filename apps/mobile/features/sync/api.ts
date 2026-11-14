@@ -168,9 +168,9 @@ export class SyncSession {
     });
   }
 
-  /** WebSocket URL for live notifications (needs a fresh token). */
-  async liveUrl() {
+  /** The WebSocket URL for live notifications, and the token to open it with (logging in first if there is none). */
+  async live() {
     if (!this.token) await this.login();
-    return `${this.server.replace(/^http/i, 'ws')}/v1/live?token=${encodeURIComponent(this.token!)}`;
+    return { url: `${this.server.replace(/^http/i, 'ws')}/v1/live`, token: this.token! };
   }
 }

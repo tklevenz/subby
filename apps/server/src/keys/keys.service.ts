@@ -4,7 +4,8 @@ import { and, eq } from 'drizzle-orm';
 import type { KeysResponse } from '@subby/shared/sync';
 import { DB, schema, type Db, type Tx } from '../db/db';
 import { RECOVERY, type AuthContext } from '../auth/auth.service';
-import { appendVerified, lockFamily } from '../families/families.service';
+import { appendVerified } from '../families/families.service';
+import { familyTransaction } from '../db/lock';
 import { LiveBus } from '../live/live';
 
 @Injectable()
@@ -44,8 +45,7 @@ export class KeysService {
 
   /** Hands existing epochs to a member that was just added, or to a newly set recovery key. */
   async grant(auth: AuthContext, recipient: string, keys: { epoch: number; sealed: string }[]) {
-    await this.db.transaction(async (tx) => {
-      const family = await lockFamily(tx, auth.familyId);
+    await familyTransaction(this.db, auth.familyId, async (tx, family) => {
       await this.assertRecipient(tx, auth.familyId, recipient, family.recoverySignKey !== null);
       // The recovery key only grants to the phone it added (recovering a family). Grants are first-come, so leaked
       // words must not be able to hand other members or itself keys that don't open, before a phone grants real ones.
@@ -55,13 +55,13 @@ export class KeysService {
         if (!addedByRecovery) throw new ForbiddenException('The recovery key only grants to the phone it added');
       }
       if (keys.some((k) => k.epoch > family.currentEpoch)) throw new BadRequestException('Unknown epoch');
-      for (const k of keys) {
-        await tx
-          .insert(schema.familyKeys)
-          .values({ familyId: auth.familyId, epoch: k.epoch, recipient, sealed: k.sealed })
-          // Never replaces a key someone already has (a retried grant is fine; overwriting would only break things).
-          .onConflictDoNothing();
-      }
+      // Each epoch once: so a grant is never longer than the family's epochs.
+      if (new Set(keys.map((k) => k.epoch)).size !== keys.length) throw new BadRequestException('Each epoch may be granted once');
+      await tx
+        .insert(schema.familyKeys)
+        .values(keys.map((k) => ({ familyId: auth.familyId, epoch: k.epoch, recipient, sealed: k.sealed })))
+        // Never replaces a key someone already has (a retried grant is fine; overwriting would only break things).
+        .onConflictDoNothing();
     });
     return { ok: true };
   }
@@ -73,15 +73,14 @@ export class KeysService {
   async rotate(auth: AuthContext, entry: DeviceLogEntry, sealed: Record<string, string>) {
     if (entry.type !== 'epoch' || entry.signer !== auth.deviceId) throw new ForbiddenException('Epochs must be started by the caller');
     const epoch = entry.epoch!;
-    await this.db.transaction(async (tx) => {
-      const family = await lockFamily(tx, auth.familyId);
+    await familyTransaction(this.db, auth.familyId, async (tx, family) => {
       if (epoch !== family.currentEpoch + 1) throw new BadRequestException(`Next epoch is ${family.currentEpoch + 1}`);
       // The entry closes the old epochs at this seq: the phone must have pulled everything, so no genuine record
       // lies beyond it. Required: without it the log would leave the old epochs open.
       if (entry.closedSeq !== family.seq) {
         throw new ConflictException(`Pull first: the family is at seq ${family.seq}`);
       }
-      await appendVerified(tx, auth.familyId, entry);
+      await appendVerified(tx, auth.familyId, [entry]);
       const members = await tx
         .select({ id: schema.devices.id })
         .from(schema.devices)

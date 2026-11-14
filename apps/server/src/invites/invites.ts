@@ -24,12 +24,13 @@ export class InvitesService {
   ) {}
 
   async create(auth: AuthContext, inviteId: string, claimHash: string) {
-    await this.db.insert(schema.invites).values({
-      id: inviteId,
-      familyId: auth.familyId,
-      claimHash,
-      expiresAt: new Date(Date.now() + INVITE_MS),
-    });
+    const [created] = await this.db
+      .insert(schema.invites)
+      .values({ id: inviteId, familyId: auth.familyId, claimHash, expiresAt: new Date(Date.now() + INVITE_MS) })
+      .onConflictDoNothing()
+      .returning({ id: schema.invites.id });
+    // Ids are random UUIDs the phone makes; one taken already is a retry or a client bug.
+    if (!created) throw new ConflictException('This invite id is taken');
     return { inviteId, expiresAt: Date.now() + INVITE_MS };
   }
 

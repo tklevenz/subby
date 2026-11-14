@@ -1,4 +1,5 @@
-import { access, constants, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { access, constants, mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -7,13 +8,18 @@ import type { BlobStoreConfig } from '../config';
 /** Where encrypted files live. Ids are UUIDs checked by the caller, so they are safe as file names and keys. */
 export interface BlobStore {
   put(id: string, data: Uint8Array): Promise<void>;
-  /** null when the blob doesn't exist. */
-  get(id: string): Promise<Uint8Array | null>;
+  /**
+   * A stream of the stored file and its size, or null when the blob doesn't exist. Streamed: photos are up to
+   * 20 MB, and a client reading slowly must not keep a whole one in memory.
+   */
+  get(id: string): Promise<StoredBlob | null>;
   /** Deleting a missing blob is not an error. */
   delete(id: string): Promise<void>;
   /** Throws when the store can't be used (for /healthz): the folder isn't writable, or the bucket can't be reached. */
   check(): Promise<void>;
 }
+
+export type StoredBlob = { body: Readable; size: number | undefined };
 
 export const BLOB_STORE = Symbol('BLOB_STORE');
 
@@ -38,9 +44,15 @@ class DiskStore implements BlobStore {
     await rename(tmp, path);
   }
 
-  async get(id: string) {
+  async get(id: string): Promise<StoredBlob | null> {
     try {
-      return await readFile(this.path(id)); // a Buffer is a Uint8Array; no copy
+      const file = await open(this.path(id));
+      try {
+        return { body: file.createReadStream(), size: (await file.stat()).size };
+      } catch (e) {
+        await file.close();
+        throw e;
+      }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw e;
@@ -78,10 +90,13 @@ class S3Store implements BlobStore {
     await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: id, Body: data, ContentType: 'application/octet-stream' }));
   }
 
-  async get(id: string) {
+  async get(id: string): Promise<StoredBlob | null> {
     try {
       const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: id }));
-      return res.Body ? await res.Body.transformToByteArray() : null;
+      if (!res.Body) return null;
+      // In Node, the SDK's body is a Readable (the HTTP response).
+      const body = res.Body instanceof Readable ? res.Body : Readable.from([await res.Body.transformToByteArray()]);
+      return { body, size: res.ContentLength };
     } catch (e) {
       if (e instanceof NoSuchKey) return null;
       throw e;

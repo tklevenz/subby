@@ -19,12 +19,14 @@ import { Entitlements } from './sync/entitlements';
 import { LiveBus, LiveGateway } from './live/live';
 import { BlobsController, BlobsService } from './blobs/blobs';
 import { BLOB_STORE, openBlobStore, type BlobStore } from './blobs/store';
+import { installBlobTransferLimits } from './blobs/transfers';
 import { PushController, PushService } from './push/push';
 import { Housekeeping } from './common/housekeeping';
 import { PurchasesController, PurchasesService } from './purchases/purchases';
-import { installRateLimits } from './common/rateLimit';
+import { installDeviceLimits, installRateLimits } from './common/rateLimit';
 import { installBodyGate } from './common/bodyGate';
 import { Metrics } from './common/metrics';
+import { SafeExceptionFilter } from './common/errors';
 import { MAX_BLOB_BYTES, MAX_REQUEST_BYTES } from '@subby/shared/sync';
 
 export const PROTOCOL_VERSION = 1;
@@ -121,11 +123,17 @@ export async function createApp(config: Config) {
     }),
     { logger: ['error', 'warn'] },
   );
+  // Errors are logged without their messages (they can carry ids and request data).
+  app.useGlobalFilters(new SafeExceptionFilter());
   const fastify = app.getHttpAdapter().getInstance();
   const metrics = app.get(Metrics);
   metrics.install(fastify);
+  // In this order: per-IP limits before anything touches the database, then the session (the body gate), then what
+  // needs the session.
   if (config.rateLimit) installRateLimits(fastify);
   installBodyGate(fastify, app.get(AuthService));
+  if (config.rateLimit) installDeviceLimits(fastify);
+  installBlobTransferLimits(fastify, metrics);
   // Encrypted files arrive as raw bytes.
   fastify.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_BLOB_BYTES + 1 }, (_req, body, done) => done(null, body));
   app.useWebSocketAdapter(new WsAdapter(app));

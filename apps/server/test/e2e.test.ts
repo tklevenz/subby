@@ -1090,7 +1090,10 @@ describe.skipIf(!reachable)('sync server', () => {
     let play: Server;
     const apple = appleTestSigner();
     /** The fake Play API's purchases by token, and what was acknowledged or consumed. */
-    const playPurchases = new Map<string, { product: string; purchaseState: number; obfuscatedExternalAccountId?: string; consumptionState: number; acknowledgementState: number }>();
+    const playPurchases = new Map<
+      string,
+      { product: string; purchaseState: number; obfuscatedExternalAccountId?: string; consumptionState: number; acknowledgementState: number; anyProduct?: boolean }
+    >();
     const voided: string[] = [];
 
     beforeAll(async () => {
@@ -1114,10 +1117,12 @@ describe.skipIf(!reachable)('sync server', () => {
           }
           const m = /^\/play\/applications\/baby\.subby\.app\/purchases\/products\/([^/]+)\/tokens\/([^/:]+)(:consume|:acknowledge)?$/.exec(path);
           const purchase = m && playPurchases.get(m[2]!);
-          if (!m || !purchase || purchase.product !== m[1]) return send(404);
+          // `anyProduct`: a Play API that answers for any product in the URL (the server checks `productId` itself).
+          if (!m || !purchase || (purchase.product !== m[1] && !purchase.anyProduct)) return send(404);
           if (m[3] === ':consume') purchase.consumptionState = 1;
           if (m[3] === ':acknowledge') purchase.acknowledgementState = 1;
-          send(200, m[3] ? {} : purchase);
+          const { product, anyProduct: _, ...state } = purchase;
+          send(200, m[3] ? {} : { ...state, productId: product });
         });
       });
       await new Promise<void>((resolve) => play.listen(0, '127.0.0.1', resolve));
@@ -1196,8 +1201,13 @@ describe.skipIf(!reachable)('sync server', () => {
       await ageFamily(a, 30);
       const moved = () => a.seal('moved', randomUUID(), { server: 'https://sync.example.com', familyId: randomUUID(), from: a.deviceId, seq: a.lastSeq });
       await expectStatus(a.push([a.seal('log', randomUUID(), { note: 'x' })]), 402);
-      await a.push([moved()]);
+      const first = moved();
+      await a.push([first]);
       await expectStatus(a.push([moved(), a.seal('log', randomUUID(), { note: 'x' })]), 402);
+      // Only one: new `moved` records, one per request, would be free storage.
+      await expectStatus(a.push([moved()]), 402);
+      // Sending the same one again (its answer got lost) is fine.
+      expect((await a.push([first])).stale).toEqual([first.id]);
     });
 
     it('a phone that joins after the trial gets its own 48 hours', async () => {
@@ -1265,6 +1275,10 @@ describe.skipIf(!reachable)('sync server', () => {
       await expectStatus(buy(a, 'google', 'sync_unlock', googlePurchase(a, 'sync_unlock', 1)), 403);
       await expectStatus(buy(a, 'google', 'sync_unlock', 'nobody-knows'), 403);
       await expectStatus(buy(a, 'google', 'sync_slot', googlePurchase(a, 'sync_unlock')), 403);
+      const unlockToken = googlePurchase(a, 'sync_unlock');
+      playPurchases.get(unlockToken)!.anyProduct = true;
+      await expectStatus(buy(a, 'google', 'sync_slot', unlockToken), 403);
+      await buy(a, 'google', 'sync_unlock', unlockToken);
       await expectStatus(buy(a, 'google', 'sync_other', 'x'), 400);
     });
 

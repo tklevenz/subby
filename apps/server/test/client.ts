@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { WebSocket as WsClient } from 'ws';
 import {
   RECOVERY_SIGNER,
   appendEntry,
@@ -450,16 +451,18 @@ export class TestClient {
 
   // --- live ---------------------------------------------------------------------------------------------
 
-  /** Opens the live socket; resolves once connected. */
-  async live() {
+  /** Opens the live socket, with the token in a header (or, like older apps, `inUrl`); resolves once connected. */
+  async live({ inUrl = false } = {}) {
     const messages: LiveMessage[] = [];
-    const ws = new WebSocket(`${this.server.replace(/^http/, 'ws')}/v1/live?token=${this.token}`);
-    ws.onmessage = (e) => messages.push(JSON.parse(String(e.data)) as LiveMessage);
+    const base = `${this.server.replace(/^http/, 'ws')}/v1/live`;
+    const ws = inUrl ? new WsClient(`${base}?token=${this.token}`) : new WsClient(base, { headers: { authorization: `Bearer ${this.token}` } });
+    ws.on('message', (data) => messages.push(JSON.parse(String(data)) as LiveMessage));
     let closeCode = 0;
-    ws.onclose = (e) => (closeCode = e.code);
+    ws.on('close', (code) => (closeCode = code));
     await new Promise<void>((resolve, reject) => {
-      ws.onopen = () => resolve();
-      ws.onerror = () => reject(new Error('socket error'));
+      ws.once('open', () => resolve());
+      ws.once('error', () => reject(new Error('socket error')));
+      ws.once('close', (code) => reject(new Error(`socket closed (${code})`)));
     });
     return { messages, close: () => ws.close(), closeCode: () => closeCode };
   }

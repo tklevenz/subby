@@ -6,6 +6,7 @@ import { GoogleAuth } from '../common/google';
 import { DB, schema, type Db } from '../db/db';
 import { parse } from '../common/validate';
 import { Metrics } from '../common/metrics';
+import { logError } from '../common/errors';
 import { Auth, DeviceGuard } from '../auth/auth.guard';
 import { ApnsSender } from './apns';
 import type { AuthContext } from '../auth/auth.service';
@@ -79,7 +80,7 @@ export class PushService implements OnModuleDestroy {
       const skip = writers.size === 1 ? [...writers][0]! : null;
       void this.send(familyId, skip).catch((e: unknown) => {
         this.metrics.count('push_error');
-        console.warn('Push failed', e);
+        logError('Push failed', e);
       });
     }, COALESCE_MS);
     timer.unref();
@@ -104,7 +105,7 @@ export class PushService implements OnModuleDestroy {
     if (!this.reaches(token.platform)) return;
     void this.deliver([token]).catch((e: unknown) => {
       this.metrics.count('push_error');
-      console.warn('Push failed', e);
+      logError('Push failed', e);
     });
   }
 
@@ -131,7 +132,8 @@ export class PushService implements OnModuleDestroy {
         if (res.ok) return { ...t, sent: true, gone: false };
         // 404: the app was uninstalled or the token expired. 400: the message is always the same, so it's the
         // token (e.g. an Expo token from an older app, or garbage). Either way it's of no use any more.
-        if (res.status !== 404 && res.status !== 400) console.warn(`FCM answered ${res.status}`, await res.text().catch(() => ''));
+        // Only the status and Google's error code: the body could echo the token.
+        if (res.status !== 404 && res.status !== 400) console.warn(`FCM answered ${res.status} ${await fcmErrorCode(res)}`);
         return { ...t, sent: false, gone: res.status === 404 || res.status === 400 };
       }),
     );
@@ -146,6 +148,13 @@ export class PushService implements OnModuleDestroy {
 }
 
 type PushToken = { deviceId: string; token: string; platform: string };
+
+/** FCM's error status (`UNAVAILABLE`, `QUOTA_EXCEEDED`…), never the rest of its answer. */
+async function fcmErrorCode(res: Response) {
+  const body = (await res.json().catch(() => null)) as { error?: { status?: unknown } } | null;
+  const status = body?.error?.status;
+  return typeof status === 'string' && /^[A-Z_]{1,40}$/.test(status) ? status : '';
+}
 
 @Controller('v1/push')
 @UseGuards(DeviceGuard)

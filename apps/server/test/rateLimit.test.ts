@@ -1,5 +1,7 @@
+import Fastify, { type FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LIMIT, RateLimiter, ruleFor } from '../src/common/rateLimit';
+import type { AuthContext } from '../src/auth/auth.service';
+import { DEFAULT_LIMIT, DEVICE_LIMIT, RateLimiter, clientKey, installDeviceLimits, ruleFor } from '../src/common/rateLimit';
 
 describe('rate limits', () => {
   it('allows a burst, then refills at the given rate', () => {
@@ -40,18 +42,49 @@ describe('rate limits', () => {
     expect(limiter.take('c', limit, 0)).toBeGreaterThan(0);
   });
 
-  it('picks the rule by method and path, ignoring the query', () => {
+  it("picks the rule by method and the router's route pattern", () => {
     expect(ruleFor('POST', '/v1/auth/challenge').name).toBe('auth');
     expect(ruleFor('POST', '/v1/auth/verify').name).toBe('auth');
-    // Percent-encoded paths are routed like the plain ones, so they count against the same limit.
-    expect(ruleFor('POST', '/v1/f%61milies').name).toBe('family');
-    expect(ruleFor('POST', '/v1/invites/x/cl%61im?y=1').name).toBe('claim');
-    expect(ruleFor('POST', '/v1/%zz').name).toBe('default');
     expect(ruleFor('POST', '/v1/families').name).toBe('family');
-    expect(ruleFor('POST', '/v1/families/me/log').name).toBe('default');
-    expect(ruleFor('POST', '/v1/invites/abc/claim').name).toBe('claim');
-    expect(ruleFor('PUT', '/v1/blobs/abc').name).toBe('blob');
-    expect(ruleFor('GET', '/v1/blobs/abc').limit).toBe(DEFAULT_LIMIT);
-    expect(ruleFor('GET', '/v1/sync/pull?since=5').name).toBe('default');
+    expect(ruleFor('POST', '/v1/families/me/log').name).toBe('log');
+    expect(ruleFor('POST', '/v1/families/me/log/restore').name).toBe('logRestore');
+    expect(ruleFor('POST', '/v1/keys/rotate').name).toBe('rotate');
+    expect(ruleFor('POST', '/v1/sync/push').name).toBe('push');
+    expect(ruleFor('POST', '/v1/invites/:id/claim').name).toBe('claim');
+    expect(ruleFor('PUT', '/v1/blobs/:id').name).toBe('blob');
+    expect(ruleFor('GET', '/v1/blobs/:id').limit).toBe(DEFAULT_LIMIT);
+    expect(ruleFor('GET', '/v1/sync/pull').name).toBe('default');
+    // A URL no route matched: the default rule.
+    expect(ruleFor('POST', undefined).name).toBe('default');
+  });
+
+  it('keys IPv4 clients by address and IPv6 clients by their /64', () => {
+    expect(clientKey('203.0.113.7')).toBe('203.0.113.7');
+    expect(clientKey('::ffff:203.0.113.7')).toBe('203.0.113.7');
+    expect(clientKey('2001:db8:1:2::1')).toBe('2001:db8:1:2::/64');
+    expect(clientKey('2001:0db8:0001:0002:ffff:ffff:ffff:ffff')).toBe('2001:db8:1:2::/64');
+    expect(clientKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(clientKey('2001:db8:1:2:3::')).toBe('2001:db8:1:2::/64');
+    expect(clientKey('::1')).toBe('0:0:0:0::/64');
+    expect(clientKey('fe80::1%en0')).toBe('fe80:0:0:0::/64');
+    expect(clientKey('64:ff9b::203.0.113.7')).toBe('64:ff9b:0:0::/64');
+  });
+
+  it('counts each phone on its own, whatever its IP', async () => {
+    const app = Fastify();
+    app.addHook('onRequest', async (request: FastifyRequest & { auth?: AuthContext }) => {
+      const device = request.headers['x-device'];
+      if (typeof device === 'string') request.auth = { familyId: 'f', deviceId: device };
+    });
+    installDeviceLimits(app);
+    app.get('/', async () => 'ok');
+    const get = (device?: string) => app.inject({ url: '/', headers: { ...(device ? { 'x-device': device } : {}), 'x-forwarded-for': String(Math.random()) } });
+    for (let i = 0; i < DEVICE_LIMIT.burst; i++) expect((await get('a')).statusCode).toBe(200);
+    const refused = await get('a');
+    expect(refused.statusCode).toBe(429);
+    expect(Number(refused.headers['retry-after'])).toBeGreaterThan(0);
+    expect((await get('b')).statusCode).toBe(200);
+    expect((await get()).statusCode).toBe(200);
+    await app.close();
   });
 });

@@ -23,20 +23,23 @@ const uuid = z.uuid();
 /** Who a sealed family key is for: a device id, or the recovery key. */
 export const recipient = z.union([uuid, z.literal('recovery')]);
 
-export const DeviceLogEntrySchema = z.object({
-  index: int32,
-  prev: z.string().max(128),
-  type: z.enum(['create', 'add', 'remove', 'setRecovery', 'epoch']),
-  deviceId: recipient,
-  signKey: b64.nullable(),
-  boxKey: b64.nullable(),
-  epoch: int32.positive().nullable(),
-  keyHash: b64.nullable(),
-  closedSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
-  signer: recipient,
-  at: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  sig: b64,
-});
+export const DeviceLogEntrySchema = z
+  .object({
+    index: int32,
+    prev: z.string().max(128),
+    type: z.enum(['create', 'add', 'remove', 'setRecovery', 'epoch']),
+    /** A device's UUID; `'recovery'` only on setRecovery (which names the recovery key). */
+    deviceId: recipient,
+    signKey: b64.nullable(),
+    boxKey: b64.nullable(),
+    epoch: int32.positive().nullable(),
+    keyHash: b64.nullable(),
+    closedSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+    signer: recipient,
+    at: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    sig: b64,
+  })
+  .refine((e) => e.type === 'setRecovery' || uuid.safeParse(e.deviceId).success, { path: ['deviceId'], message: 'Expected a device id (UUID)' });
 
 // --- families -----------------------------------------------------------------------------------------
 
@@ -48,13 +51,19 @@ export const CreateFamilySchema = z.object({
   sealedKey: b64,
 });
 
+/**
+ * The longest device log the server keeps. Each pairing, removal, key rotation and recovery-key change adds an
+ * entry or two, so a real family stays far below this; the server refuses entries past it (409).
+ */
+export const MAX_LOG_ENTRIES = 1000;
+
 /** POST /v1/families/me/log: adds, removes and recovery changes. Epochs go through /v1/keys/rotate. */
 export const AppendLogSchema = z.object({ entry: DeviceLogEntrySchema });
 /**
  * POST /v1/families/me/log/restore: entries a phone verified that the server lost (restored from a backup), given
  * back as they were signed, epochs included. They must continue the server's log.
  */
-export const RestoreLogSchema = z.object({ entries: z.array(DeviceLogEntrySchema).min(1).max(1000) });
+export const RestoreLogSchema = z.object({ entries: z.array(DeviceLogEntrySchema).min(1).max(MAX_LOG_ENTRIES) });
 
 // --- auth ---------------------------------------------------------------------------------------------
 
@@ -134,6 +143,13 @@ export const InviteStatusSchema = z.object({ claimKey: b64 });
 export const MAX_RECORD_DATA = 256 * 1024;
 export const MAX_PUSH = 500;
 /**
+ * What one family may keep on a server: records (live and deleted) and their ciphertext in all. A long real history
+ * is ~10,000 records and a few MB (photos are blobs, counted apart). A push that would go past either is refused
+ * (403); deletions and edits that don't grow the family still go through.
+ */
+export const MAX_FAMILY_RECORDS = 250_000;
+export const MAX_FAMILY_DATA_BYTES = 256 * 1024 ** 2;
+/**
  * The newest edit wins, by the writing phone's clock. A record dated further ahead of the server's clock than this
  * is refused (reported stale, not stored): a phone whose clock runs ahead would otherwise win over every later edit.
  * It stays pending on that phone until its clock is right again (see `clock.ts`).
@@ -208,7 +224,11 @@ export type PullResponse = {
 // --- push (hosted) -------------------------------------------------------------------------------------
 
 /** PUT /v1/push/token: this phone's own push token (FCM on Android, APNs on iOS). `GET /v1/info` says whether the server sends pushes. */
-export const RegisterPushSchema = z.object({ token: z.string().min(1).max(4096), platform: z.enum(['android', 'ios']).default('android') });
+export const RegisterPushSchema = z.object({
+  // FCM and APNs tokens are printable ASCII (letters, digits, `:_-`): nothing else is stored.
+  token: z.string().min(1).max(4096).regex(/^[\x21-\x7e]+$/, 'Expected a push token'),
+  platform: z.enum(['android', 'ios']).default('android'),
+});
 /**
  * Whether the server kept the token: only if it can send to that platform (an iPhone on a server without an APNs
  * key isn't kept, and registers again later). Older servers answer 204 with no body: kept.
@@ -276,7 +296,7 @@ export type EntitlementResponse = {
   inactiveDays?: number | null;
 };
 
-// --- live (WebSocket /v1/live?token=) -----------------------------------------------------------------
+// --- live (WebSocket /v1/live, the token in `Authorization: Bearer …`; older apps send `?token=`) -------
 
 export type LiveMessage =
   | { type: 'seq'; seq: number }

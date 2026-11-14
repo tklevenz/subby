@@ -6,8 +6,16 @@
 #   With HTTPS, also set TRUST_PROXY=uniquelocal, so request limits see each client's IP, not Caddy's.
 # See README.md in this folder.
 
+# Docker keeps container logs forever by default: at most 5 files of 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
+    logging: *logging
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -23,6 +31,7 @@ services:
       retries: 10
 
   server:
+    logging: *logging
     image: subby-sync:latest
     build:
       context: ../..
@@ -65,6 +74,7 @@ services:
         condition: service_healthy
 
   caddy:
+    logging: *logging
     image: caddy:2-alpine
     profiles: ["https"]
     restart: unless-stopped

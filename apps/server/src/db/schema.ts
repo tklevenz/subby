@@ -21,6 +21,9 @@ export const families = pgTable('families', {
   lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
   /** When Housekeeping last woke the family's phones because it had gone quiet (month 11). */
   inactivityPingedAt: timestamp('inactivity_pinged_at', { withTimezone: true }),
+  /** Its rows in `records` and their ciphertext (characters of `data`), kept by each push for the family's caps. */
+  recordCount: integer('record_count').notNull().default(0),
+  dataBytes: bigint('data_bytes', { mode: 'number' }).notNull().default(0),
 });
 
 /** The signed, hash-chained membership log, stored verbatim; verified on every append. */

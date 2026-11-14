@@ -2,8 +2,16 @@
 # Lives in /opt/subby on the server, next to .env (from env.example) and secrets/. deploy.sh installs it and sets
 # IMAGE_TAG; nothing is built on the server. Tuned for a 1 GB box (Hetzner CPX02 with 2 GB swap).
 
+# Docker keeps container logs forever by default: at most 5 files of 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
+    logging: *logging
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -27,6 +35,7 @@ services:
       retries: 10
 
   server:
+    logging: *logging
     image: subby-sync:${IMAGE_TAG:?Deploy with deploy.sh (it sets IMAGE_TAG)}
     restart: unless-stopped
     env_file: .env
@@ -44,6 +53,7 @@ services:
         condition: service_healthy
 
   caddy:
+    logging: *logging
     image: caddy:2-alpine
     restart: unless-stopped
     environment:

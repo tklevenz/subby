@@ -2,6 +2,7 @@ import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { INACTIVE_DELETE_DAYS, INACTIVE_WARN_DAYS } from '@subby/shared/sync';
 import { Metrics } from './metrics';
+import { logError } from './errors';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
 import { FamiliesService } from '../families/families.service';
@@ -33,7 +34,7 @@ export class Housekeeping implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.timer = setInterval(() => void this.run().catch((e: unknown) => console.warn('Housekeeping failed', e)), EVERY_MS);
+    this.timer = setInterval(() => void this.run().catch((e: unknown) => logError('Housekeeping failed', e)), EVERY_MS);
     this.timer.unref();
   }
 
@@ -46,7 +47,7 @@ export class Housekeeping implements OnModuleInit, OnModuleDestroy {
     const invites = await this.db.delete(schema.invites).where(lt(schema.invites.expiresAt, new Date(now - INVITE_GRACE_MS))).returning({ id: schema.invites.id });
     const refunds = await this.purchases.checkVoided(now).catch((e: unknown) => {
       this.metrics.count('refund_check_failed');
-      console.warn('Checking Google Play refunds failed', e);
+      logError('Checking Google Play refunds failed', e);
       return 0;
     });
     const inactive = await this.inactiveFamilies(now);
@@ -73,7 +74,7 @@ export class Housekeeping implements OnModuleInit, OnModuleDestroy {
       .where(and(lt(f.lastActiveAt, new Date(now - INACTIVE_WARN_DAYS * DAY_MS)), or(isNull(f.inactivityPingedAt), lt(f.inactivityPingedAt, new Date(now - PING_EVERY_MS)))));
     for (const { id } of quiet) {
       await this.db.update(f).set({ inactivityPingedAt: new Date(now) }).where(eq(f.id, id));
-      await this.push.send(id, null).catch((e: unknown) => console.warn('Waking a quiet family failed', e));
+      await this.push.send(id, null).catch((e: unknown) => logError('Waking a quiet family failed', e));
     }
     return { pinged: quiet.length, deleted: gone.length };
   }

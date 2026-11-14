@@ -4,6 +4,7 @@ import { count, isNotNull, sum } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { DB, schema, type Db } from '../db/db';
 import { Entitlements } from '../sync/entitlements';
+import { logError } from './errors';
 
 type Counts = { requests: number; client: number; server: number; ms: number };
 
@@ -100,7 +101,7 @@ export class Metrics {
       this.render(url.searchParams.get('totals') === '1').then(
         (body) => res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4' }).end(body),
         (e: unknown) => {
-          console.warn('Metrics failed', e);
+          logError('Metrics failed', e);
           res.writeHead(500).end();
         },
       );

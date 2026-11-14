@@ -29,6 +29,19 @@ describe('App Store signatures', () => {
     expect(() => verifyAppleJws('garbage', [apple.rootPem])).toThrow(PurchaseRefused);
   });
 
+  it('refuses anything that doesn’t parse, rather than failing (a 500 anyone could cause)', () => {
+    const b64 = (v: unknown) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
+    const [, body, sig] = apple.sign({ a: 1 }).split('.');
+    const x5c = JSON.parse(Buffer.from(apple.sign({}).split('.')[0]!, 'base64url').toString()).x5c as string[];
+    for (const header of [null, 1, 'text', [], { alg: 'ES256', x5c: [1, 2, 3] }, { alg: 'ES256', x5c: [{}, {}, {}] }, { alg: 'ES256', x5c: ['AAAA', 'AAAA', 'AAAA'] }, { alg: 'ES256', x5c: [x5c[0], 'not a cert!', x5c[2]] }]) {
+      expect(() => verifyAppleJws(`${b64(header)}.${body}.${sig}`, [apple.rootPem]), JSON.stringify(header)).toThrow(PurchaseRefused);
+    }
+    expect(() => verifyAppleJws(`${b64('{not json')}.${body}.${sig}`, [apple.rootPem])).toThrow(PurchaseRefused);
+    expect(() => verifyAppleJws(`..`, [apple.rootPem])).toThrow(PurchaseRefused);
+    // Signed, but the payload isn't an object.
+    expect(() => verifyAppleJws(apple.sign(5 as unknown as object), [apple.rootPem])).toThrow(PurchaseRefused);
+  });
+
   it('refuses certificates outside their validity', () => {
     expect(() => verifyAppleJws(apple.sign({}), [apple.rootPem], new Date(Date.now() + 365 * 86_400_000))).toThrow('Expired certificate');
   });

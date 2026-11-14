@@ -31,6 +31,14 @@ docker compose --profile https up -d --build
 Caddy gets and renews a Let's Encrypt certificate automatically. In the app: Settings → Sync → Sync server
 `https://sync.example.com`.
 
+Behind another reverse proxy (nginx, Traefik…): login tokens travel in the `Authorization` header, which proxies
+don't log. Older versions of the app send the live socket's token in its URL (`/v1/live?token=…`) instead,
+and many proxies log URLs by default, so turn off access logs for `/v1/live`, or update the apps. The shipped Caddy
+keeps no access log.
+
+The server's own log names no families, phones, records or IP addresses (errors are logged by class, database
+error code and route only). Both compose files keep at most 5 × 10 MB of log per container.
+
 ### Plain HTTP (LAN or VPN only)
 
 ```sh

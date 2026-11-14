@@ -33,6 +33,8 @@ type ProductPurchase = {
   /** 0 not yet acknowledged, 1 acknowledged. */
   acknowledgementState?: number;
   obfuscatedExternalAccountId?: string;
+  /** The product the token was bought for (Google fills it in for newer purchases). */
+  productId?: string;
 };
 
 export const googlePurchaseId = (token: string) => `google:${sha256b64(token)}`;
@@ -60,6 +62,8 @@ export class GooglePlay implements Store {
 
   async verify(product: string, token: string): Promise<VerifiedPurchase> {
     const purchase = (await (await this.call(this.url(product, token))).json()) as ProductPurchase;
+    // The URL names the product, but don't rely on Google refusing a token bought for another one.
+    if (purchase.productId !== undefined && purchase.productId !== product) throw new PurchaseRefused('This purchase is for another product');
     if (purchase.purchaseState === 2) throw new PurchasePending('The payment isn’t through yet');
     if (purchase.purchaseState !== 0) throw new PurchaseRefused('This purchase was cancelled');
     return { id: googlePurchaseId(token), accountId: purchase.obfuscatedExternalAccountId ?? null };
@@ -117,25 +121,34 @@ export function verifyAppleJws<T>(jws: string, roots: string[], now = new Date()
   const parts = jws.split('.');
   if (parts.length !== 3) throw new PurchaseRefused('Not a signed transaction');
   const [head, body, sig] = parts as [string, string, string];
-  let header: { alg?: string; x5c?: string[] };
-  try {
-    header = JSON.parse(Buffer.from(head, 'base64url').toString('utf8')) as typeof header;
-  } catch {
-    throw new PurchaseRefused('Not a signed transaction');
-  }
-  if (header.alg !== 'ES256' || !Array.isArray(header.x5c) || header.x5c.length !== 3) throw new PurchaseRefused('Unexpected signature');
-  const [leaf, intermediate, root] = header.x5c.map((c) => new X509Certificate(Buffer.from(c, 'base64')));
+  // Anything that doesn't parse is refused, never a 500: this is reachable without an account.
+  const parsed = <R>(what: string, read: () => R): R => {
+    try {
+      return read();
+    } catch {
+      throw new PurchaseRefused(what);
+    }
+  };
+  const header = parsed('Not a signed transaction', () => JSON.parse(Buffer.from(head, 'base64url').toString('utf8')) as unknown);
+  if (typeof header !== 'object' || header === null || Array.isArray(header)) throw new PurchaseRefused('Not a signed transaction');
+  const { alg, x5c } = header as { alg?: unknown; x5c?: unknown };
+  if (alg !== 'ES256' || !Array.isArray(x5c) || x5c.length !== 3 || !x5c.every((c) => typeof c === 'string')) throw new PurchaseRefused('Unexpected signature');
+  const [leaf, intermediate, root] = parsed('Bad certificate', () => (x5c as string[]).map((c) => new X509Certificate(Buffer.from(c, 'base64')))) as [X509Certificate, X509Certificate, X509Certificate];
   const trusted = roots.map((pem) => new X509Certificate(pem));
-  if (!trusted.some((t) => t.raw.equals(root!.raw))) throw new PurchaseRefused('Not signed by Apple');
+  if (!trusted.some((t) => t.raw.equals(root.raw))) throw new PurchaseRefused('Not signed by Apple');
   const valid = (c: X509Certificate) => new Date(c.validFrom) <= now && now <= new Date(c.validTo);
-  if (![leaf!, intermediate!, root!].every(valid)) throw new PurchaseRefused('Expired certificate');
-  if (!intermediate!.ca || leaf!.ca) throw new PurchaseRefused('Bad certificate chain');
-  if (!leaf!.checkIssued(intermediate!) || !leaf!.verify(intermediate!.publicKey)) throw new PurchaseRefused('Bad certificate chain');
-  if (!intermediate!.checkIssued(root!) || !intermediate!.verify(root!.publicKey)) throw new PurchaseRefused('Bad certificate chain');
-  if (!leaf!.raw.includes(LEAF_OID) || !intermediate!.raw.includes(INTERMEDIATE_OID)) throw new PurchaseRefused('Not a StoreKit certificate');
-  const ok = verifySignature('sha256', Buffer.from(`${head}.${body}`), { key: leaf!.publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url'));
+  if (![leaf, intermediate, root].every(valid)) throw new PurchaseRefused('Expired certificate');
+  if (!intermediate.ca || leaf.ca) throw new PurchaseRefused('Bad certificate chain');
+  const chained = parsed('Bad certificate chain', () => leaf.checkIssued(intermediate) && leaf.verify(intermediate.publicKey) && intermediate.checkIssued(root) && intermediate.verify(root.publicKey));
+  if (!chained) throw new PurchaseRefused('Bad certificate chain');
+  if (!leaf.raw.includes(LEAF_OID) || !intermediate.raw.includes(INTERMEDIATE_OID)) throw new PurchaseRefused('Not a StoreKit certificate');
+  const ok = parsed('Bad signature', () =>
+    verifySignature('sha256', Buffer.from(`${head}.${body}`), { key: leaf.publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig, 'base64url')),
+  );
   if (!ok) throw new PurchaseRefused('Bad signature');
-  return JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as T;
+  const payload = parsed('Not a signed transaction', () => JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as unknown);
+  if (typeof payload !== 'object' || payload === null) throw new PurchaseRefused('Not a signed transaction');
+  return payload as T;
 }
 
 /** The decoded StoreKit 2 transaction (JWSTransactionDecodedPayload), as far as we use it. */
@@ -183,7 +196,7 @@ export class AppStore implements Store {
   notification(signedPayload: string): { id: string; revoked: boolean } | null {
     const n = verifyAppleJws<AppleNotification>(signedPayload, this.config.roots);
     const revoked = n.notificationType === 'REFUND' || n.notificationType === 'REVOKE' ? true : n.notificationType === 'REFUND_REVERSED' ? false : null;
-    if (revoked === null || !n.data?.signedTransactionInfo) return null;
+    if (revoked === null || typeof n.data?.signedTransactionInfo !== 'string') return null;
     const t = this.transaction(n.data.signedTransactionInfo);
     return { id: applePurchaseId(t.originalTransactionId), revoked };
   }

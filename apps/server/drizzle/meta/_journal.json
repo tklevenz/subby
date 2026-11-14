@@ -50,6 +50,20 @@
       "when": 1794306221574,
       "tag": "0006_dapper_stepford_cuckoos",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794655031117,
+      "tag": "0007_family_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794655036036,
+      "tag": "0008_family_storage_backfill",
+      "breakpoints": true
     }
   ]
 }
