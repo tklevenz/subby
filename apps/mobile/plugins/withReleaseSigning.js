@@ -26,9 +26,10 @@ module.exports = function withReleaseSigning(config, propertiesFile) {
       `        }`,
     ].join('\n');
     const withConfig = gradle.replace(/signingConfigs \{\n/, (m) => `${m}${release}\n`);
+    // Both forms: expo-iap rewrites the template's `signingConfig signingConfigs.debug` as an assignment.
     const withBuildType = withConfig.replace(
-      /(buildTypes \{[\s\S]*?release \{[\s\S]*?)signingConfig signingConfigs\.debug/,
-      '$1signingConfig signingConfigs.release',
+      /(buildTypes \{[\s\S]*?release \{[\s\S]*?)signingConfig(\s*=\s*|\s+)signingConfigs\.debug/,
+      '$1signingConfig$2signingConfigs.release',
     );
     if (withConfig === gradle || withBuildType === withConfig) {
       throw new Error('withReleaseSigning: build.gradle has an unexpected shape; update the plugin');

@@ -57,6 +57,14 @@
       "expo-secure-store",
       "expo-sharing",
       [
+        "expo-iap",
+        {
+          "android": {
+            "store": "play"
+          }
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
