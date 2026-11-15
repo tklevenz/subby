@@ -19,6 +19,7 @@ import { Metrics } from '../src/common/metrics';
 import { AdminError, runAdmin } from '../src/admin';
 import { DB } from '../src/db/db';
 import { Entitlements } from '../src/sync/entitlements';
+import { MAX_MOVES_PER_DEVICE } from '../src/sync/sync';
 import { HttpError, TestClient } from './client';
 import { appleTestSigner } from './appleCerts';
 
@@ -1204,10 +1205,12 @@ describe.skipIf(!reachable)('sync server', () => {
       const first = moved();
       await a.push([first]);
       await expectStatus(a.push([moved(), a.seal('log', randomUUID(), { note: 'x' })]), 402);
-      // Only one: new `moved` records, one per request, would be free storage.
-      await expectStatus(a.push([moved()]), 402);
       // Sending the same one again (its answer got lost) is fine.
       expect((await a.push([first])).stale).toEqual([first.id]);
+      // A move that failed after its record was stored is retried with a new family, so a new id: a couple of those
+      // are fine, but no more (new `moved` records, one per request, would be free storage).
+      for (let i = 1; i < MAX_MOVES_PER_DEVICE; i++) await a.push([moved()]);
+      await expectStatus(a.push([moved()]), 402);
     });
 
     it('a phone that joins after the trial gets its own 48 hours', async () => {

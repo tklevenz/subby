@@ -11,7 +11,7 @@ import { MAX_FAMILY_DATA_BYTES, MAX_FAMILY_RECORDS, MAX_LOG_ENTRIES } from '@sub
 import { createApp } from '../src/app';
 import type { Config } from '../src/config';
 import { describeError } from '../src/common/errors';
-import { AuthService, MAX_CHALLENGES_PER_DEVICE, MAX_SESSIONS_PER_DEVICE } from '../src/auth/auth.service';
+import { MAX_SESSIONS_PER_DEVICE } from '../src/auth/auth.service';
 import { MAX_FAMILY_QUEUE, familyQueue } from '../src/db/lock';
 import { DB, type Db } from '../src/db/db';
 import { BLOB_TRANSFERS_PER_DEVICE, TransferSlots } from '../src/blobs/transfers';
@@ -332,20 +332,22 @@ describe.skipIf(!reachable)('hardening', () => {
       expect((await res.arrayBuffer()).byteLength).toBe(length);
     });
 
-    it('caps transfers for the whole server too', () => {
-      const slots = new TransferSlots({ perDevice: 2, upload: 3, download: 1 });
-      const one = slots.take('a', 'upload');
+    it('caps transfers per family and for the whole server too', () => {
+      const slots = new TransferSlots({ perDevice: 2, perFamily: 3, upload: 4, download: 1 });
+      const one = slots.take('f', 'a', 'upload');
       expect(typeof one).toBe('function');
-      expect(typeof slots.take('a', 'upload')).toBe('function');
-      expect(slots.take('a', 'upload')).toBe('device');
-      expect(typeof slots.take('b', 'upload')).toBe('function');
-      expect(slots.take('c', 'upload')).toBe('server');
-      expect(typeof slots.take('c', 'download')).toBe('function');
-      expect(slots.take('d', 'download')).toBe('server');
+      expect(typeof slots.take('f', 'a', 'upload')).toBe('function');
+      expect(slots.take('f', 'a', 'upload')).toBe('device');
+      expect(typeof slots.take('f', 'b', 'upload')).toBe('function');
+      expect(slots.take('f', 'c', 'upload')).toBe('family');
+      expect(typeof slots.take('g', 'c', 'upload')).toBe('function');
+      expect(slots.take('h', 'd', 'upload')).toBe('server');
+      expect(typeof slots.take('h', 'd', 'download')).toBe('function');
+      expect(slots.take('i', 'e', 'download')).toBe('server');
       (one as () => void)();
       (one as () => void)(); // twice is once
-      expect(slots.size).toBe(3);
-      expect(typeof slots.take('c', 'upload')).toBe('function');
+      expect(slots.size).toBe(4);
+      expect(typeof slots.take('f', 'c', 'upload')).toBe('function');
     });
   });
 
@@ -381,6 +383,23 @@ describe.skipIf(!reachable)('hardening', () => {
       expect(log).toContain('500 POST /v1/invites');
       expect(log).toContain('42P01');
       for (const secret of [inviteId, a.familyId, claimHash, 'insert into']) expect(log).not.toContain(secret);
+    });
+
+    it("log a database error answered as the client's too, so an unexpected conflict isn't silent", async () => {
+      const a = await family();
+      // A constraint the code doesn't expect to hit: one session per phone.
+      await db`delete from sessions where device_id = ${a.deviceId}`;
+      await db`create unique index sessions_one_test on sessions (device_id)`;
+      let log = '';
+      try {
+        await a.login();
+        log = await captured(() => expectStatus(a.login(), 409));
+      } finally {
+        await db`drop index sessions_one_test`;
+      }
+      expect(log).toContain('409 POST /v1/auth/verify from the database');
+      expect(log).toContain('23505 table=sessions constraint=sessions_one_test');
+      for (const secret of [a.familyId, a.deviceId]) expect(log).not.toContain(secret);
     });
 
     it('describe an error by its classes, codes and stack only', () => {
@@ -453,20 +472,23 @@ describe.skipIf(!reachable)('hardening', () => {
   });
 
   describe('logins', () => {
-    it("caps open challenges per phone, so nobody can push everyone else's out", async () => {
+    it("keeps a phone's challenge however many others are asked for in its name, and takes each once", async () => {
       const a = await family();
-      const victim = await family();
-      // The victim asks for a challenge, then someone floods challenges for a's id (anyone may ask for any id).
-      const { challenge } = await victim.request<{ challenge: string }>('POST', '/v1/auth/challenge', { deviceId: victim.deviceId }, '');
-      const auth = app.get(AuthService);
-      const before = auth.pendingChallenges;
-      for (let i = 0; i < 50; i++) await a.request('POST', '/v1/auth/challenge', { deviceId: a.deviceId }, '');
-      expect(auth.pendingChallenges - before).toBeLessThanOrEqual(MAX_CHALLENGES_PER_DEVICE);
-      // The victim's still works, and a's newest do.
       const { sign: signWith } = await import('@subby/shared/crypto');
       const { authMessage } = await import('@subby/shared/sync');
-      await victim.request('POST', '/v1/auth/verify', { challenge, signature: toBase64(signWith(victim.identity, authMessage(challenge))) }, '');
-      await a.login();
+      const answer = (challenge: string) =>
+        a.request<{ token: string }>('POST', '/v1/auth/verify', { challenge, signature: toBase64(signWith(a.identity, authMessage(challenge))) }, '');
+      // The phone asks for a challenge, then someone asks for many more for its id (anyone may ask for any id).
+      const { challenge } = await a.request<{ challenge: string }>('POST', '/v1/auth/challenge', { deviceId: a.deviceId }, '');
+      for (let i = 0; i < 50; i++) await a.request('POST', '/v1/auth/challenge', { deviceId: a.deviceId }, '');
+      await answer(challenge);
+      // Once only.
+      await expectStatus(answer(challenge), 401);
+      // Made up, or changed: refused.
+      const bytes = Buffer.from(challenge, 'base64url');
+      bytes[0] ^= 1;
+      await expectStatus(answer(bytes.toString('base64url')), 401);
+      await expectStatus(answer(Buffer.from(`device:${a.deviceId}:${Date.now() + 60_000}:${'x'.repeat(48)}`).toString('base64url')), 401);
     });
 
     it(`keeps the newest ${MAX_SESSIONS_PER_DEVICE} sessions per phone`, async () => {

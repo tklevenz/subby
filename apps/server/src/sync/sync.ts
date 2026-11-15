@@ -17,6 +17,8 @@ const ACTIVE_EVERY_MS = 24 * 60 * 60 * 1000;
 
 /** A `moved` record's sealed body (server URL, two ids, a seq) is far below this. */
 const MOVED_MAX_CHARS = 2048;
+/** `moved` records a phone without an unlock may have live: a move, and a couple of retries after a failed one. */
+export const MAX_MOVES_PER_DEVICE = 3;
 
 @Injectable()
 export class SyncService {
@@ -31,7 +33,7 @@ export class SyncService {
   /** Stores each record if it is newer than the server's copy; every accepted record gets the next seq. */
   async push(auth: AuthContext, records: SyncRecord[]): Promise<PushResponse> {
     // A phone without an unlock may still tell its family it moved elsewhere (leaving is always free): one small
-    // `moved` record, nothing else, and only while it has no other (checked below), so it can't keep writing.
+    // `moved` record, nothing else, and only a few of them (checked below), so it can't keep writing.
     const movedOnly = records.length === 1 && records[0]!.kind === 'moved' && (records[0]!.data?.length ?? 0) <= MOVED_MAX_CHARS;
     const unlocked = await this.entitlements.canSync(auth.familyId, auth.deviceId);
     if (!movedOnly && !unlocked) throw notUnlocked();
@@ -46,10 +48,11 @@ export class SyncService {
       const old = records.find((r) => r.epoch !== family.currentEpoch);
       if (old) throw new BadRequestException(`Record ${old.id} uses epoch ${old.epoch}; current is ${family.currentEpoch}`);
 
-      // A phone's one way out: its `moved` record, while it has no other live one (a retry of the same is fine).
+      // A phone's one way out: its `moved` record, while it has fewer than MAX_MOVES_PER_DEVICE others live (a retry of
+      // the same is fine; a move that failed after its record was stored makes a new family, hence a new id).
       const leaving =
         movedOnly &&
-        !(
+        (
           await tx
             .select({ id: schema.records.id })
             .from(schema.records)
@@ -62,8 +65,8 @@ export class SyncService {
                 ne(schema.records.id, records[0]!.id),
               ),
             )
-            .limit(1)
-        ).length;
+            .limit(MAX_MOVES_PER_DEVICE)
+        ).length < MAX_MOVES_PER_DEVICE;
       if (!unlocked && !leaving) throw notUnlocked();
 
       const ids = [...new Set(records.map((r) => r.id))];
@@ -74,7 +77,7 @@ export class SyncService {
               id: schema.records.id,
               updatedAt: schema.records.updatedAt,
               deviceId: schema.records.deviceId,
-              size: sql<number>`coalesce(length(${schema.records.data}), 0)`.mapWith(Number),
+              size: sql<number>`coalesce(octet_length(${schema.records.data}), 0)`.mapWith(Number),
             })
             .from(schema.records)
             .where(and(eq(schema.records.familyId, auth.familyId), inArray(schema.records.id, ids)))

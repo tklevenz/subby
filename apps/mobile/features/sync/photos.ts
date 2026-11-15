@@ -53,14 +53,23 @@ export async function queueUnsyncedPhotos() {
 /**
  * Before a push: encrypts each new photo with its own key, uploads it, and records the reference on the row
  * (in place, so the push carries it). The row's version is untouched; if it was edited meanwhile, the
- * reference is saved with the next push instead. Returns whether any row changed (the loaded stores are stale then).
+ * reference is saved with the next push instead. Returns whether any row changed (the loaded stores are stale then),
+ * and the rows whose photo couldn't go up because the server was busy (429): they stay out of this push, pending, so
+ * they go up with their photo on the next run.
  */
-export async function uploadPhotos(api: SyncSession, children: Child[], logs: LogEntry[]): Promise<boolean> {
+export async function uploadPhotos(api: SyncSession, children: Child[], logs: LogEntry[]): Promise<{ changed: boolean; busy: string[] }> {
   let changed = false;
+  const busy: string[] = [];
+  // Once the server is busy, the other photos wait for the next run too.
+  const send = async (row: { id: string }, uri: string) => {
+    const blob = busy.length ? BUSY : await upload(api, uri);
+    if (blob === BUSY) busy.push(row.id);
+    return blob;
+  };
   for (const child of children) {
     if (!needsPhotoUpload(child)) continue;
-    const blob = await upload(api, child.photoUri!);
-    if (blob === TOO_LARGE) continue;
+    const blob = await send(child, child.photoUri!);
+    if (blob === TOO_LARGE || blob === BUSY) continue;
     // A missing file: forget it, so the entry syncs without a photo instead of retrying forever.
     const change = blob ? { photoBlob: blob } : { photoUri: null };
     Object.assign(child, change);
@@ -72,8 +81,8 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
   }
   for (const log of logs) {
     if (!needsPhotoUpload(log) || log.payload.type !== 'note') continue;
-    const blob = await upload(api, log.payload.photoUri!);
-    if (blob === TOO_LARGE) continue;
+    const blob = await send(log, log.payload.photoUri!);
+    if (blob === TOO_LARGE || blob === BUSY) continue;
     const { photoUri: _, ...note } = log.payload;
     log.payload = blob ? { ...log.payload, photoBlob: blob } : note;
     changed = true;
@@ -82,16 +91,20 @@ export async function uploadPhotos(api: SyncSession, children: Child[], logs: Lo
       .set({ payload: log.payload })
       .where(and(eq(l.id, log.id), eq(l.updatedAt, log.updatedAt)));
   }
-  return changed;
+  return { changed, busy };
 }
 
 const TOO_LARGE = 'tooLarge';
+const BUSY = 'busy';
+/** The server is busy (429: too many photo transfers at once, or its limits): try again later, nothing is wrong. */
+const isBusy = (e: unknown) => isHttpError(e, 429);
+const BUSY_TRIES = 5;
 
 /**
  * Encrypts and uploads one photo. null when its file is gone (the row then drops the photo); TOO_LARGE when it
  * exceeds the server's limit or the server refuses it (403/413): it stays on this phone only and the entry syncs without it, so it can't block sync.
  */
-async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null | typeof TOO_LARGE> {
+async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null | typeof TOO_LARGE | typeof BUSY> {
   const size = photoSize(uri);
   if (size !== null && encryptedFileSize(size) > MAX_BLOB_BYTES) { // i18n-ignore
     console.warn('[sync] a photo is too large to sync; it stays on this phone');
@@ -110,6 +123,7 @@ async function upload(api: SyncSession, uri: string): Promise<PhotoBlob | null |
       console.warn(`[sync] the server refused a photo (${e.status}); it stays on this phone`);
       return TOO_LARGE;
     }
+    if (isBusy(e)) return BUSY;
     throw e;
   }
   return { id, key: toBase64(key) };
@@ -130,8 +144,20 @@ export async function downloadPhotos(api: SyncSession, onProgress: (done: number
     .where(and(eq(l.logType, 'note'), eq(l.isDeleted, false), noteHas('photoBlob'), noteHas('photoUri', false)));
 
   let done = 0;
+  // Once the server is busy (429), the rest wait for the next run: their rows still lack the file, so they're asked again.
+  let busy = false;
+  const download = async (blob: PhotoBlob) => {
+    if (busy) return null;
+    try {
+      return await downloadOne(api, blob);
+    } catch (e) {
+      if (!isBusy(e)) throw e;
+      busy = true;
+      return null;
+    }
+  };
   for (const { id, blob } of children) {
-    const uri = await download(api, blob!);
+    const uri = await download(blob!);
     if (!uri) continue;
     // Only if the row still wants this photo (a newer version may have arrived meanwhile).
     const res = await db
@@ -143,7 +169,7 @@ export async function downloadPhotos(api: SyncSession, onProgress: (done: number
   }
   for (const { id, payload } of notes) {
     if (payload.type !== 'note' || !payload.photoBlob) continue;
-    const uri = await download(api, payload.photoBlob);
+    const uri = await download(payload.photoBlob);
     if (!uri) continue;
     const res = await db
       .update(l)
@@ -157,7 +183,7 @@ export async function downloadPhotos(api: SyncSession, onProgress: (done: number
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function download(api: SyncSession, blob: PhotoBlob): Promise<string | null> {
+async function downloadOne(api: SyncSession, blob: PhotoBlob): Promise<string | null> {
   // The id comes from another phone's record and becomes a file name: only ever a UUID, never a path.
   if (!UUID.test(blob.id)) return null;
   const data = await api.getBlob(blob.id);
@@ -196,8 +222,18 @@ export async function uploadPhotosAsTheyAre(api: SyncSession, onProgress: (done:
     const data = await readPhotoBytes(uri);
     // A missing file: the entry moves without it, like any photo that never synced.
     if (!data) continue;
+    const sealed = encryptFile(fromBase64(blob.key), data);
     try {
-      await api.putBlob(blob.id, encryptFile(fromBase64(blob.key), data));
+      // Every photo has to go up here (a move, a restored server), so a busy server is waited for, a few times.
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await api.putBlob(blob.id, sealed);
+          break;
+        } catch (e) {
+          if (!isBusy(e) || attempt >= BUSY_TRIES) throw e;
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+        }
+      }
     } catch (e) {
       if (!(tolerant && isHttpError(e, 403, 409, 413))) throw e;
     }

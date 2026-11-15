@@ -98,8 +98,13 @@ export class SafeExceptionFilter implements ExceptionFilter {
         body = { statusCode: status, message: mapped.message };
       }
     }
+    const route = `${request.method} ${request.routeOptions?.url ?? 'unmatched'}`;
     if (status >= 500 && !(exception instanceof HttpException && status !== 500)) {
-      console.error(`${status} ${request.method} ${request.routeOptions?.url ?? 'unmatched'}: ${describeError(exception)}`);
+      console.error(`${status} ${route}: ${describeError(exception)}`);
+    } else if (!(exception instanceof HttpException) && status < 500 && postgresError(exception)) {
+      // A database error answered as the client's (a duplicate, a value Postgres can't store): logged anyway, since
+      // one the code didn't expect is a server bug that the client only sees as a conflict.
+      console.warn(`${status} ${route} from the database: ${describeError(exception)}`);
     }
     if (retryAfter !== undefined) void reply.header('retry-after', String(retryAfter));
     // A route may have set another type (photos are octet-stream); errors are always JSON.

@@ -399,10 +399,13 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     if (!children.length && !logs.length) return { applied, tooLarge: tooLarge.size };
 
     // The rows now carry photo references the loaded stores don't have yet: reload them afterwards.
-    if (await uploadPhotos(api, children, logs)) applied = true;
+    const photos = await uploadPhotos(api, children, logs);
+    if (photos.changed) applied = true;
+    // Rows whose photo the server was too busy to take: pending for the next run, so they go up with it.
+    for (const id of photos.busy) held.add(id);
     const sealed: SyncRecord[] = [
-      ...children.map((row) => sealRecord(key, epoch, meta(row.id, 'child', row), childToBody(row))),
-      ...logs.map((row) => sealRecord(key, epoch, meta(row.id, 'log', row), logToBody(row))),
+      ...children.filter((row) => !held.has(row.id)).map((row) => sealRecord(key, epoch, meta(row.id, 'child', row), childToBody(row))),
+      ...logs.filter((row) => !held.has(row.id)).map((row) => sealRecord(key, epoch, meta(row.id, 'log', row), logToBody(row))),
     ];
     const records = sealed.filter((r) => {
       if ((r.data?.length ?? 0) <= MAX_RECORD_CHARS) return true;
