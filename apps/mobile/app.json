@@ -23,7 +23,8 @@
         "monochromeImage": "./assets/adaptive-icon-monochrome.png",
         "backgroundColor": "#0E1B3D"
       },
-      "package": "baby.subby.app"
+      "package": "baby.subby.app",
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro"

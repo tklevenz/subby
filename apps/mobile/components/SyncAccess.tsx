@@ -7,7 +7,8 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { SyncAccess } from '@subby/shared/sync';
 import { Button, Card, Row, Segmented, SectionLabel, Hint } from './ui';
-import { PRICE, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools } from '../features/sync/access';
+import { buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools, usePrice, useStoreUnavailable } from '../features/sync/access';
+import { PurchaseCancelled, PurchasePending } from '../features/sync/store';
 import { syncNow } from '../features/sync/engine';
 import { sessionFor, useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -28,7 +29,11 @@ function useStoreAction() {
         await action(sessionFor(settings));
         syncNow().catch(() => {});
       },
-      (e) => Alert.alert(t('access.failed'), errorMessage(e)),
+      (e) => {
+        if (e instanceof PurchaseCancelled) return;
+        if (e instanceof PurchasePending) Alert.alert(e.message);
+        else Alert.alert(t('access.failed'), errorMessage(e));
+      },
     );
   };
   return { busy, run };
@@ -72,6 +77,9 @@ export function AccessCard() {
   const formatTime = useFormatTime();
   const now = useNow(MINUTE_MS);
   const { busy, run } = useStoreAction();
+  const price = usePrice('unlock');
+  const unavailable = useStoreUnavailable();
+  const testStore = useAccessStore((s) => s.testPurchases);
   if (!access || access === 'free') return null;
 
   // A few minutes' slack: `now` ticks once a minute and clocks differ, so a fresh 14-day trial doesn't read 15.
@@ -81,7 +89,7 @@ export function AccessCard() {
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {
     trial: {
       title: daysLeft ? t('access.trialLeft', { count: daysLeft }) : t('access.trialTitle'),
-      body: t('access.trialBody', { price: PRICE }),
+      body: t('access.trialBody', { price }),
       tone: 'calm',
     },
     grace: {
@@ -106,13 +114,13 @@ export function AccessCard() {
       <Text className="text-ink-soft text-[15px] leading-[22px] mt-1">{body}</Text>
       {needsUnlock ? (
         <>
-          <Button label={t('access.unlockButton', { price: PRICE })} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy()} />
-          <Pressable onPress={() => run(restore)} disabled={busy || !canBuy()} className="items-center mt-3" hitSlop={8}>
-            <Text className={`text-violet-soft text-sm ${canBuy() ? '' : 'opacity-40'}`}>{t('access.restore')}</Text>
+          <Button label={t('access.unlockButton', { price })} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy('unlock')} />
+          <Pressable onPress={() => run(restore)} disabled={busy || !canBuy('unlock')} className="items-center mt-3" hitSlop={8}>
+            <Text className={`text-violet-soft text-sm ${canBuy('unlock') ? '' : 'opacity-40'}`}>{t('access.restore')}</Text>
           </Pressable>
-          <Text className="text-ink-faint text-xs text-center mt-2">
-            {t(canBuy() ? 'access.testStore' : 'access.storeLater')}
-          </Text>
+          {testStore || unavailable ? (
+            <Text className="text-ink-faint text-xs text-center mt-2">{t(testStore ? 'access.testStore' : 'access.storeUnavailable')}</Text>
+          ) : null}
         </>
       ) : null}
     </View>
@@ -124,6 +132,7 @@ export function GiftSlot() {
   const access = useAccess();
   const entitlement = useAccessStore((s) => s.entitlement);
   const { busy, run } = useStoreAction();
+  const price = usePrice('slot');
   if (!access || access === 'free' || !entitlement) return null;
   const waiting = entitlement.devices.filter((d) => d.access !== 'unlock' && d.access !== 'slot').length;
   const free = entitlement.freeSlots;
@@ -136,7 +145,7 @@ export function GiftSlot() {
             ? t('access.giftWaiting')
             : t('access.giftNext')}
       </Hint>
-      <Button label={t('access.giftButton', { price: PRICE })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy()} />
+      <Button label={t('access.giftButton', { price })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy('slot')} />
     </>
   );
 }

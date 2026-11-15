@@ -854,8 +854,6 @@ export const en = {
   'channel.reminders': 'Reminders',
 
   // Sync: messages from the engine.
-  'sync.error.buyLater': 'Buying comes with the store release of the app.',
-  'sync.error.restoreLater': 'Restoring comes with the store release of the app.',
   'sync.error.noUnlock': 'No unlock to restore on this account.',
   'sync.error.noTestPurchase': 'Nothing bought with the test store yet.',
   'sync.error.unreachable': "Can't reach {server}",
@@ -984,7 +982,9 @@ export const en = {
   'access.unlockButton': 'Unlock this phone · {price}',
   'access.restore': 'Restore a purchase',
   'access.testStore': 'Test store: nothing is charged.',
-  'access.storeLater': 'Buying comes with the store release.',
+  'access.storeUnavailable': 'Buying works in the app from Google Play or the App Store.',
+  'access.pending': "The payment isn't through yet. Subby finishes the purchase as soon as it is.",
+  'access.sendLater': "The purchase went through, but the server couldn't be reached. Subby sends it again on the next sync.",
   'access.unusedGifts': { one: '{count} unused gift: the next phone that joins is unlocked.', other: '{count} unused gifts: the next phone that joins is unlocked.' },
   'access.giftWaiting': 'You can unlock a phone in your family for them. A gift goes to the phone without an unlock that joined first.',
   'access.giftNext': 'A gift unlocks the next phone that joins, like a grandparent’s.',
