@@ -1,0 +1,115 @@
+---
+paths:
+  - "packages/shared/src/crypto/**"
+  - "packages/shared/src/sync/**"
+  - "apps/mobile/features/sync/**"
+  - "apps/mobile/app/sync/**"
+  - "apps/mobile/components/{SyncAccess,ServerChoice,QrCode}.tsx"
+  - "apps/server/src/{families,keys,sync,auth,invites}/**"
+  - "apps/server/test/client.ts"
+---
+
+# Sync and crypto (shared, app client)
+
+Plan: `~/.claude/plans/let-s-analyze-the-current-precious-scroll.md` (Phase 2). The server side is in `server.md`; `apps/server/test/client.ts` is a full simulated app and the reference for the mobile sync engine.
+
+## Shared crypto (`packages/shared/src/crypto/`, import from `@subby/shared/crypto`)
+End-to-end encryption for sync, shared by the app and the server.
+- Built on the audited `@noble/*` and `@scure/bip39` libraries. Never hand-roll primitives, and never use `Math.random` for keys.
+- React Native must call `setRandomSource` with `expo-crypto` at startup.
+- `aead` (XChaCha20-Poly1305).
+- `keys`: device identity (Ed25519 sign + X25519 box) and sealed boxes.
+- `recovery`: 24 words to an identity. Its test vector must never change, or existing recovery keys stop working.
+- `pairing`: the 6-digit code.
+- `files`: chunked photo encryption.
+- `deviceLog`: the signed, hash-chained family membership (`subby/devicelog/v1`). Every client verifies it.
+  - It also records every family key epoch. `create` (epoch 1) and `epoch` entries carry `keyHash = epochKeyHash(epoch, key)`, a commitment to the key.
+  - Sealed boxes are anonymous, so the server could seal a key of its own. Phones therefore open keys only with `openFamilyKey`, which checks the commitment, and take the current epoch from the log (`state.epoch`), never from the server.
+  - `assertLogContinues` rejects a log older than the one a phone already saw (`settings.sync.logSeen`), because a server could otherwise serve a prefix that hides a removal or a newer epoch.
+  - Only devices start epochs, one at a time; the recovery key can only `add`.
+  - `state.rotationDue`: a removal, or a replaced or cleared recovery key, owes a new epoch.
+  - `epoch` entries carry `closedSeq`: the sync seq the rotating phone had pulled to (the server checks it's the family's latest). Records of older epochs end there (`state.closedAt`, `withinEpoch`), so a removed phone writing with a key it still has, stored by a hostile server, is refused. Signed only when set, so older entries keep their signatures; an epoch without one closes nothing.
+  - A phone that joins later can't tell such records from genuine history (the seq isn't signed per record); phones that were in sync can.
+
+## Shared sync (`packages/shared/src/sync/`, `@subby/shared/sync`)
+- `protocol.ts` is the HTTP contract (zod 4: use `z.uuid()` and `.loose()`, not the deprecated `z.string().uuid()` and `.passthrough()`). The server validates with `parse()`; the app uses the same types.
+- `envelope`: `sealRecord`/`openRecord`. Metadata is bound to the ciphertext as AAD.
+  - Tombstones carry a sealed empty body: no content stays on the server, but a server can't delete on its own. `openRecord` throws `UnsealedRecordError` for one without data (older apps sent those); phones skip them.
+- `merge`: last-writer-wins with a device-id tie-break, the same rule on server and client.
+- `clock`: last-writer-wins goes by phone clocks, so a wrong one loses edits. Pulls carry the server's `time`; `clockOffset`/`clockOff` (> 5 min) set `useSyncStore.clockOff`, shown on Home (`SyncStopped`) and the Sync screen. The server refuses records dated more than `MAX_CLOCK_AHEAD_MS` (a day) ahead as stale; the app re-dates pending rows from the future before pushing (`redateFutureEdits`).
+
+## App client (`apps/mobile/features/sync/`)
+- `keystore.ts`: this device's identity seed and the family keys by epoch, in SecureStore (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`: never in an iOS backup or on another phone; `kl.dbKey` stays `AFTER_FIRST_UNLOCK`, so a restored backup brings the data). It installs `expo-crypto` as the shared crypto's random source on import.
+  - `deviceIdentity()` never makes up a seed: a missing one throws `IdentityLostError`, and a run sets `useSyncStore.identityLost` (Sync screen: "This phone has to join the family again", Join again = turn sync off, keep the data, open Join). Only setting up, joining and recovering call `ensureDeviceIdentity()`. Tested on the simulator by deleting the `cku` items from its keychain db (`simctl keychain reset` would take the database key too).
+- `api.ts`: `checkServer`, `createFamily`, and `SyncSession`, which logs in by signed challenge and logs in again on 401. `SyncSession` has `appendLog`, `grant`, `rotate`, `deleteFamily`; `isHttpError(e, ...statuses)`, `serverLabel`, `sealTo`/`sealEpochs` are here too.
+- `records.ts` (tested): local row ↔ encrypted body. Photo paths and Baby Buddy import refs are device-local and never synced.
+  - `isValidBody` checks every pulled body before `applyPage` writes it; malformed records are skipped.
+  - Bodies are written as checked (`validBody`), so a null in an optional payload field arrives as missing. Payloads are checked with `LenientPayloadSchema` (field types, not values), so unusual values from another phone still sync, but nothing a screen would crash on. It accepts everything the strict schema does; all rows of the real Baby Buddy history pass. A refused record is skipped for good (`lastSeq` moves on), so keep it lenient.
+  - Older apps skip record kinds they don't know (`validBody` returns null).
+- **Modules** (the engine is split; keep new code in the right one): `state.ts` (`useSyncStore`, `INITIAL_STATUS`, `sessionFor`, `syncSettings`/`saveSync`, `newSyncSettings`), `live.ts` (the WebSocket; `openLive(onNotify)`), `apply.ts` (open, check and write pulled records, device names, `noteMove`, `takePulledLogs`), `pending.ts` (`markAllPending(ids?)`), `engine.ts` (the rest: setup, runs, push, pull, keys). `engine.ts` and `move.ts` still import each other (`followMove` runs inside a run; moving calls `syncNow`). A run returns whether to run again; nothing sets a hidden flag.
+
+### Photos (`photos.ts`)
+- A photo syncs as an encrypted blob with its own key; the reference `photoBlob: {id, key}` sits in the encrypted record (`children.photo_blob`, note `payload.photoBlob`), and `photoUri` stays this device's file.
+- Stores clear `photoBlob` whenever `photoUri` changes; `uploadPhotos` (before each push) uploads rows with a file but no reference, without bumping their version.
+- `downloadPhotos` (after each pull) fetches references without a local file into `photos/<blobId>.jpg` (only UUID ids; the id comes from another phone's record); a pulled version pointing at another blob drops (and deletes) the local copy.
+- `queueUnsyncedPhotos` re-queues photos from before photo sync, as an edit, only when the family changes (with `forgetPhotoUploads`): run every time, it would re-push a photo that stays local forever.
+- A photo the server refuses (403: the family's allowance is full; 413) stays on the phone like a too-large one; the entry syncs without it.
+- Each record lists its blob ids (`SyncRecord.blobs`, not in the AAD) so the server can delete unused photos.
+- Blob up/download uses `expo/fetch` (raw bytes).
+- The app treats a 429 on a photo as busy: the row waits for the next run (uploads), or the photo is fetched next run (downloads); moving and restoring wait and retry.
+
+### Engine (`engine.ts`)
+- `setUpSync` creates the family; `turnOffSync` leaves the family (a self `remove` in the device log, best effort) and forgets this phone's keys. The last phone leaving deletes the family on the server.
+- No "delete the family" button: any phone can remove the others and then leave, and the last one leaving deletes the family on the server; one phone shouldn't end sync for everyone in one tap (gifted slots go with the family). The server's `DELETE families/me` stays for a failed move's cleanup and the recovery key.
+- Every run verifies the device log (`refreshMembers`, which also checks and updates `logSeen`); `refreshKeys` opens new epochs against the log's commitments. `refreshMembers` provides `members` for the UI, `newDevices` for the "New phone in your family" alert, and `removed` when another phone removed this one. A removed phone is told once (`notifyRemoved`, a local notification even with family alerts off; `settings.sync.removedNotified`), and Home shows `SyncStopped` (removed or identity lost) until sync is turned off there; the server wakes it with a push when another phone removes it (`PushService.wakeRemoved`, not when a phone leaves). Notification permission is asked when sync starts on a phone (`askForSyncNotifications`: setup, join, recovery), since these messages have no reminder switch.
+- Phone names are encrypted `device` records (id = device id); a phone without one names itself (`defaultDeviceName`, from expo-device).
+- `syncNow` runs serialized: refresh keys, push pending rows in batches of 500 (marked synced only if unchanged since read), then pull since `settings.sync.lastSeq` and apply in a transaction with `clientApplies`.
+- Own echoes are skipped. A stale push gets the winning versions back (`PushResponse.newer`), of any epoch this phone holds (still checked by `withinEpoch`). `settlePush` (shared) marks a stale row synced only if one of them beats it or is the very same version (a push whose answer got lost), and that version actually opens and passes the body check (`openAll`, before anything is marked); otherwise the row stays pending for the next run, so a server can't make a phone drop an edit. There's no re-pull from 0.
+- Pulled records are refused (skipped, not written) if their seq is outside the page asked for, or `withinEpoch` says the log closed their epoch before them. Unsealed tombstones, and records that don't open with a key this phone has (damaged or tampered with), are skipped too, so one bad record can't stop sync; a record of an epoch without a key still fails the run (the next one fetches it). A page that doesn't move forward, or claims more to come without ending at its last record (`pageContinues`), fails the run.
+- A photo blob that doesn't decrypt is skipped (retried next run). `uploadPhotos` reports changed rows, so the stores reload.
+- `rotateKeys` pulls everything first and signs `closedSeq` = this phone's `lastSeq`; on 409 (another phone pushed in between) it pulls and retries, up to three times.
+- Pushes are split by size (`pushChunks`, under the server's `MAX_REQUEST_BYTES`); pushed ids the server answers neither way are held for the run, so a push can't loop.
+- Rows whose sealed data exceeds `MAX_RECORD_DATA` stay pending and are skipped (`useSyncStore.tooLarge`, shown on the Sync screen). Photos over `MAX_BLOB_BYTES` stay on the phone only (`encryptedFileSize`), so neither can block sync.
+- The live WebSocket triggers pulls. `useSyncStore` holds the status for the UI.
+- **A server restored from a backup** gets back what it lost, without anyone doing anything:
+  - Phones keep the whole verified device log (`settings.sync.log`). When the server's log is exactly the start of it (`entriesToRestore`), `refreshMembers` gives back the missing entries (`POST families/me/log/restore`), signed as they were; `heal` then grants the epochs members lack. A log that isn't a prefix still fails (`assertLogContinues`), and an empty one (a deleted family) is never restored.
+  - Pulls carry `restored: {gen, seq}` after `admin.js restored`. A phone that saw another `gen` (or finds the server's seq below its `lastSeq`, `serverWentBack`) runs `resyncAfterRestore`: every photo up again under its id and key (`uploadPhotosAsTheyAre`, tolerant), every row pending, its name pushed, `lastSeq` 0, no family alerts for that run. A pull from 0 only notes the `gen`.
+  - Each restore leaves a floor (`settings.sync.floors`: the epoch then current and the restore's seq): old-key records past it were written after the backup by a phone the log had already removed, and are refused (`belowFloors`, with `withinEpoch` in `genuineAt`).
+  - Not automatic: a family whose phones all joined after the backup isn't on the server; its phones see "no longer in the family" and set up sync again. Purchases made after the backup need a restore from the store.
+- **Self-healing** (`heal`, every run):
+  - Grants epochs that `GET /v1/keys` lists as `missing` for a member or the recovery key, sealed only to public keys from the verified log.
+  - Rotates when `rotationDue` (`rotateKeys`, also used by `removeDevice`). A concurrent rotation by another phone (400) is fine.
+  - So an approval, recovery-key setup or removal that stopped halfway is finished by the next sync. `approveClaim` and `setRecoveryKey` are also safe to retry, and `completeJoin` waits up to ~20 s for keys.
+
+### Access (`access.ts`, hosted payments)
+- Each run reads `GET /v1/entitlement` (404 from an older server = `free`) into `useAccessStore`. A `readOnly` phone skips pushing (a 402 mid-run means the same) and keeps pulling; its entries stay pending, so nothing is lost and they go up once it's unlocked. Logging is never blocked.
+- Buying (`buy`/`restore`): the test store whenever the server offers it, else Google Play and the App Store through `expo-iap` (`features/sync/store.ts`, required lazily; pinned to Play with `android.store` in app.json). `canBuy(kind)` = test store, or the store returned a price for it (`prices`, fetched once per app run; `usePrice` shows it, `PRICE` before that).
+  - The device id goes into each purchase (Google `obfuscatedAccountId`, Apple `appAccountToken`), so the server can tell a slot was bought on this phone. The app POSTs `purchaseToken` (Google's token, or StoreKit's JWS); Google purchases are acknowledged/consumed by the server, StoreKit's finished on the phone after the server took them.
+  - Each foreground sync run re-sends paid purchases that never reached the server (Android: an unacknowledged unlock, or an unconsumed slot with this device id; never an acknowledged unlock, which would move it here). "Already owned" restores.
+  - Billing only sells to builds installed from the store; others show `access.storeUnavailable`. iOS still needs its products and the unsent-purchase replay.
+- Screens (`components/SyncAccess.tsx`): `PhotoStorage` ("Photos on the server", hosted, with a note at 90 % and when full), `AccessCard` on the Sync screen (trial days left, grace end, unlock/restore), access labels in the phone list, `GiftSlot` (buy a slot for the family), `AccessBanner` on Home (grace or read-only only), and the family id row (Share) for support grants. `AccessDevTools` (dev builds, or a test-store server) pretends any access state on the screens and refunds test purchases.
+- **Inactivity warning** (`inactivity.ts`): after each run, with `inactiveDays` from the entitlement (hosted), a local notification is (re)scheduled for 11 months later (`kl-sync:inactive`, at most daily per app start), so only a phone that stopped syncing sees it; cancelled when sync is turned off.
+
+### Moving to another server (`move.ts`, `app/sync/move.tsx`)
+Sync → "Move to another server"; official ↔ self-hosted, no re-pairing.
+- `moveToServer` syncs first, then builds the new family with `movedFamilyLog` (shared: the same phones with their keys, the same recovery key, a new epoch-1 key sealed to each), uploads every photo under its existing blob id and key (so records don't change), writes an encrypted `moved` record (`MovedBody`: server, family id, mover, the seq it had pulled to) to the old family, switches, marks everything pending, pushes the names, and leaves the old family. If anything fails before the `moved` record, the new family is deleted again.
+- Other phones note a pulled `moved` record (`settings.sync.move`) and follow at the start of the next run (`followMove`): `verifyMovedLog` (shared) checks the new log against the old one: created by the mover with its keys from the old log, and not by a phone another phone removed; in the part the mover wrote (`MovedBody.entries`, the whole log for older apps) only the old family's phones, with the same keys, none removed by another phone, and the same recovery key; this phone in it. Later entries (a phone paired on the new server, new recovery words) are the family's own and don't block a phone that follows late. `noteMove` only takes a `moved` record its `from` wrote, the key is checked against the new log, own records written to the old family after the mover's seq are marked pending again, then the phone switches and leaves the old family. The last one leaving deletes it there. The first run afterwards sends no family notifications (`quietNextRun`); `useSyncStore.movedTo` shows a one-time alert.
+- Server: a `readOnly` phone may still push a single small `moved` record (leaving is free).
+
+### Triggers and background
+- `useSyncEngine` (in `_layout`) triggers sync on start, on store changes (debounced), when the app comes to the foreground, and on live messages.
+- `background.ts` is imported first by the entry `index.ts`, because headless launches render no screen: `backgroundSync` = `appReady()` (`features/startup.ts`, opens the DB once per runtime) + `syncNow` + `replanReminders`.
+  - Runs from an `expo-background-task` periodic task (everyone; at best every 15 min) and from an `expo-notifications` background task when a server's "sync now" push arrives.
+  - `setUpBackgroundSync` (each foreground start) registers the tasks, stores whether the server pushes (`settings.sync.push`), and registers the phone's own push token (`getDevicePushTokenAsync`: FCM on Android, with its platform). No Expo push service and no EAS. The FCM token needs `apps/mobile/google-services.json` (the Firebase project's Android config, gitignored; `app.config.js` sets `googleServicesFile` when it exists and has a client for the package id, or from `GOOGLE_SERVICES_JSON`); without it, registration is skipped.
+  - Without push and with other phones, medication reminders say to check the app first (`planReminders({ checkBeforeDosing })`).
+
+### Pairing and recovery (`family.ts`)
+- Inviter `createInvite` → `inviteStatus` → `claimCode` (checks the claim's MAC) → `approveClaim` (signs the `add`, grants every epoch); joiner `claimInvite` → `joinStatus` → `finishJoin(join, 'merge' | 'replace')`.
+- Merging marks everything pending and sets `settings.sync.merging`: the first run pulls before it pushes, so rows the family already has (the same `updatedAt`: `clientApplies` takes another phone's copy of the same millisecond) are taken from the server instead of pushed back, and only the photo references of what's still pending are forgotten (`forgetPhotoUploads({ onlyPending })`). Pushing them back used to win every tie (the newest phone has the highest device id) and carried that phone's device-local gaps to everyone.
+- `removeDevices(ids)` (`removeDevice` = one) signs a `remove` per phone, then rotates once: one `keys/rotate` request with the signed `epoch` entry and the key sealed to the remaining phones plus recovery. It also tombstones the removed phones' names.
+- `setRecoveryKey(words)` signs a `setRecovery` and grants every epoch to it (the server then drops the old recovery key's keys and sessions). `recoverFamily(server, words, local)` logs in as the recovery key (`SyncSession(..., asRecovery)`), checks the log's recovery key matches, signs this phone's `add`, grants it the keys, then finishes like a join (`completeJoin`).
+- Setting up and recovering use Subby Sync (`OFFICIAL_SERVER`, `https://sync.subby.baby`) unless "Use your own server" is picked (`components/ServerChoice.tsx`); the address field only shows then.
+
+### Screens
+- `app/sync/index.tsx` (Settings → Sync: status, phones, rename, remove), `sync/add.tsx` (QR code, then compare the 6-digit code), `sync/join.tsx` (scan or paste, compare, then replace or merge local data; not route-guarded, so onboarding links to it), `sync/recovery.tsx` (show 24 words, type two back, only then register them; regenerating replaces the old words), `sync/recover.tsx` (server + words; linked from Join, not route-guarded; afterwards it lists the family's other phones, all ticked, and removes the lost ones in one rotation). `components/QrCode.tsx` draws with `qrcode` + react-native-svg.
+- Recovery key nudges, for a family whose only phone is this one and no key (`useSyncStore.hasRecovery`): setting up sync goes straight on to `sync/recovery` (`after=setup`, with Later); the Sync screen highlights it; Home shows `RecoveryNudge` from 3 days after `settings.sync.since`, until dismissed (`recoveryNudgeDismissed`, per family), a key exists or a second phone joins.

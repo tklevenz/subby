@@ -1,0 +1,71 @@
+---
+paths:
+  - "apps/server/**"
+---
+
+# `apps/server` (`@subby/server`, Subby Sync; AGPL-3.0, everything else is MIT)
+
+A zero-knowledge sync relay. NestJS 12 (Fastify 5; the Fastify adapter pins its fastify version, so keep the direct `fastify` dependency equal to it) + PostgreSQL via Drizzle (`drizzle-orm/postgres-js`).
+- The server stores only ids, public keys, signatures, versions and ciphertext. **Never add a column that holds readable user data.**
+- The HTTP contract is `packages/shared/src/sync/protocol.ts` (see `sync.md`). The server validates with `parse()` (`src/common/validate.ts`).
+- Ops (Docker, runtime lock, production backups, monitoring, admin commands): the `server-ops` skill.
+
+## Code conventions
+- No `emitDecoratorMetadata` (tsx/esbuild/vitest don't emit it): always inject with an explicit `@Inject(Token)`.
+- `familyTransaction(db, familyId, (tx, family) => …)` (`db/lock.ts`) is the only way to write under a family's lock: it queues the family's writes in process (`FamilyQueue`, at most `MAX_FAMILY_QUEUE`, then 429 with Retry-After) before they take one of the pool's 10 connections, then takes the row lock. Never call it inside another for the same family. The pool sets `lock_timeout`, `statement_timeout` and `idle_in_transaction_session_timeout` (`DB_TIMEOUTS`; migrations use their own connection).
+- Errors: `SafeExceptionFilter` (`common/errors.ts`) answers every error and logs 5xx by class, Postgres code, table, constraint, route pattern and stack only, never the message (drizzle's carries the query parameters). Postgres 23505 answers 409, 22xxx 400 (both still logged as a warning, since an unexpected one is a server bug), lock/statement timeouts 503. Background jobs log with `logError(what, e)`, never `console.warn(…, e)`. `RetryLater` is an HttpException with Retry-After.
+- Metrics (`common/metrics.ts`): in-memory counters (requests by route pattern and outcome, pushes, purchase checks, housekeeping), Prometheus text on the container's own `127.0.0.1:8788` (`METRICS_PORT`; `?totals=1` adds database totals). Never ids, IPs or URLs in counters or log lines; count with `Metrics.count('<event>')`.
+- Query parameters: numbers are parsed with `queryInt` (whole numbers only, at most a 32-bit integer unless a larger `max` is given, otherwise 400).
+- Single-instance assumptions: auth challenges, rate limits and live sockets are in memory. Use Postgres LISTEN/NOTIFY to scale out.
+
+## Endpoints (`/v1`)
+- `info`.
+- `auth/challenge` + `auth/verify`: the device signs `authMessage(challenge)` and gets a bearer token. Sessions are stored hashed. `verify` re-checks membership (or the current recovery key) under the family's lock, so a phone removed after its challenge gets no session. Challenges are stateless (owner and expiry under an HMAC with a per-process key; each is answered once), so nobody can push a phone's challenge out by asking for many in its name. Sessions are capped per device (`MAX_SESSIONS_PER_DEVICE`, the newest kept).
+- `families` (create) and `families/me/log`: the signed device log. Every append (and restore, and rotate) replays the whole chain with `verifyDeviceLog`, but checks only the new entries' signatures (`{ trusted }`: the stored ones were checked when stored; phones never pass it). At most `MAX_LOG_ENTRIES` (1000) entries, then 409. Adds, removes and setRecovery update `devices` and `sessions` (always filtered by family too). A setRecovery key another family has is a 409; a device can't use the id `recovery` (schema and `verifyDeviceLog`).
+- `families/me/log/restore` (devices only): entries a phone verified that a restored server lost, epochs included (their keys come by grant); they must continue the log and pass the chain checks.
+- `DELETE families/me` (any member, or the recovery key): deletes the family row (every table cascades from it) and its photo files, and closes its live sockets. A `remove` that leaves no active phone does the same, recovery key included. Nothing of a deleted family is kept.
+- `keys`: `GET`, `grant`, and `rotate`.
+  - A rotation is the signed `epoch` log entry plus the key sealed to exactly the current members plus the recovery key, stored in one transaction. `families/me/log` refuses `epoch` entries.
+  - Its `closedSeq` must equal the family's seq, otherwise 409 ("Pull first"); it's required.
+  - Grants never overwrite an existing sealed key.
+- `invites`: create, `:id`, `:id/claim`, `:id/status`. The QR secret never reaches the server, only the hash of a derived claim key.
+- `blobs/:id` (PUT/GET, `application/octet-stream`, ≤ `MAX_BLOB_BYTES`): encrypted photos in a `BlobStore` (`BLOB_STORE=disk`, default `./data/blobs`, or `s3` for any S3-compatible storage). A push links each record's listed `blobs`; blobs a record stops listing, and all of a tombstone's, are deleted; unlinked uploads are swept after a day. A record without `blobs` (older app) keeps its links. A record can only link unlinked blobs or its own. Ids are lowercased (Postgres returns them so, and deletes use those). The allowance check and the id claim run under `lockFamily`. An upload claims its id with the row first, so a taken id is refused before the file is touched. `Entitlements.canStore` is the hosted quota hook.
+- `sync/push` and `sync/pull`:
+  - Last writer wins via `serverAccepts`, and a per-family `seq`.
+  - A pull with nothing new answers the family's seq (below `since` if the server lost data), plus `restored` after `admin.js restored` (`families.restore_gen`, `restored_seq`).
+  - New data must use the current epoch, deletions too.
+  - Tombstones may carry a sealed body or (older apps) none; anything else needs data.
+  - Records must be written as the calling device.
+- WebSocket `live` (the token in `Authorization: Bearer`, or `?token=` from older apps; the app falls back to the URL once if a server refuses the header, and remembers a server as URL-only only once that socket stays open, since a stale token is refused either way) sends data-free notifications (`seq`, `log`, `keys`, `invite`). At most 4 sockets per phone (the oldest go); errors while connecting close the socket instead of reaching Nest (an unhandled rejection would end the process).
+- `push/token` (PUT/DELETE, `{token, platform}`): kept only with `PUSH=fcm` (the default for `MODE=hosted`; needs `FCM_SERVICE_ACCOUNT`, a Firebase service-account key, mounted from `./secrets` in Docker).
+  - After accepted writes, `PushService` sends the family's other Android phones a data-only, high-priority `{kind: 'sync'}` message straight to FCM HTTP v1 (coalesced over 2 s; OAuth token from a JWT signed with the key via `node:crypto`, cached for the hour). Tokens are dropped on FCM 404/400 or when the device is removed.
+  - iOS: with `APNS_KEY` (+ `APNS_KEY_ID`, `APNS_TEAM_ID`; `push/apns.ts`), a content-free background push (`apns-push-type: background`, priority 5, `content-available`) over `node:http2` with an ES256 provider token (cached 50 min); production first, the sandbox on `BadDeviceToken` (development-signed builds), so the app doesn't say which; 410/`BadDeviceToken` in both drop the token.
+  - A platform the server can't reach keeps its tokens unsent. A push key that doesn't load (missing, unreadable, not a key) turns that push off with an error in the log, and the server starts anyway (a malformed `apns.p8` once crash-looped production). Push only reaches app builds made with the same Firebase project (Apple team and bundle id). `/v1/info` reports `push` (FCM or APNs).
+- **Recovery-key sessions** (`deviceId === 'recovery'`) may only read the log and keys, append an `add`, grant (only to a phone the recovery key added; grants are first-come), and delete the family. They can't sync or rotate.
+
+## Payments (hosted only, `MODE=hosted`; PROJECT.md §3; `purchases/`, `sync/entitlements.ts`)
+- `Entitlements.family` works out each active phone's `SyncAccess`, in join order (`devices.added_at`): its own `unlock`, else one of the family's gifted `slot`s (handed out in join order, so a removed phone's slot passes on), else `trial` (14 days from `families.created_at`), else `grace` (48 h after the trial or after joining, if later), else `readOnly`. Self-hosted: `free`.
+- A `readOnly` phone gets 402 on `sync/push` and blob uploads; pulling, the log and keys still work. Photos stop at 2 GB per family (`canStore`, 403).
+- `GET /v1/entitlement` (also the photo use and allowance, and `inactiveDays` when the server deletes quiet families); `POST /v1/purchases {store, product, token}` verifies with the store, stores a `purchases` row (`google:`+sha256(token) or `apple:`+originalTransactionId; no personal data), then acknowledges (unlock) or consumes (slot) on Google. An unlock moves to whichever phone sends it (a restore); a slot belongs to the buyer's family for good. Changes publish a live `entitlement` message.
+- Google: the Android Publisher API with a service account (`common/google.ts` `GoogleAuth`, shared with FCM push); refunds from `voidedpurchases`, checked hourly by Housekeeping.
+- Apple: StoreKit 2 JWS checked offline against the embedded Apple Root CA G3 (`purchases/appleRoot.ts`; x5c chain, Apple's marker OIDs, ES256); refunds from App Store Server Notifications V2 at `POST /v1/purchases/apple/notifications`. Sandbox purchases only with `APPLE_ALLOW_SANDBOX=1`.
+- Test store (`TEST_PURCHASES=1`, never on the official server; `/v1/info` reports `testPurchases`): accepts any `test-…` token the app makes up, plus `POST /v1/purchases/test/refund`. The app uses it (release builds too) whenever the server offers it.
+- Product ids: `PRODUCTS` in `protocol.ts` (`sync_unlock` non-consumable, `sync_slot` consumable). The e2e suite runs a hosted app against a fake Play API and an openssl-made Apple chain (`test/appleCerts.ts`).
+
+## Abuse limits
+- **Bodies before a session** (`common/bodyGate.ts`): GET, HEAD and OPTIONS with a body are refused (Fastify reads one on OPTIONS). A request with a body needs a valid session before it's read (the gate looks up any token once; the guard and the per-phone limits reuse it), except on the open routes (auth challenge/verify, creating a family, claiming an invite and its status, Apple's notifications), which take at most `OPEN_BODY_LIMIT` (64 KB). **A new unauthenticated route with a body goes in `OPEN_ROUTES`, or it answers 401.** Open routes and rate-limit rules match the router's route pattern (`request.routeOptions.url`, e.g. `/v1/invites/:id/claim`), never the URL: the router stops at `#` and decodes escapes, and parsing the URL again let `/v1/families#x` past the limits.
+- **Rate limits** (`common/rateLimit.ts`): token buckets per rule and client IP, in memory and bounded (least recently used dropped). Tight on unauthenticated or costly routes (auth, family create, the log, log restore, key rotation, invites, claims, sync push, blob uploads, purchases, push tokens), generous for the rest; 429 with `Retry-After`. IPv6 clients count by their /64 (`clientKey`), and every phone also has its own bucket whatever its IP (`DEVICE_LIMIT`). `RATE_LIMIT=off` disables them (the e2e suite does, since every simulated phone is 127.0.0.1). WebSocket upgrades skip Fastify's hooks, so `LiveGateway` limits opening live sockets per IP itself (`LIVE_LIMIT`).
+- **Behind a proxy:** `TRUST_PROXY` is Fastify's `trustProxy` (proxy addresses or ranges, e.g. `uniquelocal` for Caddy in the compose; `true` is refused, since any client could then pick its IP). Without it, every request seems to come from the proxy.
+- **Input bounds** (`protocol.ts`): base64url fields are length-capped and refuse lengths that can't decode (4n+1); epochs and log indexes fit 32 bits; grant and rotate lists are capped. Push tokens are printable ASCII. Grants name each epoch once. A family keeps at most `MAX_FAMILY_RECORDS` records and `MAX_FAMILY_DATA_BYTES` of ciphertext (`families.record_count`/`data_bytes`, kept by each push; a push that would grow past them is a 403, deleting still works). A phone without an unlock may have `MAX_MOVES_PER_DEVICE` (3) live `moved` records (a move and retries after a failed one, each with a new family id). Photo transfers at once are capped per phone, per family and for the server (`blobs/transfers.ts`, 429 in onRequest, before the body; a request whose client left during the session lookup takes no slot), and a transfer moving less than `BLOB_STALL` (16 KB per 10 s) is cut off; downloads are streamed. Live sockets have a 4 KB message limit and aren't tracked if they closed during auth.
+
+## Housekeeping and shutdown
+- **Housekeeping** (`common/housekeeping.ts`, hourly): deletes expired sessions and invites more than a day past expiry. Hosted: families without a pull for `INACTIVE_DELETE_DAYS` (365) are deleted like `DELETE families/me`; from `INACTIVE_WARN_DAYS` (335) their Android phones get a sync push at most weekly (`inactivity_pinged_at`). Pulls refresh `families.last_active_at` at most daily.
+- **Shutdown:** Fastify runs with `forceCloseConnections: true`, and `LiveGateway` terminates its sockets on destroy. Otherwise a connection that never sent a request (or a closing WebSocket) holds a restart for up to the 60 s header timeout; that was the flaky e2e teardown.
+
+## Commands and tests (in `apps/server`)
+- `pnpm db:up`: dev Postgres on port **54329** via `docker-compose.dev.yml` (binds to 127.0.0.1 only).
+- `pnpm serve:dev`: needs `.env`, copied from `.env.example`. Deliberately not named `dev`, so the root `pnpm run dev` still only starts the app.
+- `pnpm build`: esbuild bundles the shared package; npm dependencies stay external. `src/admin.ts` is a second esbuild entry.
+- Schema changes: edit `src/db/schema.ts`, then run `pnpm db:generate`. Migrations run at startup.
+- After changing the server's dependencies, run `pnpm runtime-lock` and commit both `runtime/` files (details in the `server-ops` skill).
+- `test/e2e.test.ts` runs the real server on a throwaway database. The tests are skipped, with a warning, when the dev Postgres isn't running.
