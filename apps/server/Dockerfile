@@ -33,6 +33,7 @@ USER node
 # Encrypted photos (BLOB_STORE=disk). Postgres holds everything else.
 VOLUME /data
 EXPOSE 8787
+# Busybox wget, not `node -e fetch`: starting a second Node every 30 s cost ~65 MB and 40 ms of CPU each time.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD node -e "fetch('http://127.0.0.1:' + process.env.PORT + '/v1/info').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+  CMD wget -q -O /dev/null "http://127.0.0.1:$PORT/v1/info" || exit 1
 CMD ["node", "dist/main.js"]

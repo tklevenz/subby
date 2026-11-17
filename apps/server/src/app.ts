@@ -28,6 +28,11 @@ import { installBodyGate } from './common/bodyGate';
 import { Metrics } from './common/metrics';
 import { SafeExceptionFilter } from './common/errors';
 import { MAX_BLOB_BYTES, MAX_REQUEST_BYTES } from '@subby/shared/sync';
+import { setSignatureVerifier } from '@subby/shared/crypto';
+import { nativeVerify } from './common/ed25519';
+
+// Signature checks (logins, device log entries) through OpenSSL instead of pure JS.
+setSignatureVerifier(nativeVerify);
 
 export const PROTOCOL_VERSION = 1;
 

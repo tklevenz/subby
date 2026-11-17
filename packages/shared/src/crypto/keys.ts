@@ -22,9 +22,24 @@ export const newIdentity = () => identityFromSeed(randomBytes(32));
 
 export const sign = (keys: IdentityKeys, message: Uint8Array) => ed25519.sign(message, keys.sign.secretKey);
 
+type Verifier = (signPublicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => boolean;
+
+const nobleVerify: Verifier = (signPublicKey, message, signature) => ed25519.verify(signature, message, signPublicKey);
+
+let verifier: Verifier = nobleVerify;
+
+/**
+ * Install a native Ed25519 verifier (the server uses `node:crypto`, ~15x faster than pure JS). It may be stricter
+ * than noble's ZIP-215 rules (refusing non-canonical encodings no honest signer produces), never looser.
+ */
+export function setSignatureVerifier(next: Verifier): void {
+  verifier = next;
+}
+
 export function verify(signPublicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean {
+  if (signPublicKey.length !== 32 || signature.length !== 64) return false;
   try {
-    return ed25519.verify(signature, message, signPublicKey);
+    return verifier(signPublicKey, message, signature);
   } catch {
     return false;
   }

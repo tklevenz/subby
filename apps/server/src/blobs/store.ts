@@ -2,7 +2,7 @@ import { access, constants, mkdir, open, rename, rm, writeFile } from 'node:fs/p
 import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
-import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import type { S3Client } from '@aws-sdk/client-s3';
 import type { BlobStoreConfig } from '../config';
 
 /** Where encrypted files live. Ids are UUIDs checked by the caller, so they are safe as file names and keys. */
@@ -69,14 +69,25 @@ class DiskStore implements BlobStore {
   }
 }
 
-/** Any S3-compatible object storage (AWS, Hetzner, MinIO, R2…). */
+type S3Sdk = typeof import('@aws-sdk/client-s3');
+
+/**
+ * Any S3-compatible object storage (AWS, Hetzner, MinIO, R2…). The AWS SDK is loaded only here, so a server storing
+ * photos on disk never pays its memory (tens of MB).
+ */
 class S3Store implements BlobStore {
-  private readonly s3: S3Client;
+  private readonly client: Promise<{ sdk: S3Sdk; s3: S3Client }>;
   private readonly bucket: string;
 
   constructor(config: Extract<BlobStoreConfig, { kind: 's3' }>) {
     this.bucket = config.bucket;
-    this.s3 = new S3Client({
+    this.client = import('@aws-sdk/client-s3').then((sdk) => ({ sdk, s3: S3Store.connect(sdk, config) }));
+    // Failing to load surfaces on first use (and /healthz); don't leave the rejection unhandled meanwhile.
+    void this.client.catch(() => undefined);
+  }
+
+  private static connect(sdk: S3Sdk, config: Extract<BlobStoreConfig, { kind: 's3' }>) {
+    return new sdk.S3Client({
       region: config.region,
       endpoint: config.endpoint,
       // Most non-AWS providers want bucket-in-path URLs.
@@ -87,27 +98,31 @@ class S3Store implements BlobStore {
   }
 
   async put(id: string, data: Uint8Array) {
-    await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: id, Body: data, ContentType: 'application/octet-stream' }));
+    const { sdk, s3 } = await this.client;
+    await s3.send(new sdk.PutObjectCommand({ Bucket: this.bucket, Key: id, Body: data, ContentType: 'application/octet-stream' }));
   }
 
   async get(id: string): Promise<StoredBlob | null> {
+    const { sdk, s3 } = await this.client;
     try {
-      const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: id }));
+      const res = await s3.send(new sdk.GetObjectCommand({ Bucket: this.bucket, Key: id }));
       if (!res.Body) return null;
       // In Node, the SDK's body is a Readable (the HTTP response).
       const body = res.Body instanceof Readable ? res.Body : Readable.from([await res.Body.transformToByteArray()]);
       return { body, size: res.ContentLength };
     } catch (e) {
-      if (e instanceof NoSuchKey) return null;
+      if (e instanceof sdk.NoSuchKey) return null;
       throw e;
     }
   }
 
   async delete(id: string) {
-    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: id }));
+    const { sdk, s3 } = await this.client;
+    await s3.send(new sdk.DeleteObjectCommand({ Bucket: this.bucket, Key: id }));
   }
 
   async check() {
-    await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    const { sdk, s3 } = await this.client;
+    await s3.send(new sdk.HeadBucketCommand({ Bucket: this.bucket }));
   }
 }
