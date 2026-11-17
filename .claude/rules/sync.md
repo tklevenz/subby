@@ -11,7 +11,7 @@ paths:
 
 # Sync and crypto (shared, app client)
 
-Plan: `~/.claude/plans/let-s-analyze-the-current-precious-scroll.md` (Phase 2). The server side is in `server.md`; `apps/server/test/client.ts` is a full simulated app and the reference for the mobile sync engine.
+The server side is in `server.md`; `apps/server/test/client.ts` is a full simulated app and the reference for the mobile sync engine.
 
 ## Shared crypto (`packages/shared/src/crypto/`, import from `@subby/shared/crypto`)
 End-to-end encryption for sync, shared by the app and the server.
