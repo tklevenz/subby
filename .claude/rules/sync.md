@@ -18,7 +18,7 @@ End-to-end encryption for sync, shared by the app and the server.
 - Built on the audited `@noble/*` and `@scure/bip39` libraries. Never hand-roll primitives, and never use `Math.random` for keys.
 - React Native must call `setRandomSource` with `expo-crypto` at startup.
 - `aead` (XChaCha20-Poly1305).
-- `keys`: device identity (Ed25519 sign + X25519 box) and sealed boxes.
+- `keys`: device identity (Ed25519 sign + X25519 box) and sealed boxes. `verify` goes through a swappable verifier (`setSignatureVerifier`): the server installs OpenSSL's (`apps/server/src/common/ed25519.ts`), the phones keep noble. A replacement may be stricter than noble's ZIP-215 rules, never looser.
 - `recovery`: 24 words to an identity. Its test vector must never change, or existing recovery keys stop working.
 - `pairing`: the 6-digit code.
 - `files`: chunked photo encryption.
