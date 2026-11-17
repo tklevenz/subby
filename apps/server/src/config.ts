@@ -138,22 +138,26 @@ function apnsConfig(env: NodeJS.ProcessEnv): ApnsConfig | null {
 
 export type BlobStoreConfig =
   | { kind: 'disk'; dir: string }
-  | { kind: 's3'; bucket: string; region: string; endpoint?: string; accessKeyId?: string; secretAccessKey?: string };
+  | { kind: 's3'; bucket: string; region: string; endpoint?: string; accessKeyId: string; secretAccessKey: string; sessionToken?: string };
 
 function blobStoreConfig(env: NodeJS.ProcessEnv): BlobStoreConfig {
   const kind = env.BLOB_STORE || 'disk';
   if (kind === 'disk') return { kind, dir: env.BLOB_DIR ?? './data/blobs' };
   if (kind !== 's3') throw new Error(`BLOB_STORE must be "disk" or "s3", got "${kind}"`);
   if (!env.S3_BUCKET) throw new Error('S3_BUCKET is required with BLOB_STORE=s3');
+  // Empty counts as unset (docker compose passes unset variables as ""). AWS's own variables work too; profiles and
+  // instance roles don't (the AWS SDK was replaced by a small signer).
+  const accessKeyId = env.S3_ACCESS_KEY_ID || env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY || env.AWS_SECRET_ACCESS_KEY;
+  if (!accessKeyId || !secretAccessKey) throw new Error('S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required with BLOB_STORE=s3');
   return {
     kind,
     bucket: env.S3_BUCKET,
-    // Empty counts as unset (docker compose passes unset variables as "").
-    region: env.S3_REGION || 'us-east-1',
+    region: env.S3_REGION || env.AWS_REGION || 'us-east-1',
     endpoint: env.S3_ENDPOINT || undefined,
-    // Left out, the AWS SDK's default credential chain applies (env, profile, instance role).
-    accessKeyId: env.S3_ACCESS_KEY_ID || undefined,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY || undefined,
+    accessKeyId,
+    secretAccessKey,
+    sessionToken: env.S3_ACCESS_KEY_ID ? undefined : env.AWS_SESSION_TOKEN || undefined,
   };
 }
 

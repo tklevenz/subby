@@ -37,3 +37,16 @@ describe('push keys', () => {
     error.mockRestore();
   });
 });
+
+describe('S3 blob store', () => {
+  it('needs credentials, from S3_* or AWS_*', () => {
+    expect(() => load({ BLOB_STORE: 's3', S3_BUCKET: 'b' })).toThrow(/S3_ACCESS_KEY_ID/);
+    expect(() => load({ BLOB_STORE: 's3', S3_BUCKET: 'b', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: '' })).toThrow(/S3_SECRET_ACCESS_KEY/);
+    expect(load({ BLOB_STORE: 's3', S3_BUCKET: 'b', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's', S3_ENDPOINT: '' }).blobs).toEqual({
+      kind: 's3', bucket: 'b', region: 'us-east-1', endpoint: undefined, accessKeyId: 'k', secretAccessKey: 's', sessionToken: undefined,
+    });
+    expect(load({ BLOB_STORE: 's3', S3_BUCKET: 'b', AWS_ACCESS_KEY_ID: 'a', AWS_SECRET_ACCESS_KEY: 's', AWS_SESSION_TOKEN: 't', AWS_REGION: 'eu-central-1' }).blobs).toMatchObject({
+      accessKeyId: 'a', sessionToken: 't', region: 'eu-central-1',
+    });
+  });
+});

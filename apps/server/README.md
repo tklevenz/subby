@@ -140,7 +140,7 @@ A slot belongs to the family, so it covers its phones through reinstalls and re-
 | `PORT` | `8787` | |
 | `MODE` | `self` | `self` (no quotas or payment, no push) or `hosted` |
 | `BLOB_STORE` | `disk` | `disk` (`BLOB_DIR`, `/data/blobs` in the image) or `s3` |
-| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | for `BLOB_STORE=s3`, any S3-compatible storage |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | for `BLOB_STORE=s3`, any S3-compatible storage. The keys are required (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_REGION` work too); AWS profiles and instance roles aren't supported |
 | `PUSH` | `none` (`fcm` when hosted) | background "sync now" pings via Firebase Cloud Messaging |
 | `FCM_SERVICE_ACCOUNT` | | for `PUSH=fcm`: path to the Firebase service-account key (`/secrets/firebase.json`, from `./secrets`) |
 | `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID` | | iOS push: path to an APNs auth key (`/secrets/apns.p8`), its key id and the team id. `APNS_TOPIC` (`baby.subby.app`) is the app's bundle id |

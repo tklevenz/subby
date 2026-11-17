@@ -17,7 +17,6 @@
     "runtime-lock": "node scripts/runtime-deps.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1167.0",
     "@fastify/proxy-addr": "^5.1.2",
     "@nestjs/common": "^12.5.0",
     "@nestjs/core": "^12.5.0",
@@ -25,6 +24,7 @@
     "@nestjs/platform-ws": "^12.5.0",
     "@nestjs/websockets": "^12.5.0",
     "@subby/shared": "workspace:*",
+    "aws4fetch": "1.0.20",
     "drizzle-orm": "^0.45.4",
     "fastify": "5.12.8",
     "postgres": "^3.4.9",

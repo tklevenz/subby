@@ -2,7 +2,7 @@ import { access, constants, mkdir, open, rename, rm, writeFile } from 'node:fs/p
 import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
-import type { S3Client } from '@aws-sdk/client-s3';
+import { AwsClient } from 'aws4fetch';
 import type { BlobStoreConfig } from '../config';
 
 /** Where encrypted files live. Ids are UUIDs checked by the caller, so they are safe as file names and keys. */
@@ -69,60 +69,74 @@ class DiskStore implements BlobStore {
   }
 }
 
-type S3Sdk = typeof import('@aws-sdk/client-s3');
-
 /**
- * Any S3-compatible object storage (AWS, Hetzner, MinIO, R2…). The AWS SDK is loaded only here, so a server storing
- * photos on disk never pays its memory (tens of MB).
+ * Any S3-compatible object storage (AWS, Hetzner, MinIO, R2…), spoken to directly with SigV4-signed fetches
+ * (aws4fetch: one small file, no dependencies, reviewed at 1.0.20) instead of the AWS SDK's ~30 packages and
+ * tens of MB. Only four calls are needed: put, get, delete, and a bucket check.
  */
 class S3Store implements BlobStore {
-  private readonly client: Promise<{ sdk: S3Sdk; s3: S3Client }>;
-  private readonly bucket: string;
+  private readonly aws: AwsClient;
+  private readonly base: string;
 
   constructor(config: Extract<BlobStoreConfig, { kind: 's3' }>) {
-    this.bucket = config.bucket;
-    this.client = import('@aws-sdk/client-s3').then((sdk) => ({ sdk, s3: S3Store.connect(sdk, config) }));
-    // Failing to load surfaces on first use (and /healthz); don't leave the rejection unhandled meanwhile.
-    void this.client.catch(() => undefined);
-  }
-
-  private static connect(sdk: S3Sdk, config: Extract<BlobStoreConfig, { kind: 's3' }>) {
-    return new sdk.S3Client({
+    this.aws = new AwsClient({
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+      sessionToken: config.sessionToken,
+      service: 's3',
       region: config.region,
-      endpoint: config.endpoint,
-      // Most non-AWS providers want bucket-in-path URLs.
-      forcePathStyle: Boolean(config.endpoint),
-      credentials:
-        config.accessKeyId && config.secretAccessKey ? { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey } : undefined,
+      // Its default is 10 retries (up to ~100 s of backoff); a request should fail well within the app's patience.
+      retries: 3,
+      initRetryMs: 100,
     });
+    // Most non-AWS providers want bucket-in-path URLs; AWS itself takes the bucket as a subdomain.
+    this.base = config.endpoint
+      ? `${config.endpoint.replace(/\/+$/, '')}/${encodeURIComponent(config.bucket)}`
+      : `https://${config.bucket}.s3.${config.region}.amazonaws.com`;
   }
 
-  async put(id: string, data: Uint8Array) {
-    const { sdk, s3 } = await this.client;
-    await s3.send(new sdk.PutObjectCommand({ Bucket: this.bucket, Key: id, Body: data, ContentType: 'application/octet-stream' }));
-  }
-
-  async get(id: string): Promise<StoredBlob | null> {
-    const { sdk, s3 } = await this.client;
+  /** Throws on anything but `ok` (and the listed statuses), with the status only: S3's error bodies aren't logged. */
+  private async request(method: string, id: string | null, init: { body?: Uint8Array; headers?: Record<string, string> } = {}, allow: number[] = []) {
+    const url = id === null ? this.base : `${this.base}/${id}`;
+    // Covers getting the response headers; a streamed body is paced by the client reading it, not by this.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), S3_TIMEOUT_MS);
     try {
-      const res = await s3.send(new sdk.GetObjectCommand({ Bucket: this.bucket, Key: id }));
-      if (!res.Body) return null;
-      // In Node, the SDK's body is a Readable (the HTTP response).
-      const body = res.Body instanceof Readable ? res.Body : Readable.from([await res.Body.transformToByteArray()]);
-      return { body, size: res.ContentLength };
-    } catch (e) {
-      if (e instanceof sdk.NoSuchKey) return null;
-      throw e;
+      const res = await this.aws.fetch(url, { method, body: init.body as Uint8Array<ArrayBuffer> | undefined, headers: init.headers, signal: abort.signal });
+      if (!res.ok && !allow.includes(res.status)) {
+        await res.body?.cancel();
+        throw new Error(`S3 ${method} failed: ${res.status}`);
+      }
+      return res;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
+  async put(id: string, data: Uint8Array) {
+    const res = await this.request('PUT', id, { body: data, headers: { 'Content-Type': 'application/octet-stream' } });
+    await res.body?.cancel();
+  }
+
+  async get(id: string): Promise<StoredBlob | null> {
+    const res = await this.request('GET', id, {}, [404]);
+    if (res.status === 404 || !res.body) {
+      await res.body?.cancel();
+      return null;
+    }
+    const length = res.headers.get('content-length');
+    return { body: Readable.fromWeb(res.body as import('node:stream/web').ReadableStream), size: length === null ? undefined : Number(length) };
+  }
+
   async delete(id: string) {
-    const { sdk, s3 } = await this.client;
-    await s3.send(new sdk.DeleteObjectCommand({ Bucket: this.bucket, Key: id }));
+    // S3 answers 204 whether or not the object existed; some compatible stores answer 404 for a missing one.
+    const res = await this.request('DELETE', id, {}, [404]);
+    await res.body?.cancel();
   }
 
   async check() {
-    const { sdk, s3 } = await this.client;
-    await s3.send(new sdk.HeadBucketCommand({ Bucket: this.bucket }));
+    await this.request('HEAD', null);
   }
 }
+
+const S3_TIMEOUT_MS = 60_000;
