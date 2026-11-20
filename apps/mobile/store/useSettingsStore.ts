@@ -22,6 +22,8 @@ export type Settings = {
   bbUrl: string | null;
   /** Home tile pinned to the top, per child id (default sleep). Set by long-pressing a tile. */
   homeTop: Record<string, HomeTile>;
+  /** Device-local: pairs of overlapping sleeps (`SleepConflict.key`) the person chose to keep both of, so Home stops asking. */
+  keptOverlaps: string[];
   /** Device-local sync state; null until sync is set up. Keys live in the keychain (features/sync/keystore). */
   sync: SyncSettings | null;
 };
@@ -80,6 +82,7 @@ const DEFAULTS: Settings = {
   familyAlerts: DEFAULT_FAMILY_ALERTS,
   bbUrl: null,
   homeTop: {},
+  keptOverlaps: [],
   sync: null,
 };
 

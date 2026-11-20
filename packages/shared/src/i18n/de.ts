@@ -396,6 +396,10 @@ export const de: Translation = {
   'overlap.running': 'Überschneidet sich mit dem laufenden Schlaf (seit {time}).',
   'overlap.other': 'Überschneidet sich mit einem anderen Schlaf ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Zwei Schlafeinträge zur gleichen Zeit',
+  'conflict.body': 'Wahrscheinlich gleichzeitig auf zwei Handys eingetragen (Beginn {first} und {second}).',
+  'conflict.merge': 'Zu einem zusammenführen',
+  'conflict.keepBoth': 'Beide behalten',
 
   'night.wakeAfterBed': 'Das Aufwachen muss nach dem Einschlafen liegen.',
   'night.wakingInside': 'Jede Wachphase muss in der Nacht liegen, ohne andere zu überschneiden.',

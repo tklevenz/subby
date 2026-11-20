@@ -396,6 +396,10 @@ export const fr: Translation = {
   'overlap.running': 'Chevauche le sommeil en cours (depuis {time}).',
   'overlap.other': 'Chevauche un autre sommeil ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Deux sommeils en même temps',
+  'conflict.body': 'Sans doute saisis en même temps sur deux téléphones (début : {first} et {second}).',
+  'conflict.merge': 'Fusionner en un seul',
+  'conflict.keepBoth': 'Garder les deux',
 
   'night.wakeAfterBed': 'Le réveil doit être après le coucher.',
   'night.wakingInside': 'Chaque réveil doit tenir dans la nuit, sans en chevaucher un autre.',

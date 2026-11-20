@@ -8,6 +8,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { pendingCount, requestSync } from './engine';
 import { closeLive, openLive } from './live';
 import { useSyncStore } from './state';
+import { syncEvent } from './debugLog'; // TEMPORARY (A16)
 import { setUpBackgroundSync, stopBackgroundSync } from './background';
 import { serverLabel } from './api';
 
@@ -22,8 +23,8 @@ export function useSyncEngine(ready: boolean) {
       if (!useSettingsStore.getState().sync) return;
       useSyncStore.setState((s) => (s.phase === 'off' ? { phase: 'idle' } : s));
       void pendingCount().then((pending) => useSyncStore.setState({ pending }));
-      requestSync(0);
-      void openLive(() => requestSync(300));
+      requestSync(0, 'start');
+      void openLive(() => requestSync(300, 'live'));
       setUpBackgroundSync().catch((e: unknown) => console.warn('Background sync setup failed', e)); // i18n-ignore
     };
     start();
@@ -64,7 +65,11 @@ export function useSyncEngine(ready: boolean) {
         Alert.alert(t('sync.moved.title'), t('sync.moved.body', { server: to }));
       }),
     );
-    const appState = AppState.addEventListener('change', (state) => (state === 'active' ? start() : closeLive()));
+    const appState = AppState.addEventListener('change', (state) => {
+      syncEvent(`app ${state}`); // TEMPORARY (A16)
+      if (state === 'active') start();
+      else closeLive();
+    });
     return () => {
       unsubs.forEach((u) => u());
       appState.remove();

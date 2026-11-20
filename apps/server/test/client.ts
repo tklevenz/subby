@@ -456,7 +456,10 @@ export class TestClient {
     const messages: LiveMessage[] = [];
     const base = `${this.server.replace(/^http/, 'ws')}/v1/live`;
     const ws = inUrl ? new WsClient(`${base}?token=${this.token}`) : new WsClient(base, { headers: { authorization: `Bearer ${this.token}` } });
-    ws.on('message', (data) => messages.push(JSON.parse(String(data)) as LiveMessage));
+    ws.on('message', (data) => {
+      const message = JSON.parse(String(data)) as LiveMessage;
+      if (message.type !== 'ping') messages.push(message); // heartbeats aren't changes
+    });
     let closeCode = 0;
     ws.on('close', (code) => (closeCode = code));
     await new Promise<void>((resolve, reject) => {

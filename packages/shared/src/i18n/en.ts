@@ -431,6 +431,10 @@ export const en = {
   'overlap.running': "Overlaps the sleep that's still going (since {time}).",
   'overlap.other': 'Overlaps another sleep ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Two sleeps at the same time',
+  'conflict.body': 'Probably logged on two phones at once (started {first} and {second}).',
+  'conflict.merge': 'Merge into one',
+  'conflict.keepBoth': 'Keep both',
 
   // A night (edit screen).
   'night.wakeAfterBed': 'Wake-up must be after bedtime.',

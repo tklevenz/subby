@@ -16,5 +16,6 @@ export * from './domain/reminders';
 export * from './domain/story';
 export * from './domain/timeline';
 export * from './domain/nights';
+export * from './domain/sleepConflicts';
 export * from './domain/familyAlerts';
 export * from './domain/photo';

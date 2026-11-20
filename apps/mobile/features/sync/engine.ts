@@ -25,6 +25,7 @@ import { db, schema } from '../../db/client';
 import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
+import { syncEvent } from './debugLog'; // TEMPORARY (A16)
 import { activeChildOf } from '../../store/useActiveChild';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
@@ -150,8 +151,9 @@ export function syncNow(): Promise<void> {
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 /** Debounced trigger for local writes, app foreground and live notifications. */
-export function requestSync(delayMs = 1500) {
+export function requestSync(delayMs = 1500, why = 'write') {
   if (!syncSettings()) return;
+  syncEvent(`sync requested (${why})`); // TEMPORARY (A16)
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = null;
@@ -167,6 +169,8 @@ async function runOnce(): Promise<boolean> {
     return false;
   }
   useSyncStore.setState({ phase: 'syncing', error: null });
+  const startedAt = Date.now(); // TEMPORARY (A16)
+  syncEvent(`run start, lastSeq ${settings.lastSeq}`); // TEMPORARY (A16)
   try {
     // Another phone moved the family: follow it before anything else touches the old one.
     if (settings.move) {
@@ -214,6 +218,7 @@ async function runOnce(): Promise<boolean> {
     if (!syncSettings()?.names?.[settings.deviceId] && canWrite()) await pushDeviceName(defaultDeviceName());
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
+    syncEvent(`run ok in ${Date.now() - startedAt} ms: pulled ${pulled.applied ? 'new' : 'nothing'}, lastSeq ${syncSettings()?.lastSeq}${applied || photos ? ', stores reloaded' : ''}`); // TEMPORARY (A16)
     await notifyFamily(takePulledLogs()).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
     await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e)); // i18n-ignore
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, identityLost: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
@@ -223,6 +228,7 @@ async function runOnce(): Promise<boolean> {
     const identityLost = e instanceof IdentityLostError;
     const removed = !identityLost && isRemoved(e);
     const message = removed ? t('sync.error.removed') : errorMessage(e);
+    syncEvent(`run failed after ${Date.now() - startedAt} ms: ${message}`); // TEMPORARY (A16)
     useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, identityLost, progress: null, pending: await pendingCount() });
     if (removed && !syncSettings()?.removedNotified) {
       await notifyRemoved().catch((n) => console.warn('Removed notification failed', n)); // i18n-ignore
@@ -418,6 +424,7 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     // The server takes at most MAX_REQUEST_BYTES per request: a batch of large notes goes up in several.
     for (const chunk of pushChunks(records)) {
       const res = await api.push(chunk);
+      syncEvent(`pushed ${chunk.length}`); // TEMPORARY (A16)
 
       // The winning versions the server sent back for stale ones, of any epoch we hold, unless the log closed that
       // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise

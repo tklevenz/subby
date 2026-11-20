@@ -304,4 +304,12 @@ export type LiveMessage =
   | { type: 'keys'; epoch: number }
   | { type: 'invite'; inviteId: string; status: InviteStatus }
   /** A purchase, refund or membership change altered who may sync: re-read GET /v1/entitlement. */
-  | { type: 'entitlement' };
+  | { type: 'entitlement' }
+  /** The heartbeat, every `LIVE_HEARTBEAT_MS`: nothing changed, the socket is alive. Apps replace a quiet socket. */
+  | { type: 'ping' };
+
+/**
+ * How often the server sends `ping` (and a WebSocket ping, which drops sockets that don't answer). The app can't see
+ * WebSocket pings from JS, and Android's never notices a socket the server dropped, so it watches for this message.
+ */
+export const LIVE_HEARTBEAT_MS = 30_000;

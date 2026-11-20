@@ -396,6 +396,10 @@ export const it: Translation = {
   'overlap.running': 'Si sovrappone al sonno ancora in corso (dalle {time}).',
   'overlap.other': 'Si sovrappone a un altro sonno ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Due sonni alla stessa ora',
+  'conflict.body': 'Probabilmente registrati insieme su due telefoni (inizio: {first} e {second}).',
+  'conflict.merge': 'Unisci in uno',
+  'conflict.keepBoth': 'Tienili entrambi',
 
   'night.wakeAfterBed': 'Il risveglio deve essere dopo l’ora della nanna.',
   'night.wakingInside': 'Ogni risveglio deve stare dentro la notte, senza sovrapporsi a un altro.',

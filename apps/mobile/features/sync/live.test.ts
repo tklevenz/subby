@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// TEMPORARY (A16): the sync event log writes to the database.
+vi.mock('./debugLog', () => ({ syncEvent: () => {} }));
 vi.mock('./state', () => ({
   syncSettings: () => ({ server: 'https://sync.example.com' }),
   sessionFor: () => ({ live: async () => ({ url: 'wss://sync.example.com/v1/live', token: 'tok' }) }),
@@ -9,7 +11,7 @@ vi.mock('./state', () => ({
 class FakeSocket {
   static all: FakeSocket[] = [];
   onopen: (() => void) | null = null;
-  onmessage: (() => void) | null = null;
+  onmessage: ((m: { data: string }) => void) | null = null;
   onclose: ((e: { code: number }) => void) | null = null;
   constructor(
     readonly url: string,
@@ -18,7 +20,10 @@ class FakeSocket {
   ) {
     FakeSocket.all.push(this);
   }
-  close() {}
+  closed = false;
+  close() {
+    this.closed = true;
+  }
 }
 vi.stubGlobal('WebSocket', FakeSocket);
 
@@ -67,5 +72,77 @@ describe('the live socket', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe('heartbeats', () => {
+    const ping = () => last().onmessage!({ data: JSON.stringify({ type: 'ping' }) });
+
+    it("syncs on changes, not on heartbeats", async () => {
+      const notify = vi.fn();
+      await openLive(notify);
+      last().onopen!();
+      ping();
+      expect(notify).not.toHaveBeenCalled();
+      last().onmessage!({ data: JSON.stringify({ type: 'seq', seq: 5 }) });
+      expect(notify).toHaveBeenCalledTimes(1);
+    });
+
+    it('replaces a socket that went quiet after heartbeats, and syncs once the new one is open', async () => {
+      vi.useFakeTimers();
+      try {
+        const notify = vi.fn();
+        await openLive(notify);
+        const first = last();
+        first.onopen!();
+        ping();
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(FakeSocket.all).toHaveLength(1); // still within the allowance
+        ping();
+        await vi.advanceTimersByTimeAsync(80_000);
+        expect(first.closed).toBe(true);
+        expect(FakeSocket.all).toHaveLength(2);
+        expect(notify).not.toHaveBeenCalled();
+        last().onopen!();
+        expect(notify).toHaveBeenCalledTimes(1); // whatever the dead socket missed
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('trusts a quiet socket on a server without heartbeats (older)', async () => {
+      vi.useFakeTimers();
+      try {
+        await openLive(() => {});
+        last().onopen!();
+        last().onmessage!({ data: JSON.stringify({ type: 'seq', seq: 1 }) });
+        await vi.advanceTimersByTimeAsync(10 * 60_000);
+        expect(FakeSocket.all).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('syncs after reconnecting from a dropped socket', async () => {
+      vi.useFakeTimers();
+      try {
+        const notify = vi.fn();
+        await openLive(notify);
+        last().onopen!();
+        last().onclose!({ code: 1006 });
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(FakeSocket.all).toHaveLength(2);
+        last().onopen!();
+        expect(notify).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('opens nothing when the app left while the token was fetched', async () => {
+    const opened = openLive(() => {});
+    closeLive();
+    await opened;
+    expect(FakeSocket.all).toHaveLength(0);
   });
 });

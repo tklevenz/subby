@@ -396,6 +396,10 @@ export const ptBR: Translation = {
   'overlap.running': 'Se sobrepõe ao sono que ainda está em andamento (desde {time}).',
   'overlap.other': 'Se sobrepõe a outro sono ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Dois sonos ao mesmo tempo',
+  'conflict.body': 'Provavelmente registrados ao mesmo tempo em dois celulares (início: {first} e {second}).',
+  'conflict.merge': 'Juntar em um',
+  'conflict.keepBoth': 'Manter os dois',
 
   'night.wakeAfterBed': 'O despertar precisa ser depois da hora de dormir.',
   'night.wakingInside': 'Cada despertar precisa ficar dentro da noite, sem se sobrepor a outro.',

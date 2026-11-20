@@ -7,6 +7,7 @@ import { AccessBanner } from '../../components/SyncAccess';
 import { RecoveryNudge } from '../../components/RecoveryNudge';
 import { SyncStopped } from '../../components/SyncStopped';
 import HomeTiles from '../../components/home/HomeTiles';
+import { SleepConflictCard } from '../../components/home/SleepConflictCard';
 import { useActiveChild } from '../../store/useActiveChild';
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
       <SyncStopped />
       <AccessBanner />
       <RecoveryNudge />
+      <SleepConflictCard />
       <ActiveTimers />
       <View className="flex-1 mt-2">{child ? <HomeTiles child={child} /> : null}</View>
     </View>

@@ -396,6 +396,10 @@ export const nl: Translation = {
   'overlap.running': 'Overlapt met de slaap die nog loopt (sinds {time}).',
   'overlap.other': 'Overlapt met een andere slaap ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Twee slaapjes tegelijk',
+  'conflict.body': 'Waarschijnlijk tegelijk op twee telefoons gelogd (begin {first} en {second}).',
+  'conflict.merge': 'Samenvoegen tot één',
+  'conflict.keepBoth': 'Allebei houden',
 
   'night.wakeAfterBed': 'Het wakker worden moet na de bedtijd komen.',
   'night.wakingInside': 'Elke wakkere periode moet binnen de nacht vallen, zonder overlap met een andere.',

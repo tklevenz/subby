@@ -396,6 +396,10 @@ export const es: Translation = {
   'overlap.running': 'Se solapa con el sueño que sigue en curso (inicio: {time}).',
   'overlap.other': 'Se solapa con otro sueño ({from}–{to}).',
   'overlap.dayTime': '{day} {time}',
+  'conflict.title': 'Dos sueños a la misma hora',
+  'conflict.body': 'Seguramente se registró a la vez en dos teléfonos (inicio: {first} y {second}).',
+  'conflict.merge': 'Unir en uno',
+  'conflict.keepBoth': 'Conservar ambos',
 
   'night.wakeAfterBed': 'El despertar debe ser posterior a la hora de dormir.',
   'night.wakingInside': 'Cada despertar debe quedar dentro de la noche, sin solaparse con otro.',

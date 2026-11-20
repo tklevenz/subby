@@ -2,7 +2,7 @@ import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { WebSocketGateway, type OnGatewayConnection, type OnGatewayDisconnect } from '@nestjs/websockets';
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket } from 'ws';
-import type { LiveMessage } from '@subby/shared/sync';
+import { LIVE_HEARTBEAT_MS, type LiveMessage } from '@subby/shared/sync';
 import proxyAddr from '@fastify/proxy-addr';
 import { AuthService, RECOVERY } from '../auth/auth.service';
 import { bearer } from '../auth/auth.guard';
@@ -54,7 +54,7 @@ const MAX_SOCKETS_PER_DEVICE = 4;
 // Apps never send anything but pongs: a small message limit (ws allows 100 MB by default).
 @WebSocketGateway({ path: '/v1/live', maxPayload: 4096 })
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
-  private readonly heartbeat = setInterval(() => this.ping(), 30_000);
+  private readonly heartbeat = setInterval(() => this.ping(), LIVE_HEARTBEAT_MS);
   private readonly alive = new WeakMap<WebSocket, boolean>();
   private readonly all = new Set<WebSocket>();
   /** Upgrades don't pass Fastify's hooks, so the per-IP limit for opening sockets lives here. */
@@ -117,8 +117,10 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     this.all.clear();
   }
 
-  // Drops sockets that stopped answering (phones switching networks rarely close cleanly).
+  // Drops sockets that stopped answering (phones switching networks rarely close cleanly), and sends the app a
+  // heartbeat it can see: a phone can't tell a dropped socket from a quiet one otherwise (`LiveMessage` 'ping').
   private ping() {
+    const beat = JSON.stringify({ type: 'ping' } satisfies LiveMessage);
     for (const socket of this.all) {
       if (!this.alive.get(socket)) {
         socket.terminate();
@@ -127,6 +129,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       }
       this.alive.set(socket, false);
       socket.ping();
+      if (socket.readyState === socket.OPEN) socket.send(beat);
     }
   }
 }

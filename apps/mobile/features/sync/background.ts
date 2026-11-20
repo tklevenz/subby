@@ -10,6 +10,7 @@ import type { RegisterPushResponse } from '@subby/shared/sync';
 import { checkServer } from './api';
 import { syncNow } from './engine';
 import { saveSync, sessionFor, syncSettings } from './state';
+import { flushSyncEvents, syncEvent } from './debugLog'; // TEMPORARY (A16)
 
 /** Periodic sync for everyone (as often as the OS allows, at best every 15 minutes). */
 const SYNC_TASK = 'subby-sync-periodic';
@@ -34,10 +35,13 @@ export async function backgroundSync() {
 async function backgroundRun(via: 'periodic' | 'push'): Promise<boolean> {
   let ok = true;
   try {
+    await appReady();
+    syncEvent(`background run (${via})`); // TEMPORARY (A16)
     await backgroundSync();
   } catch {
     ok = false;
   }
+  await flushSyncEvents(); // TEMPORARY (A16): a headless run may end before the debounced write
   await saveSync({ lastBackground: { at: Date.now(), via, ok } }).catch(() => {});
   return ok;
 }
