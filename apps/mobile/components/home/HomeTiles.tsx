@@ -408,7 +408,7 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
         icon={<ClockRotateLeft color={colors.inkSoft} size={16} />}
         label={t('home.todaysLog')}
         note={t('home.entries', { count: today })}
-        onPress={() => router.push('/history')}
+        onPress={() => router.push({ pathname: '/history', params: { today: String(Date.now()) } })}
         last
       />
     </View>

@@ -1,5 +1,6 @@
 import { formatDate, t } from '@subby/shared/i18n';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabHeader from '../../components/TabHeader';
@@ -15,10 +16,18 @@ import { colors } from '../../theme/colors';
 /** History: one day as a timeline, with wake windows and the day's totals. */
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
-  const [anchor, setAnchor] = useState(() => startOfDay(Date.now()));
   const now = useNow(MINUTE_MS);
   const units = useSettingsStore((s) => s.units);
   const today = startOfDay(now);
+  // `null` is today, whichever day that is: the tab stays mounted, so after midnight it follows on to the new day.
+  const [picked, setPicked] = useState<number | null>(null);
+  const anchor = picked ?? today;
+  const setAnchor = (day: number) => setPicked(day >= today ? null : day);
+  // Home's "Today's log" opens today, wherever History was left (a new `today` value on every tap).
+  const { today: openToday } = useLocalSearchParams<{ today?: string }>();
+  useEffect(() => {
+    if (openToday) setPicked(null);
+  }, [openToday]);
   const days = useMemo(() => [anchor], [anchor]);
   // A day also reads the two before it (last night's sleep, the sleep before the first wake window) and the one
   // after: the rest of a night that started this evening, so its block shows the whole night with every waking.
