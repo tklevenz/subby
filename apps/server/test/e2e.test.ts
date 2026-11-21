@@ -1211,6 +1211,22 @@ describe.skipIf(!reachable)('sync server', () => {
       // are fine, but no more (new `moved` records, one per request, would be free storage).
       for (let i = 1; i < MAX_MOVES_PER_DEVICE; i++) await a.push([moved()]);
       await expectStatus(a.push([moved()]), 402);
+      // Nor as tombstones, which would never count as stored moves; and deleting one doesn't make room for another.
+      const tombstone = () => a.seal('moved', randomUUID(), null, { deleted: true });
+      await expectStatus(a.push([tombstone()]), 402);
+      await expectStatus(a.push([a.seal('moved', first.id, null, { deleted: true })]), 402);
+    });
+
+    it('deleted `moved` records count toward the moves a phone may write', async () => {
+      const { a } = await pairedFamily(base);
+      const moved = () => a.seal('moved', randomUUID(), { server: 'https://sync.example.com', familyId: randomUUID(), from: a.deviceId, seq: a.lastSeq });
+      for (let i = 0; i < MAX_MOVES_PER_DEVICE; i++) {
+        const r = moved();
+        await a.push([r]);
+        await a.push([a.seal('moved', r.id, null, { deleted: true })]);
+      }
+      await ageFamily(a, 30);
+      await expectStatus(a.push([moved()]), 402);
     });
 
     it('a phone that joins after the trial gets its own 48 hours', async () => {
@@ -1420,6 +1436,25 @@ describe.skipIf(!reachable)('sync server', () => {
       expect(chunked.status).toBe(413);
       // Small ones still reach the route (and fail its own validation).
       expect((await fetch(`${url}/v1/auth/challenge`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(400);
+    });
+
+    it('caps member bodies by route, and takes raw bytes only for photos', async () => {
+      const { a } = await pairedFamily();
+      const headers = { 'content-type': 'application/json', authorization: `Bearer ${a.token}` };
+      const body = JSON.stringify({ pad: 'x'.repeat(OPEN_BODY_LIMIT) });
+      expect((await fetch(`${url}/v1/invites`, { method: 'POST', headers, body })).status).toBe(413);
+      const chunked = await fetch(`${url}/v1/push/token`, {
+        method: 'PUT',
+        headers,
+        body: new ReadableStream({ start: (c) => (c.enqueue(new TextEncoder().encode(body)), c.close()) }),
+        duplex: 'half',
+      } as RequestInit);
+      expect(chunked.status).toBe(413);
+      const raw = await fetch(`${url}/v1/keys/grant`, { method: 'POST', headers: { ...headers, 'content-type': 'application/octet-stream' }, body: new Uint8Array(1024) });
+      expect(raw.status).toBe(415);
+      // A push may still be large.
+      const notes = Array.from({ length: 20 }, () => a.seal('log', randomUUID(), { note: 'x'.repeat(10_000) }));
+      expect((await a.push(notes)).accepted).toHaveLength(20);
     });
 
     it('lets members and the recovery key through as before', async () => {

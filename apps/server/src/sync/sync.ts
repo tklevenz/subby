@@ -34,7 +34,8 @@ export class SyncService {
   async push(auth: AuthContext, records: SyncRecord[]): Promise<PushResponse> {
     // A phone without an unlock may still tell its family it moved elsewhere (leaving is always free): one small
     // `moved` record, nothing else, and only a few of them (checked below), so it can't keep writing.
-    const movedOnly = records.length === 1 && records[0]!.kind === 'moved' && (records[0]!.data?.length ?? 0) <= MOVED_MAX_CHARS;
+    const movedOnly =
+      records.length === 1 && records[0]!.kind === 'moved' && !records[0]!.deleted && (records[0]!.data?.length ?? 0) <= MOVED_MAX_CHARS;
     const unlocked = await this.entitlements.canSync(auth.familyId, auth.deviceId);
     if (!movedOnly && !unlocked) throw notUnlocked();
     for (const r of records) {
@@ -48,8 +49,9 @@ export class SyncService {
       const old = records.find((r) => r.epoch !== family.currentEpoch);
       if (old) throw new BadRequestException(`Record ${old.id} uses epoch ${old.epoch}; current is ${family.currentEpoch}`);
 
-      // A phone's one way out: its `moved` record, while it has fewer than MAX_MOVES_PER_DEVICE others live (a retry of
-      // the same is fine; a move that failed after its record was stored makes a new family, hence a new id).
+      // A phone's one way out: its `moved` record, while it has fewer than MAX_MOVES_PER_DEVICE others stored, deleted
+      // ones too (else deleting them would make room for ever). A retry of the same is fine; a move that failed after
+      // its record was stored makes a new family, hence a new id.
       const leaving =
         movedOnly &&
         (
@@ -61,7 +63,6 @@ export class SyncService {
                 eq(schema.records.familyId, auth.familyId),
                 eq(schema.records.kind, 'moved'),
                 eq(schema.records.deviceId, auth.deviceId),
-                eq(schema.records.deleted, false),
                 ne(schema.records.id, records[0]!.id),
               ),
             )

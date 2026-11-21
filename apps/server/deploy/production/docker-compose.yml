@@ -38,9 +38,31 @@ services:
     logging: *logging
     image: subby-sync:${IMAGE_TAG:?Deploy with deploy.sh (it sets IMAGE_TAG)}
     restart: unless-stopped
-    env_file: .env
+    # Only what the server reads (src/config.ts), never the whole .env: the backup bucket's keys and the
+    # Healthchecks URLs there are for backup.sh and monitor.sh on the host, out of reach of the server.
     environment:
       DATABASE_URL: postgres://subby:${POSTGRES_PASSWORD}@db:5432/subby
+      MODE: ${MODE:?Set MODE in .env}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      BLOB_STORE: ${BLOB_STORE:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      PUSH: ${PUSH:-}
+      FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      APNS_KEY: ${APNS_KEY:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_TOPIC: ${APNS_TOPIC:-}
+      GOOGLE_PLAY_SERVICE_ACCOUNT: ${GOOGLE_PLAY_SERVICE_ACCOUNT:-}
+      GOOGLE_PLAY_PACKAGE: ${GOOGLE_PLAY_PACKAGE:-}
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-}
+      APPLE_ALLOW_SANDBOX: ${APPLE_ALLOW_SANDBOX:-}
+      APPLE_IAP: ${APPLE_IAP:-}
+      RATE_LIMIT: ${RATE_LIMIT:-}
+      METRICS_PORT: ${METRICS_PORT:-}
       # The pretend store must never run here.
       TEST_PURCHASES: "0"
       NODE_OPTIONS: --max-old-space-size=320
