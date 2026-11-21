@@ -127,7 +127,8 @@ export function bbDurationMinutes(s: string | null | undefined): number | undefi
   if (!m) return undefined;
   const [, d = '0', h, min, sec] = m;
   const total = Number(d) * 1440 + Number(h) * 60 + Number(min) + Number(sec) / 60;
-  return total > 0 ? Math.round(total) : undefined;
+  // Under a minute rounds up to one: a duration that's there is never zero.
+  return total > 0 ? Math.max(1, Math.round(total)) : undefined;
 }
 
 // ---- Mapping ----

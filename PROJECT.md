@@ -58,7 +58,7 @@ Subby is open source: the app and shared package are MIT, Subby Sync (the server
   - *Its own unlock:* a non-consumable purchase on the person's store account. "Restore purchases" brings it back on a new phone, and it comes along into any family. The server records which phone uses it, one at a time.
   - *A gift from the family:* any member's phone buys a slot (a consumable), usually while adding a grandparent or nanny. The slot belongs to the family, frees up when its phone is removed, and works on Android and iPhone alike.
   - So the cost can be split however the family likes, with no main account or license holder. There's no free caregiver tier.
-- **Trial:** a new family syncs fully for 14 days. No card, nothing renews. After the trial, a phone without an unlock still syncs for 48 hours (so a partner's phone doesn't stop in the middle of the night), then reads everything but can't log until it's unlocked.
+- **Trial:** a new family syncs fully for 14 days. No card, nothing renews. After the trial, a phone without an unlock still syncs for 48 hours (so a partner's phone doesn't stop in the middle of the night), then reads everything; what it logs stays on the phone, pending, until it's unlocked (logging is never blocked).
 - **Purchases** carry the buying phone's device id through the store's own account field (Apple `appAccountToken`, Google `obfuscatedAccountId`). The server verifies them itself against Google Play and the App Store (no RevenueCat) and stores only store, transaction id, kind and the device or family it belongs to. No personal data, no expiry. Refunds revoke. Self-hosted mode always allows everything.
 - **Switching between Android and iPhone:** an own unlock stays with its store, so switching means buying again; gifted slots work on both.
 - **Photos:** shrunk when picked (~2048 px). Past the 2 GB allowance, new photos stay on the phone only, as oversized ones already do.
@@ -80,7 +80,7 @@ The launch tickets for all of this are in `LAUNCH.md`.
 ### Frontend (Mobile App)
 
 * **Framework:** React Native via **Expo SDK 57** (Expo Router).
-* **Styling:** **NativeWind v4** (Tailwind CSS for React Native), utilizing an OLED-friendly dark palette (`bg-slate-950`).
+* **Styling:** **NativeWind v4** (Tailwind CSS for React Native), utilizing an OLED-friendly dark palette (roles from `theme/palette.js`, e.g. `bg-ground`).
 * **State Management:** **Zustand** (synchronous in-memory store hydrating directly from local SQLite).
 * **Local Database:** `drizzle-orm` over `expo-sqlite` (SQLCipher in native builds), with migrations from `drizzle-kit`.
 * **Interactions:** `expo-haptics` for tactile feedback on logging actions.
@@ -110,7 +110,7 @@ The launch tickets for all of this are in `LAUNCH.md`.
 * **Phase 2: Encrypted Sync & Multi-User Handshake (MVP v1.0)**
 * NestJS backend setup, cryptographic key exchange, user accounts, and real-time E2EE background sync.
 * M1–M7 done (2026-10-23): crypto and protocol, server, sync engine, pairing, recovery key, photo sync, background sync and push.
-* M8, open source and hosting readiness:
+* M8, open source and hosting readiness (all done):
   * Remove the app's premium gates: the one-child limit (`FREE_CHILD_LIMIT`, `PremiumGate`, the Baby Buddy import default) and the "Premium" label on CSV export.
   * Compress photos when they're picked: resize to a long edge of about 2048 px (avatars smaller) and re-encode as JPEG. There's no need to keep full-size camera photos (often 5–10 MB) in Subby; this keeps photo sync and the hosted allowance small. Existing photos stay as they are.
   * `LICENSE` files, the self-hosting README and the hosted-mode entitlements.

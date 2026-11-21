@@ -59,7 +59,7 @@ export class Housekeeping implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Hosted only (D5, LAUNCH.md S4): a family no phone has synced for `INACTIVE_DELETE_DAYS` is deleted with all its
-   * data, gifted slots included (the website and the app's warning say so). From `INACTIVE_WARN_DAYS` its Android
+   * data, gifted slots included (the website and the app's warning say so). From `INACTIVE_WARN_DAYS` its
    * phones get a sync push each week: a phone that's still installed syncs, and that keeps the family. (Phones
    * also warn themselves then, with a local notification each sync schedules.)
    */

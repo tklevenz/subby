@@ -72,8 +72,15 @@ export class BlobsService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.store.put(id, data);
     } catch (e) {
-      await this.db.delete(schema.blobs).where(eq(schema.blobs.id, id));
+      await this.db.delete(schema.blobs).where(and(eq(schema.blobs.id, id), eq(schema.blobs.familyId, auth.familyId)));
       throw e;
+    }
+    // The family was deleted (or the row swept) while the file was being written: its row is gone with it, so
+    // nothing would ever delete this file.
+    const [still] = await this.db.select({ id: schema.blobs.id }).from(schema.blobs).where(and(eq(schema.blobs.id, id), eq(schema.blobs.familyId, auth.familyId)));
+    if (!still) {
+      await this.store.delete(id).catch((e: unknown) => logError("Couldn't delete a photo file", e));
+      throw new NotFoundException('This family is gone');
     }
   }
 

@@ -35,9 +35,10 @@ export function recentMedications(logs: LogEntry[], limit = 6): PayloadOf<'medic
 export function flaggedFoods(logs: LogEntry[]): string[] {
   return distinctRecent(
     logs.flatMap((l) =>
-      l.payload.type === 'feed' && (l.payload.allergen || l.payload.reaction) ? l.payload.foods ?? [] : [],
+      l.payload.type === 'feed' && (l.payload.allergen || l.payload.reaction?.trim()) ? l.payload.foods ?? [] : [],
     ),
-    100,
+    // All of them: a food flagged long ago still matters.
+    Infinity,
   );
 }
 

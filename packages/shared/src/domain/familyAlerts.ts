@@ -1,6 +1,6 @@
 import { t } from '../i18n';
 import type { LogEntry } from '../schemas/log.schema';
-import { groupNights, isSleepEntry, nightOf } from './nights';
+import { NIGHT_GAP_MS, groupNights, isSleepEntry, nightOf } from './nights';
 import { isNightWaking } from './prediction';
 import { isNap } from './stats';
 import { formatHoursMinutes } from './time';
@@ -94,9 +94,18 @@ export function familyAlerts(input: {
     const sleeps = () => input.sleeps(after.childId);
 
     if (isRunning(after) && !was) {
-      if (!on || now - after.startedAt > FAMILY_ALERT_RECENT_MS) continue;
-      // Back asleep after a night waking: the night already notified.
-      if (!nap && (!settings.nights || nightOf(groupNights(sleeps(), now), after.id)?.pieces[0]?.id !== after.id)) continue;
+      // A finished sleep running again: its wake-up was undone, so a "woke up" shown for it is wrong now.
+      const undone = before !== null;
+      const firstPiece = () => (nap ? after.id : (nightOf(groupNights(sleeps(), now), after.id)?.pieces[0]?.id ?? after.id));
+      const quiet =
+        !on ||
+        now - after.startedAt > FAMILY_ALERT_RECENT_MS ||
+        // Back asleep after a night waking: the night already notified.
+        (!nap && (!settings.nights || firstPiece() !== after.id));
+      if (quiet) {
+        if (undone) out.push({ kind: 'dismiss', id: `${FAMILY_ALERT_ID_PREFIX}sleep:${firstPiece()}` });
+        continue;
+      }
       out.push({
         kind: 'show',
         id,
@@ -107,7 +116,8 @@ export function familyAlerts(input: {
     } else if (was && !isRunning(after)) {
       // Up in the night: the night isn't over, so nothing changes yet. Also when back asleep already (the waking
       // and the next piece arrived in one pull; isNightWaking is false then, a sleep is running).
-      if (!nap && (isNightWaking(sleeps(), now) || sleeps().some((s) => isRunning(s) && s.startedAt >= after.endedAt!))) continue;
+      // (Only a night sleep soon after counts: a morning nap is the day, and the night is over.)
+      if (!nap && (isNightWaking(sleeps(), now) || sleeps().some((s) => isRunning(s) && isSleepEntry(s) && !isNap(s) && s.startedAt >= after.endedAt! && s.startedAt - after.endedAt! < NIGHT_GAP_MS))) continue;
       // A night's notification belongs to its first piece, the one that said "down for the night".
       const night = nap ? undefined : nightOf(groupNights(sleeps(), now), after.id);
       const nightId = night ? `${FAMILY_ALERT_ID_PREFIX}sleep:${night.pieces[0]!.id}` : id;

@@ -1,4 +1,5 @@
 import { formatNumber, t, type MessageKey } from '@subby/shared/i18n';
+import { useSingleFlight } from '../../components/useSingleFlight';
 import { errorMessage } from '../../features/errorMessage';
 import { useAsyncAction } from '../../features/useAsyncAction';
 import React, { useMemo, useRef, useState } from 'react';
@@ -236,7 +237,8 @@ function Review({
     [localChildren],
   );
 
-  const start = async () => {
+  const once = useSingleFlight();
+  const start = once(async () => {
     // Resolve mapping: create new children, tag matched ones with their BB ref for future re-runs.
     const childMap = new Map<number, string | null>();
     for (const bb of preview.children) {
@@ -257,7 +259,7 @@ function Review({
     if (!fallback) return;
     if (!activeChildId) await setSetting('activeChildId', fallback);
     onStart(units, childMap, fallback);
-  };
+  });
 
   return (
     <View>
@@ -271,7 +273,7 @@ function Review({
       <FieldLabel>{t('bb.children')}</FieldLabel>
       {preview.children.map((bb) => (
         <View key={bb.id} className="mb-3">
-          <Text className="text-ink-light mb-2">{bb.first_name} {bb.last_name} · born {bb.birth_date} → import into</Text>
+          <Text className="text-ink-light mb-2">{t('bb.childRow', { name: `${bb.first_name} ${bb.last_name}`.trim(), date: bb.birth_date })}</Text>
           <Segmented options={childOptions} value={mapping[bb.id]} onChange={(v) => setMapping((m) => ({ ...m, [bb.id]: v }))} />
         </View>
       ))}

@@ -80,6 +80,8 @@ export function suggestedNextSide(logs: LogEntry[]): 'left' | 'right' | null {
     (l): l is EntryOf<'feed'> => isType('feed')(l) && l.payload.method === 'breast',
   );
   if (!last) return null;
+  // A breastfeed with no time on either side (started and stopped at once) says nothing about the sides.
+  if (!last.payload.lastSide && !last.payload.leftSeconds && !last.payload.rightSeconds) return null;
   const side = last.payload.lastSide
     ?? ((last.payload.rightSeconds ?? 0) > (last.payload.leftSeconds ?? 0) ? 'right' : 'left');
   return side === 'left' ? 'right' : 'left';

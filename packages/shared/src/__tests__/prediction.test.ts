@@ -152,6 +152,15 @@ describe('suggestedSchedule', () => {
     expect(items[2]).toEqual({ kind: 'bedtime', at: at(0, 18, 45), logged: true });
   });
 
+  it("doesn't take the morning's night, back asleep past the usual wake-up, for tonight's bedtime", () => {
+    // Asleep 19:30–05:30, a feed, back asleep at 07:15 (after the usual 07:00), still asleep at 07:30.
+    const logs = [...week(7).slice(0, -1), entry({ type: 'sleep', nap: false }, at(-1, 19, 30), at(0, 5, 30)), entry({ type: 'sleep', nap: false }, at(0, 7, 15), null)];
+    const { items } = suggestedSchedule(logs, child, at(0, 7, 30));
+    expect(items[0]).toEqual({ kind: 'wake', at: at(0, 7, 30) });
+    expect(items.map((i) => i.kind)).toEqual(['wake', 'nap', 'nap', 'bedtime']);
+    expect(items.at(-1)).toEqual({ kind: 'bedtime', at: at(0, 19, 30) });
+  });
+
   it('leaves out a nap that would run into bedtime', () => {
     // One late nap until 16:30: nap 2 would start ~19:20, past the usual bedtime minus 90 min.
     const logs = [...week(7), entry({ type: 'sleep', nap: true }, at(0, 15), at(0, 16, 30))];
@@ -260,3 +269,32 @@ describe('defaultNap', () => {
     expect(defaultNap([], at(0, 19, 10))).toBe(false);
   });
 });
+
+describe('sleep habits at the edges', () => {
+  it('counts nap indexes from whole days, even when the window starts mid-day', () => {
+    // From 11:00 three days back: that day's first nap is cut off, its second is still nap 2.
+    expect(sleepHabits(week(7), at(0, 11), 3).napLengths.get(1)).toBe(90);
+  });
+
+  it('only looks at sleeps up to `now` (backdating, or a sleep dated ahead)', () => {
+    const now = at(-3, 12);
+    const until = week(7).filter((l) => (l.endedAt ?? l.startedAt) <= now);
+    expect(sleepHabits(week(7), now)).toEqual(sleepHabits(until, now));
+  });
+
+  it('takes the morning wake-up from mornings only', () => {
+    // Every night in two stretches more than 3 h apart: 19:00–22:00 and 01:30–07:00.
+    const logs = [];
+    for (let d = -7; d < 0; d++) {
+      logs.push(entry({ type: 'sleep', nap: false }, at(d - 1, 19), at(d - 1, 22)));
+      logs.push(entry({ type: 'sleep', nap: false }, at(d, 1, 30), at(d, 7)));
+    }
+    expect(sleepHabits(logs, at(0, 12)).wakeClock).toBe(7 * 60);
+  });
+
+  it("isn't awake in the night after a night sleep marked in the morning", () => {
+    const logs = [...week(7).slice(0, -1), entry({ type: 'sleep', nap: false }, at(-1, 19, 30), at(0, 4)), entry({ type: 'sleep', nap: false }, at(0, 7, 15), at(0, 8))];
+    expect(isNightWaking(logs, at(0, 9))).toBe(false);
+  });
+});
+

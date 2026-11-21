@@ -2,6 +2,7 @@ import { t } from '@subby/shared/i18n';
 import { fetch as expoFetch } from 'expo/fetch';
 import { seal, sign, toBase64, type DeviceLogEntry, type IdentityKeys } from '@subby/shared/crypto';
 import {
+  MAX_BLOB_BYTES,
   authMessage,
   type ChallengeResponse,
   type KeysResponse,
@@ -148,7 +149,14 @@ export class SyncSession {
   getBlob = async (id: string): Promise<Uint8Array | null> => {
     try {
       const res = await this.raw((token) => expoFetch(`${this.server}/v1/blobs/${id}`, { headers: { authorization: `Bearer ${token}` } }));
-      return new Uint8Array(await res.arrayBuffer());
+      // No photo is larger than the server takes, so a bigger answer isn't one (and would be read into memory whole).
+      // Skipped like one that doesn't decrypt, so one bad answer can't stop sync.
+      if (Number(res.headers.get('content-length') ?? 0) > MAX_BLOB_BYTES + 1) { // i18n-ignore
+        console.warn(`[sync] photo ${id} is larger than any photo can be`); // i18n-ignore
+        return null;
+      }
+      const data = new Uint8Array(await res.arrayBuffer());
+      return data.length > MAX_BLOB_BYTES + 1 ? null : data;
     } catch (e) {
       if (isHttpError(e, 404)) return null;
       throw e;

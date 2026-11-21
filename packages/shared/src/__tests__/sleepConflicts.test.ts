@@ -31,6 +31,17 @@ describe('sleep conflicts', () => {
     expect(sleepConflicts([old, older], at(-600))).toHaveLength(1);
   });
 
+  it('finds a sleep still running from before the window, and keeps a night a night', () => {
+    const forgotten = sleep(at(-600), null); // started before `since`, never stopped
+    const fresh = sleep(at(10), at(60));
+    expect(sleepConflicts([forgotten, fresh], at(-60))).toHaveLength(1);
+    // One phone tapped a nap a minute before the other logged bedtime: the merged sleep is the night.
+    const nap = entry({ type: 'sleep', nap: true }, at(0), null);
+    const night = sleep(at(2), at(600));
+    const [c] = sleepConflicts([nap, night], at(-60));
+    expect(mergedSleep(c!).payload.nap).toBe(false);
+  });
+
   it('puts each sleep in at most one pair', () => {
     const a = sleep(at(0), null);
     const b = sleep(at(1), null);

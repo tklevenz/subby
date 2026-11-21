@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BB_ENDPOINTS, detectUnits, mapRecord } from '@subby/shared';
 import { BBClient, BBError, nextOffset, normalizeBaseUrl } from './client';
 
@@ -16,6 +16,30 @@ describe('nextOffset', () => {
     expect(nextOffset('http://bb/api/feedings/?limit=500&offset=500', 500)).toBeNull();
     expect(nextOffset('http://bb/api/feedings/?limit=500', 0)).toBeNull();
     expect(nextOffset(null, 0)).toBeNull();
+  });
+});
+
+describe('BBClient against a misbehaving server', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const answer = (url: string, body: unknown) => ({ ok: true, status: 200, url, json: async () => body }) as unknown as Response;
+
+  it("won't read what a redirect elsewhere (or to http) brings back", async () => {
+    vi.stubGlobal('fetch', async () => answer('https://evil.example/api/profile/', {}));
+    await expect(new BBClient('https://bb.example.com', 'k').profile()).rejects.toBeInstanceOf(BBError);
+    vi.stubGlobal('fetch', async () => answer('http://bb.example.com/api/profile/', {}));
+    await expect(new BBClient('https://bb.example.com', 'k').profile()).rejects.toBeInstanceOf(BBError);
+    vi.stubGlobal('fetch', async (url: string) => answer(url, {}));
+    await expect(new BBClient('https://bb.example.com', 'k').profile()).resolves.toEqual({});
+  });
+
+  it('stops at an empty page, whatever next says', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls++;
+      return answer(url, { count: 9, next: `https://bb.example.com/api/children/?limit=100&offset=${calls * 100}`, results: [] });
+    });
+    expect(await new BBClient('https://bb.example.com', 'k').children()).toEqual([]);
+    expect(calls).toBe(1);
   });
 });
 

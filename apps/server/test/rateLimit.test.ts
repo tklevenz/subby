@@ -1,7 +1,7 @@
 import Fastify, { type FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { AuthContext } from '../src/auth/auth.service';
-import { DEFAULT_LIMIT, DEVICE_LIMIT, RateLimiter, clientKey, installDeviceLimits, ruleFor } from '../src/common/rateLimit';
+import { DEFAULT_LIMIT, DEVICE_LIMIT, RULES, RateLimiter, clientKey, installDeviceLimits, installRateLimits, perRule, ruleFor } from '../src/common/rateLimit';
 
 describe('rate limits', () => {
   it('allows a burst, then refills at the given rate', () => {
@@ -64,6 +64,7 @@ describe('rate limits', () => {
     expect(clientKey('2001:db8:1:2::1')).toBe('2001:db8:1:2::/64');
     expect(clientKey('2001:0db8:0001:0002:ffff:ffff:ffff:ffff')).toBe('2001:db8:1:2::/64');
     expect(clientKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(clientKey('2001:db8:1:2::1', 48)).toBe('2001:db8:1::/48');
     expect(clientKey('2001:db8:1:2:3::')).toBe('2001:db8:1:2::/64');
     expect(clientKey('::1')).toBe('0:0:0:0::/64');
     expect(clientKey('fe80::1%en0')).toBe('fe80:0:0:0::/64');
@@ -85,6 +86,47 @@ describe('rate limits', () => {
     expect(Number(refused.headers['retry-after'])).toBeGreaterThan(0);
     expect((await get('b')).statusCode).toBe(200);
     expect((await get()).statusCode).toBe(200);
+    await app.close();
+  });
+});
+
+describe('per-IP rules', () => {
+  const serve = async (ip: () => string) => {
+    const app = Fastify({ trustProxy: false });
+    app.addHook('onRequest', async (request) => {
+      Object.defineProperty(request, 'ip', { value: ip() });
+    });
+    installRateLimits(app, perRule(4));
+    app.post('/v1/families', async () => ({ ok: true }));
+    app.get('/v1/sync/pull', async () => ({ ok: true }));
+    await app.ready();
+    return app;
+  };
+
+  it("keep their own buckets: a flood elsewhere doesn't evict them", async () => {
+    let n = 0;
+    let ip = '203.0.113.7';
+    const app = await serve(() => ip);
+    const family = RULES.find((r) => r.name === 'family')!.limit.burst;
+    for (let i = 0; i < family; i++) expect((await app.inject({ method: 'POST', url: '/v1/families' })).statusCode).toBe(200);
+    // Many clients on the default rule, more than a limiter keeps.
+    for (; n < 20; n++) {
+      ip = `198.51.100.${n}`;
+      await app.inject({ method: 'GET', url: '/v1/sync/pull' });
+    }
+    ip = '203.0.113.7';
+    expect((await app.inject({ method: 'POST', url: '/v1/families' })).statusCode).toBe(429);
+    await app.close();
+  });
+
+  it('limit creating families per IPv6 /48 too, not only per /64', async () => {
+    let n = 0;
+    const app = await serve(() => `2001:db8:1:${(n++).toString(16)}::1`);
+    const family = RULES.find((r) => r.name === 'family')!.limit.burst;
+    const codes: number[] = [];
+    for (let i = 0; i < family * 4 + 1; i++) codes.push((await app.inject({ method: 'POST', url: '/v1/families' })).statusCode);
+    expect(codes.filter((c) => c === 200)).toHaveLength(family * 4);
+    expect(codes.at(-1)).toBe(429);
     await app.close();
   });
 });

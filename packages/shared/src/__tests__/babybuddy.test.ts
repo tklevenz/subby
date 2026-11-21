@@ -54,6 +54,8 @@ describe('Baby Buddy mapping', () => {
 
   it('maps medication intervals and parses durations', () => {
     expect(bbDurationMinutes('06:00:00')).toBe(360);
+    expect(bbDurationMinutes('00:00:20')).toBe(1);
+    expect(bbDurationMinutes('00:00:00')).toBeUndefined();
     expect(bbDurationMinutes('1 02:30:00')).toBe(1590);
     const m = mapRecord('medication', { ...base, time: '2026-01-01T08:00:00Z', name: 'Paracetamol', dosage: 2.5, dosage_unit: 'ml', next_dose_interval: '06:00:00' }, H, METRIC);
     expect(m.payload).toMatchObject({ name: 'Paracetamol', dose: 2.5, unit: 'ml', nextDoseIntervalMin: 360 });

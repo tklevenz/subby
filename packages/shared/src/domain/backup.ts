@@ -287,9 +287,16 @@ export function planRestore(
       revivedChildren.add(c.id);
     } else plan.unchanged++;
   }
+  // Children the backup deletes (it deleted them after this phone's version): not live after the restore either.
+  for (const d of backup.deleted) {
+    const row = d.kind === 'child' ? local.children.get(d.id) : undefined;
+    if (row && !row.isDeleted && backupWins(row, d)) liveChildren.delete(d.id);
+  }
   for (const l of backup.logs) {
     const row = local.logs.get(l.id);
-    if (backupWins(row, l)) plan.logs.push(l);
+    // Only for a child that's live after the restore; one this phone deleted comes back only with "bring them back".
+    if (backupWins(row, l) && liveChildren.has(l.childId)) plan.logs.push(l);
+    else if (backupWins(row, l) && revivedChildren.has(l.childId)) plan.revive.logs.push(l);
     else if (deletedSince(row) && (liveChildren.has(l.childId) || revivedChildren.has(l.childId))) plan.revive.logs.push(fresh(l, row));
     else plan.unchanged++;
   }

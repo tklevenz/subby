@@ -102,6 +102,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     this.alive.set(socket, true);
     socket.on('pong', () => this.alive.set(socket, true));
     this.bus.add(auth.familyId, socket);
+    // Removed (or the family deleted) while its token was being checked: closing it then found no socket to close.
+    // Checked again now that it's tracked, so a removal from here on finds it.
+    if (!(await this.auth.authenticate(token))) {
+      this.handleDisconnect(socket);
+      socket.close(4401, 'Unauthorized');
+    }
   }
 
   handleDisconnect(socket: WebSocket) {

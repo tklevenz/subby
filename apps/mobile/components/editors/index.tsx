@@ -111,7 +111,8 @@ function DiaperEditor({ payload: p, onChange }: EditorProps<'diaper'>) {
           { value: 'dry', label: t('diaper.dry') },
         ]}
         value={p.condition}
-        onChange={(condition) => onChange({ condition })}
+        // Wet or dry has no stool: its color goes too, or it would stay hidden in the entry.
+        onChange={(condition) => onChange(hasStool(condition) ? { condition } : { condition, color: undefined })}
       />
       {hasStool(p.condition) ? (
         <>

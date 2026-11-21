@@ -166,6 +166,15 @@ describe('device log', () => {
     expect(() => verifyDeviceLog([log[0]!, log[2]!], { trusted: 2 })).toThrow();
   });
 
+  it('refuses a phone with a small-order box key (every seal to it would throw)', () => {
+    const zero = { ...keysOf(phoneB.keys), box: new Uint8Array(32) };
+    expect(() => verifyDeviceLog(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: zero }))).toThrow('malformed keys');
+    const high = new Uint8Array(32);
+    high[0] = 1;
+    high[31] = 0x80; // the top bit is ignored
+    expect(() => verifyDeviceLog(push(created, phoneA, { type: 'add', deviceId: phoneB.id, keys: { ...keysOf(phoneB.keys), box: high } }))).toThrow('malformed keys');
+  });
+
   it("never lets a device use the recovery key's id", () => {
     const sneaky = { id: RECOVERY_SIGNER, keys: newIdentity() };
     const log = push([], sneaky, { type: 'create', deviceId: RECOVERY_SIGNER, keys: keysOf(sneaky.keys), familyKey: { epoch: 1, key: key1 } });

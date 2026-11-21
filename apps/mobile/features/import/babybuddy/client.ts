@@ -32,6 +32,8 @@ export class BBClient {
     } catch {
       throw new BBError(t('bb.error.unreachable', { host: this.host }));
     }
+    // Redirected to another server (or from https to http): never read what comes from there.
+    if (res.url && (hostOf(res.url) !== this.host || (/^https:/i.test(this.baseUrl) && !/^https:/i.test(res.url)))) throw new BBError(t('bb.error.notBB', { host: this.host }));
     if (res.status === 401 || res.status === 403) throw new BBError(t('bb.error.rejected'));
     if (res.status === 404) throw new BBError(t('bb.error.notBB', { host: this.host }));
     if (!res.ok) throw new BBError(t('bb.error.http', { status: String(res.status) }));
@@ -44,7 +46,8 @@ export class BBClient {
 
   /** Verifies URL + token. */
   async profile(): Promise<unknown> {
-    return this.get('profile');
+    // With the slash: Django redirects without it, and the token shouldn't go through a redirect.
+    return this.get('profile/');
   }
 
   async children(): Promise<BBChild[]> {
@@ -72,7 +75,8 @@ export class BBClient {
     while (offset !== null) {
       const page: Page<T> = await this.get(`${path}/?limit=${pageSize}&offset=${offset}`);
       yield page;
-      offset = nextOffset(page.next, offset);
+      // An empty page ends it, whatever `next` says (a broken server can't keep the import going).
+      offset = page.results.length ? nextOffset(page.next, offset) : null;
     }
   }
 }

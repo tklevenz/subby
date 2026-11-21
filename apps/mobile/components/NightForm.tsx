@@ -25,7 +25,7 @@ const NEW_WAKING_MS = 15 * MINUTE_MS;
 /**
  * A finished night as one: bedtime, wake-up and the wakings between. Saving turns it back into sleep pieces,
  * reusing the existing entries in order, adding new ones for added wakings and deleting the ones a removed waking
- * joined (their notes move to the first). Opened from any piece of the night.
+ * joined. The night's notes (every piece's) are one field, kept on the first piece. Opened from any piece of the night.
  */
 export default function NightForm({ night }: { night: Night }) {
   const writeLogs = useLogStore((s) => s.writeLogs);
@@ -41,7 +41,12 @@ export default function NightForm({ night }: { night: Night }) {
   const nextKey = useRef(0);
   const [rows, setRows] = useState<(Waking & { key: number })[]>(() => initialWakings.map((w) => ({ ...w, key: nextKey.current++ })));
   const wakings: Waking[] = rows.map(({ start, end }) => ({ start, end }));
-  const { payload, patch, changed: payloadChanged } = usePayloadForm<PayloadOf<'sleep'>>({ ...first.payload, nap: isNap(first) });
+  const { payload, patch, changed: payloadChanged } = usePayloadForm<PayloadOf<'sleep'>>({
+    ...first.payload,
+    nap: isNap(first),
+    // The night's notes, from every piece: the form has one field for them, and saving keeps them on the first.
+    notes: night.pieces.map((p) => p.payload.notes).filter(Boolean).join('\n') || undefined,
+  });
 
   const pieces = nightPieces(bedtime, wakeUp, wakings);
   const ids = night.pieces.map((p) => p.id);
@@ -75,8 +80,8 @@ export default function NightForm({ night }: { night: Night }) {
   const save = once(async () => {
     if (!pieces) return;
     const joined = night.pieces.slice(pieces.length);
-    const notes = [payload.notes, ...joined.map((p) => p.payload.notes)].filter(Boolean).join('\n') || undefined;
-    const firstPayload = { ...payload, notes };
+    // The form held every piece's notes: they all go on the first, so none stays behind on a stretch that moved.
+    const firstPayload = payload;
     // One transaction: a failure leaves the night as it was, and screens re-read once.
     const update: { id: string; patch: LogPatch }[] = [];
     const add: { payload: LogPayload; startedAt: number; endedAt: number }[] = [];
@@ -84,7 +89,8 @@ export default function NightForm({ night }: { night: Night }) {
       const existing = night.pieces[i];
       if (!existing) add.push({ payload: { type: 'sleep', nap: false }, startedAt: start, endedAt: end });
       else if (i === 0) update.push({ id: existing.id, patch: { payload: firstPayload, startedAt: start, endedAt: end } });
-      else if (existing.startedAt !== start || existing.endedAt !== end) update.push({ id: existing.id, patch: { startedAt: start, endedAt: end } });
+      else if (existing.startedAt !== start || existing.endedAt !== end || existing.payload.notes)
+        update.push({ id: existing.id, patch: { startedAt: start, endedAt: end, ...(existing.payload.notes ? { payload: { notes: undefined } } : {}) } });
     }
     await writeLogs({ add, update, remove: joined.map((p) => p.id) });
     leave();

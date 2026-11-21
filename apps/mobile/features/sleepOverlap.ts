@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { t } from '@subby/shared/i18n';
 import { overlappingSleep, startOfDay, DAY_MS, type LogEntry } from '@subby/shared';
 import { useLogQuery } from '../store/queries';
@@ -10,7 +11,11 @@ const WEEK_MS = 7 * DAY_MS;
 function useNearbySleeps(start: number) {
   const nearby = useLogQuery({ from: startOfDay(start) - WEEK_MS, types: ['sleep'] });
   const loaded = useLogStore((s) => s.logs);
-  return [...(nearby ?? []), ...loaded];
+  // While another day's read is on its way, the last one's sleeps still count: none at all would let Save through
+  // for a moment.
+  const last = useRef<LogEntry[]>([]);
+  if (nearby) last.current = nearby;
+  return [...last.current, ...loaded];
 }
 
 /** The message for the sleep that [start, end) would overlap (end null: still going), or null. */

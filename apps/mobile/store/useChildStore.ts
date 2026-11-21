@@ -98,7 +98,7 @@ export const useChildStore = create<ChildState>((set, get) => ({
       .set({ ...change, updatedAt: now, syncStatus: 'pending' })
       .where(eq(schema.childrenTable.id, id));
     set((state) => ({
-      children: state.children.map((c) => (c.id === id ? { ...c, ...change, updatedAt: now } : c)),
+      children: state.children.map((c) => (c.id === id ? { ...c, ...change, updatedAt: now, syncStatus: 'pending' } : c)),
     }));
   },
 

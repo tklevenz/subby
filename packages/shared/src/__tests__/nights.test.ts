@@ -50,4 +50,23 @@ describe('nights', () => {
     expect(averageNights(per)).toMatchObject({ wakings: 2, nights: 1 });
     expect(averageNights([null])).toBeNull();
   });
+
+  it("doesn't join night sleeps across a nap, nor count pieces that touch as a waking", () => {
+    const early = entry({ type: 'sleep', nap: false }, at(-1, 19, 40), at(0, 4));
+    const morningNap = entry({ type: 'sleep', nap: true }, at(0, 4, 30), at(0, 5));
+    const after = entry({ type: 'sleep', nap: false }, at(0, 5, 30), at(0, 6, 30));
+    expect(groupNights([early, morningNap, after], at(0, 12))).toHaveLength(2);
+    const touching = entry({ type: 'sleep', nap: false }, at(0, 1, 10), at(0, 4, 45));
+    const [night] = groupNights([a, touching], at(0, 12));
+    expect(night!.pieces).toHaveLength(2);
+    expect(night!.wakings).toEqual([]);
+  });
+
+  it("doesn't count tonight's first stretch, ended for a waking, as this morning's night", () => {
+    const evening = entry({ type: 'sleep', nap: false }, at(0, 19, 30), at(0, 22, 30));
+    expect(nightsByDay(groupNights([evening], at(0, 22, 45)), [day])).toEqual([null]);
+    // Last night still counts for today, even when it began after midnight.
+    const late = entry({ type: 'sleep', nap: false }, at(0, 0, 30), at(0, 6, 30));
+    expect(nightsByDay(groupNights([late, evening], at(0, 22, 45)), [day])[0]).toMatchObject({ asleepMs: 360 * MIN });
+  });
 });

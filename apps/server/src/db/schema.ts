@@ -38,14 +38,19 @@ export const deviceLog = pgTable(
 );
 
 /** Current members, derived from the log (for auth lookups). Removed devices stay with active = false. */
-export const devices = pgTable('devices', {
-  id: uuid('id').primaryKey(),
-  familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
-  signKey: text('sign_key').notNull(),
-  active: boolean('active').notNull().default(true),
-  /** When it joined: its grace after the trial counts from here if it joined later (hosted payments). */
-  addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const devices = pgTable(
+  'devices',
+  {
+    id: uuid('id').primaryKey(),
+    familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+    signKey: text('sign_key').notNull(),
+    active: boolean('active').notNull().default(true),
+    /** When it joined: its grace after the trial counts from here if it joined later (hosted payments). */
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Postgres doesn't index foreign keys by itself: every family lookup (and the cascade on delete) would scan.
+  (t) => [index('devices_family_idx').on(t.familyId)],
+);
 
 /** Family keys sealed to one recipient (device id or 'recovery') per epoch. */
 export const familyKeys = pgTable(
@@ -60,22 +65,31 @@ export const familyKeys = pgTable(
 );
 
 /** Bearer tokens, stored as sha256. `deviceId` is 'recovery' for a recovery-key session. */
-export const sessions = pgTable('sessions', {
-  tokenHash: text('token_hash').primaryKey(),
-  familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
-  deviceId: text('device_id').notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-});
+export const sessions = pgTable(
+  'sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+    deviceId: text('device_id').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  // Dropped by family and device on removal, and by expiry in housekeeping.
+  (t) => [index('sessions_family_device_idx').on(t.familyId, t.deviceId), index('sessions_expires_idx').on(t.expiresAt)],
+);
 
-export const invites = pgTable('invites', {
-  id: uuid('id').primaryKey(),
-  familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
-  /** sha256 of the claim key; the invite secret itself never reaches the server. */
-  claimHash: text('claim_hash').notNull(),
-  status: text('status', { enum: ['open', 'claimed', 'approved'] }).notNull().default('open'),
-  claimant: jsonb('claimant').$type<{ deviceId: string; signKey: string; boxKey: string; mac: string }>(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-});
+export const invites = pgTable(
+  'invites',
+  {
+    id: uuid('id').primaryKey(),
+    familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+    /** sha256 of the claim key; the invite secret itself never reaches the server. */
+    claimHash: text('claim_hash').notNull(),
+    status: text('status', { enum: ['open', 'claimed', 'approved'] }).notNull().default('open'),
+    claimant: jsonb('claimant').$type<{ deviceId: string; signKey: string; boxKey: string; mac: string }>(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('invites_family_idx').on(t.familyId), index('invites_expires_idx').on(t.expiresAt)],
+);
 
 /**
  * Encrypted files (photos), stored in the blob store under `id`. `recordId` is the record that lists the
@@ -94,16 +108,20 @@ export const blobs = pgTable(
 );
 
 /** Push: one token per device (removed with the device, or when the push service drops it). */
-export const pushTokens = pgTable('push_tokens', {
-  deviceId: uuid('device_id').primaryKey(),
-  familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
-  token: text('token').notNull(),
-  /** `android` (an FCM token) or `ios` (an APNs token, not sent to yet). Older rows held Expo tokens; FCM refuses them and they're dropped. */
-  platform: text('platform').notNull().default('android'),
-  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
-});
+export const pushTokens = pgTable(
+  'push_tokens',
+  {
+    deviceId: uuid('device_id').primaryKey(),
+    familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+    token: text('token').notNull(),
+    /** `android` (an FCM token) or `ios` (an APNs token). Older rows held Expo tokens; FCM refuses them and they're dropped. */
+    platform: text('platform').notNull().default('android'),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (t) => [index('push_tokens_family_idx').on(t.familyId)],
+);
 
-/** Encrypted records; the newest version per id (last writer wins), tombstones without data. */
+/** Encrypted records; the newest version per id (last writer wins), tombstones with a sealed empty body. */
 export const records = pgTable(
   'records',
   {

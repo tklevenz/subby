@@ -13,7 +13,7 @@ const variables = Object.fromEntries(Object.entries(dark).map(([key, hex]) => [`
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',
-  content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
+  content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}', './features/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
   theme: {
     // Replaces Tailwind's palette entirely: an unmapped class like bg-slate-900 has no effect.

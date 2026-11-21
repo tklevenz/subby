@@ -61,6 +61,11 @@ describe('i18n', () => {
     expect(formatDuration(3_725_000)).toBe('1h 2m');
     expect(formatRelative(30_000)).toBe('Just now');
     expect(formatAge('2026-01-01', new Date(2026, 0, 2).getTime())).toBe('1 day');
+    // Calendar months: no step back from weeks to months, and birthdays count.
+    expect(formatAge('2026-01-01', new Date(2026, 2, 31).getTime())).toBe('12 weeks');
+    expect(formatAge('2026-01-01', new Date(2026, 3, 1).getTime())).toBe('3 months');
+    expect(formatAge('2025-03-10', new Date(2026, 2, 10).getTime())).toBe('12 months');
+    expect(formatAge('2024-03-10', new Date(2026, 2, 10).getTime())).toBe('2 years');
     expect(formatDose(1, 'drops')).toBe('1 drop');
     expect(formatDose(2, 'tablets')).toBe('2 tablets');
   });

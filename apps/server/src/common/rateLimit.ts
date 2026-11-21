@@ -49,7 +49,7 @@ export function ruleFor(method: string, route: string | undefined): { name: stri
  * Whom a bucket belongs to: an IPv4 address as is, an IPv6 address by its /64. A home or mobile network gets a
  * whole /64, so a client can pick any address in it.
  */
-export function clientKey(ip: string): string {
+export function clientKey(ip: string, prefix: 64 | 48 = 64): string {
   const v4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
   if (v4) return v4[1]!;
   if (!ip.includes(':')) return ip;
@@ -59,9 +59,9 @@ export function clientKey(ip: string): string {
   const h = groups(head);
   const all = tail === undefined ? h : [...h, ...Array<string>(Math.max(0, 8 - h.length - groups(tail).length)).fill('0'), ...groups(tail)];
   return `${all
-    .slice(0, 4)
+    .slice(0, prefix / 16)
     .map((g) => (parseInt(g, 16) || 0).toString(16))
-    .join(':')}::/64`;
+    .join(':')}::/${prefix}`;
 }
 
 /** Opening a live socket (`/v1/live`): an app keeps one, reconnecting when it comes back or changes networks. */
@@ -97,13 +97,37 @@ export class RateLimiter {
 const tooMany = (reply: FastifyReply, wait: number) =>
   reply.code(429).header('retry-after', String(wait)).send({ statusCode: 429, message: 'Too many requests, try again later' });
 
-/** Answers 429 with Retry-After once a client is over its limit. Runs first, before any database lookup. */
-export function installRateLimits(fastify: FastifyInstance, limiter = new RateLimiter()) {
+/**
+ * The open routes that create something or check a secret: also limited per IPv6 /48 (a site's whole allocation, so
+ * a VPS can't spread over its 65,536 /64s), at this many times the rule.
+ */
+const WIDE_RULES = new Set(['auth', 'family', 'claim']);
+const WIDE_FACTOR = 4;
+
+/**
+ * Answers 429 with Retry-After once a client is over its limit. Runs first, before any database lookup. Each rule
+ * has its own limiter, so clients flooding one rule (or the default) can't push others' buckets out of memory.
+ */
+export function installRateLimits(fastify: FastifyInstance, limiterFor: (rule: string) => RateLimiter = perRule()) {
   fastify.addHook('onRequest', async (request, reply) => {
     const { name, limit } = ruleFor(request.method, request.routeOptions.url);
-    const wait = limiter.take(`${name}:${clientKey(request.ip)}`, limit);
+    const limiter = limiterFor(name);
+    let wait = limiter.take(clientKey(request.ip), limit);
+    if (!wait && WIDE_RULES.has(name) && request.ip.includes(':') && !clientKey(request.ip).includes('.')) {
+      wait = limiter.take(clientKey(request.ip, 48), { burst: limit.burst * WIDE_FACTOR, perMinute: limit.perMinute * WIDE_FACTOR });
+    }
     if (wait) await tooMany(reply, wait);
   });
+}
+
+/** A limiter per rule name, made on first use. */
+export function perRule(maxKeys?: number): (rule: string) => RateLimiter {
+  const limiters = new Map<string, RateLimiter>();
+  return (rule) => {
+    let limiter = limiters.get(rule);
+    if (!limiter) limiters.set(rule, (limiter = new RateLimiter(maxKeys)));
+    return limiter;
+  };
 }
 
 /**

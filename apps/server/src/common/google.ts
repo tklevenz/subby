@@ -20,8 +20,16 @@ export class GoogleAuth {
     private readonly scope: string,
   ) {}
 
+  /** One request at a time: a burst of pushes shares the token being fetched. */
+  private pending: Promise<string> | null = null;
+
   async token(): Promise<string> {
     if (this.cached && this.cached.expiresAt > Date.now() + 5 * 60_000) return this.cached.token;
+    this.pending ??= this.fetchToken().finally(() => (this.pending = null));
+    return this.pending;
+  }
+
+  private async fetchToken(): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     const b64 = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
     const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({
@@ -33,6 +41,7 @@ export class GoogleAuth {
     })}`;
     const signature = createSign('RSA-SHA256').update(unsigned).sign(this.account.privateKey, 'base64url');
     const res = await fetch(this.account.tokenUri, {
+      signal: AbortSignal.timeout(15_000),
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${signature}` }),

@@ -10,12 +10,13 @@ import { isSleepEntry, type SleepEntry } from './nights';
 export type SleepConflict = { keep: SleepEntry; drop: SleepEntry; key: string };
 
 /**
- * Overlapping pairs among a child's live sleeps that started from `since` on, oldest first, each sleep in at most
+ * Overlapping pairs among a child's live sleeps that went on past `since`, oldest first, each sleep in at most
  * one pair (after a merge, any third one shows up as the next pair). Running sleeps last until stopped; touching
  * ends (a night's pieces) don't overlap.
  */
 export function sleepConflicts(logs: LogEntry[], since: number): SleepConflict[] {
-  const sleeps = logs.filter((l): l is SleepEntry => isSleepEntry(l) && l.startedAt >= since).sort((a, b) => a.startedAt - b.startedAt || cmp(a.id, b.id));
+  // Still going at `since` counts too: a forgotten running sleep from before overlaps a new one just the same.
+  const sleeps = logs.filter((l): l is SleepEntry => isSleepEntry(l) && (l.endedAt ?? Infinity) > since).sort((a, b) => a.startedAt - b.startedAt || cmp(a.id, b.id));
   const used = new Set<string>();
   const found: SleepConflict[] = [];
   for (let i = 0; i < sleeps.length; i++) {
@@ -48,6 +49,7 @@ export function mergedSleep({ keep, drop }: SleepConflict): Pick<SleepEntry, 'st
   return {
     startedAt: Math.min(keep.startedAt, drop.startedAt),
     endedAt: ends.length ? Math.max(...ends) : null,
-    payload: { ...keep.payload, ...(joined ? { notes: joined } : {}) },
+    // A night either phone logged makes it a night (a nap tapped a minute before the bedtime is the same sleep).
+    payload: { ...keep.payload, ...(drop.payload.nap === false ? { nap: false } : {}), ...(joined ? { notes: joined } : {}) },
   };
 }

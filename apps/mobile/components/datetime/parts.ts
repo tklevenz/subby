@@ -22,11 +22,18 @@ export function splitTime(ms: number) {
   return { day: startOfDay(ms), hour: d.getHours(), minute: d.getMinutes() };
 }
 
-/** Back from wheel positions to epoch ms (local time). */
-export function joinTime(day: number, hour: number, minute: number): number {
+/**
+ * Back from wheel positions to epoch ms (local time). The night the clocks go back has one hour twice: of the two,
+ * the one nearer `near` (the value being edited), so changing the minute in the second one stays there.
+ */
+export function joinTime(day: number, hour: number, minute: number, near?: number): number {
   const d = new Date(day);
   d.setHours(hour, minute, 0, 0);
-  return d.getTime();
+  const first = d.getTime();
+  const second = first + 3_600_000;
+  const again = new Date(second);
+  const twice = again.getHours() === hour && again.getMinutes() === minute && startOfDay(second) === startOfDay(first);
+  return twice && near !== undefined && Math.abs(near - second) < Math.abs(near - first) ? second : first;
 }
 
 /** 0–23 → 1–12 plus AM/PM, and back. */

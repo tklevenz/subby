@@ -16,13 +16,13 @@ Area details load automatically from `.claude/rules/` when you touch those files
 The mark is a yellow submarine with a crescent moon in its big porthole, on navy (`#0E1B3D`), wordmark in Fredoka. Components and assets: `mobile-ui.md`.
 
 ## Tech stack
-- Expo SDK 57, React 19, React Native 0.86, TypeScript 6, `expo-router` 57, Reanimated 4.5 / Worklets 0.10, New Architecture (exact versions: `apps/mobile/package.json`). Node 24 on macOS (Apple Silicon).
+- Expo SDK 57, React 19, React Native 0.86, TypeScript 6 in the app (5.9 in shared and the server), `expo-router` 57, Reanimated 4.5 / Worklets 0.10, New Architecture (exact versions: `apps/mobile/package.json`). Node 24 on macOS (Apple Silicon).
 - Use `npx expo install <pkg>` (not `pnpm add`) for anything Expo-managed; verify with `npx expo install --check`.
 - State: Zustand (in-memory) backed by `expo-sqlite` via `drizzle-orm/expo-sqlite` (SQLCipher-encrypted in native builds, plain in Expo Go), Drizzle migrations.
 - Minimum iOS 17.0 (`expo-build-properties` `ios.deploymentTarget`): the pods are built for Xcode's recommended minimum; raise it with the Xcode toolchain.
 - `android/` and `ios/` are generated and gitignored. Never edit them: change `app.json` or a config plugin. Builds: the `native-build` skill.
 - `babel.config.js`: `babel-preset-expo` with `jsxImportSource: 'nativewind'`, `nativewind/babel`, and `inline-import` for `.sql`. `metro.config.js`: `withNativeWind(... './global.css')`, plus `sql` in `sourceExts`. `react-native-css-interop` must stay a direct dependency or Metro can't resolve the NativeWind JSX runtime.
-- `app.json` plugins: `expo-router`, `expo-splash-screen`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), `expo-notifications`, `expo-background-task`.
+- `app.json` plugins (the list there is the truth) include `expo-router`, `expo-splash-screen`, `expo-sqlite`, `expo-secure-store`, `expo-camera` (QR scanning; no microphone), `expo-notifications`, `expo-background-task`, `expo-iap`, `expo-localization`, `expo-build-properties` and our `plugins/withSceneLifecycle` (`app.config.js` adds `withReleaseSigning`).
 
 ## Styling (NativeWind v4 + Tailwind)
 Dark only for launch, but built for themes.

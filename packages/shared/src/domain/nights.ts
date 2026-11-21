@@ -28,11 +28,15 @@ export type Night = {
 
 /** The night sleeps in `logs`, grouped into nights, oldest first. */
 export function groupNights(logs: LogEntry[], now: number): Night[] {
-  const sleeps = logs.filter((l): l is SleepEntry => isSleepEntry(l) && !l.isDeleted && !isNap(l)).sort((a, b) => a.startedAt - b.startedAt);
+  const all = logs.filter((l): l is SleepEntry => isSleepEntry(l) && !l.isDeleted);
+  const sleeps = all.filter((l) => !isNap(l)).sort((a, b) => a.startedAt - b.startedAt);
+  const naps = all.filter((l) => isNap(l));
   const groups: SleepEntry[][] = [];
   for (const s of sleeps) {
     const last = groups.at(-1)?.at(-1);
-    if (last && last.endedAt !== null && s.startedAt >= last.endedAt && s.startedAt - last.endedAt < NIGHT_GAP_MS) groups.at(-1)!.push(s);
+    // A nap in between ends the night, however short the gap.
+    const napBetween = (from: number) => naps.some((n) => n.startedAt >= from && n.startedAt < s.startedAt);
+    if (last && last.endedAt !== null && s.startedAt >= last.endedAt && s.startedAt - last.endedAt < NIGHT_GAP_MS && !napBetween(last.endedAt)) groups.at(-1)!.push(s);
     else groups.push([s]);
   }
   return groups.map((pieces) => {
@@ -41,7 +45,8 @@ export function groupNights(logs: LogEntry[], now: number): Night[] {
       pieces,
       start: pieces[0]!.startedAt,
       end: pieces.at(-1)!.endedAt,
-      wakings: pieces.slice(1).map((p, i) => ({ start: pieces[i]!.endedAt!, end: p.startedAt })),
+      // Pieces that touch (edited to meet) leave no waking.
+      wakings: pieces.slice(1).map((p, i) => ({ start: pieces[i]!.endedAt!, end: p.startedAt })).filter((w) => w.end > w.start),
       asleepMs: lengths.reduce((a, b) => a + b, 0),
       longestMs: Math.max(...lengths),
     };
@@ -78,10 +83,14 @@ const statsOf = (n: Night): NightStats => ({
   longestMs: n.longestMs,
 });
 
-/** Per day: the finished night that ended that morning (the longest, if a day has two), or null. */
+/**
+ * Per day: the finished night that ended that morning (the longest, if a day has two), or null. One that began that
+ * afternoon or evening is tonight's, ended only for now (awake for a waking), not the morning's.
+ */
 export function nightsByDay(nights: Night[], days: number[]): (NightStats | null)[] {
   return days.map((day) => {
-    const ended = nights.filter((n) => n.end !== null && n.end >= day && n.end < addDays(day, 1));
+    const afternoon = new Date(day).setHours(14, 0, 0, 0);
+    const ended = nights.filter((n) => n.end !== null && n.end >= day && n.end < addDays(day, 1) && n.start < afternoon);
     const night = ended.sort((a, b) => b.asleepMs - a.asleepMs)[0];
     return night ? statsOf(night) : null;
   });

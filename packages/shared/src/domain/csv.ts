@@ -63,7 +63,9 @@ export function csvCell(v: Value): string {
   if (v === undefined) return '';
   if (typeof v !== 'string') return String(v);
   const safe = /^(\s|[=+\-@|])/.test(v) ? `'${v}` : v;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  // Quoted also on ; and tab: spreadsheets in most of our languages split on those, and an unquoted "ok;=CMD()"
+  // would start a cell with a formula.
+  return /[",;\t\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 /** One CSV of entries (any mix of types), oldest first. */

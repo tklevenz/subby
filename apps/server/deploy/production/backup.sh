@@ -11,6 +11,7 @@
 #   deleted is gone from backups after at most ~3 months (the privacy policy says so).
 # - On success it writes backups/last-backup (UTC time and size) and reports to Healthchecks.io (HC_PING_BACKUP,
 #   LAUNCH.md O3), which emails when a run fails or none arrives for a day.
+# - Deletes deploy.sh's pre-deploy dumps older than 30 days (they stay unencrypted for a quick rollback).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -44,6 +45,10 @@ case ${1:-} in
   "") ;;
   *) echo "Usage: backup.sh [--list | --cat <path>]" >&2; exit 1 ;;
 esac
+
+# deploy.sh's pre-deploy dumps (for a quick rollback) are swept here too, nightly: with no deploy for a while, they'd
+# otherwise outlive the retention the privacy policy promises.
+find backups -name 'pre-*.sql.gz' -mtime +30 -delete 2>/dev/null || true
 
 # Healthchecks.io: start, then success or failure (a missing report alerts too).
 hc=$(setting HC_PING_BACKUP)

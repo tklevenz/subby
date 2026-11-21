@@ -38,6 +38,8 @@ describe('summary', () => {
   it('computes wake window start and next side', () => {
     expect(lastWakeAt(logs)).toBe(8 * H);
     expect(suggestedNextSide(logs)).toBe('right');
+    // A breastfeed with no time on either side tells nothing.
+    expect(suggestedNextSide(desc([entry({ type: 'feed', method: 'breast' }, 0, 0)]))).toBeNull();
   });
 
   it('describes feeds', () => {

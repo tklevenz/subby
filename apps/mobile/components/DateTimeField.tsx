@@ -130,7 +130,7 @@ function DateTimeWheels({ value, max, onChange }: { value: number; max?: number;
   const dayIndex = Math.max(0, days.indexOf(day));
   const set = (patch: Partial<{ day: number; hour: number; minute: number }>) => {
     const next = { day, hour, minute, ...patch };
-    onChange(joinTime(next.day, next.hour, next.minute));
+    onChange(joinTime(next.day, next.hour, next.minute, value));
   };
 
   const minutes = range(0, 59).map(pad);

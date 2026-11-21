@@ -98,4 +98,21 @@ describe('medication given on another phone', () => {
     expect(medRun([{ before: null, after: dose(at(0, 1), at(0, 14, 5)), by: 'x' }], at(0, 14, 6))).toEqual([]); // backdated 13 h
     expect(medRun([{ before: d, after: { ...d, isDeleted: true }, by: 'x' }], at(0, 14, 9))).toEqual([{ kind: 'dismiss', id: medId(d) }]);
   });
+
+  it("says they woke up when this morning's nap arrived in the same pull", () => {
+    const nights = { enabled: true, wakeUps: true, nights: true, medications: false };
+    const bed = entry({ type: 'sleep', nap: false }, at(-1, 19, 30), null);
+    const up = ended(bed, at(0, 6, 30));
+    const nap = entry({ type: 'sleep', nap: true }, at(0, 9, 30), null);
+    const alerts = run([{ before: bed, after: up, by: 'x' }, { before: null, after: nap, by: 'x' }], at(0, 9, 32), [...history(0).slice(0, -1), up, nap], nights);
+    expect(alerts.filter((a) => a.id === id(bed))).toHaveLength(1);
+  });
+
+  it('takes back "woke up" when the wake-up is undone', () => {
+    const nap = entry({ type: 'sleep', nap: true }, at(0, 13), at(0, 14));
+    const undone = { ...nap, endedAt: null };
+    // Undone 20 minutes later (too late to tell as a new sleep): the old "woke up" mustn't stay.
+    expect(run([{ before: nap, after: undone, by: 'x' }], at(0, 14, 20), [undone])).toEqual([{ kind: 'dismiss', id: id(nap) }]);
+  });
 });
+

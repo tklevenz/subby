@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { formatPercentile, growthAgeMonths, growthPercentile, growthPoints, lmsAt, normalCdf, percentileCurves, valueAtZ, zScore, formatGrowthValue, growthSex } from '../domain/growth';
 import { entry } from './fixtures';
+import { registerCatalog, setLocale } from '../i18n';
+import { de } from '../i18n/de';
 
 describe('WHO LMS', () => {
   it('matches the published -2 SD value (boys, weight, birth)', () => {
@@ -51,6 +53,16 @@ describe('growth helpers', () => {
     expect(formatPercentile(1.04)).toBe('1st');
     expect(formatPercentile(22)).toBe('22nd');
     expect(formatPercentile(12)).toBe('12th');
+    expect(formatPercentile(0.42)).toBe('0.4th');
+    registerCatalog('de', de);
+    setLocale('de');
+    try {
+      // A fraction gets no ordinal mark.
+      expect(formatPercentile(0.42)).toBe('0,4');
+      expect(formatPercentile(50.2)).toBe('50.');
+    } finally {
+      setLocale('en');
+    }
     expect(formatPercentile(99.95)).toBe('>99.9th');
   });
 });
@@ -69,3 +81,14 @@ describe('growthSex and formatGrowthValue', () => {
     expect(formatGrowthValue('lengthCm', 50, 'metric')).toBe('50 cm');
   });
 });
+
+describe('growth at the edges', () => {
+  it("doesn't throw on a missing age, and counts the birth day as age 0", () => {
+    expect(lmsAt('weightKg', 'female', NaN)).toBeNull();
+    // A few hours "before" the birth date (the clock after flying west) is still the birth day.
+    const born = new Date(2026, 0, 10).getTime();
+    expect(growthAgeMonths({ birthDate: '2026-01-10' }, born - 3 * 3_600_000)).toBe(0);
+    expect(growthAgeMonths({ birthDate: '2026-01-10' }, born - 3 * 86_400_000)).toBeLessThan(0);
+  });
+});
+

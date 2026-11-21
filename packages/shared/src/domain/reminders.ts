@@ -115,8 +115,11 @@ export function planReminders(input: {
       });
     }
 
-    const pumpRunning = c.timers.some((t) => t.type === 'pumping');
-    if (settings.pumping.enabled && c.lastPumpAt !== null && !pumpRunning) {
+    // Pumping is the parent's, logged under whichever child: one reminder, from the latest pumping of any child,
+    // and none while one runs (twins would otherwise get a reminder each).
+    const pumpRunning = children.some((k) => k.timers.some((t) => t.type === 'pumping'));
+    const latestPump = Math.max(...children.map((k) => k.lastPumpAt ?? -Infinity));
+    if (settings.pumping.enabled && c.lastPumpAt !== null && c.lastPumpAt === latestPump && !pumpRunning && !out.some((n) => n.id.startsWith(`${REMINDER_ID_PREFIX}pumping:`))) {
       add({
         id: `${REMINDER_ID_PREFIX}pumping:${c.id}`,
         at: c.lastPumpAt + settings.pumping.intervalMin * 60_000,

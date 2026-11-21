@@ -36,11 +36,22 @@ export default function WheelColumn({
 
   useEffect(() => () => clearTimeout(endTimer.current), []);
 
+  // The latest index the parent gave, for after onChange (see select).
+  const given = useRef(index);
+  given.current = index;
+
   const select = (i: number) => {
     if (i === current.current) return;
     current.current = i;
     void Haptics.selectionAsync();
     onChange(i);
+    // The parent may keep its value (the 31st in February, an hour the clocks skip): then the index doesn't
+    // change, nothing re-renders, and the wheel would rest on a row that isn't the value. Back to it.
+    setTimeout(() => {
+      if (given.current === i) return;
+      current.current = given.current;
+      list.current?.scrollToOffset({ offset: given.current * ITEM_HEIGHT, animated: true });
+    }, 50);
   };
 
   // Follow outside changes (e.g. the day of month clamped when the month gets shorter).

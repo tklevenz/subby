@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { DeviceLogEntry } from '@subby/shared/crypto';
 import { and, eq } from 'drizzle-orm';
 import type { KeysResponse } from '@subby/shared/sync';
@@ -18,6 +18,8 @@ export class KeysService {
   /** Every epoch sealed for the caller (a device, or the recovery key). */
   async mine(auth: AuthContext): Promise<KeysResponse> {
     const [family] = await this.db.select().from(schema.families).where(eq(schema.families.id, auth.familyId));
+    // Deleted meanwhile (the last phone left): like any request of a family that's gone.
+    if (!family) throw new UnauthorizedException('This family no longer exists');
     const keys = await this.db
       .select({ epoch: schema.familyKeys.epoch, recipient: schema.familyKeys.recipient, sealed: schema.familyKeys.sealed })
       .from(schema.familyKeys)

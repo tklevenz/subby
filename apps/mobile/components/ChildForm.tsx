@@ -1,5 +1,6 @@
 import { t } from '@subby/shared/i18n';
 import { useConfirmDiscard } from './useConfirmDiscard';
+import { useSingleFlight } from './useSingleFlight';
 import React, { useState } from 'react';
 import { Pressable, View, Text } from 'react-native';
 import { Camera } from './icons';
@@ -30,13 +31,14 @@ export default function ChildForm({
   /** Open with the keyboard up on the name (not where there's more to see below, like onboarding). */
   autoFocus?: boolean;
   submitLabel: string;
-  onSubmit: (input: ChildInput) => void;
+  onSubmit: (input: ChildInput) => void | Promise<unknown>;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [birthDate, setBirthDate] = useState(initial?.birthDate ?? toIsoDate(Date.now()));
   const [sex, setSex] = useState<Child['sex']>(initial?.sex ?? null);
   const [photoUri, setPhotoUri] = useState<string | null>(initial?.photoUri ?? null);
   const [menu, setMenu] = useState(false);
+  const once = useSingleFlight();
   const leave = useConfirmDiscard(
     name !== (initial?.name ?? '') || birthDate !== (initial?.birthDate ?? toIsoDate(Date.now())) || sex !== (initial?.sex ?? null) || photoUri !== (initial?.photoUri ?? null),
   );
@@ -70,10 +72,10 @@ export default function ChildForm({
       <Button
         label={submitLabel}
         disabled={name.trim().length === 0}
-        onPress={() => {
+        onPress={once(async () => {
           leave();
-          onSubmit({ name: name.trim(), birthDate, sex, photoUri });
-        }}
+          await onSubmit({ name: name.trim(), birthDate, sex, photoUri });
+        })}
       />
     </View>
   );

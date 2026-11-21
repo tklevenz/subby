@@ -30,6 +30,8 @@ interface LogState {
   revision: number;
 
   loadLogs: (childId: string) => Promise<void>;
+  /** No child left (the last one deleted elsewhere, or by a restore): nothing loaded. */
+  unload: () => void;
   loadOlder: () => Promise<void>;
   /** Log a completed entry. Timed types default endedAt to startedAt (an instant event). */
   addLog: (payload: LogPayload, times?: { startedAt?: number; endedAt?: number | null }) => Promise<LogEntry>;
@@ -99,6 +101,8 @@ export const useLogStore = create<LogState>((set, get) => ({
   loadedSince: 0,
   revision: 0,
 
+  unload: () => set((s) => ({ activeChildId: null, logs: [], revision: s.revision + 1 })),
+
   loadLogs: async (childId: string) => {
     set({ activeChildId: childId });
     const since = Date.now() - WINDOW_DAYS * DAY_MS;
@@ -113,7 +117,8 @@ export const useLogStore = create<LogState>((set, get) => ({
     const { activeChildId: childId, loadedSince } = get();
     if (!childId) return;
     const since = loadedSince - WINDOW_DAYS * DAY_MS;
-    const rows = await readSince(childId, since, false);
+    // Running timers too, however old (as loadLogs): the window replaces what's loaded.
+    const rows = await readSince(childId, since, true);
     if (get().activeChildId !== childId) return;
     set((s) => ({ logs: rows, loadedSince: since, revision: s.revision + 1 }));
   },

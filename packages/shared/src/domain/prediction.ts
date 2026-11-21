@@ -146,7 +146,9 @@ const NAP_DAY_SHARE = 0.3;
 const RANGE_MIN = 30;
 
 /** The baby's own patterns over the 7 days before `now`. */
-export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabits {
+export function sleepHabits(all: LogEntry[], now: number, days = 7): SleepHabits {
+  // Nothing after `now`: a sleep backdated into the past is judged by what came before it.
+  const logs = all.filter((l) => (l.endedAt ?? l.startedAt) <= now);
   const since = now - days * 24 * H;
   const windows = wakeWindows(logs, since);
   const group = (pred: (w: WakeWindow) => boolean) => windows.filter(pred).map((w) => w.minutes);
@@ -158,30 +160,34 @@ export function sleepHabits(logs: LogEntry[], now: number, days = 7): SleepHabit
   }
   const bedXs = group((w) => w.beforeNight);
 
-  const recent = completedSleeps(logs).filter((l) => l.startedAt >= since);
+  const completed = completedSleeps(logs);
+  const recent = completed.filter((l) => l.startedAt >= since);
   const nights = recent.filter((l) => !isNap(l));
+  // The morning wake-up comes from mornings: a stretch that ended in the evening (a long waking after it) isn't one.
+  const mornings = nights.filter((n) => new Date(n.endedAt!).getHours() < 14);
   const naps = recent.filter(isNap);
 
-  // Nap lengths by index within the day (naps since the morning wake-up).
+  // Nap lengths by index within the day (naps since the morning wake-up), counted over whole days: the window
+  // may start mid-day, and that day's afternoon nap is still its second.
   const napLengths = new Map<number, number[]>();
   let idx = 0;
   let prevWasNight = true;
   let prevEnd = -Infinity;
-  for (const s of recent) {
+  for (const s of completed) {
     // Over 10 h since the last sleep: a night that wasn't logged.
     if (!isNap(s) || s.startedAt - prevEnd > 10 * H) prevWasNight = true;
     prevEnd = s.endedAt!;
     if (!isNap(s)) continue;
     idx = prevWasNight ? 0 : idx + 1;
     prevWasNight = false;
-    napLengths.set(idx, [...(napLengths.get(idx) ?? []), (s.endedAt! - s.startedAt) / MIN]);
+    if (s.startedAt >= since) napLengths.set(idx, [...(napLengths.get(idx) ?? []), (s.endedAt! - s.startedAt) / MIN]);
   }
 
   return {
     napWindows,
     bedtimeWindow: bedXs.length >= MIN_SAMPLES ? median(bedXs) : null,
     bedtimeClock: nights.length >= MIN_SAMPLES ? median(nights.map((n) => clockMinutes(n.startedAt))) : null,
-    wakeClock: nights.length >= MIN_SAMPLES ? median(nights.map((n) => clockMinutes(n.endedAt!, 0))) : null,
+    wakeClock: mornings.length >= MIN_SAMPLES ? median(mornings.map((n) => clockMinutes(n.endedAt!, 0))) : null,
     napLengths: new Map(
       [...napLengths].filter(([, xs]) => xs.length >= MIN_SAMPLES).map(([i, xs]) => [i, median(xs)!]),
     ),
@@ -255,6 +261,10 @@ const atClock = (ref: number, minutes: number) => {
  */
 function stillNight(night: SleepEntry, now: number, usualWake: number | null): boolean {
   const clock = usualWake ?? 6 * 60;
+  // Begun after the usual wake-up and before the afternoon: that's the day, whatever it was marked as.
+  const started = new Date(night.startedAt);
+  const startClock = started.getHours() * 60 + started.getMinutes();
+  if (startClock >= clock && startClock < 14 * 60) return false;
   let morning = atClock(night.startedAt, clock);
   if (morning <= night.startedAt) morning = atClock(addDays(startOfDay(night.startedAt), 1), clock);
   return night.endedAt! < morning - 90 * MIN && now < morning && now - night.endedAt! < NIGHT_GAP_MS;
@@ -386,8 +396,10 @@ export function suggestedSchedule(
     .at(-1);
   const backAsleep = night && logs.some((l) => isSleep(l) && l.endedAt === null && !isNap(l) && l.startedAt - night.endedAt! < NIGHT_GAP_MS);
   const wakeLogged = night !== undefined && !backAsleep && !stillNight(night, now, habits.wakeClock);
-  const wake = wakeLogged ? night.endedAt! : atClock(today, usualWake);
-  const napLength = (i: number) => (habits.napLengths.get(i) ?? norms.napLength) * MIN;
+  // Back asleep past the usual wake-up: still this morning's night, so the day starts no earlier than now (and that
+  // stretch isn't tonight's bedtime).
+  const wake = wakeLogged ? night.endedAt! : backAsleep ? Math.max(atClock(today, usualWake), now) : atClock(today, usualWake);
+  const napLength = (i: number) => (habits.napLengths.get(i) ?? habits.napLength ?? norms.napLength) * MIN;
   const usualBedtime = atClock(today, bedClock);
 
   const items: ScheduleItem[] = [{ kind: 'wake', at: wake, ...(wakeLogged ? { logged: true as const } : {}) }];

@@ -56,11 +56,14 @@ function openAppDatabase(): SQLiteDatabase {
 
   if (plan.kind === 'setAside') {
     // Never delete data we can't read: move it aside, it can still be opened if the key turns up.
-    dbFile(ENCRYPTED_DB).moveSync(dbFile(`subby.unreadable-${Date.now()}.db`));
-    for (const ext of ['-wal', '-shm']) {
-      const f = dbFile(ENCRYPTED_DB + ext);
-      if (f.exists) f.delete();
-    }
+    const aside = `subby.unreadable-${Date.now()}.db`;
+    dbFile(ENCRYPTED_DB).moveSync(dbFile(aside));
+    // The write-ahead log holds the latest changes not yet in the file: it goes with it. The shared-memory index is
+    // rebuilt from both, so it can go.
+    const wal = dbFile(`${ENCRYPTED_DB}-wal`);
+    if (wal.exists) wal.moveSync(dbFile(`${aside}-wal`));
+    const shm = dbFile(`${ENCRYPTED_DB}-shm`);
+    if (shm.exists) shm.delete();
     console.warn('[db] encrypted database has no key; set aside and starting empty');
   }
 

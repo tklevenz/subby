@@ -15,6 +15,7 @@ import { SubMono, Sub } from '../brand/Sub';
 import { DozingSub } from '../brand/loaders';
 import { useFormatTime, useNow } from '../../store/timeHelpers';
 import { colors } from '../../theme/colors';
+import { useSingleFlight } from '../useSingleFlight';
 
 const TILES: HomeTile[] = ['sleep', 'feed', 'diaper'];
 const label = (tile: HomeTile) => TYPE_META[tile].label;
@@ -118,6 +119,8 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   const updateLog = useLogStore((s) => s.updateLog);
   const softDeleteLog = useLogStore((s) => s.softDeleteLog);
   const open = useSheetStore((s) => s.open);
+  // A double tap on the big tile mustn't start (or stop) twice.
+  const once = useSingleFlight();
   const minute = Math.floor(now / MINUTE_MS);
   const prediction = useMemo(() => predictNextSleep(logs, child, minute * MINUTE_MS), [logs, child, minute]);
   // Awake in the night: how long they've slept tonight instead of a prediction.
@@ -142,7 +145,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       hint: t('home.tapWake'),
       active: true,
       entryId: sleeping.id,
-      onPress: async () => {
+      onPress: once(async () => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const sleptMs = Date.now() - sleeping.startedAt;
         // Under a minute is a mistap on the big tile (or a change of mind), not a sleep: it isn't kept, so it
@@ -154,7 +157,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
         }
         await stopTimer(sleeping.id);
         offerUndo({ label: t('home.wokeUpAfter', { span: formatHoursMinutes(sleptMs) }), undo: () => updateLog(sleeping.id, { endedAt: null }), sub: true });
-      },
+      }),
       onDiscard: () =>
         confirmDestructive({ title: t('home.discardTitle'), text: t('home.discardText'), action: t('home.discard'), onConfirm: () => softDeleteLog(sleeping.id) }),
     };
@@ -174,12 +177,12 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
       lines: wakeAt !== null ? [t('home.awakeSince', { time: formatTime(wakeAt) }), ...lines] : [t('home.noSleep')],
       hint: t('home.tapSleep'),
       entryId: logs.find((l) => l.logType === 'sleep' && l.endedAt !== null)?.id,
-      onPress: async () => {
+      onPress: once(async () => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Nap or night from the usual bedtime (else the clock); editable afterwards.
         const entry = await startTimer({ type: 'sleep', nap: defaultNap(logs, Date.now()) });
         offerUndo({ label: t('home.sleepStarted'), undo: () => softDeleteLog(entry.id), sub: true });
-      },
+      }),
     };
   }
 
@@ -356,6 +359,7 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
   const startTimer = useLogStore((s) => s.startTimer);
   const softDeleteLog = useLogStore((s) => s.softDeleteLog);
   const pumpReminder = useSettingsStore((s) => s.reminders.pumping);
+  const once = useSingleFlight();
   const today = logs.filter((l) => l.startedAt >= startOfDay(now)).length;
 
   const due: Due[] = medicationsDue(logs).map((m) => {
@@ -376,11 +380,11 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
       key: 'pumping',
       dueAt: pump.dueAt,
       action: t('home.start'),
-      onPress: async () => {
+      onPress: once(async () => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const entry = await startTimer({ type: 'pumping' });
         offerUndo({ label: t('home.pumpingStarted'), undo: () => softDeleteLog(entry.id) });
-      },
+      }),
     });
   }
   const shown = due.filter((d) => now - d.dueAt < DUE_FOR_MS).sort((a, b) => a.dueAt - b.dueAt);

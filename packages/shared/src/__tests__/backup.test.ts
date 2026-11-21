@@ -157,6 +157,23 @@ describe('backup', () => {
     expect([plan.children.length, plan.logs.length, plan.deletions.length, plan.unchanged]).toEqual([0, 0, 0, 1]);
   });
 
+  it("doesn't restore an entry this phone never had for a child it deleted, unless asked", () => {
+    const { backup } = readBackup(build());
+    const deletedAt = t + 5000;
+    // The child was deleted here, and the backup has entries this phone never saw.
+    const plan = planRestore(backup, { children: new Map([[child.id, { updatedAt: deletedAt, isDeleted: true }]]), logs: new Map() }, t + 9000);
+    expect(plan.logs).toEqual([]);
+    expect(plan.revive.children.map((c) => c.id)).toEqual([child.id]);
+    expect(plan.revive.logs.map((l) => l.id).sort()).toEqual(backup.logs.map((l) => l.id).sort());
+    // The backup deleted the child after this phone's version: its entries don't come back as live ones either.
+    const deletes = planRestore(
+      { ...backup, deleted: [{ kind: 'child', id: child.id, updatedAt: t + 1 }] },
+      { children: new Map([[child.id, { updatedAt: t - 1, isDeleted: false }]]), logs: new Map() },
+      t + 9000,
+    );
+    expect(deletes.logs).toEqual([]);
+  });
+
   it("doesn't offer an entry whose child stays deleted", () => {
     const { backup } = readBackup(build());
     const tomb = { updatedAt: t + 5000, isDeleted: true };

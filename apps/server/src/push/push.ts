@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, HttpCode, Inject, Injectable, Put, UseGuards, type OnModuleDestroy } from '@nestjs/common';
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { Body, Controller, Delete, HttpCode, Inject, Injectable, Put, UnauthorizedException, UseGuards, type OnModuleDestroy } from '@nestjs/common';
+import { and, eq, ne, or } from 'drizzle-orm';
 import { RegisterPushSchema, type RegisterPushResponse } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { GoogleAuth } from '../common/google';
 import { DB, schema, type Db } from '../db/db';
+import { familyTransaction } from '../db/lock';
 import { parse } from '../common/validate';
 import { Metrics } from '../common/metrics';
 import { logError } from '../common/errors';
@@ -57,8 +58,17 @@ export class PushService implements OnModuleDestroy {
   async register(auth: AuthContext, token: string, platform: 'android' | 'ios') {
     if (!this.reaches(platform)) return false; // nothing would be sent, so don't keep the token
     const row = { deviceId: auth.deviceId, familyId: auth.familyId, token, platform, updatedAt: Date.now() };
-    await this.db.insert(schema.pushTokens).values(row).onConflictDoUpdate({ target: schema.pushTokens.deviceId, set: row });
-    return true;
+    // Under the family's lock, and only for a phone still in it: a removal running at the same time can't be
+    // followed by its token coming back.
+    return familyTransaction(this.db, auth.familyId, async (tx) => {
+      const [device] = await tx
+        .select({ id: schema.devices.id })
+        .from(schema.devices)
+        .where(and(eq(schema.devices.id, auth.deviceId), eq(schema.devices.familyId, auth.familyId), eq(schema.devices.active, true)));
+      if (!device) throw new UnauthorizedException();
+      await tx.insert(schema.pushTokens).values(row).onConflictDoUpdate({ target: schema.pushTokens.deviceId, set: row });
+      return true;
+    });
   }
 
   async unregister(auth: AuthContext) {
@@ -115,34 +125,46 @@ export class PushService implements OnModuleDestroy {
     if (!tokens.length) return 0;
     const results = await Promise.all(
       tokens.map(async (t) => {
-        if (t.platform === 'ios') {
-          const res = await this.apns!.wake(t.token);
-          if (!res.sent && !res.gone) console.warn(`APNs answered ${res.status} ${res.reason ?? ''}`);
-          return { ...t, sent: res.sent, gone: !res.sent && res.gone };
+        try {
+          if (t.platform === 'ios') {
+            const res = await this.apns!.wake(t.token);
+            if (!res.sent && !res.gone) console.warn(`APNs answered ${res.status} ${res.reason ?? ''}`);
+            return { ...t, sent: res.sent, gone: !res.sent && res.gone };
+          }
+          const fcm = this.config.push;
+          if (fcm.kind !== 'fcm') return { ...t, sent: false, gone: false };
+          const access = await this.auth!.token();
+          // Data-only and high priority: nothing is shown, and Android lets the app run its task right away.
+          const res = await fetch(fcm.sendUrl, {
+            signal: AbortSignal.timeout(15_000),
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${access}` },
+            body: JSON.stringify({ message: { token: t.token, data: { kind: 'sync' }, android: { priority: 'high' } } }),
+          });
+          if (res.ok) return { ...t, sent: true, gone: false };
+          // 404: the app was uninstalled or the token expired. 400: the message is always the same, so it's the
+          // token (e.g. an Expo token from an older app, or garbage). Either way it's of no use any more.
+          // Only the status and Google's error code: the body could echo the token.
+          if (res.status !== 404 && res.status !== 400) console.warn(`FCM answered ${res.status} ${await fcmErrorCode(res)}`);
+          return { ...t, sent: false, gone: res.status === 404 || res.status === 400 };
+        } catch (e) {
+          // One token's failure (a timeout, a dropped connection) doesn't stop the others, or the clean-up below.
+          this.metrics.count('push_error');
+          logError('Push failed', e);
+          return { ...t, sent: false, gone: false };
         }
-        const fcm = this.config.push;
-        if (fcm.kind !== 'fcm') return { ...t, sent: false, gone: false };
-        const access = await this.auth!.token();
-        // Data-only and high priority: nothing is shown, and Android lets the app run its task right away.
-        const res = await fetch(fcm.sendUrl, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${access}` },
-          body: JSON.stringify({ message: { token: t.token, data: { kind: 'sync' }, android: { priority: 'high' } } }),
-        });
-        if (res.ok) return { ...t, sent: true, gone: false };
-        // 404: the app was uninstalled or the token expired. 400: the message is always the same, so it's the
-        // token (e.g. an Expo token from an older app, or garbage). Either way it's of no use any more.
-        // Only the status and Google's error code: the body could echo the token.
-        if (res.status !== 404 && res.status !== 400) console.warn(`FCM answered ${res.status} ${await fcmErrorCode(res)}`);
-        return { ...t, sent: false, gone: res.status === 404 || res.status === 400 };
       }),
     );
 
-    const gone = results.filter((r) => r.gone).map((r) => r.deviceId);
+    const gone = results.filter((r) => r.gone);
     this.metrics.count('push_sent', results.filter((r) => r.sent).length);
     this.metrics.count('push_failed', results.filter((r) => !r.sent && !r.gone).length);
     this.metrics.count('push_token_dropped', gone.length);
-    if (gone.length) await this.db.delete(schema.pushTokens).where(inArray(schema.pushTokens.deviceId, gone));
+    // Only that token: the phone may have registered a new one meanwhile.
+    if (gone.length)
+      await this.db
+        .delete(schema.pushTokens)
+        .where(or(...gone.map((g) => and(eq(schema.pushTokens.deviceId, g.deviceId), eq(schema.pushTokens.token, g.token)))));
     return results.filter((r) => r.sent).length;
   }
 }

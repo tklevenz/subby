@@ -704,6 +704,7 @@ export const en = {
   'childForm.add': 'Add child',
   // Percentiles: "50th"; other languages put their ordinal around the number ("50.", "50e").
   'percentile.short': '{n}',
+  'percentile.fraction': '{n}',
   'percentile.below': '<{n}',
   'percentile.above': '>{n}',
   'percentile.long': '{value} percentile',
@@ -844,6 +845,7 @@ export const en = {
   'bb.dontImport': "Don't import",
   'bb.found': { one: 'Found {count} entry', other: 'Found {count} entries' },
   'bb.children': 'Children',
+  'bb.childRow': '{name} · born {date} → import into',
   'bb.units': 'Units in Baby Buddy (detected — check the examples)',
   'bb.importN': { one: 'Import {count} entry', other: 'Import {count} entries' },
   'bb.noChildren': 'No children found on this server.',

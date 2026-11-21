@@ -27,13 +27,15 @@ export function growthAgeMonths(child: Pick<Child, 'birthDate'>, at: number): nu
   const from = isoToMs(child.birthDate);
   // Calendar time: a DST change in between shouldn't shift the age by an hour.
   const dstShift = (new Date(from).getTimezoneOffset() - new Date(at).getTimezoneOffset()) * 60_000;
-  return (at - from + dstShift) / 86_400_000 / DAYS_PER_MONTH;
+  const months = (at - from + dstShift) / 86_400_000 / DAYS_PER_MONTH;
+  // Measured on the birth day after flying west, the clock can put it a few hours before the birth date.
+  return months < 0 && months > -1 / DAYS_PER_MONTH ? 0 : months;
 }
 
 /** LMS parameters at a fractional month, linearly interpolated; null outside 0–24 months. */
 export function lmsAt(measure: GrowthMeasure, sex: WhoSex, months: number): LmsRow | null {
   const table = WHO_LMS[measure][sex];
-  if (months < 0 || months > WHO_MAX_MONTHS) return null;
+  if (!(months >= 0 && months <= WHO_MAX_MONTHS)) return null; // NaN too
   const i = Math.min(Math.floor(months), WHO_MAX_MONTHS - 1);
   const t = months - i;
   const [a, b] = [table[i], table[i + 1]];
@@ -81,7 +83,9 @@ function ordinal(n: number): string {
 export function formatPercentile(p: number): string {
   if (p < 0.1) return t('percentile.below', { n: ordinal(0.1) });
   if (p > 99.9) return t('percentile.above', { n: ordinal(99.9) });
-  return t('percentile.short', { n: ordinal(p < 1 || p > 99 ? Math.round(p * 10) / 10 : Math.round(p)) });
+  const n = p < 1 || p > 99 ? Math.round(p * 10) / 10 : Math.round(p);
+  // A fraction takes no ordinal mark ("0,4", not "0,4." or "0,4e"); English says "0.4th" (`ordinal`).
+  return t(Number.isInteger(n) ? 'percentile.short' : 'percentile.fraction', { n: ordinal(n) });
 }
 
 /** Percentiles drawn on growth charts, as in the WHO/CDC charts. */

@@ -30,6 +30,18 @@ describe('date wheel parts', () => {
     expect(joinTime(at(2026, 9, 25), 23, 5)).toBe(t);
   });
 
+  it('keeps the second of the hour the clocks go back through', () => {
+    // 2026-10-25, Europe/Berlin: 02:00–02:59 happens twice (CEST, then CET).
+    const firstTime = at(2026, 9, 25, 2, 30);
+    const secondTime = firstTime + 3_600_000;
+    expect(new Date(secondTime).getHours()).toBe(2);
+    expect(joinTime(at(2026, 9, 25), 2, 45)).toBe(firstTime + 15 * 60_000);
+    expect(joinTime(at(2026, 9, 25), 2, 45, secondTime)).toBe(secondTime + 15 * 60_000);
+    expect(joinTime(at(2026, 9, 25), 2, 45, firstTime)).toBe(firstTime + 15 * 60_000);
+    // Any other hour has one.
+    expect(joinTime(at(2026, 9, 25), 4, 0, secondTime)).toBe(at(2026, 9, 25, 4));
+  });
+
   it('converts 12-hour clock values', () => {
     expect(to12(0)).toEqual({ hour12: 12, pm: false });
     expect(to12(12)).toEqual({ hour12: 12, pm: true });

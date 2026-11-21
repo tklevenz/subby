@@ -58,6 +58,16 @@ describe('planReminders', () => {
     expect(planReminders({ now, settings: { ...all, enabled: false }, children: [child], formatTime: fmt })).toEqual([]);
   });
 
+  it('one pumping reminder for twins: from the latest pumping, none while one runs under the other', () => {
+    const settings = { ...DEFAULT_REMINDERS, pumping: { enabled: true, intervalMin: 180 } };
+    const base = { ...child, lastFeedAt: null, lastDiaperAt: null, timers: [] };
+    const a = { ...base, id: 'a', lastPumpAt: now - 60 * MIN };
+    const b = { ...base, id: 'b', lastPumpAt: now - 170 * MIN };
+    expect(planReminders({ now, settings, children: [a, b], formatTime: fmt }).map((p) => p.id)).toEqual(['kl:pumping:a']);
+    const running = { ...b, timers: [{ id: 'p', type: 'pumping' as const, startedAt: now - MIN }] };
+    expect(planReminders({ now, settings, children: [a, running], formatTime: fmt })).toEqual([]);
+  });
+
   it('diaper and pumping intervals; no pumping reminder while pumping', () => {
     const settings = { ...DEFAULT_REMINDERS, diaper: { enabled: true, intervalMin: 120 }, pumping: { enabled: true, intervalMin: 180 } };
     const c = { ...child, lastDiaperAt: now - 30 * MIN, lastPumpAt: now - 60 * MIN };

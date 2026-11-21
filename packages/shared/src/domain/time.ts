@@ -59,8 +59,10 @@ export function formatAge(birthDate: string, now: number): string {
   const days = ageInDays(birthDate, now);
   if (days < 0) return t('age.notBorn');
   if (days < 14) return t('age.days', { count: days });
-  if (days < 7 * 13) return t('age.weeks', { count: Math.floor(days / 7) });
-  const months = Math.floor(days / 30.4375);
+  // Calendar months, as in formatAgeLong: weeks until 3 months, so "12 weeks" never turns into "2 months", and the
+  // first birthday says "12 months", not "11 months".
+  const { months } = ageParts(birthDate, now);
+  if (months < 3) return t('age.weeks', { count: Math.floor(days / 7) });
   if (months < 24) return t('age.months', { count: months });
   return t('age.years', { count: Math.floor(months / 12) });
 }

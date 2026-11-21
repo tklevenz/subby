@@ -109,6 +109,9 @@ export function forgetSession() {
 }
 
 async function forgetSync() {
+  // A sync asked for just before doesn't run after.
+  if (timer) clearTimeout(timer);
+  timer = null;
   forgetSession();
   await cancelInactivityWarning();
   await useSettingsStore.getState().set('sync', null);
@@ -226,6 +229,11 @@ async function runOnce(): Promise<boolean> {
     // A pulled `moved` record: the next round follows it.
     return restarted || Boolean(syncSettings()?.move);
   } catch (e) {
+    // Sync was turned off while this run was going: its failure (the session went with it) isn't news.
+    if (!syncSettings()) {
+      useSyncStore.setState({ ...INITIAL_STATUS, lastError: useSyncStore.getState().lastError });
+      return false;
+    }
     const identityLost = e instanceof IdentityLostError;
     const removed = !identityLost && isRemoved(e);
     const message = removed ? t('sync.error.removed') : errorMessage(e);
@@ -575,5 +583,12 @@ async function reloadStores() {
   const active = activeChildOf(children, settings.activeChildId);
   if (active && active.id !== settings.activeChildId) await settings.set('activeChildId', active.id);
   if (active) await useLogStore.getState().loadLogs(active.id);
+  else noChildLeft();
+}
+
+/** The last child was deleted (on another phone, or by a restore): forget it here too; onboarding shows. */
+export function noChildLeft() {
+  useLogStore.getState().unload();
+  void useSettingsStore.getState().set('activeChildId', null);
 }
 

@@ -18,7 +18,7 @@ import { db, schema } from '../db/client';
 import { deletePhoto, readPhotoBytes, savePhotoBytes } from './photos';
 import { childTombstone } from './sync/records';
 import { deletedLog } from '../db/tombstone';
-import { requestSync } from './sync/engine';
+import { noChildLeft, requestSync } from './sync/engine';
 import { useChildStore } from '../store/useChildStore';
 import { useLogStore } from '../store/useLogStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -210,4 +210,5 @@ async function reloadAfterRestore() {
   const active = kids.find((c) => c.id === settings.activeChildId) ?? kids[0];
   if (active && active.id !== settings.activeChildId) await settings.set('activeChildId', active.id);
   if (active) await useLogStore.getState().loadLogs(active.id);
+  else noChildLeft();
 }

@@ -9,11 +9,13 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime, useNow } from '../store/timeHelpers';
 import { logDisplay } from './logDisplay';
 import { colors } from '../theme/colors';
+import { useSingleFlight } from './useSingleFlight';
 
 /** Running pumping and activity timers; sleep and feeds show in their own Home tiles. */
 export default function ActiveTimers() {
   const logs = useLogStore((s) => s.logs);
   const stopTimer = useLogStore((s) => s.stopTimer);
+  const once = useSingleFlight();
   const units = useSettingsStore((s) => s.units);
   const formatTime = useFormatTime();
   const now = useNow();
@@ -34,12 +36,12 @@ export default function ActiveTimers() {
             </Pressable>
             <Pressable
               hitSlop={10}
-              onPress={async () => {
+              onPress={once(async () => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 await stopTimer(t.id);
-                // Pumped amount is only known at the end: go straight to the editor.
+                // Pumped amount is only known at the end: go straight to the editor (once, on a double tap too).
                 if (t.payload.type === 'pumping') router.push(`/entry/${t.id}`);
-              }}
+              })}
               className="bg-raised rounded-full p-2 mr-3"
             >
               <Stop color={colors.ink} size={14} />

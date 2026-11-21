@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isCompletePayload, isEmptySolids, endBeforeStart, sameName } from '../domain/validate';
 import { notePhoto } from '../domain/photo';
 import { hasStool } from '../schemas/log.schema';
+import { ChildSchema } from '../schemas/child.schema';
 
 describe('isCompletePayload', () => {
   it('rejects empty entries', () => {
@@ -64,3 +65,17 @@ describe('sameName', () => {
     expect(sameName('Carrot', 'Carrots')).toBe(false);
   });
 });
+
+describe('ChildSchema', () => {
+  it('takes only real dates and times', () => {
+    const child = { id: '0190a000-0000-7000-8000-000000000001', name: 'Emma', birthDate: '2026-02-28', birthTime: '23:59', dueDate: null, sex: null, photoUri: null, createdAt: 1, updatedAt: 1, syncStatus: 'synced', isDeleted: false, importRef: null };
+    const ok = (patch: object) => ChildSchema.safeParse({ ...child, ...patch }).success;
+    expect(ok({})).toBe(true);
+    expect(ok({ birthDate: '2028-02-29' })).toBe(true);
+    expect(ok({ birthDate: '2026-02-31' })).toBe(false);
+    expect(ok({ birthDate: '2026-13-01' })).toBe(false);
+    expect(ok({ birthTime: '24:00' })).toBe(false);
+    expect(ok({ birthTime: '99:99' })).toBe(false);
+  });
+});
+
