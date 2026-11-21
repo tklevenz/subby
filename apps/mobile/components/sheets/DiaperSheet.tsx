@@ -1,4 +1,4 @@
-import { t } from '@subby/shared/i18n';
+import { t, tOption } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -97,7 +97,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
           <Text className="text-ink text-base font-semibold">{t('diaperSheet.logged', { kind: label })}</Text>
           <Text className="text-ink-muted text-xs">
             {formatTime(logged.startedAt)}
-            {p.color ? ` · ${t(`diaperColor.${p.color}`)}` : ''}
+            {p.color ? ` · ${tOption('diaperColor', p.color)}` : ''}
           </Text>
         </View>
         <Pressable

@@ -6,7 +6,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Baby, CalendarDays, ClockRotateLeft, Moon, PoopDroplet, Xmark, type IconComponent } from '../icons';
-import { activeSleep, describeDiaper, describeFeed, formatDuration, formatHoursMinutes, formatElapsed, groupNights, defaultNap, isNightWaking, isRunning, lastOfType, lastWakeAt, medicationsDue, predictNextSleep, pumpingDue, startOfDay, suggestedNextSide, type Child, type LogEntry, HOUR_MS, MINUTE_MS } from '@subby/shared';
+import { activeSleep, describeDiaper, describeFeed, formatDuration, formatHoursMinutes, formatElapsed, groupNights, defaultNap, isNap, isNightWaking, isRunning, lastOfType, lastWakeAt, medicationsDue, predictNextSleep, pumpingDue, startOfDay, suggestedNextSide, type Child, type LogEntry, HOUR_MS, MINUTE_MS } from '@subby/shared';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore, type HomeTile } from '../../store/useSettingsStore';
 import { useSheetStore } from '../../store/useSheetStore';
@@ -138,7 +138,7 @@ function useTileContent(logs: LogEntry[], child: Child, now: number, offerUndo: 
   if (sleeping) {
     sleep = {
       value: formatDuration(now - sleeping.startedAt),
-      lines: [t(sleeping.payload.nap ? 'home.napping' : 'home.asleep', { time: formatTime(sleeping.startedAt) })],
+      lines: [t(isNap(sleeping) ? 'home.napping' : 'home.asleep', { time: formatTime(sleeping.startedAt) })],
       hint: t('home.tapWake'),
       active: true,
       entryId: sleeping.id,

@@ -77,7 +77,9 @@ export async function setUpBackgroundSync() {
   try {
     token = String((await Notifications.getDevicePushTokenAsync()).data);
   } catch {
-    if (!settings.push) await saveSync({ push: true }); // pushes, but this build has no token (no google-services.json)
+    // No token (a build without google-services.json, no Play services): the server can't wake this phone, so the
+    // medication reminders say to check the app first. A token registered before stays (this may be a hiccup).
+    if (settings.push && !settings.pushToken) await saveSync({ push: false });
     return;
   }
   if (token === settings.pushToken && settings.push) return;

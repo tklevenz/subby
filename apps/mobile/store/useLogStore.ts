@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StoreApi } from 'zustand';
 import { eq, and, desc, gte, or } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db, schema } from '../db/client';
@@ -149,54 +149,12 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   deleteLogs: (ids) => get().writeLogs({ remove: ids }),
 
-  writeLogs: async ({ add = [], update = [], remove = [] }) => {
-    const childId = get().activeChildId;
-    if (add.length > 0 && !childId) throw new Error('No active child'); // i18n-ignore
-    // Read first (entries outside the loaded window come from SQLite); the writes below are one synchronous transaction.
-    const edits: { before: LogEntry; after: LogEntry }[] = [];
-    for (const { id, patch } of update) {
-      const before = await get().getLog(id);
-      if (before) edits.push({ before, after: applyPatch(before, patch) });
-    }
-    const removed = (await Promise.all(remove.map((id) => get().getLog(id)))).filter((l): l is LogEntry => l !== undefined);
-    const added = add.map((a) => newEntry(childId!, a.payload, a.startedAt, a.endedAt));
-    if (edits.length + removed.length + added.length === 0) return;
-
-    const t = schema.logsTable;
-    const now = Date.now();
-    db.transaction((tx) => {
-      for (const { after } of edits) {
-        tx.update(t)
-          .set({ payload: after.payload, startedAt: after.startedAt, endedAt: after.endedAt, updatedAt: after.updatedAt, syncStatus: 'pending' })
-          .where(eq(t.id, after.id))
-          .run();
-      }
-      for (const { id } of removed) {
-        tx.update(t)
-          // Only the id and type stay behind (for sync); nothing personal is kept in a deleted entry.
-          .set(deletedLogs({ updatedAt: now, syncStatus: 'pending' }))
-          .where(eq(t.id, id))
-          .run();
-      }
-      for (const entry of added) tx.insert(t).values(entry).run();
-    });
-
-    for (const { before, after } of edits) {
-      if (notePhoto(before.payload) !== notePhoto(after.payload)) deletePhoto(notePhoto(before.payload));
-    }
-    for (const entry of removed) deletePhoto(notePhoto(entry.payload));
-
-    set((state) => {
-      const touched = new Set([...edits.map((e) => e.after.id), ...removed.map((r) => r.id)]);
-      const others = state.logs.filter((l) => !touched.has(l.id));
-      // Keep the in-memory window consistent: an entry may move into or out of it.
-      // Running timers are always loaded, however old (see loadLogs).
-      const inWindow = (e: LogEntry) => e.childId === state.activeChildId && (e.startedAt >= state.loadedSince || isRunning(e));
-      return {
-        logs: [...others, ...edits.map((e) => e.after).filter(inWindow), ...added].sort(byStartedDesc),
-        revision: state.revision + 1,
-      };
-    });
+  // One at a time: each reads before it writes, so an edit and an Undo tapped close together (DiaperSheet's color
+  // and Undo) would otherwise both read the live entry, and the edit would bring the deleted one back.
+  writeLogs: (writes) => {
+    const run = writing.then(() => writeLogsNow(get, set, writes));
+    writing = run.catch(() => undefined);
+    return run;
   },
 
   getLog: async (id) =>
@@ -207,3 +165,55 @@ export const useLogStore = create<LogState>((set, get) => ({
       .where(and(eq(schema.logsTable.id, id), eq(schema.logsTable.isDeleted, false)))
       .get()),
 }));
+
+let writing: Promise<unknown> = Promise.resolve();
+
+async function writeLogsNow(get: () => LogState, set: StoreApi<LogState>['setState'], { add = [], update = [], remove = [] }: LogWrites) {
+  const childId = get().activeChildId;
+  if (add.length > 0 && !childId) throw new Error('No active child'); // i18n-ignore
+  // Read first (entries outside the loaded window come from SQLite); the writes below are one synchronous transaction.
+  const edits: { before: LogEntry; after: LogEntry }[] = [];
+  for (const { id, patch } of update) {
+    const before = await get().getLog(id);
+    if (before) edits.push({ before, after: applyPatch(before, patch) });
+  }
+  const removed = (await Promise.all(remove.map((id) => get().getLog(id)))).filter((l): l is LogEntry => l !== undefined);
+  const added = add.map((a) => newEntry(childId!, a.payload, a.startedAt, a.endedAt));
+  if (edits.length + removed.length + added.length === 0) return;
+
+  const t = schema.logsTable;
+  const now = Date.now();
+  db.transaction((tx) => {
+    for (const { after } of edits) {
+      tx.update(t)
+        .set({ payload: after.payload, startedAt: after.startedAt, endedAt: after.endedAt, updatedAt: after.updatedAt, syncStatus: 'pending' })
+        .where(and(eq(t.id, after.id), eq(t.isDeleted, false)))
+        .run();
+    }
+    for (const { id } of removed) {
+      tx.update(t)
+        // Only the id and type stay behind (for sync); nothing personal is kept in a deleted entry.
+        .set(deletedLogs({ updatedAt: now, syncStatus: 'pending' }))
+        .where(eq(t.id, id))
+        .run();
+    }
+    for (const entry of added) tx.insert(t).values(entry).run();
+  });
+
+  for (const { before, after } of edits) {
+    if (notePhoto(before.payload) !== notePhoto(after.payload)) deletePhoto(notePhoto(before.payload));
+  }
+  for (const entry of removed) deletePhoto(notePhoto(entry.payload));
+
+  set((state) => {
+    const touched = new Set([...edits.map((e) => e.after.id), ...removed.map((r) => r.id)]);
+    const others = state.logs.filter((l) => !touched.has(l.id));
+    // Keep the in-memory window consistent: an entry may move into or out of it.
+    // Running timers are always loaded, however old (see loadLogs).
+    const inWindow = (e: LogEntry) => e.childId === state.activeChildId && (e.startedAt >= state.loadedSince || isRunning(e));
+    return {
+      logs: [...others, ...edits.map((e) => e.after).filter(inWindow), ...added].sort(byStartedDesc),
+      revision: state.revision + 1,
+    };
+  });
+}

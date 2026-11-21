@@ -145,7 +145,7 @@ async function sync() {
 }
 
 /** Other phones log too, but this one only hears about it when the app opens (no push on this server). */
-const sharedWithoutPush = (s: Settings['sync']) => Boolean(s && !s.push && (s.knownDevices?.length ?? 1) > 1);
+const sharedWithoutPush = (s: Settings['sync']) => Boolean(s && !(s.push && s.pushToken) && (s.knownDevices?.length ?? 1) > 1);
 
 let running: Promise<void> = Promise.resolve();
 let timer: ReturnType<typeof setTimeout> | undefined;

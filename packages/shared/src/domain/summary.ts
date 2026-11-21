@@ -1,4 +1,4 @@
-import { formatNumber, t } from '../i18n';
+import { formatNumber, t, tOption } from '../i18n';
 import { TIMED_LOG_TYPES, type LogEntry, type LogType, type PayloadOf } from '../schemas/log.schema';
 
 export type EntryOf<T extends LogType> = LogEntry & { logType: T; payload: PayloadOf<T> };
@@ -63,12 +63,15 @@ export function describeFeed(p: PayloadOf<'feed'>): string {
     }
     case 'solids':
       return p.foods?.length ? pair(t('feed.solids'), p.foods.join(t('list.join'))) : t('feed.solids');
+    default:
+      // A method from a newer app (synced payloads are checked for types, not values).
+      return String(p.method);
   }
 }
 
 export function describeDiaper(p: PayloadOf<'diaper'>): string {
-  const condition = t(`diaper.${p.condition}`);
-  return p.color ? pair(condition, t(`diaperColor.${p.color}`)) : condition;
+  const condition = tOption('diaper', p.condition);
+  return p.color ? pair(condition, tOption('diaperColor', p.color)) : condition;
 }
 
 /** Which breast to offer next, based on the last breastfeed. */

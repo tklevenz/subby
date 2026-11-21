@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { LogEntrySchema } from '../schemas/log.schema';
 import {
-  activeSleep, activeTimers, describeFeed, lastOfType, lastWakeAt, overlappingSleep, suggestedNextSide,
+  activeSleep, activeTimers, describeDiaper, describeFeed, lastOfType, lastWakeAt, overlappingSleep, suggestedNextSide,
 } from '../domain/summary';
 import { desc, entry } from './fixtures';
 
 const H = 3_600_000;
 
 describe('summary', () => {
+  it('describes values from a newer app without crashing', () => {
+    expect(describeDiaper({ type: 'diaper', condition: 'sparkly', color: 'teal' } as never)).toContain('sparkly');
+    expect(describeFeed({ type: 'feed', method: 'tube' } as never)).toBe('tube');
+  });
+
   const logs = desc([
     entry({ type: 'sleep', nap: false }, 0, 8 * H),
     entry({ type: 'feed', method: 'breast', leftSeconds: 600, lastSide: 'left' }, 8 * H, 8 * H + 600_000),

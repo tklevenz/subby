@@ -57,7 +57,10 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const updateLog = useLogStore((s) => s.updateLog);
   const softDeleteLog = useLogStore((s) => s.softDeleteLog);
 
-  const { payload, patch, changed: payloadChanged } = usePayloadForm<LogPayload>(entry.payload);
+  const { payload, patch, changed: payloadChanged } = usePayloadForm<LogPayload>(
+    // A sleep without the flag (imported, older) shows as what it counts as everywhere else.
+    isSleepEntry(entry) ? { ...entry.payload, nap: isNap(entry) } : entry.payload,
+  );
   const [startedAt, setStartedAt] = useState(entry.startedAt);
   const [endedAt, setEndedAt] = useState<number | null>(entry.endedAt);
   // A bottle or solids feed logged as a moment (it ends when it starts): moving its time moves both.
@@ -74,7 +77,9 @@ function EntryForm({ entry }: { entry: LogEntry }) {
   const save = once(async () => {
     // Stopping a running breastfeed here: fold the running side's time into its total.
     const stopped = entry.endedAt === null && endedAt !== null && payload.type === 'feed';
-    await updateLog(entry.id, { payload: stopped ? pauseFeed(payload, endedAt) : payload, startedAt, endedAt });
+    // A running breastfeed turned into a bottle or solids: those are moments, never running.
+    const moment = payload.type === 'feed' && payload.method !== 'breast' && endedAt === null;
+    await updateLog(entry.id, { payload: stopped ? pauseFeed(payload, endedAt) : payload, startedAt, endedAt: moment ? startedAt : endedAt });
     leave();
     router.back();
   });

@@ -5,7 +5,7 @@ import React, { useRef, useState } from 'react';
 import { ScreenScroll } from './ScreenScroll';
 import { Pressable, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { formatHoursMinutes, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking, MINUTE_MS } from '@subby/shared';
+import { formatHoursMinutes, isNap, nightPieces, type LogPayload, type Night, type PayloadOf, type Waking, MINUTE_MS } from '@subby/shared';
 import DateTimeField from './DateTimeField';
 import { PayloadEditor } from './editors';
 import { CommonFields } from './editors/CommonFields';
@@ -41,7 +41,7 @@ export default function NightForm({ night }: { night: Night }) {
   const nextKey = useRef(0);
   const [rows, setRows] = useState<(Waking & { key: number })[]>(() => initialWakings.map((w) => ({ ...w, key: nextKey.current++ })));
   const wakings: Waking[] = rows.map(({ start, end }) => ({ start, end }));
-  const { payload, patch, changed: payloadChanged } = usePayloadForm<PayloadOf<'sleep'>>(first.payload);
+  const { payload, patch, changed: payloadChanged } = usePayloadForm<PayloadOf<'sleep'>>({ ...first.payload, nap: isNap(first) });
 
   const pieces = nightPieces(bedtime, wakeUp, wakings);
   const ids = night.pieces.map((p) => p.id);

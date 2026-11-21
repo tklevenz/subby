@@ -53,7 +53,7 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
           onChange({
             method,
             amountMl: undefined, milkType: undefined,
-            leftSeconds: undefined, rightSeconds: undefined, lastSide: undefined,
+            leftSeconds: undefined, rightSeconds: undefined, lastSide: undefined, timerSide: undefined, timerSideSince: undefined,
             foods: undefined, allergen: undefined, reaction: undefined, feeder: undefined,
           })
         }

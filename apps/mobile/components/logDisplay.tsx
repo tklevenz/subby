@@ -1,4 +1,4 @@
-import { t } from '@subby/shared/i18n';
+import { t, tOption } from '@subby/shared/i18n';
 import React from 'react';
 import {
   describeDiaper,
@@ -9,6 +9,7 @@ import {
   formatTemperature,
   formatVolume,
   formatWeight,
+  isNap,
   milestoneLabel,
   type LogEntry,
   type UnitSystem,
@@ -64,7 +65,7 @@ export function logDisplay(
       case 'sleep':
         if (running) return { label: t('row.sleeping'), detail: ongoing };
         return {
-          label: t(p.nap === false ? 'row.nightSleep' : 'row.nap'),
+          label: t(isNap({ ...entry, payload: p }) ? 'row.nap' : 'row.nightSleep'),
           detail: withNotes(dot(formatSpan(entry.endedAt! - entry.startedAt), span)),
         };
       case 'pumping':
@@ -88,8 +89,8 @@ export function logDisplay(
         return { label: p.name, detail: withNotes(p.dose !== undefined ? formatDose(p.dose, p.unit) : '') };
       case 'potty':
         return {
-          label: t(p.accident ? 'row.pottyAccident' : 'row.potty', { result: t(`potty.${p.result}`) }),
-          detail: withNotes(p.location ? t(`potty.${p.location}`) : ''),
+          label: t(p.accident ? 'row.pottyAccident' : 'row.potty', { result: tOption('potty', p.result) }),
+          detail: withNotes(p.location ? tOption('potty', p.location) : ''),
         };
       case 'activity':
         if (running) return { label: t('row.running', { what: activityLabel(p.kind) }), detail: ongoing };

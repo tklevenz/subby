@@ -4,7 +4,7 @@ import * as Crypto from 'expo-crypto';
 import { AppState } from 'react-native';
 import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess } from '@subby/shared/sync';
 import type { Purchase } from 'expo-iap';
-import { isHttpError, checkServer, type SyncSession } from './api';
+import { isHttpError, checkServer, isOfficialServer, type SyncSession } from './api';
 import { AlreadyOwned, PurchasePending, finish, ownedUnlock, purchase, storeName, storePrices, unsentPurchases } from './store';
 
 /**
@@ -45,7 +45,14 @@ export async function refreshEntitlement(api: SyncSession) {
     const entitlement = await api.request<EntitlementResponse>('GET', '/v1/entitlement');
     const testPurchases = entitlement.access !== 'free' ? Boolean((await checkServer(api.server)).testPurchases) : false;
     useAccessStore.setState({ entitlement, testPurchases });
-    if (entitlement.access !== 'free' && !testPurchases) await checkStore(api);
+    if (entitlement.access === 'free' || testPurchases) return;
+    // Real store purchases belong to the official server only: a purchase token moves the unlock to whoever presents
+    // it, so another server (misconfigured or hostile) must never see one.
+    if (isOfficialServer(api.server)) await checkStore(api);
+    else {
+      useAccessStore.setState({ prices: {} }); // nothing to buy there (`useStoreUnavailable`)
+      storeAsked = false; // asked again on the official server
+    }
   } catch (e) {
     if (isHttpError(e, 404)) {
       useAccessStore.setState({ entitlement: FREE, testPurchases: false });
@@ -65,9 +72,13 @@ export function forgetAccess() {
  * Hosted, with the real store: its prices (once per app run), and purchases paid for but never sent (each run, in
  * the foreground only: background runs don't open the billing connection). Never fails the run.
  */
+let storeAsked = false;
 async function checkStore(api: SyncSession) {
   try {
-    if (useAccessStore.getState().prices === null) useAccessStore.setState({ prices: await storePrices() });
+    if (!storeAsked) {
+      useAccessStore.setState({ prices: await storePrices() });
+      storeAsked = true;
+    }
     if (AppState.currentState !== 'active') return;
     for (const { purchase: p, kind } of await unsentPurchases(api.deviceId)) await send(api, p, kind);
   } catch (e) {
@@ -86,6 +97,10 @@ export const canBuy = (kind: ProductKind = 'unlock') => {
   const { testPurchases, prices } = useAccessStore.getState();
   return testPurchases || Boolean(prices?.[kind]);
 };
+
+/** `canBuy`, and never the real store on another server than the official one (see `refreshEntitlement`). */
+const canBuyOn = (api: SyncSession, kind: ProductKind = 'unlock') =>
+  canBuy(kind) && (useAccessStore.getState().testPurchases || isOfficialServer(api.server));
 
 /** Whether the store was asked and can't sell here (a build that didn't come from a store, no Play Store). */
 export const useStoreUnavailable = () => useAccessStore((s) => !s.testPurchases && s.prices !== null && !s.prices.unlock);
@@ -113,7 +128,7 @@ async function send(api: SyncSession, p: Purchase, kind: ProductKind) {
  * with the store and answers with the new access.
  */
 export async function buy(api: SyncSession, kind: ProductKind) {
-  if (!canBuy(kind)) throw new Error(t('access.storeUnavailable'));
+  if (!canBuyOn(api, kind)) throw new Error(t('access.storeUnavailable'));
   if (!useAccessStore.getState().testPurchases) {
     try {
       return await send(api, await purchase(kind, api.deviceId), kind);
@@ -131,7 +146,7 @@ export async function buy(api: SyncSession, kind: ProductKind) {
 
 /** Sends this store account's unlock again, so it moves to this phone (a new phone, or after re-joining). */
 export async function restore(api: SyncSession) {
-  if (!canBuy()) throw new Error(t('access.storeUnavailable'));
+  if (!canBuyOn(api)) throw new Error(t('access.storeUnavailable'));
   if (!useAccessStore.getState().testPurchases) {
     const owned = await ownedUnlock();
     if (!owned) throw new Error(t('sync.error.noUnlock'));

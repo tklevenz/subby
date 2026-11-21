@@ -79,9 +79,26 @@ export const formatClock = (ms: number, clock: '12h' | '24h') =>
  * messages pick their form by `params.count`. Numbers are formatted for the language ("2,5" in German), so pass a
  * year or an id as a string.
  */
+/** Own entries only: a synced value such as `toString` must not find Object's methods. */
+const lookup = (locale: Locale, key: string): string | Plural | undefined => {
+  const catalog = catalogs[locale];
+  return catalog && Object.hasOwn(catalog, key) ? catalog[key] : undefined;
+};
+
+/**
+ * The label for an option stored in an entry (`prefix.value`, e.g. `diaper.wet`), or the value itself when this app
+ * has no label for it: a newer app or another phone may send values this one doesn't know.
+ */
+export function tOption(prefix: string, value: string): string {
+  const key = `${prefix}.${value}`;
+  return lookup(current, key) !== undefined || lookup('en', key) !== undefined ? t(key as MessageKey) : value;
+}
+
 export function t(key: MessageKey, params?: Params): string {
-  const msg = catalogs[current]?.[key] ?? (en as Catalog)[key];
-  const text = typeof msg === 'string' ? msg : msg[pluralCategory(current, Number(params?.count ?? 0))];
+  const msg = lookup(current, key) ?? lookup('en', key);
+  // A key nobody wrote (built from a value another phone or a newer app sent): the key itself, never a crash.
+  if (msg === undefined) return key;
+  const text = (typeof msg === 'string' ? msg : (msg[pluralCategory(current, Number(params?.count ?? 0))] ?? msg.other)) ?? key;
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (whole, name: string) => {
     const v = params[name];

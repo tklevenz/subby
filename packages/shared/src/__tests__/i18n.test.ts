@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { en, getLocale, pickLocale, placeholders, pluralCategory, registerCatalog, setLocale, t, type Translation } from '../i18n';
+import { en, getLocale, pickLocale, placeholders, pluralCategory, registerCatalog, setLocale, t, tOption, type MessageKey, type Translation } from '../i18n';
 import { TRANSLATIONS } from '../i18n/catalogs';
 import { REVIEW_KEYS } from '../i18n/review';
 import { formatAge, formatAgeLong, formatDuration, formatRelative } from '../domain/time';
@@ -8,6 +8,16 @@ import { formatDose, formatWeight } from '../domain/units';
 afterEach(() => setLocale('en'));
 
 describe('i18n', () => {
+  it("never throws on a key it doesn't have, nor finds Object's methods", () => {
+    expect(t('diaper.sparkly' as MessageKey)).toBe('diaper.sparkly');
+    expect(t('toString' as MessageKey)).toBe('toString');
+    expect(tOption('diaper', 'wet')).toBe(t('diaper.wet'));
+    expect(tOption('diaper', 'sparkly')).toBe('sparkly');
+    expect(tOption('diaper', 'constructor')).toBe('constructor');
+    setLocale('de');
+    expect(tOption('diaper', 'sparkly')).toBe('sparkly');
+  });
+
   it('picks our language for the phone', () => {
     expect(pickLocale(['de-AT', 'en-US'])).toBe('de');
     expect(pickLocale(['pt-PT'])).toBe('pt-BR');

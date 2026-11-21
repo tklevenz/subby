@@ -155,7 +155,7 @@ export default function SettingsScreen() {
           </Card>
           <Text className="text-ink-ghost text-xs mt-2 mx-1 leading-5">
             {t(familyAlerts.nights ? 'settings.familyNoteNights' : 'settings.familyNoteNaps')}
-            {sync.push ? '' : t('settings.familyNoPush')}
+            {sync.push && sync.pushToken ? '' : t('settings.familyNoPush')}
           </Text>
         </View>
       ) : null}
