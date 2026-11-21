@@ -62,7 +62,9 @@ export function csvDateTime(ms: number): string {
 export function csvCell(v: Value): string {
   if (v === undefined) return '';
   if (typeof v !== 'string') return String(v);
-  const safe = /^(\s|[=+\-@|])/.test(v) ? `'${v}` : v;
+  // Also after ; tab and line breaks: a spreadsheet splitting on ; (or reading the file as tab-separated) doesn't
+  // see the quotes mid-cell, so each of those starts a cell of its own there.
+  const safe = (/^(\s|[=+\-@|])/.test(v) ? `'${v}` : v).replace(/([;\t\r\n])(\s*[=+\-@|])/g, "$1'$2");
   // Quoted also on ; and tab: spreadsheets in most of our languages split on those, and an unquoted "ok;=CMD()"
   // would start a cell with a formula.
   return /[",;\t\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;

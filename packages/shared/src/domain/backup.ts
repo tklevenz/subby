@@ -296,7 +296,8 @@ export function planRestore(
     const row = local.logs.get(l.id);
     // Only for a child that's live after the restore; one this phone deleted comes back only with "bring them back".
     if (backupWins(row, l) && liveChildren.has(l.childId)) plan.logs.push(l);
-    else if (backupWins(row, l) && revivedChildren.has(l.childId)) plan.revive.logs.push(l);
+    // Dated after the child's deletion, as its entries deleted here are: the server holds their tombstones from then.
+    else if (backupWins(row, l) && revivedChildren.has(l.childId)) plan.revive.logs.push(fresh(l, local.children.get(l.childId)!));
     else if (deletedSince(row) && (liveChildren.has(l.childId) || revivedChildren.has(l.childId))) plan.revive.logs.push(fresh(l, row));
     else plan.unchanged++;
   }

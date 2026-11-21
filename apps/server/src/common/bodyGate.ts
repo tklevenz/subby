@@ -4,6 +4,7 @@ import { MAX_BLOB_BYTES, MAX_REQUEST_BYTES } from '@subby/shared/sync';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AuthService, AuthContext } from '../auth/auth.service';
 import { bearer } from '../auth/auth.guard';
+import { BLOB_STALL } from '../blobs/transfers';
 
 /**
  * The routes that take a body without a session, by method and the router's route pattern (never the URL, which
@@ -68,7 +69,12 @@ export type GatedRequest = FastifyRequest & { auth?: AuthContext };
  * this, anyone could make the server read and parse 16 MB per request (a session only takes creating a family). It also looks up the session of any request that brings a token, once, for the per-phone
  * limits and the route's guard, which still decides what the session may do.
  */
-export function installBodyGate(fastify: FastifyInstance, auth: AuthService, budget = { perDevice: LARGE_BODIES_PER_DEVICE, bytes: LARGE_BODY_BUDGET }) {
+export function installBodyGate(
+  fastify: FastifyInstance,
+  auth: AuthService,
+  budget = { perDevice: LARGE_BODIES_PER_DEVICE, bytes: LARGE_BODY_BUDGET },
+  stall = BLOB_STALL,
+) {
   const inFlight = new Map<string, number>();
   let bytesInFlight = 0;
   fastify.addHook('onRequest', async (request: GatedRequest, reply) => {
@@ -109,7 +115,17 @@ export function installBodyGate(fastify: FastifyInstance, auth: AuthService, bud
     }
     inFlight.set(device, (inFlight.get(device) ?? 0) + 1);
     bytesInFlight += size;
+    // A body that trickles in is cut off, as photos are (`BLOB_STALL`): it can't hold the budget for the whole
+    // request timeout.
+    const socket = request.raw.socket;
+    let read = socket.bytesRead;
+    const watch = setInterval(() => {
+      if (!request.raw.complete && socket.bytesRead - read < stall.bytes) socket.destroy();
+      read = socket.bytesRead;
+    }, stall.ms);
+    watch.unref();
     reply.raw.once('close', () => {
+      clearInterval(watch);
       bytesInFlight -= size;
       const left = (inFlight.get(device) ?? 1) - 1;
       if (left > 0) inFlight.set(device, left);

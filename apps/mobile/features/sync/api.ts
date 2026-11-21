@@ -67,10 +67,13 @@ export async function call<T>(server: string, method: string, path: string, body
   return json as T;
 }
 
+/** The address answers, but it isn't a Subby Sync server. */
+export class NotSubbyError extends Error {}
+
 /** Checks that a URL is a Subby Sync server this app can talk to. */
 export async function checkServer(server: string) {
   const info = await call<{ service?: string; protocol?: number; mode?: string; push?: boolean; testPurchases?: boolean }>(server, 'GET', '/v1/info');
-  if (info.service !== 'subby-sync') throw new Error(t('sync.error.notSubby'));
+  if (info.service !== 'subby-sync') throw new NotSubbyError(t('sync.error.notSubby'));
   if (info.protocol !== 1) throw new Error(t('sync.error.newerApp'));
   return info;
 }

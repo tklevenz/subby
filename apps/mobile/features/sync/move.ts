@@ -18,7 +18,7 @@ import {
 import { sealRecord, type MovedBody } from '@subby/shared/sync';
 import { markAllPending } from './pending';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
-import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealTo, serverLabel, SyncSession } from './api';
+import { checkServer, createFamily, isHttpError, normalizeServerUrl, NotSubbyError, sealTo, serverLabel, SyncSession } from './api';
 import { deviceIdentity, saveFamilyKeys } from './keystore';
 import { setUpBackgroundSync } from './background';
 import { uploadPhotosAsTheyAre } from './photos';
@@ -111,9 +111,15 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     const { entries: oldEntries } = await oldApi.log();
     // The old server can't hide a removal behind an older list than this phone already saw.
     assertLogContinues(oldEntries, settings.logSeen);
+    // Not a Subby server at that address: no retry will change that. (One that needs a newer app may work after an
+    // update, and an unreachable one later: those are tried again.)
+    await checkServer(move.server).catch((e: unknown) => {
+      throw e instanceof NotSubbyError ? new MoveRefused(e.message) : e;
+    });
     const login = await api.login().catch((e: unknown) => {
-      // Not a member there (the family is gone, or never had this phone): no retry will change that.
-      throw isHttpError(e, 404) ? new MoveRefused(errorMessage(e)) : e;
+      // Refused for good: not a member there (the family is gone, or never had this phone), or a request the server
+      // can't take. A 401 can be a challenge that expired on the way, so it's tried again.
+      throw isHttpError(e, 400, 403, 404, 405) ? new MoveRefused(errorMessage(e)) : e;
     });
     if (login.familyId !== move.familyId) throw new MoveRefused(t('sync.error.otherFamily'));
     const { entries } = await api.log();

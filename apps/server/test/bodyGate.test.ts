@@ -5,10 +5,10 @@ import { installBodyGate } from '../src/common/bodyGate';
 import type { AuthService } from '../src/auth/auth.service';
 
 /** The body gate on a bare Fastify, with every bearer token a session of its own phone. */
-async function server(budget: { perDevice: number; bytes: number }) {
+async function server(budget: { perDevice: number; bytes: number }, stall = { ms: 60_000, bytes: 1024 }) {
   const app = Fastify({ bodyLimit: 16 * 1024 * 1024 });
   const auth = { authenticate: async (token: string) => ({ familyId: 'f', deviceId: token }) } as unknown as AuthService;
-  installBodyGate(app, auth, budget);
+  installBodyGate(app, auth, budget, stall);
   app.post('/v1/sync/push', async () => ({ ok: true }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const { port } = app.server.address() as { port: number };
@@ -53,6 +53,20 @@ describe('large bodies in flight', () => {
     expect((await push(s.port, 'c', 10)).status).toBe(200);
     for (const socket of sockets.splice(0)) socket.destroy();
     await new Promise((r) => setTimeout(r, 100));
+    expect((await push(s.port, 'a')).status).toBe(200);
+  });
+
+  it('cuts off a large body that trickles in, giving its budget back', async () => {
+    const s = await server({ perDevice: 1, bytes: 3 * 1024 * 1024 }, { ms: 200, bytes: 1024 });
+    app = s.app;
+    let closed = false;
+    const socket = slowPush(s.port, 'a', 1024 * 1024);
+    socket.on('close', () => (closed = true));
+    sockets.push(socket);
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await push(s.port, 'a')).status).toBe(429);
+    await new Promise((r) => setTimeout(r, 600));
+    expect(closed).toBe(true);
     expect((await push(s.port, 'a')).status).toBe(200);
   });
 });

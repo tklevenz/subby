@@ -236,6 +236,8 @@ export class TestClient {
    */
   async pull() {
     const out: { record: SyncRecord; body: unknown }[] = [];
+    // Past an old epoch's end already (a rotation since the last pull): noted before the server's answer.
+    this.pulledEpochs = pulledEpochs(this.state!, this.lastSeq, this.pulledEpochs);
     for (;;) {
       const since = this.lastSeq;
       const page = await this.request<PullResponse>('GET', `/v1/sync/pull?since=${since}&limit=200`);

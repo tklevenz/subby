@@ -262,8 +262,7 @@ const atClock = (ref: number, minutes: number) => {
 function stillNight(night: SleepEntry, now: number, usualWake: number | null): boolean {
   const clock = usualWake ?? 6 * 60;
   // Begun after the usual wake-up and before the afternoon: that's the day, whatever it was marked as.
-  const started = new Date(night.startedAt);
-  const startClock = started.getHours() * 60 + started.getMinutes();
+  const startClock = clockMinutes(night.startedAt, 0);
   if (startClock >= clock && startClock < 14 * 60) return false;
   let morning = atClock(night.startedAt, clock);
   if (morning <= night.startedAt) morning = atClock(addDays(startOfDay(night.startedAt), 1), clock);

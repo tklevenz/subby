@@ -165,6 +165,8 @@ describe('backup', () => {
     expect(plan.logs).toEqual([]);
     expect(plan.revive.children.map((c) => c.id)).toEqual([child.id]);
     expect(plan.revive.logs.map((l) => l.id).sort()).toEqual(backup.logs.map((l) => l.id).sort());
+    // Dated after the deletion: the server has those entries' tombstones from then, and would win otherwise.
+    expect(plan.revive.logs.every((l) => l.updatedAt > deletedAt)).toBe(true);
     // The backup deleted the child after this phone's version: its entries don't come back as live ones either.
     const deletes = planRestore(
       { ...backup, deleted: [{ kind: 'child', id: child.id, updatedAt: t + 1 }] },

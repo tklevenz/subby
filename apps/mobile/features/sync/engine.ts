@@ -490,6 +490,10 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
   let applied = false;
   let again = false;
   let done = 0;
+  // Already past an old epoch's end (a rotation since the last pull closed it there): noted before anything this
+  // server answers can start pulling over.
+  const pulledBefore = pulledEpochs({ closedAt }, since, syncSettings()?.pulledEpochs);
+  if (pulledBefore > (syncSettings()?.pulledEpochs ?? 0)) await saveSync({ pulledEpochs: pulledBefore });
   for (let first = true; ; first = false) {
     const sentAt = Date.now();
     const page = await api.pull(seq);

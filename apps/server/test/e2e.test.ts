@@ -402,6 +402,20 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(a.rejected).toContain(forged.id);
   });
 
+  it('notes an old epoch pulled to its end before the first pull after the rotation (a fake restore then)', async () => {
+    const { a, b } = await pairedFamily();
+    await a.push([a.seal('log', randomUUID(), { before: 'removal' })]);
+    const forged = b.seal('log', randomUUID(), { forged: true });
+    await a.removeDevice(b.deviceId);
+    // No pull since the rotation: the very next answer claims a restore and serves b's old-key record low.
+    await db`insert into records (family_id, id, kind, epoch, updated_at, device_id, deleted, data, seq)
+      values (${a.familyId}, ${forged.id}, 'log', 1, ${forged.updatedAt}, ${forged.deviceId}, false, ${forged.data}, 1)`;
+    await db`update families set restore_gen = restore_gen + 1, restored_seq = 1 where id = ${a.familyId}`;
+    const pulled = await a.pull();
+    expect(a.resynced).toBe(true);
+    expect(pulled.map((p) => p.record.id)).not.toContain(forged.id);
+  });
+
   it('a rotation closes the old epochs only at the latest seq', async () => {
     const { a, b } = await pairedFamily();
     await a.pull();
@@ -585,11 +599,15 @@ describe.skipIf(!reachable)('sync server', () => {
     await a.heal();
     expect(a.log).toHaveLength(5);
     await expectStatus(b.login(), 404);
-    // Its pull notices the restore: everything again, without b's old-key record, then a pushes all it has.
+    // Its pull notices the restore: everything again, then a pushes all it has. It had pulled epoch 1 to its end
+    // before rotating, so it takes nothing of that epoch again: neither b's old-key record nor the backup's copy of
+    // `before`, which it already has.
+    expect(a.pulledEpochs).toBe(0);
     const pulled = await a.pull();
+    expect(a.pulledEpochs).toBe(1);
     expect(a.resynced).toBe(true);
-    expect(pulled.map((p) => p.record.id)).toEqual([before.id]);
-    expect(a.rejected).toContain(evil.id);
+    expect(pulled.map((p) => p.record.id)).toEqual([]);
+    expect(a.rejected).toEqual(expect.arrayContaining([evil.id, before.id]));
     await a.push([a.seal('log', before.id, { before: 'backup' }, { updatedAt: before.updatedAt }), a.seal('log', after.id, { after: 'backup' }, { updatedAt: after.updatedAt })]);
 
     // c is back in, with its key, and gets what the server lost. It had pulled epoch 1 to its end, so it takes

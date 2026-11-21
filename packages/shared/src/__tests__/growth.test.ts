@@ -60,6 +60,7 @@ describe('growth helpers', () => {
       // A fraction gets no ordinal mark.
       expect(formatPercentile(0.42)).toBe('0,4');
       expect(formatPercentile(50.2)).toBe('50.');
+      expect(formatPercentile(0.01)).toBe('<0,1');
     } finally {
       setLocale('en');
     }
