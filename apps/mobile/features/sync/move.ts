@@ -25,7 +25,7 @@ import { uploadPhotosAsTheyAre } from './photos';
 import { forgetSession, pushDeviceName, refreshKeys, refreshMembers, requestSync, syncNow } from './engine';
 import { quietNextRun } from './apply';
 import { openLive } from './live';
-import { sessionFor, syncSettings, useSyncStore } from './state';
+import { saveSync, sessionFor, syncSettings, useSyncStore } from './state';
 
 /**
  * Moving the family to another server (official ↔ self-hosted), without pairing again (LAUNCH.md A13).
@@ -105,17 +105,23 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
   const oldApi = sessionFor(settings);
   const api = new SyncSession(move.server, me.id, me.keys);
   try {
+    // Never from HTTPS to plain HTTP: a phone of the family (or its key in the wrong hands) can't lead the others to
+    // a server anyone on the way can read.
+    if (/^https:/i.test(settings.server) && !/^https:/i.test(move.server)) throw new MoveRefused(t('sync.error.moveInsecure'));
     const { entries: oldEntries } = await oldApi.log();
     // The old server can't hide a removal behind an older list than this phone already saw.
     assertLogContinues(oldEntries, settings.logSeen);
-    const login = await api.login();
-    if (login.familyId !== move.familyId) throw new Error(t('sync.error.otherFamily'));
+    const login = await api.login().catch((e: unknown) => {
+      // Not a member there (the family is gone, or never had this phone): no retry will change that.
+      throw isHttpError(e, 404) ? new MoveRefused(errorMessage(e)) : e;
+    });
+    if (login.familyId !== move.familyId) throw new MoveRefused(t('sync.error.otherFamily'));
     const { entries } = await api.log();
-    const state = verifyMovedLog(oldEntries, entries, move.from, me.id, move.entries);
+    const state = refused(() => verifyMovedLog(oldEntries, entries, move.from, me.id, move.entries));
     const res = await api.keys();
     const sealed = res.keys.find((k) => k.epoch === state.epoch);
     if (!sealed) throw new Error(t('sync.error.newServerNoKey'));
-    const keys = new Map(res.keys.map((k) => [k.epoch, openFamilyKey(me.keys, state, k.epoch, fromBase64(k.sealed))]));
+    const keys = new Map(res.keys.map((k) => [k.epoch, refused(() => openFamilyKey(me.keys, state, k.epoch, fromBase64(k.sealed)))]));
 
     // What this phone wrote to the old family after the mover's last pull isn't in the new one yet.
     const own: string[] = [];
@@ -131,14 +137,32 @@ export async function followMove(settings: SyncSettings, move: MovedBody) {
     await leave(oldApi, oldEntries, me);
     useSyncStore.setState({ movedTo: move.server });
   } catch (e) {
+    // A move that can never work (it doesn't check out, or the family isn't there) is dropped, so this phone goes
+    // on syncing with the family it's in, and it won't be taken up again. Anything else is tried again next run.
+    if (e instanceof MoveRefused) {
+      console.warn('[sync] refused to follow a move:', e.message);
+      await saveSync({ move: undefined, refusedMoves: [...(syncSettings()?.refusedMoves ?? []), move.familyId].slice(-20) });
+    }
     // Not "removed": that's about the old family, which this phone is still in.
     const why = errorMessage(e);
     throw new Error(t('sync.error.followFailed', { server: serverLabel(move.server), why }));
   }
 }
 
-/** Settings that belong to the old server: its log copy, restore count and floors, push registration, and the move note itself. */
-const OLD_SERVER_ONLY = ['move', 'pushToken', 'push', 'log', 'restoreGen', 'floors'] as const;
+/** A move this phone won't follow, whatever happens next (see `followMove`). */
+class MoveRefused extends Error {}
+
+/** Runs a check whose failure means the move can't be genuine. */
+function refused<T>(check: () => T): T {
+  try {
+    return check();
+  } catch (e) {
+    throw new MoveRefused(errorMessage(e));
+  }
+}
+
+/** Settings that belong to the old server: its log copy, restore count, floors and resync time, the epochs pulled (the new family's start at 1), push registration, and the move note itself. */
+const OLD_SERVER_ONLY = ['move', 'pushToken', 'push', 'log', 'restoreGen', 'floors', 'pulledEpochs', 'resyncedAt'] as const;
 
 const omit = <T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Omit<T, K> => {
   const copy = { ...obj };
@@ -162,7 +186,9 @@ async function switchTo(
     server: next.server,
     familyId: next.familyId,
     lastSeq: 0,
-    knownDevices: next.members,
+    // Kept, not the new family's list: a phone the new server's family has and this one never saw is pointed out
+    // ("New phone in your family") on the next run, as on the old server.
+    knownDevices: settings.knownDevices ?? next.members,
     // Photo references stay valid: the blobs are on the new server under the same ids and keys.
     photosFamily: next.familyId,
     logSeen: { length: next.entries.length, head: verifyDeviceLog(next.entries).head },

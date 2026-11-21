@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fromBase64, newSymmetricKey } from '../crypto';
-import { MAX_PUSH, UnsealedRecordError, clientApplies, compareVersions, openRecord, pageContinues, pushChunks, sealRecord, serverAccepts, serverWentBack, settlePush, type RecordMeta } from '../sync';
+import { MAX_PUSH, UnsealedRecordError, clientApplies, compareVersions, newestOnly, openRecord, pageContinues, pushChunks, sealRecord, serverAccepts, serverWentBack, settlePush, type RecordMeta } from '../sync';
 
 describe('records', () => {
   const key = newSymmetricKey();
@@ -155,5 +155,13 @@ describe('clock offset', async () => {
     expect(clockOff(CLOCK_WARN_MS)).toBeNull();
     expect(clockOff(-CLOCK_WARN_MS - 1)).toBe(-CLOCK_WARN_MS - 1);
     expect(clockOff(3_600_000)).toBe(3_600_000);
+  });
+});
+
+describe('newestOnly', () => {
+  it('keeps the newest version of each id, in the order they came', () => {
+    const r = (id: string, updatedAt: number, kind = 'log') => ({ record: { id, kind, updatedAt, deviceId: 'd' } });
+    const items = [r('a', 2000), r('b', 5), r('a', 1000), r('a', 1500, 'child')];
+    expect(newestOnly(items)).toEqual([r('a', 2000), r('b', 5), r('a', 1500, 'child')]);
   });
 });

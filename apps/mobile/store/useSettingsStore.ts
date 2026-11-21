@@ -37,6 +37,8 @@ export type SyncSettings = {
   lastSyncedAt: number | null;
   /** Display names of the family's phones by device id (synced encrypted as `device` records). */
   names?: Record<string, string>;
+  /** The version of each name taken (`applyDeviceNames`), so an older one is never applied over it. */
+  nameVersions?: Record<string, { updatedAt: number; deviceId: string }>;
   /** Devices this phone has already seen in the family, to point out new ones. */
   knownDevices?: string[];
   /** Whether the server wakes this phone with push when others write (hosted Subby Sync does). */
@@ -59,8 +61,14 @@ export type SyncSettings = {
   restoreGen?: number;
   /** What restores left: old-key records past their seq can't be genuine (`belowFloors`). */
   floors?: RestoreFloor[];
+  /** Every old epoch up to this one was pulled to its end here: anything new in them is refused (`pulledEpochs`). */
+  pulledEpochs?: number;
+  /** When this phone last synced everything again after a restore (`resyncAfterRestore`, at most every 6 hours). */
+  resyncedAt?: number;
   /** Another phone moved the family to another server (a `moved` record): this phone follows on its next sync run. */
   move?: MovedBody;
+  /** New families of moves this phone refused to follow (they didn't check out): never taken up again. */
+  refusedMoves?: string[];
   /** When this phone started syncing with this family (set up, joined or recovered); kept across a server move. */
   since?: number;
   /** The Home card suggesting a recovery key was dismissed (per family: joining another one shows it again). */

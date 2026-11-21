@@ -833,6 +833,8 @@ export const de: Translation = {
   'sync.error.newServerNoKey': 'Der neue Server hat den Schlüssel dieses Handys noch nicht',
   'sync.error.followFailed': 'Deine Familie ist zu {server} umgezogen, aber dieses Handy konnte noch nicht folgen: {why}',
   'sync.error.pageStalled': 'Der Server hat eine Seite gesendet, die nicht an {seq} anschließt',
+  'sync.error.restoredAgain': "Der Server meldet erneut, dass er aus einer Sicherung wiederhergestellt wurde. Die Synchronisierung versucht es in einigen Stunden erneut.",
+  'sync.error.moveInsecure': "Die Familie ist auf einen Server ohne HTTPS umgezogen. Dieses Handy bleibt auf dem bisherigen Server.",
   'sync.progress.moving': 'Umzug auf den neuen Server',
   'sync.progress.photos': 'Fotos werden geladen',
   'sync.progress.uploading': 'Wird hochgeladen',

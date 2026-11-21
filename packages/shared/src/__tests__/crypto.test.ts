@@ -5,6 +5,7 @@ import {
   appendEntry,
   assertLogContinues,
   belowFloors,
+  pulledEpochs,
   entriesToRestore,
   bytesToHex,
   decrypt,
@@ -242,6 +243,13 @@ describe('device log', () => {
     // Phone B still has epoch 1's key; anything it writes after the rotation lands past seq 40.
     expect(withinEpoch(state, 1, 41)).toBe(false);
     expect(withinEpoch(state, 2, 1000)).toBe(true);
+
+    // A phone that pulled to seq 40 or past has all of epoch 1: nothing new can come in it, even after a restore.
+    expect(pulledEpochs(state, 39)).toBe(0);
+    expect(pulledEpochs(state, 40)).toBe(1);
+    expect(pulledEpochs(state, 0, 1)).toBe(1); // lastSeq starts over after a restore; this doesn't
+    expect(pulledEpochs({ closedAt: new Map([[1, 10], [2, 20]]) }, 25)).toBe(2);
+    expect(pulledEpochs({ closedAt: new Map([[1, 10], [2, 20]]) }, 15)).toBe(1);
 
     // The seq is signed: a server changing it breaks the signature. It never goes back, and only epochs close.
     const tampered = log.map((e, i) => (i === log.length - 1 ? { ...e, closedSeq: 4000 } : e));

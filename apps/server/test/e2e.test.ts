@@ -383,6 +383,25 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(a.rejected).toContain(oldKey.id);
   });
 
+  it("a phone that pulled past an old epoch's end takes nothing new in it, even after a claimed restore", async () => {
+    const { a, b } = await pairedFamily();
+    await a.push([a.seal('log', randomUUID(), { before: 'removal' })]);
+    const forged = b.seal('log', randomUUID(), { forged: true });
+    await a.removeDevice(b.deviceId);
+    await a.pull();
+    expect(a.pulledEpochs).toBe(1);
+    // A hostile server claims a restore at a seq far past its own, starts a over, and serves b's old-key record
+    // low enough to pass both the log's close and the floor.
+    await db`insert into records (family_id, id, kind, epoch, updated_at, device_id, deleted, data, seq)
+      values (${a.familyId}, ${forged.id}, 'log', 1, ${forged.updatedAt}, ${forged.deviceId}, false, ${forged.data}, 1)`;
+    await db`update families set restore_gen = restore_gen + 1, restored_seq = 999999999 where id = ${a.familyId}`;
+    const pulled = await a.pull();
+    expect(a.resynced).toBe(true);
+    expect(a.floors.at(-1)!.seq).toBeLessThan(999999999);
+    expect(pulled.map((p) => p.record.id)).not.toContain(forged.id);
+    expect(a.rejected).toContain(forged.id);
+  });
+
   it('a rotation closes the old epochs only at the latest seq', async () => {
     const { a, b } = await pairedFamily();
     await a.pull();
@@ -573,13 +592,23 @@ describe.skipIf(!reachable)('sync server', () => {
     expect(a.rejected).toContain(evil.id);
     await a.push([a.seal('log', before.id, { before: 'backup' }, { updatedAt: before.updatedAt }), a.seal('log', after.id, { after: 'backup' }, { updatedAt: after.updatedAt })]);
 
-    // c is back in, with its key, and gets everything.
+    // c is back in, with its key, and gets what the server lost. It had pulled epoch 1 to its end, so it takes
+    // nothing of that epoch again: the backup's copy of `before` is one it already has, and b's would be new.
     await c.login();
     await c.refresh();
+    expect(c.pulledEpochs).toBe(1);
     const atC = await c.pull();
     expect(c.resynced).toBe(true);
-    expect(atC.map((p) => p.record.id).sort()).toEqual([before.id, after.id].sort());
-    expect(c.rejected).toContain(evil.id);
+    expect(atC.map((p) => p.record.id)).toEqual([after.id]);
+    expect(c.rejected).toEqual(expect.arrayContaining([evil.id, before.id]));
+    // A phone that joins now gets everything, `before` too. (It also takes b's record, as any phone joining later
+    // would: without the history, it can't tell one from the other. See sync.md.)
+    const d = new TestClient(url);
+    const invite = await a.invite();
+    await d.claim(invite.qr);
+    await (await a.reviewClaim(invite.qr.i, invite.secret)).approve();
+    expect(await d.finishJoin(invite.qr)).toBe(true);
+    expect((await d.pull()).map((p) => p.record.id)).toEqual(expect.arrayContaining([before.id, after.id]));
   });
 
   it('a phone approved without its keys gets them on the next sync of any other phone', async () => {
@@ -782,6 +811,17 @@ describe.skipIf(!reachable)('sync server', () => {
       await c.push([c.seal('log', randomUUID(), {})]); // something else is sent meanwhile
       await new Promise((r) => setTimeout(r, 300));
       expect(pushed.some((m) => m.to === tokenD)).toBe(false);
+    });
+
+    it('wakes a removed phone when its removal comes back with a restored log', async () => {
+      const { a, b } = await pairedFamily();
+      const tokenB = `fcm-b-${randomUUID()}`;
+      await register(b, tokenB);
+      const { appendEntry } = await import('@subby/shared/crypto');
+      const removal = appendEntry(a.state, a.log.length, { id: a.deviceId, keys: a.identity }, { type: 'remove', deviceId: b.deviceId }, Date.now());
+      await a.request('POST', '/v1/families/me/log/restore', { entries: [removal] });
+      await until(() => pushed.some((m) => m.to === tokenB), 5000);
+      expect(pushed.filter((m) => m.to === tokenB)[0]).toMatchObject({ data: { kind: 'sync' } });
     });
 
     it('wakes iPhones with a content-free background push through APNs', async () => {

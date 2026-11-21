@@ -833,6 +833,8 @@ export const ptBR: Translation = {
   'sync.error.newServerNoKey': 'O novo servidor ainda não tem a chave deste celular',
   'sync.error.followFailed': 'Sua família se mudou para {server}, mas este celular ainda não conseguiu acompanhar: {why}',
   'sync.error.pageStalled': 'O servidor enviou uma página que não continua a partir de {seq}',
+  'sync.error.restoredAgain': "O servidor diz que foi restaurado de um backup novamente. A sincronização tentará de novo em algumas horas.",
+  'sync.error.moveInsecure': "A família mudou para um servidor sem HTTPS. Este celular continua no servidor atual.",
   'sync.progress.moving': 'Mudando para o novo servidor',
   'sync.progress.photos': 'Baixando fotos',
   'sync.progress.uploading': 'Enviando',

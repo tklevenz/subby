@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, ne } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, ne } from 'drizzle-orm';
 import { verifyDeviceLog, type DeviceLogEntry } from '@subby/shared/crypto';
 import { MAX_LOG_ENTRIES } from '@subby/shared/sync';
 import { DB, schema, type Db, type Tx } from '../db/db';
@@ -94,20 +94,29 @@ export class FamiliesService {
    */
   async restore(auth: AuthContext, entries: DeviceLogEntry[]) {
     if (entries.some((e) => e.type === 'create')) throw new BadRequestException('Restored entries continue the family log');
-    const { result, deleted } = await familyTransaction(this.db, auth.familyId, async (tx) => {
+    const { result, deleted, wake } = await familyTransaction(this.db, auth.familyId, async (tx) => {
       // Checked as one batch: each entry's signature once, the stored log replayed once.
       await appendVerified(tx, auth.familyId, entries);
+      // Phones another phone removed hear about it, as on append (their tokens, read before they're dropped).
+      const removed = entries.filter((e) => e.type === 'remove' && e.signer !== e.deviceId).map((e) => e.deviceId);
+      const wake = removed.length
+        ? await tx
+            .select({ deviceId: schema.pushTokens.deviceId, token: schema.pushTokens.token, platform: schema.pushTokens.platform })
+            .from(schema.pushTokens)
+            .where(and(eq(schema.pushTokens.familyId, auth.familyId), inArray(schema.pushTokens.deviceId, removed)))
+        : [];
       for (const entry of entries) {
         await this.apply(tx, auth.familyId, entry);
         if (entry.type === 'epoch') await tx.update(schema.families).set({ currentEpoch: entry.epoch! }).where(eq(schema.families.id, auth.familyId));
       }
       const remaining = await tx.$count(schema.devices, and(eq(schema.devices.familyId, auth.familyId), eq(schema.devices.active, true)));
-      return { result: { index: entries.at(-1)!.index }, deleted: remaining === 0 ? await deleteRows(tx, auth.familyId) : null };
+      return { result: { index: entries.at(-1)!.index }, deleted: remaining === 0 ? await deleteRows(tx, auth.familyId) : null, wake };
     });
     if (deleted) {
       await this.afterDelete(auth.familyId, deleted);
       return result;
     }
+    for (const w of wake) this.push.wakeRemoved(w);
     for (const e of entries) if (e.type === 'remove') this.live.closeDevice(auth.familyId, e.deviceId);
     this.live.publish(auth.familyId, { type: 'log', index: result.index });
     return result;

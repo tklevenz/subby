@@ -888,6 +888,8 @@ export const en = {
   'sync.error.newServerNoKey': "The new server hasn't got this phone's key yet",
   'sync.error.followFailed': "Your family moved to {server}, but this phone couldn't follow yet: {why}",
   'sync.error.pageStalled': "The server sent a page that doesn't continue from {seq}",
+  'sync.error.restoredAgain': "The server says it was restored from a backup again. Sync tries again in a few hours.",
+  'sync.error.moveInsecure': "The family moved to a server without HTTPS. This phone stays on the current server.",
   'sync.progress.moving': 'Moving to the new server',
   'sync.progress.photos': 'Downloading photos',
   'sync.progress.uploading': 'Uploading',

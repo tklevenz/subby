@@ -833,6 +833,8 @@ export const nl: Translation = {
   'sync.error.newServerNoKey': 'De nieuwe server heeft de sleutel van deze telefoon nog niet',
   'sync.error.followFailed': 'Je gezin is verhuisd naar {server}, maar deze telefoon kon nog niet volgen: {why}',
   'sync.error.pageStalled': 'De server stuurde een pagina die niet aansluit op {seq}',
+  'sync.error.restoredAgain': "De server meldt dat hij opnieuw uit een back-up is hersteld. Synchronisatie probeert het over een paar uur opnieuw.",
+  'sync.error.moveInsecure': "Het gezin is verhuisd naar een server zonder HTTPS. Deze telefoon blijft op de huidige server.",
   'sync.progress.moving': 'Verhuizen naar de nieuwe server',
   'sync.progress.photos': 'Foto’s downloaden',
   'sync.progress.uploading': 'Uploaden',

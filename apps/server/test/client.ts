@@ -5,6 +5,7 @@ import {
   appendEntry,
   assertLogContinues,
   belowFloors,
+  pulledEpochs,
   entriesToRestore,
   decryptFile,
   encryptFile,
@@ -77,6 +78,8 @@ export class TestClient {
   /** The server's restore count last seen, and the floors restores left (see `pull`). */
   restoreGen = 0;
   floors: RestoreFloor[] = [];
+  /** Old epochs pulled to their end: anything new in them is refused (`pulledEpochs`), restores or not. */
+  pulledEpochs = 0;
   /** Set when a pull found the server restored from a backup: the app then pushes everything it has again. */
   resynced = false;
 
@@ -239,16 +242,23 @@ export class TestClient {
       const gen = page.restored?.gen ?? 0;
       // Restored from a backup (or behind this phone without saying so): pull everything again, and push it all
       // (`resynced`). Old-key records past the restore's seq can't be genuine. A pull from 0 just notes the count.
-      if (since > 0 && (gen !== this.restoreGen || serverWentBack(since, page))) {
-        this.floors.push({ epoch: this.state!.epoch, seq: gen !== this.restoreGen ? page.restored!.seq : page.seq });
-        this.restoreGen = gen;
+      const restored = gen > this.restoreGen;
+      if (since > 0 && (restored || serverWentBack(since, page))) {
+        this.floors.push({ epoch: this.state!.epoch, seq: restored ? Math.min(page.restored!.seq, page.seq) : page.seq });
+        this.restoreGen = Math.max(gen, this.restoreGen);
         this.lastSeq = 0;
         this.resynced = true;
         continue;
       }
-      this.restoreGen = gen;
+      this.restoreGen = Math.max(gen, this.restoreGen);
       for (const { seq, ...record } of page.records) {
-        if (seq <= since || seq > page.seq || !withinEpoch(this.state!, record.epoch, seq) || !belowFloors(this.floors, record.epoch, seq)) {
+        if (
+          seq <= since ||
+          seq > page.seq ||
+          !withinEpoch(this.state!, record.epoch, seq) ||
+          !belowFloors(this.floors, record.epoch, seq) ||
+          record.epoch <= this.pulledEpochs
+        ) {
           this.rejected.push(record.id);
           continue;
         }
@@ -260,6 +270,7 @@ export class TestClient {
         }
       }
       this.lastSeq = page.seq;
+      this.pulledEpochs = pulledEpochs(this.state!, page.seq, this.pulledEpochs);
       if (!page.more) return out;
     }
   }

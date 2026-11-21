@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { notePhoto, type Child, type LogEntry } from '@subby/shared';
-import { UnsealedRecordError, clientApplies, openRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
+import { UnsealedRecordError, clientApplies, compareVersions, newestOnly, openRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletedLog, deletedLogs } from '../../db/tombstone';
 import { deletePhoto } from '../photos';
@@ -55,7 +55,10 @@ export function openAll(records: SyncRecord[], keys: ReadonlyMap<number, Uint8Ar
 }
 
 /** Applies opened records in a transaction. Newer local edits that aren't pushed yet win (same rule as the server). */
-export async function applyOpened(opened: Opened[], ownDeviceId: string): Promise<boolean> {
+export async function applyOpened(all: Opened[], ownDeviceId: string): Promise<boolean> {
+  // The rows below are compared with what was here before the page: an older copy of an id after a newer one in the
+  // same page would win. An honest server sends one per id; a hostile one could replay an old one this way.
+  const opened = newestOnly(all);
   await applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
   await noteMove(opened.filter((o) => o.record.kind === 'moved'), ownDeviceId);
   const photos: (string | null | undefined)[] = [];
@@ -123,11 +126,16 @@ export async function applyOpened(opened: Opened[], ownDeviceId: string): Promis
 async function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]) {
   if (!records.length) return;
   const names = { ...syncSettings()?.names };
+  const versions = { ...syncSettings()?.nameVersions };
   for (const { record, body } of records) {
+    // Never back to an older name (a server replaying one): names have no row to compare with, so keep the version.
+    const seen = versions[record.id];
+    if (seen && compareVersions(record, seen) <= 0) continue;
+    versions[record.id] = { updatedAt: record.updatedAt, deviceId: record.deviceId };
     if (record.deleted) delete names[record.id];
     else names[record.id] = (body as DeviceBody).name;
   }
-  await saveSync({ names });
+  await saveSync({ names, nameVersions: versions });
 }
 
 /** Another phone moved the family to another server: remember where, and follow on the next round (`followMove`). */
@@ -136,6 +144,7 @@ async function noteMove(records: Opened[], ownDeviceId: string) {
   for (const { record, body } of records) {
     const moved = body as MovedBody | null;
     if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.from !== record.deviceId || moved.familyId === current.familyId) continue;
+    if (current.refusedMoves?.includes(moved.familyId)) continue; // checked once and refused (`followMove`)
     await saveSync({ move: moved });
   }
 }

@@ -10,6 +10,7 @@ import {
   appendEntry,
   assertLogContinues,
   belowFloors,
+  pulledEpochs,
   entriesToRestore,
   fromBase64,
   newSymmetricKey,
@@ -430,7 +431,11 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
       // (an older epoch's version this phone pulled long ago, or a server that withholds it) it stays pending.
       // Only versions that actually open and are well-formed count: the metadata alone is the server's word.
-      const candidates = (res.newer ?? []).filter((r) => keys.has(r.epoch) && genuineAt(closedAt, r.epoch, r.seq));
+      // An old epoch's version at a seq this phone already pulled isn't news: it would have it (SEC-01).
+      const pulledTo = syncSettings()?.lastSeq ?? settings.lastSeq;
+      const candidates = (res.newer ?? []).filter(
+        (r) => keys.has(r.epoch) && genuineAt(closedAt, r.epoch, r.seq) && (r.epoch === epoch || r.seq > pulledTo),
+      );
       const openedNewer = openAll(candidates, keys);
       const genuine = new Set<SyncRecord>(openedNewer.map((o) => o.record));
       const { settled, newer } = settlePush(chunk, res, (r) => genuine.has(r));
@@ -485,15 +490,19 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     const gen = page.restored?.gen ?? 0;
     const seenGen = syncSettings()?.restoreGen ?? 0;
     // Restored from a backup (or behind this phone without saying so): the server gets back what it lost, and
-    // pulling starts over. A pull from 0 (a new phone, or right after this) just notes the count.
-    if (seq > 0 && (gen !== seenGen || serverWentBack(seq, page))) {
-      await resyncAfterRestore(api, { epoch, seq: gen !== seenGen ? (page.restored?.seq ?? 0) : page.seq }, gen);
+    // pulling starts over. A pull from 0 (a new phone, or right after this) just notes the count. The count only goes
+    // up, and a restore's seq is at most the server's: a server can't move the floor past what it holds.
+    const restored = gen > seenGen;
+    if (seq > 0 && (restored || serverWentBack(seq, page))) {
+      // Each one uploads every photo again: a server claiming restores over and over gets one per RESYNC_COOLDOWN_MS.
+      if (Date.now() - (syncSettings()?.resyncedAt ?? 0) < RESYNC_COOLDOWN_MS) throw new Error(t('sync.error.restoredAgain'));
+      await resyncAfterRestore(api, { epoch, seq: restored ? Math.min(page.restored?.seq ?? 0, page.seq) : page.seq }, Math.max(gen, seenGen));
       seq = 0;
       applied = true;
       again = true;
       continue;
     }
-    if (gen !== seenGen) await saveSync({ restoreGen: gen });
+    if (restored) await saveSync({ restoreGen: gen });
     if (!pageContinues(seq, page)) throw new Error(t('sync.error.pageStalled', { seq: String(seq) }));
     const genuine = page.records.filter((r) => {
       if (r.seq > seq && r.seq <= page.seq && genuineAt(closedAt, r.epoch, r.seq)) return true; // i18n-ignore
@@ -506,14 +515,21 @@ async function pullAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
       if (since === 0 || page.more) useSyncStore.setState({ progress: { label: t('sync.progress.downloading'), done } });
     }
     seq = page.seq;
-    await saveSync({ lastSeq: seq });
+    const pulled = pulledEpochs({ closedAt }, seq, syncSettings()?.pulledEpochs);
+    await saveSync({ lastSeq: seq, ...(pulled > (syncSettings()?.pulledEpochs ?? 0) ? { pulledEpochs: pulled } : {}) });
     if (!page.more) return { applied, again };
   }
 }
 
-/** A record of `epoch` at `seq` can be genuine: within what the log let that epoch have, and below every restore's floor. */
+/**
+ * A record of `epoch` at `seq` can be genuine: within what the log let that epoch have, below every restore's floor,
+ * and not of an old epoch this phone already pulled to its end (`pulledEpochs`: it has every genuine one).
+ */
 const genuineAt = (closedAt: DeviceLogState['closedAt'], epoch: number, seq: number) =>
-  withinEpoch({ closedAt }, epoch, seq) && belowFloors(syncSettings()?.floors, epoch, seq);
+  withinEpoch({ closedAt }, epoch, seq) && belowFloors(syncSettings()?.floors, epoch, seq) && epoch > (syncSettings()?.pulledEpochs ?? 0);
+
+/** At most one resync after a restore per this long (a real restore is rare; each costs every photo again). */
+const RESYNC_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 /**
  * The server was restored from a backup (or lost data without saying so): it gets back from this phone what it
@@ -531,7 +547,7 @@ async function resyncAfterRestore(api: SyncSession, floor: RestoreFloor, gen: nu
   const name = settings.names?.[settings.deviceId];
   if (name && canWrite()) await pushDeviceName(name);
   quietNextRun();
-  await saveSync({ lastSeq: 0, restoreGen: gen, floors: [...(settings.floors ?? []), floor] });
+  await saveSync({ lastSeq: 0, restoreGen: gen, floors: [...(settings.floors ?? []), floor], resyncedAt: Date.now() });
 }
 /** A sensible default name for this phone in the family's list, e.g. "Pixel 10". */
 export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? t('sync.phone');
@@ -545,7 +561,10 @@ export async function pushDeviceName(name: string, deviceId?: string) {
   const id = deviceId ?? settings.deviceId;
   const meta = { id, kind: 'device' as const, updatedAt: Date.now(), deviceId: settings.deviceId, deleted: false };
   await api.push([sealRecord(keys.get(epoch)!, epoch, meta, { name } satisfies DeviceBody)]);
-  await saveSync({ names: { ...settings.names, [id]: name } });
+  await saveSync({
+    names: { ...settings.names, [id]: name },
+    nameVersions: { ...settings.nameVersions, [id]: { updatedAt: meta.updatedAt, deviceId: meta.deviceId } },
+  });
 }
 
 async function reloadStores() {

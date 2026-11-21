@@ -94,6 +94,22 @@ export const withinEpoch = (state: Pick<DeviceLogState, 'closedAt'>, epoch: numb
  * genuine. The server refuses old keys once its log is complete again; this covers the time before.
  */
 export type RestoreFloor = { epoch: number; seq: number };
+
+/**
+ * The highest old epoch this phone has pulled to its end (it pulled to `lastSeq`, at or past where the log closed
+ * it), at least `before`: every genuine record of it and the ones before is already on this phone, so anything new in
+ * them (a stale push's answer, a pull after a restore) was written with a retired key, by a removed phone and stored
+ * by a server that shouldn't have. Only goes up: keep it across restores (`lastSeq` starts over), reset it with the
+ * family.
+ */
+export function pulledEpochs(state: Pick<DeviceLogState, 'closedAt'>, lastSeq: number, before = 0): number {
+  let done = before;
+  for (let epoch = done + 1; ; epoch++) {
+    const closed = state.closedAt.get(epoch);
+    if (closed === undefined || lastSeq < closed) return done;
+    done = epoch;
+  }
+}
 export const belowFloors = (floors: readonly RestoreFloor[] | null | undefined, epoch: number, seq: number) =>
   !floors?.some((f) => epoch < f.epoch && seq > f.seq);
 

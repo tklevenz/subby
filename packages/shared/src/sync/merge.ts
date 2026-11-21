@@ -70,3 +70,18 @@ export function pageContinues(since: number, page: { seq: number; more: boolean;
   const last = page.records.reduce((max, r) => Math.max(max, r.seq), -Infinity);
   return page.seq > since && page.seq === last;
 }
+
+/**
+ * Only the newest version of each id (by `compareVersions`), in the order they came: a page can't carry an id twice
+ * from an honest server (one row per id), and applied one after the other, an older copy after a newer one would win.
+ */
+export function newestOnly<T extends { record: Version & { id: string; kind: string } }>(items: T[]): T[] {
+  const best = new Map<string, T>();
+  for (const item of items) {
+    const key = `${item.record.kind}:${item.record.id}`;
+    const seen = best.get(key);
+    if (!seen || compareVersions(item.record, seen.record) > 0) best.set(key, item);
+  }
+  const keep = new Set(best.values());
+  return items.filter((item) => keep.has(item));
+}
