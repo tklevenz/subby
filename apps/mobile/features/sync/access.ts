@@ -109,7 +109,20 @@ export const useStoreUnavailable = () => useAccessStore((s) => !s.testPurchases 
  * Hands a paid purchase to the server, which checks it with the store, then finishes it (StoreKit). A server that
  * can't be reached leaves it unsent: Android sends it again on the next sync run.
  */
-async function send(api: SyncSession, p: Purchase, kind: ProductKind) {
+function send(api: SyncSession, p: Purchase, kind: ProductKind): Promise<EntitlementResponse> {
+  // Closing the store's sheet brings the app back to the foreground, which starts a sync run that finds the same
+  // purchase still unfinished: one request per purchase, or Google answers the second's acknowledge/consume with 409.
+  const key = p.purchaseToken!;
+  let pending = sending.get(key);
+  if (!pending) {
+    pending = sendOnce(api, p, kind).finally(() => sending.delete(key));
+    sending.set(key, pending);
+  }
+  return pending;
+}
+const sending = new Map<string, Promise<EntitlementResponse>>();
+
+async function sendOnce(api: SyncSession, p: Purchase, kind: ProductKind) {
   let entitlement: EntitlementResponse;
   try {
     entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: storeName(), product: PRODUCTS[kind], token: p.purchaseToken! });

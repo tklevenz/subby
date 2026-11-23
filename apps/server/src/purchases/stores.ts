@@ -73,9 +73,16 @@ export class GooglePlay implements Store {
   }
 
   async finish(product: string, token: string, kind: ProductKind) {
-    const purchase = (await (await this.call(this.url(product, token))).json()) as ProductPurchase;
-    if (kind === 'slot' && purchase.consumptionState === 0) await this.call(this.url(product, token, ':consume'), 'POST');
-    if (kind === 'unlock' && purchase.acknowledgementState === 0) await this.call(this.url(product, token, ':acknowledge'), 'POST');
+    const state = async () => (await (await this.call(this.url(product, token))).json()) as ProductPurchase;
+    const done = (p: ProductPurchase) => (kind === 'slot' ? p.consumptionState !== 0 : p.acknowledgementState !== 0);
+    if (done(await state())) return;
+    try {
+      await this.call(this.url(product, token, kind === 'slot' ? ':consume' : ':acknowledge'), 'POST');
+    } catch (e) {
+      // 409: another request for the same purchase is finishing it right now (an app sending it twice). Fine if it did.
+      if ((e as { code?: unknown }).code === 'play_409' && done(await state())) return;
+      throw e;
+    }
   }
 
   /** Purchases refunded or charged back since `since` (ms, at most 30 days back), as our purchase ids. */
