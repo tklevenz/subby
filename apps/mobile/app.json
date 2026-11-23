@@ -24,7 +24,7 @@
         "backgroundColor": "#0E1B3D"
       },
       "package": "baby.subby.app",
-      "versionCode": 3
+      "versionCode": 4
     },
     "web": {
       "bundler": "metro"
