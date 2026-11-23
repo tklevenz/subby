@@ -56,7 +56,10 @@ export class GooglePlay implements Store {
     const res = await fetch(url, { method, headers: { authorization: `Bearer ${await this.auth.token()}` }, signal: AbortSignal.timeout(15_000) });
     // Unknown token, or one for another app or product.
     if (res.status === 400 || res.status === 404 || res.status === 410) throw new PurchaseRefused('Google Play doesn’t know this purchase');
-    if (!res.ok) throw new Error(`Google Play answered ${res.status}: ${await res.text().catch(() => '')}`);
+    if (!res.ok) {
+      // `code` is what `logError` shows (never the message): the status says whether it was us or Google.
+      throw Object.assign(new Error(`Google Play answered ${res.status}: ${await res.text().catch(() => '')}`), { code: `play_${res.status}` });
+    }
     return res;
   }
 
