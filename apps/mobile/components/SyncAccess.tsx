@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { GRACE_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
 import { Button, Card, Row, Segmented, SectionLabel, Hint } from './ui';
 import { UnlockInUse, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools, usePrice, useStoreUnavailable } from '../features/sync/access';
-import { PurchaseCancelled, PurchasePending } from '../features/sync/store';
+import { PurchaseCancelled, PurchasePending, requestSandboxRefund, sandboxUnlock } from '../features/sync/store';
 import { syncNow } from '../features/sync/engine';
 import { sessionFor, useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -270,6 +270,9 @@ const DEV = {
   pretends: 'Pretends only on this screen and Home; the server decides what syncs.', // i18n-ignore
   testStore: ' This server has the test store: buying here costs nothing.', // i18n-ignore
   refund: 'Refund the last test purchase', // i18n-ignore
+  sandboxTitle: 'App Store sandbox', // i18n-ignore
+  sandboxRefund: 'Request a refund of the unlock', // i18n-ignore
+  sandboxHint: 'Apple decides the sandbox refund; the server should then lock this phone again.', // i18n-ignore
 };
 
 /** Dev builds and test-store servers: pretend to be in any state, and refund test purchases. */
@@ -279,7 +282,8 @@ export function AccessDevTools() {
   const testStore = useAccessStore((s) => s.testPurchases);
   const hasTest = useAccessStore((s) => s.testTokens.length > 0);
   const { busy, run } = useStoreAction();
-  if (!show) return null;
+  const sandbox = useSandboxUnlock();
+  if (!show) return sandbox ? <SandboxRefund busy={busy} run={run} /> : null;
   // Developer tools stay in English (dev builds and test-store servers only).
   const options: { value: SyncAccess | 'real'; label: string }[] = [
     { value: 'real', label: 'Real' }, // i18n-ignore
@@ -302,6 +306,39 @@ export function AccessDevTools() {
           <Row label={DEV.refund} onPress={busy ? undefined : () => run(refundLastTest)} />
         </Card>
       ) : null}
+      {sandbox ? <SandboxRefund busy={busy} run={run} /> : null}
+    </>
+  );
+}
+
+/** iOS: whether this Apple account's unlock is a sandbox one (checked once per screen). */
+function useSandboxUnlock() {
+  const [sandbox, setSandbox] = React.useState(false);
+  React.useEffect(() => {
+    let live = true;
+    sandboxUnlock().then(
+      (s) => live && setSandbox(s),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return sandbox;
+}
+
+/**
+ * Apple's refund sheet, only for a sandbox unlock (Xcode and TestFlight builds), to test that a refund reaches the
+ * server. Real customers ask Apple or Google; the app has no refund button for them.
+ */
+function SandboxRefund({ busy, run }: ReturnType<typeof useStoreAction>) {
+  return (
+    <>
+      <SectionLabel>{DEV.sandboxTitle}</SectionLabel>
+      <Card>
+        <Row label={DEV.sandboxRefund} onPress={busy ? undefined : () => void run(() => requestSandboxRefund())} />
+      </Card>
+      <Hint className="ml-1">{DEV.sandboxHint}</Hint>
     </>
   );
 }

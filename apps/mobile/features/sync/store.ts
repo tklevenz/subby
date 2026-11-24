@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { t } from '@subby/shared/i18n';
 import { PRODUCTS, productKind, type ProductKind } from '@subby/shared/sync';
 import type * as ExpoIap from 'expo-iap';
-import type { Purchase, PurchaseAndroid } from 'expo-iap';
+import type { Purchase, PurchaseAndroid, PurchaseIOS } from 'expo-iap';
 import { optionalModule } from '../optionalModule';
 
 /**
@@ -106,6 +106,23 @@ export async function ownedUnlock({ quiet = false } = {}): Promise<Purchase | un
   if (!quiet) await m.restorePurchases().catch(() => {});
   const owned = await m.getAvailablePurchases();
   return owned.find((p) => p.productId === PRODUCTS.unlock && p.purchaseState === 'purchased' && p.purchaseToken);
+}
+
+/**
+ * iOS: whether this Apple account's unlock was bought in Apple's sandbox (Xcode and TestFlight builds with a sandbox
+ * account), never in the App Store. Only then may the app offer Apple's refund sheet: refunds are for testing that
+ * a refund reaches the server; real customers ask Apple. Reads StoreKit's local entitlements, no sign-in prompt.
+ */
+export async function sandboxUnlock(): Promise<boolean> {
+  if (Platform.OS !== 'ios' || !(await connect())) return false;
+  const owned = (await iap()!.getAvailablePurchases()) as PurchaseIOS[];
+  return owned.some((p) => p.productId === PRODUCTS.unlock && p.environmentIOS?.toLowerCase() === 'sandbox');
+}
+
+/** iOS sandbox only (see `sandboxUnlock`): Apple's refund sheet for this account's unlock. */
+export async function requestSandboxRefund(): Promise<void> {
+  if (!(await sandboxUnlock())) throw new Error(t('access.storeUnavailable'));
+  await iap()!.beginRefundRequestIOS(PRODUCTS.unlock);
 }
 
 /**
