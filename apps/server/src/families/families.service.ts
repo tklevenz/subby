@@ -154,10 +154,15 @@ export class FamiliesService {
         break;
       }
       case 'remove': {
+        // Without its own unlock right now, the phone's leaving is noted for late joiners' grace (`Entitlements`).
+        const [unlock] = await tx
+          .select({ id: schema.purchases.id })
+          .from(schema.purchases)
+          .where(and(eq(schema.purchases.deviceId, entry.deviceId), eq(schema.purchases.kind, 'unlock'), eq(schema.purchases.revoked, false)));
         // Device ids are unique across families, but every write names the family anyway.
         await tx
           .update(schema.devices)
-          .set({ active: false })
+          .set({ active: false, leftLockedAt: unlock ? null : new Date() })
           .where(and(eq(schema.devices.familyId, familyId), eq(schema.devices.id, entry.deviceId)));
         await tx.delete(schema.sessions).where(and(eq(schema.sessions.familyId, familyId), eq(schema.sessions.deviceId, entry.deviceId)));
         await tx.delete(schema.pushTokens).where(and(eq(schema.pushTokens.familyId, familyId), eq(schema.pushTokens.deviceId, entry.deviceId)));

@@ -47,6 +47,11 @@ export const devices = pgTable(
     active: boolean('active').notNull().default(true),
     /** When it joined: its grace after the trial counts from here if it joined later (hosted payments). */
     addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * When it left (or was removed) without an unlock of its own: a phone joining around then gets no grace after
+     * the trial, so leaving and joining again (a new identity each time) doesn't sync for free (`Entitlements`).
+     */
+    leftLockedAt: timestamp('left_locked_at', { withTimezone: true }),
   },
   // Postgres doesn't index foreign keys by itself: every family lookup (and the cascade on delete) would scan.
   (t) => [index('devices_family_idx').on(t.familyId)],

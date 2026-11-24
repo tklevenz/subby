@@ -1,0 +1,1 @@
+ALTER TABLE "devices" ADD COLUMN "left_locked_at" timestamp with time zone;

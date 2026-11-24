@@ -1235,7 +1235,16 @@ describe.skipIf(!reachable)('sync server', () => {
       const [{ created }] = await db`select extract(epoch from now() - created_at) * 1000 as created from families where id = ${c.familyId}`;
       const shift = days * 86_400_000 - Number(created);
       await db`update families set created_at = created_at - make_interval(secs => ${shift / 1000}) where id = ${c.familyId}`;
-      await db`update devices set added_at = added_at - make_interval(secs => ${shift / 1000}) where family_id = ${c.familyId}`;
+      await db`update devices set added_at = added_at - make_interval(secs => ${shift / 1000}), left_locked_at = left_locked_at - make_interval(secs => ${shift / 1000}) where family_id = ${c.familyId}`;
+    };
+    /** A new phone joins `a`'s family. */
+    const join = async (a: TestClient) => {
+      const { qr, secret } = await a.invite();
+      const phone = new TestClient(base);
+      await phone.claim(qr);
+      await (await a.reviewClaim(qr.i, secret)).approve();
+      await phone.finishJoin(qr);
+      return phone;
     };
     const write = (c: TestClient) => c.push([c.seal('child', randomUUID(), { name: 'Sam' })]);
 
@@ -1296,6 +1305,37 @@ describe.skipIf(!reachable)('sync server', () => {
       }
       await ageFamily(a, 30);
       await expectStatus(a.push([moved()]), 402);
+    });
+
+    it('leaving and joining again gets no new 48 hours, unless the phone that left had its own unlock', async () => {
+      // A phone without an unlock leaves (or is removed) after the trial: a phone joining then gets no grace.
+      const { a, b } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      await a.removeDevice(b.deviceId);
+      const again = await join(a);
+      expect((await entitlement(again)).access).toBe('readOnly');
+      await expectStatus(write(again), 402);
+
+      // Leaving within a joined phone's 48 hours (a new identity added first, the old one removed after) ends them.
+      const first = await pairedFamily(base);
+      await ageFamily(first.a, 30);
+      const added = await join(first.a);
+      expect((await entitlement(added)).access).toBe('grace');
+      await first.a.removeDevice(first.b.deviceId);
+      expect((await entitlement(added)).access).toBe('readOnly');
+
+      // A phone with its own unlock leaving (a reinstall) doesn't count, nor does one that left over 30 days ago.
+      const owned = await pairedFamily(base);
+      await ageFamily(owned.a, 30);
+      await buy(owned.b, 'google', 'sync_unlock', googlePurchase(owned.b, 'sync_unlock'));
+      await owned.a.removeDevice(owned.b.deviceId);
+      expect((await entitlement(await join(owned.a))).access).toBe('grace');
+
+      const old = await pairedFamily(base);
+      await ageFamily(old.a, 30);
+      await old.a.removeDevice(old.b.deviceId);
+      await ageFamily(old.a, 61);
+      expect((await entitlement(await join(old.a))).access).toBe('grace');
     });
 
     it('a phone that joins after the trial gets its own 48 hours', async () => {

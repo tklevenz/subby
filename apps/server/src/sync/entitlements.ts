@@ -1,8 +1,15 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, sum } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, sum } from 'drizzle-orm';
 import { GRACE_MS, HOSTED_PHOTO_BYTES, INACTIVE_DELETE_DAYS, TRIAL_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db, type Tx } from '../db/db';
+
+/**
+ * A phone joining after the trial gets no grace if a phone without its own unlock left the family from this long
+ * before it joined until its grace would end: leaving and joining again makes a new identity each time, which
+ * would otherwise sync for free, 48 hours at a time.
+ */
+export const REJOIN_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** 402: this phone's trial and grace are over and it has no unlock; it can still pull. The app shows the unlock screen. */
 export const notUnlocked = () => new HttpException({ statusCode: 402, message: 'This phone needs Subby Sync unlocked to write' }, 402);
@@ -13,7 +20,8 @@ type DeviceAccess = { id: string; access: SyncAccess; graceEndsAt: number | null
  * Who may sync (PROJECT.md §3). Self-hosted servers: everyone, always. Hosted: a family's phones sync during its
  * 14-day trial; after it, each phone needs its own unlock or one of the family's gifted slots. Slots go to the
  * phones without an unlock in the order they joined, so a removed phone's slot passes on by itself. A phone
- * without either still syncs for 48 h after the trial (or after joining, if later), then only pulls.
+ * without either still syncs for 48 h after the trial (or after joining, if later; not after joining around when a
+ * phone without its own unlock left, `REJOIN_WINDOW_MS`), then only pulls.
  */
 @Injectable()
 export class Entitlements {
@@ -61,6 +69,10 @@ export class Entitlements {
       schema.purchases,
       and(eq(schema.purchases.familyId, familyId), eq(schema.purchases.kind, 'slot'), eq(schema.purchases.revoked, false)),
     );
+    // Only for phones that joined after the trial (rare), so most calls skip the query.
+    const leftLocked = members.some((m) => m.addedAt.getTime() > trialEndsAt) ? await this.leftLocked(familyId, trialEndsAt) : [];
+    const joinGrace = (joined: number) =>
+      joined <= trialEndsAt || !leftLocked.some((at) => at >= joined - REJOIN_WINDOW_MS && at <= joined + GRACE_MS);
     let left = slots;
     const devices = members.map((m): DeviceAccess => {
       if (unlocked.has(m.id)) return { id: m.id, access: 'unlock', graceEndsAt: null };
@@ -68,7 +80,9 @@ export class Entitlements {
         left--;
         return { id: m.id, access: 'slot', graceEndsAt: null };
       }
-      const graceEndsAt = Math.max(trialEndsAt, m.addedAt.getTime()) + GRACE_MS;
+      const joined = m.addedAt.getTime();
+      // No grace: it ended when the phone joined, after the trial, so it's read-only right away.
+      const graceEndsAt = joinGrace(joined) ? Math.max(trialEndsAt, joined) + GRACE_MS : joined;
       return { id: m.id, access: now < trialEndsAt ? 'trial' : now < graceEndsAt ? 'grace' : 'readOnly', graceEndsAt };
     });
     return { trialEndsAt, slots, freeSlots: left, devices };
@@ -97,6 +111,15 @@ export class Entitlements {
     const { devices } = await this.family(familyId, now);
     const access = devices.find((d) => d.id === deviceId)?.access;
     return access !== undefined && access !== 'readOnly';
+  }
+
+  /** When phones left the family after the trial without their own unlock. */
+  private async leftLocked(familyId: string, trialEndsAt: number): Promise<number[]> {
+    const rows = await this.db
+      .select({ at: schema.devices.leftLockedAt })
+      .from(schema.devices)
+      .where(and(eq(schema.devices.familyId, familyId), eq(schema.devices.active, false), gte(schema.devices.leftLockedAt, new Date(trialEndsAt))));
+    return rows.flatMap((r) => (r.at ? [r.at.getTime()] : []));
   }
 
   /** Whether the family has room for another encrypted file of `bytes` (2 GB of photos per family when hosted). */
