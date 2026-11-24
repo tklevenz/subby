@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf .expo node_modules",
-    "test": "vitest run"
+    "test": "TZ=Europe/Berlin vitest run"
   },
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",

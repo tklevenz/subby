@@ -47,7 +47,7 @@ Dark only for launch, but built for themes.
 ## Commands
 - `pnpm test` / `pnpm typecheck` from the root (turbo). `pnpm lint` (flat config: hook rules, no-floating-promises; `void` for fire-and-forget).
 - `pnpm run dev` starts the app (dev build); `pnpm --filter @subby/mobile dev:go` for Expo Go.
-- Shared tests run with `TZ=Europe/Berlin`, so DST cases cross real clock changes on any machine.
+- Shared and mobile tests run with `TZ=Europe/Berlin`, so DST cases cross real clock changes on any machine.
 - Server e2e tests need the dev Postgres (`cd apps/server && pnpm db:up`, port 54329); without it they're skipped with a warning.
 - Mobile schema change: edit `apps/mobile/db/schema.ts`, then `cd apps/mobile && npx drizzle-kit generate --name <change>`; commit `db/migrations/*`, never edit an applied migration. Server: edit `src/db/schema.ts`, then `pnpm db:generate`.
 - Re-run `node scripts/licenses.mjs` (in `apps/mobile`) when dependencies change, before a store build.
