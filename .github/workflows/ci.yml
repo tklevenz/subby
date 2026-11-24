@@ -1,0 +1,45 @@
+# Typecheck, lint and test the whole monorepo on every push to main and every pull request.
+# The server's e2e tests run against a throwaway Postgres on the same port as `pnpm db:up` (54329).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: subby
+          POSTGRES_PASSWORD: subby
+          POSTGRES_DB: subby
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U subby"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
