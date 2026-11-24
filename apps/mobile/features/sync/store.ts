@@ -8,7 +8,8 @@ import { optionalModule } from '../optionalModule';
 /**
  * Google Play and the App Store, through expo-iap (LAUNCH.md A3). The server checks every purchase with the store
  * and, on Google, acknowledges (unlock) or consumes (slot) it itself; StoreKit purchases are finished here, after
- * the server took them. Not in Expo Go, and not in builds that didn't come from a store (billing refuses them).
+ * the server took them. Not in Expo Go. (Sideloaded and Xcode builds buy with test accounts: Play license testers,
+ * App Store sandbox.)
  */
 let module: typeof ExpoIap | null | undefined;
 const iap = () => (module === undefined ? (module = optionalModule(() => require('expo-iap') as typeof ExpoIap, 'expo-go')) : module);
@@ -105,15 +106,25 @@ export async function ownedUnlock(): Promise<Purchase | undefined> {
 }
 
 /**
- * Android: purchases that were paid but never reached the server (the app closed, or the network dropped, in
- * between): an unlock not yet acknowledged, or a slot bought on this phone and not yet consumed. Google refunds
- * them after three days, so each sync run sends them. An acknowledged unlock is left alone: sending it would move
- * it here from whichever phone uses it now. (iOS: StoreKit replays unfinished transactions; handled with A3 on iOS.)
+ * Purchases that were paid but never reached the server (the app closed, or the network dropped, in between), so
+ * each sync run sends them.
+ * - Android: an unlock not yet acknowledged, or a slot bought on this phone and not yet consumed (Google refunds
+ *   them after three days). An acknowledged unlock is left alone: sending it would move it here from whichever
+ *   phone uses it now.
+ * - iOS: StoreKit's unfinished transactions bought on this phone (its app account token). The queue belongs to
+ *   the Apple account, so another phone's unfinished unlock stays with that phone.
  */
 export async function unsentPurchases(deviceId: string): Promise<{ purchase: Purchase; kind: ProductKind }[]> {
-  if (Platform.OS !== 'android' || !(await connect())) return [];
-  const owned = await iap()!.getAvailablePurchases();
+  if (!(await connect())) return [];
   const unsent: { purchase: Purchase; kind: ProductKind }[] = [];
+  if (Platform.OS === 'ios') {
+    for (const p of await iap()!.getPendingTransactionsIOS()) {
+      const kind = productKind(p.productId);
+      if (kind && p.purchaseToken && p.appAccountToken?.toLowerCase() === deviceId.toLowerCase()) unsent.push({ purchase: p, kind });
+    }
+    return unsent;
+  }
+  const owned = await iap()!.getAvailablePurchases();
   for (const p of owned as PurchaseAndroid[]) {
     if (p.purchaseState !== 'purchased' || !p.purchaseToken) continue;
     if (p.productId === PRODUCTS.unlock && !p.isAcknowledgedAndroid) unsent.push({ purchase: p, kind: 'unlock' });
