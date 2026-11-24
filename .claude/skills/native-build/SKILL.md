@@ -1,6 +1,6 @@
 ---
 name: native-build
-description: Build and install Subby's native Android/iOS apps locally (no EAS) - dev builds, release APKs, LAN-server builds, store builds, iOS on a physical device, testing background tasks. Use when building, prebuilding, installing on a phone or emulator, or when a native change (new native package, app.json plugin, config plugin) needs a rebuild.
+description: Build and install Subby's native Android/iOS apps locally (no EAS) - dev builds, release APKs, LAN-server builds, iOS on a physical device, testing background tasks (store builds: the `release` skill). Use when building, prebuilding, installing on a phone or emulator, or when a native change (new native package, app.json plugin, config plugin) needs a rebuild.
 ---
 
 # Native builds (local, no EAS)
@@ -16,7 +16,7 @@ description: Build and install Subby's native Android/iOS apps locally (no EAS) 
 - **Standalone builds for a LAN server**: `app.config.js` adds `usesCleartextTraffic` (via `expo-build-properties`) only when `SUBBY_ALLOW_HTTP=1` is set during prebuild:
   `SUBBY_ALLOW_HTTP=1 npx expo prebuild --clean --platform android && (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)`
 - **Signing:** release APKs are signed with the debug key unless `SUBBY_SIGNING=/path/to/upload.properties` is set during prebuild (`plugins/withReleaseSigning.js`: Gradle reads `storeFile`, `storePassword`, `keyAlias`, `keyPassword` from that file at build time; keystore and file live outside the repo). Debug-signed release APKs install over the dev build and keep the data; upload-signed ones don't.
-- **Store builds:** never set `SUBBY_ALLOW_HTTP` for a store build. The local `android/` is usually prebuilt with it (for the LAN server), so run `npx expo prebuild --clean` without it before building anything for a store.
+- **Store builds** (upload key, version bump, artifact checks): the `release` skill.
 
 ## iOS on a device
 Team `L33LRKM2NX`, automatic signing.
