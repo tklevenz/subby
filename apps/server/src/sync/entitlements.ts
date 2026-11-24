@@ -1,5 +1,5 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gte, inArray, sum } from 'drizzle-orm';
+import { and, asc, eq, inArray, sum } from 'drizzle-orm';
 import { GRACE_MS, HOSTED_PHOTO_BYTES, INACTIVE_DELETE_DAYS, TRIAL_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db, type Tx } from '../db/db';
@@ -18,8 +18,9 @@ type DeviceAccess = { id: string; access: SyncAccess; graceEndsAt: number | null
 
 /**
  * Who may sync (PROJECT.md §3). Self-hosted servers: everyone, always. Hosted: a family's phones sync during its
- * 14-day trial; after it, each phone needs its own unlock or one of the family's gifted slots. Slots go to the
- * phones without an unlock in the order they joined, so a removed phone's slot passes on by itself. A phone
+ * 14-day trial (from when a second phone first joined); after it, each phone needs its own unlock or one of the
+ * family's gifted slots. Slots go to the phones without an unlock in the order they joined, so a removed phone's
+ * slot passes on by itself. A phone
  * without either still syncs for 48 h after the trial (or after joining, if later; not after joining around when a
  * phone without its own unlock left, `REJOIN_WINDOW_MS`), then only pulls.
  */
@@ -34,18 +35,32 @@ export class Entitlements {
     return this.config.mode === 'hosted';
   }
 
-  /** Every active phone's access, in join order, plus the family's trial and slots. */
+  /**
+   * Every active phone's access, in join order, plus the family's trial and slots. The trial runs from when the
+   * family's second phone first joined (removed ones count, so it starts once), or from its creation while a phone
+   * is alone: sharing is what the trial is for, and a parent setting up sync days before the partner joins
+   * shouldn't lose those days.
+   */
   async family(familyId: string, now = Date.now()) {
     const [family] = await this.db.select({ createdAt: schema.families.createdAt }).from(schema.families).where(eq(schema.families.id, familyId));
-    const members = await this.db
-      .select({ id: schema.devices.id, addedAt: schema.devices.addedAt })
+    // Removed phones too (few per family): when the second one joined, and who left without an unlock.
+    const all = await this.db
+      .select({ id: schema.devices.id, addedAt: schema.devices.addedAt, active: schema.devices.active, leftLockedAt: schema.devices.leftLockedAt })
       .from(schema.devices)
-      .where(and(eq(schema.devices.familyId, familyId), eq(schema.devices.active, true)))
+      .where(eq(schema.devices.familyId, familyId))
       .orderBy(asc(schema.devices.addedAt), asc(schema.devices.id));
+    const members = all.filter((d) => d.active);
     if (!this.hosted || !family) {
-      return { trialEndsAt: null, slots: 0, freeSlots: 0, devices: members.map((m): DeviceAccess => ({ id: m.id, access: 'free', graceEndsAt: null })) };
+      return {
+        trialEndsAt: null,
+        trialStartsOnJoin: false,
+        slots: 0,
+        freeSlots: 0,
+        devices: members.map((m): DeviceAccess => ({ id: m.id, access: 'free', graceEndsAt: null })),
+      };
     }
-    const trialEndsAt = family.createdAt.getTime() + TRIAL_MS;
+    const trialStartsOnJoin = all.length < 2;
+    const trialEndsAt = Math.max(family.createdAt.getTime(), all[1]?.addedAt.getTime() ?? 0) + TRIAL_MS;
     const unlocked = new Set(
       members.length
         ? (
@@ -69,8 +84,8 @@ export class Entitlements {
       schema.purchases,
       and(eq(schema.purchases.familyId, familyId), eq(schema.purchases.kind, 'slot'), eq(schema.purchases.revoked, false)),
     );
-    // Only for phones that joined after the trial (rare), so most calls skip the query.
-    const leftLocked = members.some((m) => m.addedAt.getTime() > trialEndsAt) ? await this.leftLocked(familyId, trialEndsAt) : [];
+    // When phones left after the trial without their own unlock.
+    const leftLocked = all.flatMap((d) => (!d.active && d.leftLockedAt && d.leftLockedAt.getTime() >= trialEndsAt ? [d.leftLockedAt.getTime()] : []));
     const joinGrace = (joined: number) =>
       joined <= trialEndsAt || !leftLocked.some((at) => at >= joined - REJOIN_WINDOW_MS && at <= joined + GRACE_MS);
     let left = slots;
@@ -85,7 +100,7 @@ export class Entitlements {
       const graceEndsAt = joinGrace(joined) ? Math.max(trialEndsAt, joined) + GRACE_MS : joined;
       return { id: m.id, access: now < trialEndsAt ? 'trial' : now < graceEndsAt ? 'grace' : 'readOnly', graceEndsAt };
     });
-    return { trialEndsAt, slots, freeSlots: left, devices };
+    return { trialEndsAt, trialStartsOnJoin, slots, freeSlots: left, devices };
   }
 
   /** GET /v1/entitlement, for one phone. */
@@ -95,6 +110,7 @@ export class Entitlements {
     return {
       access: me?.access ?? (this.hosted ? 'readOnly' : 'free'),
       trialEndsAt: f.trialEndsAt,
+      trialStartsOnJoin: f.trialStartsOnJoin,
       graceEndsAt: me?.graceEndsAt ?? null,
       slots: f.slots,
       freeSlots: f.freeSlots,
@@ -111,15 +127,6 @@ export class Entitlements {
     const { devices } = await this.family(familyId, now);
     const access = devices.find((d) => d.id === deviceId)?.access;
     return access !== undefined && access !== 'readOnly';
-  }
-
-  /** When phones left the family after the trial without their own unlock. */
-  private async leftLocked(familyId: string, trialEndsAt: number): Promise<number[]> {
-    const rows = await this.db
-      .select({ at: schema.devices.leftLockedAt })
-      .from(schema.devices)
-      .where(and(eq(schema.devices.familyId, familyId), eq(schema.devices.active, false), gte(schema.devices.leftLockedAt, new Date(trialEndsAt))));
-    return rows.flatMap((r) => (r.at ? [r.at.getTime()] : []));
   }
 
   /** Whether the family has room for another encrypted file of `bytes` (2 GB of photos per family when hosted). */

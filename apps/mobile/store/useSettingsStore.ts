@@ -26,6 +26,11 @@ export type Settings = {
   keptOverlaps: string[];
   /** Device-local sync state; null until sync is set up. Keys live in the keychain (features/sync/keystore). */
   sync: SyncSettings | null;
+  /**
+   * Device-local: the Home card suggesting sync (`ShareNudge`). When Home first had a child and no sync (the card
+   * shows 3 days later), or `done` once dismissed or once sync was set up: it's shown at most once, ever.
+   */
+  shareNudge: number | 'done' | null;
 };
 
 export type SyncSettings = {
@@ -92,6 +97,7 @@ const DEFAULTS: Settings = {
   homeTop: {},
   keptOverlaps: [],
   sync: null,
+  shareNudge: null,
 };
 
 interface SettingsState extends Settings {

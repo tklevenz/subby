@@ -1339,16 +1339,34 @@ describe.skipIf(!reachable)('sync server', () => {
     });
 
     it('a phone that joins after the trial gets its own 48 hours', async () => {
-      const a = new TestClient(base);
-      await a.createFamily();
+      const { a } = await pairedFamily(base);
       await ageFamily(a, 30);
-      const { qr, secret } = await a.invite();
-      const late = new TestClient(base);
-      await late.claim(qr);
-      await (await a.reviewClaim(qr.i, secret)).approve();
-      await late.finishJoin(qr);
+      const late = await join(a);
       expect((await entitlement(late)).access).toBe('grace');
       expect((await entitlement(a)).access).toBe('readOnly');
+    });
+
+    it('the trial counts from when a second phone first joins, once', async () => {
+      // Set up alone: 14 days from creating the family, and the second phone's joining starts them over.
+      const a = new TestClient(base);
+      await a.createFamily();
+      expect(await entitlement(a)).toMatchObject({ access: 'trial', trialStartsOnJoin: true });
+      await ageFamily(a, 20);
+      expect((await entitlement(a)).access).toBe('readOnly');
+      const partner = await join(a);
+      const shared = await entitlement(partner);
+      expect(shared).toMatchObject({ access: 'trial', trialStartsOnJoin: false });
+      expect(shared.trialEndsAt! - Date.now()).toBeGreaterThan(13.9 * 86_400_000);
+      expect((await entitlement(a)).access).toBe('trial');
+      await write(a);
+
+      // Only once: the partner leaving and someone joining later doesn't start it again.
+      // (The partner has its own unlock, so the next phone gets its 48 hours: grace, not a trial.)
+      await ageFamily(a, 40);
+      await buy(partner, 'google', 'sync_unlock', googlePurchase(partner, 'sync_unlock'));
+      await a.removeDevice(partner.deviceId);
+      expect((await entitlement(a)).trialStartsOnJoin).toBe(false);
+      expect((await entitlement(await join(a))).access).toBe('grace');
     });
 
     it('an own unlock from Google Play, acknowledged, and moved to a new phone by a restore', async () => {

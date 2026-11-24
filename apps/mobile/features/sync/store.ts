@@ -96,11 +96,14 @@ export async function finish(p: Purchase, kind: ProductKind) {
   if (Platform.OS === 'ios') await iap()!.finishTransaction({ purchase: p, isConsumable: kind === 'slot' });
 }
 
-/** This store account's unlock, if it has one (for Restore). */
-export async function ownedUnlock(): Promise<Purchase | undefined> {
+/**
+ * This store account's unlock, if it has one (for Restore). `quiet`: without asking the store to sync first, which
+ * can ask for the Apple ID password on iOS (only for a check nobody asked for).
+ */
+export async function ownedUnlock({ quiet = false } = {}): Promise<Purchase | undefined> {
   if (!(await connect())) throw new Error(t('access.storeUnavailable'));
   const m = iap()!;
-  await m.restorePurchases().catch(() => {});
+  if (!quiet) await m.restorePurchases().catch(() => {});
   const owned = await m.getAvailablePurchases();
   return owned.find((p) => p.productId === PRODUCTS.unlock && p.purchaseState === 'purchased' && p.purchaseToken);
 }

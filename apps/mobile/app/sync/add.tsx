@@ -3,7 +3,7 @@ import { MINUTE_MS } from '@subby/shared';
 import { errorMessage } from '../../features/errorMessage';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Share, Text, View, useWindowDimensions } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import type { InviteResponse } from '@subby/shared/sync';
 import { approveClaim, claimCode, createInvite, inviteStatus, type Invite } from '../../features/sync/family';
 import QrCode from '../../components/QrCode';
@@ -25,11 +25,16 @@ type Step =
   | { kind: 'error'; message: string; retry?: Claimant };
 
 const POLL_MS = 2000;
+/** Where the shared code tells the other person to get the app (the homepage has the store links). */
+const SITE_URL = 'https://subby.baby'; // i18n-ignore
 
 /** The phone already in the family: shows a one-time QR code, then the code to compare, then adds the phone. */
 export default function AddPhoneScreen() {
   const { width } = useWindowDimensions();
   const [step, setStep] = useState<Step>({ kind: 'loading' });
+  // Right after setting up sync: this is its next step, and the recovery key comes after it (`sync/recovery`).
+  const afterSetup = useLocalSearchParams<{ after?: string }>().after === 'setup';
+  const next = () => (afterSetup ? router.replace({ pathname: '/sync/recovery', params: { after: 'setup' } }) : router.back());
   const now = useNow(1000);
   const start = useCallback(() => {
     setStep({ kind: 'loading' });
@@ -78,6 +83,7 @@ export default function AddPhoneScreen() {
 
       {step.kind === 'showing' ? (
         <>
+          {afterSetup ? <Text className="text-green-soft text-sm font-semibold mb-2">{t('add.syncOn')}</Text> : null}
           <ScreenTitle>{t('add.scanThis')}</ScreenTitle>
           <Lead className="mt-2">
             {t('add.howTo')}
@@ -94,8 +100,13 @@ export default function AddPhoneScreen() {
           </View>
           {now >= step.invite.expiresAt ? <Button label={t('add.newCode')} onPress={start} /> : null}
           <AddPhoneNote />
-          <Button label={t('add.send')} variant="ghost" onPress={() => Share.share({ message: step.invite.code })} />
+          <Button
+            label={t('add.send')}
+            variant="ghost"
+            onPress={() => Share.share({ message: t('add.shareMessage', { url: SITE_URL, code: step.invite.code }) })}
+          />
           <Text className="text-ink-faint text-xs text-center mt-2">{t('add.sendNote')}</Text>
+          {afterSetup ? <Button label={t('common.later')} variant="ghost" onPress={next} /> : null}
         </>
       ) : null}
 
@@ -117,7 +128,7 @@ export default function AddPhoneScreen() {
         <>
           <ScreenTitle className="mt-4">{t('add.added')}</ScreenTitle>
           <Lead className="mt-2">{t('add.addedText')}</Lead>
-          <Button label={t('common.done')} onPress={() => router.back()} />
+          <Button label={t('common.done')} onPress={next} />
           <GiftNewPhone deviceId={step.deviceId} />
         </>
       ) : null}

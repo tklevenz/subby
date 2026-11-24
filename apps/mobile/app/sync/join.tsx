@@ -6,6 +6,9 @@ import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimInvite, finishJoin, hasLocalData, joinStatus, type Join } from '../../features/sync/family';
 import { defaultDeviceName, syncNow } from '../../features/sync/engine';
+import { restoreQuietly } from '../../features/sync/access';
+import { sessionFor } from '../../features/sync/state';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { Button, FieldLabel, TextField, Lead, LoaderBlock, SectionLabel, ScreenTitle } from '../../components/ui';
 import { PeriscopeLoader } from '../../components/brand/loaders';
 import { FailedStep, ReplaceOrMerge, SyncBusy } from '../../components/SyncSteps';
@@ -69,6 +72,9 @@ export default function JoinScreen() {
     // Download everything before leaving, so a phone joining from onboarding lands on Home with the family's data.
     // The phone is in the family now: a failed first sync is retried by the next one, never by joining again.
     await syncNow().catch(() => {});
+    // A new phone or a reinstall: the store account's unlock comes along if no other phone in use holds it.
+    const settings = useSettingsStore.getState().sync;
+    if (settings) void restoreQuietly(sessionFor(settings)).then((moved) => (moved ? syncNow().catch(() => {}) : undefined));
     router.replace('/');
   };
 

@@ -7,7 +7,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSyncStore } from '../../features/sync/state';
 import { moveToServer } from '../../features/sync/move';
 import { isOfficialServer, serverLabel } from '../../features/sync/api';
-import { PRICE } from '../../features/sync/access';
+import { useStorePrice } from '../../features/sync/access';
 import { Button, ErrorText, Lead, Hint, LoaderBlock } from '../../components/ui';
 import { useServerChoice } from '../../components/ServerChoice';
 import { ScreenScroll } from '../../components/ScreenScroll';
@@ -21,6 +21,7 @@ export default function MoveScreen() {
   const members = useSyncStore((s) => s.members.length);
   const onOfficial = sync ? isOfficialServer(sync.server) : false;
   const { server, ready, custom, field, toggle } = useServerChoice({ customOnly: onOfficial });
+  const price = useStorePrice('unlock');
   const [step, setStep] = useState<Step>({ kind: 'choose' });
 
   if (!sync) return null;
@@ -64,7 +65,7 @@ export default function MoveScreen() {
           {step.kind === 'error' ? <ErrorText className="mt-4">{step.message}</ErrorText> : null}
           <Button label={t(custom ? 'move.toThis' : 'move.toOfficial')} onPress={confirm} disabled={!ready} />
           <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
-            {custom ? t('move.ownFree') : t('move.trial', { price: PRICE })}
+            {custom ? t('move.ownFree') : t('move.trial', { price })}
           </Text>
           {toggle}
         </>

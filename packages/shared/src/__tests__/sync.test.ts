@@ -133,6 +133,8 @@ describe('invite code', () => {
     const text = encodeInviteQr(qr);
     expect(text).toMatch(/^subby:[A-Za-z0-9_-]+$/);
     expect(decodeInviteQr(`  ${text}\n`)).toEqual(qr);
+    // A whole shared message ("…then paste this whole message:"), as people paste it.
+    expect(decodeInviteQr(`Join our family in Subby. Get the app at https://subby.baby, then paste this whole message:\n\n${text}`)).toEqual(qr);
     expect(() => decodeInviteQr('subby:!!!')).toThrow('damaged');
     expect(() => decodeInviteQr('https://example.com')).toThrow('Not a Subby code');
   });

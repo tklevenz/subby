@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActiveTimers from '../../components/ActiveTimers';
 import { AccessBanner } from '../../components/SyncAccess';
 import { RecoveryNudge } from '../../components/RecoveryNudge';
+import { ShareNudge } from '../../components/ShareNudge';
 import { SyncStopped } from '../../components/SyncStopped';
 import HomeTiles from '../../components/home/HomeTiles';
 import { SleepConflictCard } from '../../components/home/SleepConflictCard';
@@ -20,6 +21,7 @@ export default function Dashboard() {
       <SyncStopped />
       <AccessBanner />
       <RecoveryNudge />
+      <ShareNudge />
       <SleepConflictCard />
       <ActiveTimers />
       <View className="flex-1 mt-2">{child ? <HomeTiles child={child} /> : null}</View>

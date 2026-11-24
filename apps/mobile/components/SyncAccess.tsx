@@ -65,11 +65,17 @@ const joinedAfterTrial = (e: EntitlementResponse | null) =>
 
 const hasUnlock = (access: SyncAccess) => access === 'unlock' || access === 'slot';
 
-/** Add a phone, under the QR code (hosted, after the trial): whether the new phone is covered, or what it'll need. */
+/**
+ * Add a phone, under the QR code (hosted): the trial starting with this phone, or after the trial, whether the new
+ * phone is covered or what it'll need.
+ */
 export function AddPhoneNote() {
   const entitlement = useAccessStore((s) => s.entitlement);
   const now = useNow(MINUTE_MS);
-  if (!entitlement?.trialEndsAt || now < entitlement.trialEndsAt) return null;
+  if (!entitlement?.trialEndsAt) return null;
+  // The family's first second phone: the trial starts (over) when it joins.
+  if (entitlement.trialStartsOnJoin) return <Hint className="text-center">{t('add.startsTrial')}</Hint>;
+  if (now < entitlement.trialEndsAt) return null;
   return <Hint className="text-center">{t(entitlement.freeSlots ? 'add.getsGift' : 'add.afterTrial')}</Hint>;
 }
 
@@ -83,7 +89,7 @@ export function GiftNewPhone({ deviceId }: { deviceId: string }) {
   const { busy, run } = useStoreAction();
   const price = usePrice('slot');
   const now = useNow(MINUTE_MS);
-  if (!entitlement?.trialEndsAt || now < entitlement.trialEndsAt || entitlement.freeSlots) return null;
+  if (!entitlement?.trialEndsAt || entitlement.trialStartsOnJoin || now < entitlement.trialEndsAt || entitlement.freeSlots) return null;
   const others = entitlement.devices.filter((d) => d.id !== deviceId);
   const added = entitlement.devices.find((d) => d.id === deviceId);
   if (others.some((d) => !hasUnlock(d.access)) || (added && hasUnlock(added.access))) return null;
@@ -226,17 +232,32 @@ export function GiftSlot() {
   );
 }
 
-/** Home: shown only when what this phone logs isn't reaching the family (or soon won't). */
+/** How long before the trial ends Home says so (on each phone without an unlock). */
+export const TRIAL_WARN_MS = 3 * DAY_MS;
+
+/**
+ * The trial ends within `TRIAL_WARN_MS`. Not while the phone is alone: a second phone joining starts the trial
+ * over, and until then there's nobody to share with.
+ */
+function trialEndsSoon(e: EntitlementResponse | null, now: number) {
+  if (!e?.trialEndsAt || e.trialStartsOnJoin) return false;
+  const left = e.trialEndsAt - now;
+  return 0 < left && left <= TRIAL_WARN_MS;
+}
+
+/** Home: shown only when what this phone logs isn't reaching the family (or soon won't: the trial ends in 3 days). */
 export function AccessBanner() {
   const access = useAccess();
   const entitlement = useAccessStore((s) => s.entitlement);
   const formatUntil = useFormatUntil();
-  useNow(MINUTE_MS); // "tomorrow" becomes "today" at midnight
-  if (access !== 'readOnly' && access !== 'grace') return null;
-  const text =
-    access === 'readOnly'
+  const now = useNow(MINUTE_MS); // "tomorrow" becomes "today" at midnight
+  const trialEnding = access === 'trial' && trialEndsSoon(entitlement, now);
+  if (access !== 'readOnly' && access !== 'grace' && !trialEnding) return null;
+  const text = trialEnding
+    ? t('access.bannerTrialEnds', { until: formatUntil(entitlement!.trialEndsAt!, now) })
+    : access === 'readOnly'
       ? t('access.bannerReadOnly')
-      : t(joinedAfterTrial(entitlement) ? 'access.bannerGraceLate' : 'access.bannerGrace', { until: formatUntil(entitlement?.graceEndsAt ?? Date.now()) });
+      : t(joinedAfterTrial(entitlement) ? 'access.bannerGraceLate' : 'access.bannerGrace', { until: formatUntil(entitlement?.graceEndsAt ?? now, now) });
   return (
     <Pressable onPress={() => router.push('/sync')} className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
       <Text className="text-ink text-sm leading-5">{text}</Text>

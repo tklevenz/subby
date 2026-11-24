@@ -246,7 +246,7 @@ export type ProductKind = keyof typeof PRODUCTS;
 export const productKind = (product: string): ProductKind | null =>
   product === PRODUCTS.unlock ? 'unlock' : product === PRODUCTS.slot ? 'slot' : null;
 
-/** A new family syncs fully for this long. */
+/** A family syncs fully for this long, from when its second phone first joined (from its creation while alone). */
 export const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
 /** After the trial (or after joining, if later), a phone without an unlock still syncs for this long. */
 export const GRACE_MS = 48 * 60 * 60 * 1000;
@@ -291,6 +291,11 @@ export type EntitlementResponse = {
   access: SyncAccess;
   /** Null on a self-hosted server (no trial, nothing to pay). */
   trialEndsAt: number | null;
+  /**
+   * Hosted: no second phone has joined yet, so when one first does, the trial runs 14 days from then (the trial
+   * counts from sharing, not from setting up). Missing from older servers.
+   */
+  trialStartsOnJoin?: boolean;
   /** When this phone's grace ends (it applies only without an unlock or slot). */
   graceEndsAt: number | null;
   /** Gifted slots the family has, and how many no phone uses yet. */

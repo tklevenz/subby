@@ -14,7 +14,7 @@ These block tickets further down.
     - **Its own unlock:** a non-consumable purchase on the person's store account. It's restorable on a new phone and comes along into any family; the server records which phone uses it, one at a time.
     - **A gift from the family:** any member buys a slot (a consumable). The slot belongs to the family, frees up when its phone is removed, and works on Android and iPhone alike.
   - **Price:** €6.99 per phone, the same for both kinds. No bundle.
-  - **Trial:** a new family syncs fully for 14 days. No card, nothing renews automatically: the trial simply ends.
+  - **Trial:** a family syncs fully for 14 days from when its second phone first joins (from setup while alone; changed 2026-11-24). No card, nothing renews automatically: the trial simply ends.
   - **Grace period:** after the trial, a phone without an unlock still syncs for 48 more hours (so a partner's phone doesn't stop mid-night), then reads but can't log until it's unlocked.
 - [x] **D2 Photo allowance** (decided 2026-11-05): **2 GB per family**, no add-on. Past it, new photos stay on the phone. [S3]
 - [x] **D3 Caregivers** (decided 2026-11-05): no free caregiver tier. A parent can gift a slot instead (D1).

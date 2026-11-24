@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import * as Crypto from 'expo-crypto';
 import { AppState } from 'react-native';
@@ -84,6 +85,29 @@ async function checkStore(api: SyncSession) {
   } catch (e) {
     console.warn('Store check failed', e); // i18n-ignore
   }
+}
+
+/**
+ * Before sync is set up (or when moving to Subby Sync): the store's prices, so the price shown is in the account's
+ * currency from the start. Once per app run, like `checkStore`; nothing on failure (`PRICE` is shown then).
+ */
+export async function ensurePrices() {
+  if (storeAsked || useAccessStore.getState().prices) return;
+  storeAsked = true;
+  try {
+    useAccessStore.setState({ prices: await storePrices() });
+  } catch (e) {
+    storeAsked = false;
+    console.warn('Store prices failed', e); // i18n-ignore
+  }
+}
+
+/** `usePrice`, asking the store first where sync isn't set up yet (the setup and move screens). */
+export function useStorePrice(kind: ProductKind) {
+  useEffect(() => {
+    void ensurePrices();
+  }, []);
+  return usePrice(kind);
 }
 
 /** The price shown before the stores tell us theirs (and in their place in the test store). */
@@ -202,6 +226,24 @@ export async function restore(api: SyncSession, { move = false } = {}) {
   }
   useAccessStore.setState({ entitlement });
   return entitlement;
+}
+
+/**
+ * Right after joining (a new phone, a reinstall): if this store account already has an unlock that no other phone
+ * in use holds, it moves here without asking. In use elsewhere (a partner sharing the account), offline, or no
+ * store: nothing; "Restore a purchase" on the Sync screen asks.
+ */
+export async function restoreQuietly(api: SyncSession): Promise<boolean> {
+  try {
+    const { testPurchases, entitlement } = useAccessStore.getState();
+    if (testPurchases || !canBuyOn(api) || !entitlement || entitlement.access === 'free' || entitlement.access === 'unlock') return false;
+    const owned = await ownedUnlock({ quiet: true });
+    if (!owned) return false;
+    await send(api, owned, 'unlock');
+    return true;
+  } catch {
+    return false; // see above
+  }
 }
 
 /** On a test-store server: refunds the last test purchase, to see what a refund does. */

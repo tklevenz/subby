@@ -17,7 +17,7 @@ import { Button, Card, Row, TextField, ErrorText, WarningText, Lead, SectionLabe
 import { useServerChoice } from '../../components/ServerChoice';
 import { SubSpinner, SyncPing } from '../../components/brand/loaders';
 import { accessLabel, AccessCard, AccessDevTools, GiftSlot, PhotoStorage } from '../../components/SyncAccess';
-import { PRICE, useAccessStore } from '../../features/sync/access';
+import { useAccessStore, useStorePrice } from '../../features/sync/access';
 import { serverLabel } from '../../features/sync/api';
 import { ScreenScroll } from '../../components/ScreenScroll';
 import { clockOffText } from '../../components/SyncStopped';
@@ -36,12 +36,13 @@ function SetUp() {
   const child = useActiveChild();
   const { server, ready, custom, field, toggle } = useServerChoice();
   const { run, busy, error } = useAsyncAction();
+  const price = useStorePrice('unlock');
 
   const start = () =>
     run(async () => {
       await setUpSync(server, defaultDeviceName());
-      // The family now lives on one phone only: offer the recovery key right away (it can be skipped).
-      router.push({ pathname: '/sync/recovery', params: { after: 'setup' } });
+      // Sharing is why sync is set up: the other phone first, then the recovery key (both can be skipped).
+      router.push({ pathname: '/sync/add', params: { after: 'setup' } });
     });
 
   return (
@@ -60,7 +61,7 @@ function SetUp() {
       <Button label={t(busy ? 'syncScreen.settingUp' : 'syncScreen.setUp')} onPress={start} disabled={busy || !ready} />
       <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
         {t('syncScreen.firstPhone')}
-        {custom ? t('syncScreen.ownFree') : t('syncScreen.trial', { price: PRICE })}
+        {custom ? t('syncScreen.ownFree') : t('syncScreen.trial', { price })}
       </Text>
       {toggle}
     </>

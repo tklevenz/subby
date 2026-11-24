@@ -45,9 +45,11 @@ export function checkClaimMac(secret: Uint8Array, claimant: { deviceId: string; 
 /** `subby:` + base64url(JSON): URL-safe, so the same text works in a QR code or pasted by hand. */
 export const encodeInviteQr = (qr: InviteQr) => `subby:${toBase64(jsonToBytes(qr))}`;
 
+/** The code from a QR code, or from pasted text: the code alone, or a whole shared message with the code in it. */
 export function decodeInviteQr(input: string): InviteQr {
-  const text = input.trim();
-  if (!text.startsWith('subby:')) throw new Error(t('invite.error.notCode'));
+  const at = input.indexOf('subby:');
+  if (at < 0) throw new Error(t('invite.error.notCode'));
+  const text = input.slice(at).split(/\s/)[0];
   let qr: InviteQr;
   try {
     qr = bytesToJson<InviteQr>(fromBase64(text.slice('subby:'.length)));
