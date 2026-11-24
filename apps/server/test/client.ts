@@ -54,6 +54,8 @@ export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The JSON answer, when there was one. */
+    readonly body?: unknown,
   ) {
     super(`${status}: ${message}`);
   }
@@ -92,7 +94,7 @@ export class TestClient {
       body: body ? JSON.stringify(body) : undefined,
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new HttpError(res.status, (json as { message?: string }).message ?? res.statusText);
+    if (!res.ok) throw new HttpError(res.status, (json as { message?: string }).message ?? res.statusText, json);
     return json as T;
   }
 

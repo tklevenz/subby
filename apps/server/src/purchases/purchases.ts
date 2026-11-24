@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { PurchaseSchema, productKind, type EntitlementResponse } from '@subby/shared/sync';
+import { PurchaseSchema, productKind, type EntitlementResponse, type UnlockInUseResponse } from '@subby/shared/sync';
 import { CONFIG, type Config } from '../config';
 import { DB, schema, type Db } from '../db/db';
 import { familyTransaction } from '../db/lock';
@@ -52,7 +52,9 @@ export class PurchasesService {
 
   /**
    * Records a purchase made (or restored) on this phone, after the store confirms it.
-   * - An unlock follows the phone that sends it: a restore on a new phone moves it there (one phone at a time).
+   * - An unlock follows the phone that sends it: a restore on a new phone moves it there (one phone at a time). If
+   *   another active phone uses it, it moves only with `move` (409 `UnlockInUseResponse` otherwise), so a partner
+   *   sharing the store account can't take it from the other phone without being asked.
    * - A slot belongs to the buyer's family, for good. Sending it again is fine; from another family it's refused.
    */
   async record(auth: AuthContext, purchase: z.infer<typeof PurchaseSchema>): Promise<EntitlementResponse> {
@@ -78,7 +80,7 @@ export class PurchasesService {
       throw new ForbiddenException('This purchase was made on another phone');
     }
 
-    const movedFrom = await familyTransaction(this.db, auth.familyId, async (tx) => {
+    const outcome = await familyTransaction(this.db, auth.familyId, async (tx): Promise<{ movedFrom?: string; inUse?: string | null } | null> => {
       const [existing] = await tx.select().from(schema.purchases).where(eq(schema.purchases.id, verified.id));
       if (existing?.revoked) throw new ForbiddenException('This purchase was refunded');
       if (existing && existing.kind !== kind) throw new BadRequestException('This purchase is for another product');
@@ -97,14 +99,27 @@ export class PurchasesService {
         return null;
       }
       if (existing.deviceId === auth.deviceId) return null;
+      if (!purchase.move) {
+        const [holder] = await tx
+          .select({ familyId: schema.devices.familyId })
+          .from(schema.devices)
+          .where(and(eq(schema.devices.id, existing.deviceId), eq(schema.devices.active, true)));
+        // Another family's phone stays unnamed: only a phone in this family is told which one.
+        if (holder) return { inUse: holder.familyId === auth.familyId ? existing.deviceId : null };
+      }
       await tx.update(schema.purchases).set({ deviceId: auth.deviceId }).where(eq(schema.purchases.id, verified.id));
-      return existing.deviceId;
+      return { movedFrom: existing.deviceId };
     });
 
-    // Stored first, so a failure here only means the store is told again next time.
+    // Stored first, so a failure here only means the store is told again next time. Finished even when the unlock
+    // stays where it is: it's a real, recorded purchase, and Google refunds one left unacknowledged.
     await store.finish(purchase.product, purchase.token, kind).catch((e: unknown) => logError('Couldn’t finish a purchase with the store', e));
+    if (outcome?.inUse !== undefined) {
+      const body: UnlockInUseResponse = { statusCode: 409, message: 'This unlock is in use on another phone', unlockInUse: true, deviceId: outcome.inUse };
+      throw new ConflictException(body);
+    }
     this.live.publish(auth.familyId, { type: 'entitlement' });
-    if (movedFrom) await this.notifyDevices([movedFrom]);
+    if (outcome?.movedFrom) await this.notifyDevices([outcome.movedFrom]);
     return this.entitlements.forDevice(auth.familyId, auth.deviceId);
   }
 

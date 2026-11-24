@@ -1,18 +1,18 @@
 import { formatNumber, t } from '@subby/shared/i18n';
-import { DAY_MS, MINUTE_MS } from '@subby/shared';
+import { DAY_MS, MINUTE_MS, addDays, startOfDay } from '@subby/shared';
 import { errorMessage } from '../features/errorMessage';
 import { useAsyncAction } from '../features/useAsyncAction';
 import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import type { SyncAccess } from '@subby/shared/sync';
+import { GRACE_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
 import { Button, Card, Row, Segmented, SectionLabel, Hint } from './ui';
-import { buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools, usePrice, useStoreUnavailable } from '../features/sync/access';
+import { UnlockInUse, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools, usePrice, useStoreUnavailable } from '../features/sync/access';
 import { PurchaseCancelled, PurchasePending } from '../features/sync/store';
 import { syncNow } from '../features/sync/engine';
 import { sessionFor, useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { useFormatTime, useNow } from '../store/timeHelpers';
+import { useFormatTime, useNow, weekdayDate } from '../store/timeHelpers';
 
 
 /** A phone's access in the phone list (hosted only). */
@@ -21,7 +21,8 @@ export const accessLabel = (access: SyncAccess): string | undefined => (access =
 /** Runs a purchase-like call, then syncs, so what waited goes up right away. */
 function useStoreAction() {
   const { run: runAction, busy } = useAsyncAction();
-  const run = (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => {
+  const giftPrice = usePrice('slot');
+  const run = (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>): Promise<unknown> => {
     const settings = useSettingsStore.getState().sync;
     if (!settings) return Promise.resolve(false);
     return runAction(
@@ -31,12 +32,89 @@ function useStoreAction() {
       },
       (e) => {
         if (e instanceof PurchaseCancelled) return;
-        if (e instanceof PurchasePending) Alert.alert(e.message);
+        if (e instanceof UnlockInUse) askToMove(e, giftPrice, run);
+        else if (e instanceof PurchasePending) Alert.alert(e.message);
         else Alert.alert(t('access.failed'), errorMessage(e));
       },
     );
   };
   return { busy, run };
+}
+
+/**
+ * The store account's unlock is used by another phone (a partner on the same Apple ID or Google account, or this
+ * phone before a reinstall): move it only when asked, and offer a gift for this phone instead when it would get it.
+ */
+function askToMove(e: UnlockInUse, giftPrice: string, run: (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => Promise<unknown>) {
+  const name = e.deviceId ? useSettingsStore.getState().sync?.names?.[e.deviceId] : undefined;
+  const gift = canBuy('slot') && nextGiftIsMine();
+  const text = (name ? t('access.inUseNamed', { name }) : t('access.inUseOther')) + (gift ? t('access.inUseGift') : '');
+  Alert.alert(t('access.inUseTitle'), text, [
+    { text: t('common.cancel'), style: 'cancel' },
+    ...(gift ? [{ text: t('access.inUseGiftButton', { price: giftPrice }), onPress: () => void run((api) => buy(api, 'slot')) }] : []),
+    { text: t('access.inUseMove'), style: 'destructive' as const, onPress: () => void run((api) => restore(api, { move: true })) },
+  ]);
+}
+
+/**
+ * This phone joined after the family's trial had ended: it never had a trial, so it isn't told its trial is over.
+ * Its grace counts from joining then (`graceEndsAt` = joined + 48 h, later than the trial's end + 48 h).
+ */
+const joinedAfterTrial = (e: EntitlementResponse | null) =>
+  e?.trialEndsAt != null && e.graceEndsAt != null && e.graceEndsAt - GRACE_MS > e.trialEndsAt;
+
+const hasUnlock = (access: SyncAccess) => access === 'unlock' || access === 'slot';
+
+/** Add a phone, under the QR code (hosted, after the trial): whether the new phone is covered, or what it'll need. */
+export function AddPhoneNote() {
+  const entitlement = useAccessStore((s) => s.entitlement);
+  const now = useNow(MINUTE_MS);
+  if (!entitlement?.trialEndsAt || now < entitlement.trialEndsAt) return null;
+  return <Hint className="text-center">{t(entitlement.freeSlots ? 'add.getsGift' : 'add.afterTrial')}</Hint>;
+}
+
+/**
+ * Add a phone, once added (hosted, after the trial): gift it its unlock now. Only when the gift would reach it:
+ * slots go to the phones without one in the order they joined, so not while an earlier phone (this one too) has none.
+ * Gone once it's covered (a free slot waiting for it, or its slot shows in the entitlement).
+ */
+export function GiftNewPhone({ deviceId }: { deviceId: string }) {
+  const entitlement = useAccessStore((s) => s.entitlement);
+  const { busy, run } = useStoreAction();
+  const price = usePrice('slot');
+  const now = useNow(MINUTE_MS);
+  if (!entitlement?.trialEndsAt || now < entitlement.trialEndsAt || entitlement.freeSlots) return null;
+  const others = entitlement.devices.filter((d) => d.id !== deviceId);
+  const added = entitlement.devices.find((d) => d.id === deviceId);
+  if (others.some((d) => !hasUnlock(d.access)) || (added && hasUnlock(added.access))) return null;
+  return (
+    <>
+      <Hint className="mt-6 leading-4">{t('add.giftText')}</Hint>
+      <Button label={t('access.giftButton', { price })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy('slot')} />
+    </>
+  );
+}
+
+/** Whether a new gift would unlock this phone: slots go to the phones without one in the order they joined. */
+function nextGiftIsMine() {
+  const me = useSettingsStore.getState().sync?.deviceId;
+  const next = useAccessStore.getState().entitlement?.devices.find((d) => !hasUnlock(d.access));
+  return next !== undefined && next.id === me;
+}
+
+/**
+ * "today at 10:34", "tomorrow at 10:34", else "Thu, Nov 26 at 10:34": grace lasts 48 h, so it often ends the day
+ * after tomorrow.
+ */
+function useFormatUntil() {
+  const formatTime = useFormatTime();
+  return (at: number, now = Date.now()) => {
+    const time = formatTime(at);
+    const day = startOfDay(at);
+    if (day === startOfDay(now)) return t('access.untilToday', { time });
+    if (day === addDays(startOfDay(now), 1)) return t('access.untilTomorrow', { time });
+    return t('access.untilDate', { date: weekdayDate(at, now), time });
+  };
 }
 
 /** The Sync screen's card: this phone's trial, grace, unlock or gift, and what to do about it. Nothing on a self-hosted server. */
@@ -74,7 +152,7 @@ export function AccessCard() {
   const access = useAccess();
   const entitlement = useAccessStore((s) => s.entitlement);
   const pending = useSyncStore((s) => s.pending);
-  const formatTime = useFormatTime();
+  const formatUntil = useFormatUntil();
   const now = useNow(MINUTE_MS);
   const { busy, run } = useStoreAction();
   const price = usePrice('unlock');
@@ -84,19 +162,17 @@ export function AccessCard() {
 
   // A few minutes' slack: `now` ticks once a minute and clocks differ, so a fresh 14-day trial doesn't read 15.
   const daysLeft = entitlement?.trialEndsAt ? Math.max(1, Math.ceil((entitlement.trialEndsAt - now - 5 * MINUTE_MS) / DAY_MS)) : null;
-  const graceEnd = entitlement?.graceEndsAt ?? now;
-  const until = t(new Date(graceEnd).toDateString() === new Date(now).toDateString() ? 'access.untilToday' : 'access.untilTomorrow', { time: formatTime(graceEnd) });
+  const until = formatUntil(entitlement?.graceEndsAt ?? now, now);
+  const late = joinedAfterTrial(entitlement);
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {
     trial: {
       title: daysLeft ? t('access.trialLeft', { count: daysLeft }) : t('access.trialTitle'),
       body: t('access.trialBody', { price }),
       tone: 'calm',
     },
-    grace: {
-      title: t('access.graceTitle', { until }),
-      body: t('access.graceBody'),
-      tone: 'warn',
-    },
+    grace: late
+      ? { title: t('access.graceLateTitle', { until }), body: t('access.graceLateBody'), tone: 'warn' }
+      : { title: t('access.graceTitle', { until }), body: t('access.graceBody'), tone: 'warn' },
     readOnly: {
       title: t('access.readOnlyTitle'),
       body: pending ? t('access.readOnlyBodyWaiting', { count: pending }) : t('access.readOnlyBody'),
@@ -115,7 +191,7 @@ export function AccessCard() {
       {needsUnlock ? (
         <>
           <Button label={t('access.unlockButton', { price })} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy('unlock')} />
-          <Pressable onPress={() => run(restore)} disabled={busy || !canBuy('unlock')} className="items-center mt-3" hitSlop={8}>
+          <Pressable onPress={() => run((api) => restore(api))} disabled={busy || !canBuy('unlock')} className="items-center mt-3" hitSlop={8}>
             <Text className={`text-violet-soft text-sm ${canBuy('unlock') ? '' : 'opacity-40'}`}>{t('access.restore')}</Text>
           </Pressable>
           {testStore || unavailable ? (
@@ -134,7 +210,7 @@ export function GiftSlot() {
   const { busy, run } = useStoreAction();
   const price = usePrice('slot');
   if (!access || access === 'free' || !entitlement) return null;
-  const waiting = entitlement.devices.filter((d) => d.access !== 'unlock' && d.access !== 'slot').length;
+  const waiting = entitlement.devices.filter((d) => !hasUnlock(d.access)).length;
   const free = entitlement.freeSlots;
   return (
     <>
@@ -154,12 +230,13 @@ export function GiftSlot() {
 export function AccessBanner() {
   const access = useAccess();
   const entitlement = useAccessStore((s) => s.entitlement);
-  const formatTime = useFormatTime();
+  const formatUntil = useFormatUntil();
+  useNow(MINUTE_MS); // "tomorrow" becomes "today" at midnight
   if (access !== 'readOnly' && access !== 'grace') return null;
   const text =
     access === 'readOnly'
       ? t('access.bannerReadOnly')
-      : t('access.bannerGrace', { time: formatTime(entitlement?.graceEndsAt ?? Date.now()) });
+      : t(joinedAfterTrial(entitlement) ? 'access.bannerGraceLate' : 'access.bannerGrace', { until: formatUntil(entitlement?.graceEndsAt ?? Date.now()) });
   return (
     <Pressable onPress={() => router.push('/sync')} className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
       <Text className="text-ink text-sm leading-5">{text}</Text>

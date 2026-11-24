@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RECOVERY_SIGNER, fromBase64, newRecoveryWords, recoveryIdentity, toBase64 } from '@subby/shared/crypto';
 import { WebSocket as WsClient } from 'ws';
 import { OPEN_BODY_LIMIT } from '../src/common/bodyGate';
-import { MAX_CLOCK_AHEAD_MS, openRecord, type EntitlementResponse, type PullResponse } from '@subby/shared/sync';
+import { MAX_CLOCK_AHEAD_MS, openRecord, type EntitlementResponse, type PullResponse, type UnlockInUseResponse } from '@subby/shared/sync';
 import { createApp } from '../src/app';
 import { BlobsService } from '../src/blobs/blobs';
 import { PushService } from '../src/push/push';
@@ -1211,7 +1211,18 @@ describe.skipIf(!reachable)('sync server', () => {
     });
 
     const entitlement = (c: TestClient) => c.request<EntitlementResponse>('GET', '/v1/entitlement');
-    const buy = (c: TestClient, store: 'google' | 'apple' | 'test', product: string, token: string) => c.request<EntitlementResponse>('POST', '/v1/purchases', { store, product, token });
+    const buy = (c: TestClient, store: 'google' | 'apple' | 'test', product: string, token: string, move?: boolean) =>
+      c.request<EntitlementResponse>('POST', '/v1/purchases', { store, product, token, move });
+    /** The 409 a phone gets for an unlock another active phone uses. */
+    const inUse = async (promise: Promise<unknown>) => {
+      const error = await promise.then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(409);
+      return (error as HttpError).body as UnlockInUseResponse;
+    };
     const googlePurchase = (c: TestClient, product: string, state = 0) => {
       const token = `token-${randomUUID()}`;
       playPurchases.set(token, { product, purchaseState: state, obfuscatedExternalAccountId: c.deviceId, consumptionState: 0, acknowledgementState: 0 });
@@ -1310,11 +1321,31 @@ describe.skipIf(!reachable)('sync server', () => {
       // Sending it again changes nothing.
       expect((await buy(a, 'google', 'sync_unlock', token)).access).toBe('unlock');
 
-      // The same store account on a new phone, in another family: the unlock moves there.
+      // The same store account on a phone in another family: asked first (that phone stays unnamed), then moved.
       const other = await pairedFamily(base);
       await ageFamily(other.a, 30);
-      expect((await buy(other.a, 'google', 'sync_unlock', token)).access).toBe('unlock');
+      expect(await inUse(buy(other.a, 'google', 'sync_unlock', token))).toMatchObject({ unlockInUse: true, deviceId: null });
+      expect((await entitlement(a)).access).toBe('unlock');
+      expect((await buy(other.a, 'google', 'sync_unlock', token, true)).access).toBe('unlock');
       expect((await entitlement(a)).access).toBe('readOnly');
+    });
+
+    it('an unlock in use on a partner’s phone moves only when asked; from a removed phone it just moves', async () => {
+      // Two partners sharing one store account: the second one's "restore" must not lock the first one out.
+      const { a, b } = await pairedFamily(base);
+      await ageFamily(a, 30);
+      const token = googlePurchase(a, 'sync_unlock');
+      await buy(a, 'google', 'sync_unlock', token);
+      expect(await inUse(buy(b, 'google', 'sync_unlock', token))).toMatchObject({ unlockInUse: true, deviceId: a.deviceId });
+      expect((await entitlement(a)).access).toBe('unlock');
+      expect((await entitlement(b)).access).toBe('readOnly');
+
+      expect((await buy(b, 'google', 'sync_unlock', token, true)).access).toBe('unlock');
+      expect((await entitlement(a)).access).toBe('readOnly');
+
+      // b is removed (a lost phone): its unlock moves back without asking.
+      await a.removeDevice(b.deviceId);
+      expect((await buy(a, 'google', 'sync_unlock', token)).access).toBe('unlock');
     });
 
     it('gifted slots go to the phones without an unlock, in the order they joined', async () => {

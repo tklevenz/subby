@@ -16,6 +16,8 @@ export class SyncHttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The server's JSON answer, for errors that carry more than a message (`UnlockInUseResponse`). */
+    readonly body?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -63,7 +65,7 @@ export async function call<T>(server: string, method: string, path: string, body
     throw new SyncHttpError(0, t('sync.error.unreachable', { server }));
   }
   const json = (await res.json().catch(() => ({}))) as { message?: string };
-  if (!res.ok) throw new SyncHttpError(res.status, json.message ?? t('sync.error.server', { status: String(res.status) }));
+  if (!res.ok) throw new SyncHttpError(res.status, json.message ?? t('sync.error.server', { status: String(res.status) }), json);
   return json as T;
 }
 

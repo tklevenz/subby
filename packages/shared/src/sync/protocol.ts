@@ -269,7 +269,16 @@ export const PurchaseSchema = z.object({
   store: z.enum(['google', 'apple', 'test']),
   product: z.enum([PRODUCTS.unlock, PRODUCTS.slot]),
   token: z.string().min(1).max(16_384),
+  /** An unlock another active phone uses: take it from that phone anyway (asked first, see `UnlockInUseResponse`). */
+  move: z.boolean().optional(),
 });
+
+/**
+ * 409 from POST /v1/purchases: this store account's unlock is used by another active phone (a partner sharing the
+ * Apple ID or Google account, or this phone's own entry from before a reinstall). Nothing moved; sending it again
+ * with `move: true` moves it. `deviceId`: that phone, when it's in the same family (else null).
+ */
+export type UnlockInUseResponse = { statusCode: 409; message: string; unlockInUse: true; deviceId: string | null };
 
 /**
  * Why a phone may sync: `free` (a self-hosted server), `trial`, its own `unlock`, a family `slot`, or `grace`.

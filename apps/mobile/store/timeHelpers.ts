@@ -16,7 +16,7 @@ export function useNow(intervalMs = 1000) {
 }
 
 /** "Sat, Oct 24", with the year only when it isn't this one. */
-function weekdayDate(epochMs: number, now: number): string {
+export function weekdayDate(epochMs: number, now: number): string {
   const sameYear = new Date(epochMs).getFullYear() === new Date(now).getFullYear();
   return formatDate(epochMs, { weekday: 'short', day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' });
 }

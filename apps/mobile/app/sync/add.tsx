@@ -12,6 +12,7 @@ import { useNow } from '../../store/timeHelpers';
 import { PeriscopeLoader } from '../../components/brand/loaders';
 import { usePoll } from '../../features/usePoll';
 import { ScreenScroll } from '../../components/ScreenScroll';
+import { AddPhoneNote, GiftNewPhone } from '../../components/SyncAccess';
 
 type Claimant = NonNullable<InviteResponse['claimant']>;
 type Step =
@@ -19,7 +20,7 @@ type Step =
   | { kind: 'showing'; invite: Invite }
   | { kind: 'confirm'; invite: Invite; claimant: Claimant; code: string }
   | { kind: 'approving' }
-  | { kind: 'done' }
+  | { kind: 'done'; deviceId: string }
   /** `retry`: the approval failed partway; trying again finishes it for the same phone (a new code would orphan it). */
   | { kind: 'error'; message: string; retry?: Claimant };
 
@@ -61,7 +62,7 @@ export default function AddPhoneScreen() {
     setStep({ kind: 'approving' });
     try {
       await approveClaim(claimant);
-      setStep({ kind: 'done' });
+      setStep({ kind: 'done', deviceId: claimant.deviceId });
     } catch (e) {
       setStep({ kind: 'error', message: errorMessage(e), retry: claimant });
     }
@@ -92,6 +93,7 @@ export default function AddPhoneScreen() {
             </Text>
           </View>
           {now >= step.invite.expiresAt ? <Button label={t('add.newCode')} onPress={start} /> : null}
+          <AddPhoneNote />
           <Button label={t('add.send')} variant="ghost" onPress={() => Share.share({ message: step.invite.code })} />
           <Text className="text-ink-faint text-xs text-center mt-2">{t('add.sendNote')}</Text>
         </>
@@ -116,6 +118,7 @@ export default function AddPhoneScreen() {
           <ScreenTitle className="mt-4">{t('add.added')}</ScreenTitle>
           <Lead className="mt-2">{t('add.addedText')}</Lead>
           <Button label={t('common.done')} onPress={() => router.back()} />
+          <GiftNewPhone deviceId={step.deviceId} />
         </>
       ) : null}
 

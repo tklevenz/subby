@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import { create } from 'zustand';
 import * as Crypto from 'expo-crypto';
 import { AppState } from 'react-native';
-import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess } from '@subby/shared/sync';
+import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess, type UnlockInUseResponse } from '@subby/shared/sync';
 import type { Purchase } from 'expo-iap';
 import { isHttpError, checkServer, isOfficialServer, type SyncSession } from './api';
 import { AlreadyOwned, PurchasePending, finish, ownedUnlock, purchase, storeName, storePrices, unsentPurchases } from './store';
@@ -109,24 +109,30 @@ export const useStoreUnavailable = () => useAccessStore((s) => !s.testPurchases 
  * Hands a paid purchase to the server, which checks it with the store, then finishes it (StoreKit). A server that
  * can't be reached leaves it unsent: Android sends it again on the next sync run.
  */
-function send(api: SyncSession, p: Purchase, kind: ProductKind): Promise<EntitlementResponse> {
+function send(api: SyncSession, p: Purchase, kind: ProductKind, move = false): Promise<EntitlementResponse> {
   // Closing the store's sheet brings the app back to the foreground, which starts a sync run that finds the same
   // purchase still unfinished: one request per purchase, or Google answers the second's acknowledge/consume with 409.
   const key = p.purchaseToken!;
   let pending = sending.get(key);
   if (!pending) {
-    pending = sendOnce(api, p, kind).finally(() => sending.delete(key));
+    pending = sendOnce(api, p, kind, move).finally(() => sending.delete(key));
     sending.set(key, pending);
   }
   return pending;
 }
 const sending = new Map<string, Promise<EntitlementResponse>>();
 
-async function sendOnce(api: SyncSession, p: Purchase, kind: ProductKind) {
+async function sendOnce(api: SyncSession, p: Purchase, kind: ProductKind, move: boolean) {
   let entitlement: EntitlementResponse;
   try {
-    entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: storeName(), product: PRODUCTS[kind], token: p.purchaseToken! });
+    entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: storeName(), product: PRODUCTS[kind], token: p.purchaseToken!, ...(move ? { move } : {}) });
   } catch (e) {
+    const taken = inUse(e);
+    if (taken) {
+      // The server has the purchase, so StoreKit may let it go, or it's sent again every run.
+      await finish(p, kind).catch(() => {});
+      throw taken;
+    }
     if (isHttpError(e, 409) && /isn.t through/.test(e.message)) throw new PurchasePending(); // i18n-ignore
     if (!isHttpError(e) || e.status === 0 || e.status >= 500) throw new Error(t('access.sendLater'));
     throw e;
@@ -134,6 +140,24 @@ async function sendOnce(api: SyncSession, p: Purchase, kind: ProductKind) {
   await finish(p, kind);
   useAccessStore.setState({ entitlement });
   return entitlement;
+}
+
+/**
+ * This store account's unlock is used by another active phone: a partner sharing the Apple ID or Google account, or
+ * this phone's own entry from before a reinstall. Nothing moved; `restore(api, { move: true })` takes it.
+ * `deviceId`: that phone, if it's in this family.
+ */
+export class UnlockInUse extends Error {
+  constructor(readonly deviceId: string | null) {
+    super('This unlock is in use on another phone'); // i18n-ignore
+  }
+}
+
+/** `UnlockInUse` for the server's answer that says so, else null. */
+function inUse(e: unknown): UnlockInUse | null {
+  if (!isHttpError(e, 409) || !e.body?.unlockInUse) return null;
+  const body = e.body as Partial<UnlockInUseResponse>;
+  return new UnlockInUse(typeof body.deviceId === 'string' ? body.deviceId : null);
 }
 
 /**
@@ -157,17 +181,25 @@ export async function buy(api: SyncSession, kind: ProductKind) {
   return entitlement;
 }
 
-/** Sends this store account's unlock again, so it moves to this phone (a new phone, or after re-joining). */
-export async function restore(api: SyncSession) {
+/**
+ * Sends this store account's unlock again, so it moves to this phone (a new phone, or after re-joining). If another
+ * active phone uses it, `UnlockInUse` unless `move` (asked first).
+ */
+export async function restore(api: SyncSession, { move = false } = {}) {
   if (!canBuyOn(api)) throw new Error(t('access.storeUnavailable'));
   if (!useAccessStore.getState().testPurchases) {
     const owned = await ownedUnlock();
     if (!owned) throw new Error(t('sync.error.noUnlock'));
-    return send(api, owned, 'unlock');
+    return send(api, owned, 'unlock', move);
   }
   const unlock = useAccessStore.getState().testTokens.findLast((t) => t.kind === 'unlock');
   if (!unlock) throw new Error(t('sync.error.noUnlock'));
-  const entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: 'test', product: PRODUCTS.unlock, token: unlock.token });
+  let entitlement: EntitlementResponse;
+  try {
+    entitlement = await api.request<EntitlementResponse>('POST', '/v1/purchases', { store: 'test', product: PRODUCTS.unlock, token: unlock.token, ...(move ? { move } : {}) });
+  } catch (e) {
+    throw inUse(e) ?? e;
+  }
   useAccessStore.setState({ entitlement });
   return entitlement;
 }
