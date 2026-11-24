@@ -21,8 +21,10 @@ description: Build and install Subby's native Android/iOS apps locally (no EAS) 
 ## iOS on a device
 Team `L33LRKM2NX`, automatic signing.
 - `npx expo run:ios --device` can't register a new device or create its profile. For a new device, build once with:
-  `cd ios && xcodebuild -workspace Subby.xcworkspace -scheme Subby -configuration Debug -destination 'id=<udid>' -allowProvisioningUpdates -allowProvisioningDeviceRegistration -derivedDataPath build build`
-  then `xcrun devicectl device install app --device <udid> build/Build/Products/Debug-iphoneos/Subby.app`.
+  `cd ios && xcodebuild -workspace Subby.xcworkspace -scheme Subby -configuration Debug -destination 'id=<udid>' -allowProvisioningUpdates -allowProvisioningDeviceRegistration -derivedDataPath ~/Library/Developer/Xcode/DerivedData/Subby-device build`
+  then `xcrun devicectl device install app --device <udid> ~/Library/Developer/Xcode/DerivedData/Subby-device/Build/Products/Debug-iphoneos/Subby.app`.
+- Keep Xcode's output out of `ios/build`: Expo's codegen lives in `ios/build/generated`. A `-derivedDataPath build` once broke a rebuild until `pod install`, and its Swift package checkouts (with their own JS tests) broke typecheck and tests.
+- Release builds print a harmless "command failed with exit code 0" line.
 - The device needs Developer Mode, and no Apple ID. "Unable to verify app" after an iPadOS update went away with an uninstall and reinstall.
 - iOS keeps Keychain items (SecureStore) across an uninstall: turn sync off before deleting the app, or the reinstall comes back with the old sync identity.
 

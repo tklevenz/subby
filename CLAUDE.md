@@ -4,7 +4,7 @@ Subby (store title "Subby: Private Baby Tracker", repo `github.com/tklevenz/subb
 
 Roadmap: `PROJECT.md` §5. **Next:** the launch plan in `LAUNCH.md` (no public beta; we dogfood on the production server).
 
-Area details load automatically from `.claude/rules/` when you touch those files: `shared-domain.md`, `i18n.md`, `mobile-data.md`, `mobile-ui.md`, `sync.md`, `server.md`. Procedures are skills: `native-build`, `server-ops`, `release` (store builds and uploads).
+Area details load automatically from `.claude/rules/` when you touch those files: `shared-domain.md`, `i18n.md`, `mobile-data.md`, `mobile-ui.md`, `sync.md`, `server.md`. Procedures are skills: `native-build`, `server-ops`, `release` (store builds and uploads), `handover` (ending and picking up a session).
 
 ## Frozen identifiers (changing them breaks existing data)
 - The `subby/…` crypto labels (signatures, the device log, sealed keys, records, and the recovery words' identity, pinned by its test vector).

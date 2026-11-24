@@ -42,9 +42,9 @@ The user uploads it: Play Console → Testing (internal/closed) or Production �
 ```
 cd apps/mobile && npx expo prebuild --clean --platform ios
 cd ios && xcodebuild -workspace Subby.xcworkspace -scheme Subby -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath build/Subby.xcarchive -allowProvisioningUpdates archive
+  -destination 'generic/platform=iOS' -archivePath ~/Library/Developer/Xcode/Archives/Subby-<buildNumber>.xcarchive -allowProvisioningUpdates archive
 ```
-- Upload: the user opens `build/Subby.xcarchive` in Xcode (Window → Organizer → Distribute App → App Store Connect). Or `xcodebuild -exportArchive` with an ExportOptions.plist (`method` app-store-connect, `destination` upload, `teamID` L33LRKM2NX, automatic signing); that needs the Apple account signed in to Xcode.
+- Upload: the user opens the archive in Xcode (Window → Organizer → Distribute App → App Store Connect). Or `xcodebuild -exportArchive` with an ExportOptions.plist (`method` app-store-connect, `destination` upload, `teamID` L33LRKM2NX, automatic signing); that needs the Apple account signed in to Xcode.
 - **Export compliance, open:** `app.json` doesn't set `ios.infoPlist.ITSAppUsesNonExemptEncryption`, so App Store Connect asks on every build. Subby encrypts user data itself (E2EE), so the plain "HTTPS only" exemption may not fit. That's the user's legal call: ask, don't answer it, then set the key in `app.json` so it stops asking.
 - Push needs nothing: `apps/server/src/push/apns.ts` tries production APNs, then the sandbox.
 - Purchases: TestFlight builds buy in the sandbox, so production must keep `APPLE_ALLOW_SANDBOX=1` while TestFlight is in use (R0).
