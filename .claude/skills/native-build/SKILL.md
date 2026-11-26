@@ -19,6 +19,7 @@ description: Build and install Subby's native Android/iOS apps locally (no EAS) 
   `SUBBY_ALLOW_HTTP=1 npx expo prebuild --clean --platform android && (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)`
 - **Signing:** release APKs are signed with the debug key unless `SUBBY_SIGNING=/path/to/upload.properties` is set during prebuild (`plugins/withReleaseSigning.js`: Gradle reads `storeFile`, `storePassword`, `keyAlias`, `keyPassword` from that file at build time; keystore and file live outside the repo). Debug-signed release APKs install over the dev build and keep the data; upload-signed ones don't.
 - **Store builds** (upload key, version bump, artifact checks): the `release` skill.
+- **Before installing on the family's Pixels**, check the installed app's signer matches the APK's (debug key SHA-256 `fac61745…033b9c`). `dumpsys package` sometimes prints only a short hash, so pull it: `adb -s <serial> pull $(adb -s <serial> shell pm path baby.subby.app | grep base.apk | cut -d: -f2) /tmp/x.apk` and `apksigner verify --print-certs` both. A different signer means uninstalling, which loses the data: stop.
 
 ## iOS on a device
 Team `L33LRKM2NX`, automatic signing.
