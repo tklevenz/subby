@@ -32,7 +32,13 @@ export function Periscope() {
 export function Sub({ width, periscope = true }: { width: number; periscope?: boolean }) {
   const { x, y, w, h } = SUB_VIEWBOX;
   return (
-    <Svg width={width} height={(width * h) / w} viewBox={`${x} ${y} ${w} ${h}`}>
+    <Svg
+      width={width}
+      height={(width * h) / w}
+      viewBox={`${x} ${y} ${w} ${h}`}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <SubParts periscope={periscope} />
     </Svg>
   );
@@ -41,7 +47,13 @@ export function Sub({ width, periscope = true }: { width: number; periscope?: bo
 /** The sub asleep on the sea floor, for empty states. */
 export function RestingSub({ width }: { width: number }) {
   return (
-    <Svg width={width} height={(width * 90) / 120} viewBox="0 0 120 90">
+    <Svg
+      width={width}
+      height={(width * 90) / 120}
+      viewBox="0 0 120 90"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <Path d="M0 78 Q30 72 60 78 T120 78 V90 H0 Z" fill={colors.seaFloor} />
       <Path d="M12 78 Q8 66 13 58 Q17 50 13 42" fill="none" stroke={colors.tealStrong} strokeWidth={3} strokeLinecap="round" opacity={0.6} />
       <Path d="M106 78 Q110 68 105 60" fill="none" stroke={colors.tealStrong} strokeWidth={3} strokeLinecap="round" opacity={0.5} />
@@ -61,7 +73,7 @@ export function RestingSub({ width }: { width: number }) {
 /** The app icon: the sub on its navy tile, with bubbles. */
 export function SubTile({ size }: { size: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
+    <Svg width={size} height={size} viewBox="0 0 100 100" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Rect width={100} height={100} rx={22} fill={colors.subNavy} />
       <Circle cx={76} cy={22} r={3} fill={colors.subBubble} opacity={0.55} />
       <Circle cx={83} cy={14} r={2} fill={colors.subBubble} opacity={0.45} />
@@ -75,7 +87,13 @@ export function SubTile({ size }: { size: number }) {
 export function SubMono({ width, color }: { width: number; color: string }) {
   const { x, y, w, h } = SUB_VIEWBOX;
   return (
-    <Svg width={width} height={(width * h) / w} viewBox={`${x} ${y} ${w} ${h}`}>
+    <Svg
+      width={width}
+      height={(width * h) / w}
+      viewBox={`${x} ${y} ${w} ${h}`}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <Defs>
         <Mask id="subMono" maskUnits="userSpaceOnUse" x={0} y={0} width={100} height={100}>
           <Path d="M54 40 V20 H62" fill="none" stroke="white" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />

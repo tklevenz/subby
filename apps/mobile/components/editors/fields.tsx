@@ -1,6 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUpFromBracket, Camera, Download, ImageIcon, ShareNodes, Xmark } from '../icons';
 import { canSavePhoto, photoFile, pickPhoto, savePhoto, sharePhoto } from '../../features/photos';
@@ -18,11 +19,13 @@ export function NumberField({
   onChange,
   placeholder,
   suffix,
+  accessibilityLabel,
 }: {
   value: number | undefined;
   onChange: (v: number | undefined) => void;
   placeholder?: string;
   suffix?: string;
+  accessibilityLabel?: string;
 }) {
   const [text, setText] = useState(value === undefined ? '' : String(value));
 
@@ -37,6 +40,7 @@ export function NumberField({
       <TextField
         className="flex-1"
         keyboardType="decimal-pad"
+        accessibilityLabel={accessibilityLabel}
         value={text}
         placeholder={placeholder}
         onChangeText={(text) => {
@@ -44,7 +48,7 @@ export function NumberField({
           onChange(parse(text));
         }}
       />
-      {suffix ? <Text className="text-ink-muted ml-3 w-10">{suffix}</Text> : null}
+      {suffix ? <Text className="text-ink-muted ml-3 min-w-10">{suffix}</Text> : null}
     </View>
   );
 }
@@ -57,6 +61,7 @@ export function UnitNumberField({
   fromDisplay,
   suffix,
   decimals = 1,
+  accessibilityLabel,
 }: {
   value: number | undefined;
   onChange: (v: number | undefined) => void;
@@ -64,6 +69,7 @@ export function UnitNumberField({
   fromDisplay: (display: number) => number;
   suffix: string;
   decimals?: number;
+  accessibilityLabel?: string;
 }) {
   const f = 10 ** decimals;
   return (
@@ -71,6 +77,7 @@ export function UnitNumberField({
       value={value === undefined ? undefined : Math.round(toDisplay(value) * f) / f}
       onChange={(v) => onChange(v === undefined ? undefined : fromDisplay(v))}
       suffix={suffix}
+      accessibilityLabel={accessibilityLabel}
     />
   );
 }
@@ -106,6 +113,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
             onChange(undefined);
           }}
           hitSlop={8}
+          accessibilityRole="button"
           accessibilityLabel={t('fields.removePhoto')}
           className="absolute top-2 right-2 bg-scrim/60 rounded-full p-1.5"
         >
@@ -125,6 +133,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
               onChange(removed);
               setRemoved(undefined);
             }}
+            accessibilityRole="button"
             hitSlop={8}
           >
             <Text className="text-violet-soft font-semibold">{t('common.undo')}</Text>
@@ -141,7 +150,7 @@ export function PhotoField({ value, onChange }: { value: string | undefined; onC
 
 function PickButton({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
+    <Pressable onPress={onPress} accessibilityRole="button" className="flex-row items-center px-4 py-3 rounded-xl bg-raised border border-line-strong">
       {icon}
       <Text className="text-ink-soft ml-2">{label}</Text>
     </Pressable>
@@ -151,6 +160,7 @@ function PickButton({ icon, label, onPress }: { icon: React.ReactNode; label: st
 /** The whole photo, full screen, with Share (and Save on Android); tap the photo or back to close. */
 function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
   const [saved, setSaved] = useState<string>();
   useEffect(() => setSaved(undefined), [uri]);
 
@@ -163,14 +173,15 @@ function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () =>
 
   // The buttons sit beside the photo's Pressable, not inside it: nested Pressables don't reliably get their own taps on Android.
   return (
-    <Modal transparent animationType="fade" visible={!!uri} statusBarTranslucent onRequestClose={onClose}>
+    <Modal transparent animationType={reduced ? 'none' : 'fade'} visible={!!uri} statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1 bg-scrim">
-        <Pressable onPress={onClose} accessibilityLabel={t('fields.closePhoto')} className="flex-1">
+        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('fields.closePhoto')} className="flex-1">
           {uri ? <Image source={{ uri: photoFile(uri) }} style={{ flex: 1 }} resizeMode="contain" /> : null}
         </Pressable>
         <Pressable
           onPress={onClose}
           hitSlop={8}
+          accessibilityRole="button"
           accessibilityLabel={t('fields.closePhoto')}
           style={{ top: insets.top + 12 }}
           className="absolute right-4 bg-ground/60 rounded-full p-2"
@@ -178,14 +189,14 @@ function PhotoViewer({ uri, onClose }: { uri: string | undefined; onClose: () =>
           <Xmark color={colors.ink} size={18} />
         </Pressable>
         <View style={{ bottom: insets.bottom + 20 }} className="absolute left-0 right-0 items-center">
-          {saved ? <Text className="text-ink text-sm mb-3">{t('fields.savedAs', { name: saved })}</Text> : null}
+          {saved ? <Text accessibilityLiveRegion="polite" className="text-ink text-sm mb-3">{t('fields.savedAs', { name: saved })}</Text> : null}
           <View className="flex-row gap-3">
-            <Pressable onPress={share} className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
+            <Pressable onPress={share} accessibilityRole="button" className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
               {Platform.OS === 'ios' ? <ArrowUpFromBracket color={colors.ink} size={16} /> : <ShareNodes color={colors.ink} size={16} />}
               <Text className="text-ink font-medium ml-2">{t('fields.share')}</Text>
             </Pressable>
             {canSavePhoto ? (
-              <Pressable onPress={save} className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
+              <Pressable onPress={save} accessibilityRole="button" className="flex-row items-center px-5 py-3 rounded-full bg-ground/70 border border-line-strong">
                 <Download color={colors.ink} size={16} />
                 <Text className="text-ink font-medium ml-2">{t('common.save')}</Text>
               </Pressable>

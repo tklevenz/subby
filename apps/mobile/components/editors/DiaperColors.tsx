@@ -19,10 +19,12 @@ export function DiaperColors({ value, onChange, variant }: { value?: DiaperColor
         <Pressable
           key={c}
           onPress={() => onChange(value === c ? undefined : c)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value === c }}
           style={sheet ? { width: '23%' } : undefined}
           className={
             sheet
-              ? `h-14 rounded-xl items-center justify-center bg-raised border-2 ${value === c ? 'border-violet-strong' : 'border-transparent'}`
+              ? `min-h-14 py-1.5 px-1 rounded-xl items-center justify-center bg-raised border-2 ${value === c ? 'border-violet-strong' : 'border-transparent'}`
               : `items-center rounded-xl p-1.5 border ${value === c ? 'border-violet-strong' : 'border-transparent'}`
           }
         >

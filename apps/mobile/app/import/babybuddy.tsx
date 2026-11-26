@@ -106,9 +106,9 @@ export default function BabyBuddyImport() {
             {t('bb.lead')}
           </Lead>
           <FieldLabel>{t('bb.server')}</FieldLabel>
-          <TextField value={url} onChangeText={setUrl} placeholder="https://babybuddy.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+          <TextField value={url} onChangeText={setUrl} accessibilityLabel={t('bb.server')} placeholder="https://babybuddy.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
           <FieldLabel>{t('bb.apiKey')}</FieldLabel>
-          <TextField value={token} onChangeText={setToken} placeholder={t('bb.apiKeyPlaceholder')} autoCapitalize="none" autoCorrect={false} secureTextEntry />
+          <TextField value={token} onChangeText={setToken} accessibilityLabel={t('bb.apiKey')} placeholder={t('bb.apiKeyPlaceholder')} autoCapitalize="none" autoCorrect={false} secureTextEntry />
           <Hint>{t('bb.notSaved')}</Hint>
           {url.trim().toLowerCase().startsWith('http://') ? (
             <Text className="text-amber-soft text-xs mt-2">{t('bb.http')}</Text>
@@ -178,7 +178,9 @@ export default function BabyBuddyImport() {
 
       {step.kind === 'done' ? (
         <View>
-          <Text className="text-xl font-bold text-ink">{t(step.result.cancelled ? 'bb.cancelled' : 'bb.finished')}</Text>
+          <Text accessibilityRole="header" className="text-xl font-bold text-ink">
+            {t(step.result.cancelled ? 'bb.cancelled' : 'bb.finished')}
+          </Text>
           <Card>
             <Row label={t('bb.imported')} value={formatNumber(step.result.imported)} />
             <Row label={t('bb.skipped')} value={formatNumber(step.result.skipped)} />
@@ -263,7 +265,9 @@ function Review({
 
   return (
     <View>
-      <Text className="text-ink text-lg font-semibold">{t('bb.found', { count: total })}</Text>
+      <Text accessibilityRole="header" className="text-ink text-lg font-semibold">
+        {t('bb.found', { count: total })}
+      </Text>
       <Card>
         {BB_ENDPOINTS.filter((e) => preview.counts[e] > 0).map((e) => (
           <Row key={e} label={label(e)} value={formatNumber(preview.counts[e])} />

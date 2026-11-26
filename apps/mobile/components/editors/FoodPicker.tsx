@@ -34,35 +34,58 @@ export default function FoodPicker({ value, onChange }: { value: Solids; onChang
     <View>
       <FieldLabel>{t('foods.title')}</FieldLabel>
       <View className="flex-row flex-wrap gap-2">
-        {options.map((f) => (
-          <Chip
-            key={f}
-            label={f}
-            icon={flagged.has(f.toLowerCase()) ? <TriangleExclamation color={colors.amberStrong} size={13} /> : undefined}
-            selected={has(f)}
-            onPress={() => toggle(f)}
-          />
-        ))}
+        {options.map((f) => {
+          const isFlagged = flagged.has(f.toLowerCase());
+          return (
+            <Chip
+              key={f}
+              label={f}
+              accessibilityLabel={isFlagged ? t('foods.flaggedA11y', { food: f }) : undefined}
+              icon={isFlagged ? <TriangleExclamation color={colors.amberStrong} size={13} /> : undefined}
+              selected={has(f)}
+              onPress={() => toggle(f)}
+            />
+          );
+        })}
       </View>
       <View className="flex-row items-center mt-2">
-        <TextField className="flex-1" value={draft} onChangeText={setDraft} placeholder={t('foods.new')} onSubmitEditing={add} returnKeyType="done" />
-        <Pressable onPress={add} className="ml-2 p-3 rounded-xl bg-raised" hitSlop={6}>
+        <TextField
+          className="flex-1"
+          value={draft}
+          onChangeText={setDraft}
+          accessibilityLabel={t('foods.new')}
+          placeholder={t('foods.new')}
+          onSubmitEditing={add}
+          returnKeyType="done"
+        />
+        <Pressable
+          onPress={add}
+          accessibilityRole="button"
+          accessibilityLabel={t('foods.addA11y')}
+          className="ml-2 p-3 rounded-xl bg-raised"
+          hitSlop={6}
+        >
           <Plus color={colors.inkSoft} size={18} />
         </Pressable>
       </View>
 
       <View className="flex-row items-center justify-between mt-4">
-        <View className="flex-row items-center">
+        <View className="flex-row items-center flex-1 mr-3">
           <TriangleExclamation color={colors.amberStrong} size={16} />
-          <Text className="text-ink-soft ml-2">{t('foods.allergen')}</Text>
+          <Text className="text-ink-soft ml-2 shrink">{t('foods.allergen')}</Text>
         </View>
-        <Toggle value={value.allergen ?? false} onValueChange={(allergen) => onChange({ allergen: allergen || undefined })} />
+        <Toggle
+          accessibilityLabel={t('foods.allergen')}
+          value={value.allergen ?? false}
+          onValueChange={(allergen) => onChange({ allergen: allergen || undefined })}
+        />
       </View>
 
       <FieldLabel>{t('foods.reaction')}</FieldLabel>
       <TextField
         value={value.reaction ?? ''}
         onChangeText={(reaction) => onChange({ reaction: reaction || undefined })}
+        accessibilityLabel={t('foods.reaction')}
         placeholder={t('foods.reactionPlaceholder')}
       />
     </View>

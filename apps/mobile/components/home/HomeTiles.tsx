@@ -2,7 +2,7 @@ import { t } from '@subby/shared/i18n';
 import { confirmDestructive } from '../confirmDestructive';
 import { Chevron } from '../ui';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Baby, CalendarDays, ClockRotateLeft, Moon, PoopDroplet, Xmark, type IconComponent } from '../icons';
@@ -75,24 +75,48 @@ export default function HomeTiles({ child }: { child: Child }) {
     ]);
   };
 
+  // Home only scrolls at large text sizes. Then the undo bar would cover the end of "up next", so the content makes
+  // room for it; when everything fits, the tiles keep their size (room for the bar would shrink them while it shows).
+  const [viewport, setViewport] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [barHeight, setBarHeight] = useState(0);
+  const [room, setRoom] = useState(0);
+  const scrolls = contentHeight - room > viewport + 1;
+  const wantRoom = offer && scrolls ? barHeight + 12 : 0;
+  useEffect(() => setRoom(wantRoom), [wantRoom]);
+
   const others = TILES.filter((t) => t !== top);
   return (
-    <View className="flex-1 px-4 pb-3 gap-2.5">
-      <Tile tile={top} large content={content[top]} onLongPress={() => longPress(top)} />
-      <View className="flex-1 flex-row gap-2.5">
-        {others.map((t) => (
-          <Tile key={t} tile={t} content={content[t]} onLongPress={() => longPress(t)} />
-        ))}
-      </View>
-      <UpNext logs={logs} now={now} offerUndo={offerUndo} />
+    <View className="flex-1">
+      <ScrollView
+        className="flex-1"
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
+        onLayout={(e) => setViewport(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, h) => setContentHeight(h)}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingBottom: 12 + room, gap: 10 }}
+      >
+        <Tile tile={top} large content={content[top]} onLongPress={() => longPress(top)} />
+        <View className="flex-1 flex-row gap-2.5">
+          {others.map((t) => (
+            <Tile key={t} tile={t} content={content[t]} onLongPress={() => longPress(t)} />
+          ))}
+        </View>
+        <UpNext logs={logs} now={now} offerUndo={offerUndo} />
+      </ScrollView>
       {offer ? (
-        <View className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5">
+        <View
+          accessibilityLiveRegion="polite"
+          onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+          className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5"
+        >
           {offer.sub ? (
             <View className="mr-2.5">
               <Sub width={34} />
             </View>
           ) : null}
-          <Text className="flex-1 text-ink text-sm" numberOfLines={1}>
+          <Text className="flex-1 text-ink text-sm" numberOfLines={2}>
             {offer.label}
           </Text>
           <Pressable
@@ -102,6 +126,7 @@ export default function HomeTiles({ child }: { child: Child }) {
               setOffer(null);
               offer.undo();
             }}
+            accessibilityRole="button"
             className="px-4 py-2.5 rounded-lg"
           >
             <Text className="text-violet-soft text-sm font-semibold">{t('common.undo')}</Text>
@@ -237,6 +262,10 @@ const STYLE: Record<HomeTile, { box: string; boxActive: string; label: string; i
 function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: TileContent; large?: boolean; onLongPress: () => void }) {
   const s = STYLE[tile];
   const [height, setHeight] = useState(0);
+  const { fontScale } = useWindowDimensions();
+  // Only enforce a floor at large system text sizes so small phones stay unscrollable at normal scale;
+  // scale the floor with fontScale so tiles don't clip at Android's 2× or iOS's accessibility sizes.
+  const minHeight = fontScale > 1.2 ? Math.round((large ? 172 : 144) * Math.min(fontScale, 2.5)) : undefined;
   // Discard sits in the bottom-right; a small tile has room only for a round ✕ beside the lines.
   const discard = content.onDiscard ? (
     <Pressable
@@ -255,6 +284,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
   return (
     <View
       onLayout={tile === 'sleep' ? (e) => setHeight(e.nativeEvent.layout.height) : undefined}
+      style={minHeight ? { minHeight } : undefined}
       className={`flex-1 border justify-between overflow-hidden rounded-3xl ${large ? 'p-5' : 'p-4'} ${content.active ? s.boxActive : s.box}`}
     >
       {tile === 'sleep' ? <SleepSub large={large} asleep={!!content.active} height={height} /> : null}
@@ -264,15 +294,22 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
         delayLongPress={400}
         accessibilityRole="button"
         accessibilityLabel={t('home.tileA11y', { tile: label(tile), content: [content.eyebrow, content.value, ...content.lines].filter(Boolean).join(t('list.join')) })}
-        accessibilityHint={t('home.tileHintA11y', { hint: content.hint })}
+        accessibilityHint={large ? content.hint : t('home.tileHintA11y', { hint: content.hint })}
+        accessibilityActions={large ? undefined : [{ name: 'longpress', label: t('home.makeTop') }]}
+        onAccessibilityAction={large ? undefined : (e) => e.nativeEvent.actionName === 'longpress' && onLongPress()}
         className="absolute inset-0 rounded-3xl"
       />
-      <View pointerEvents="none" className="flex-row items-center justify-between">
-        <View className="flex-row items-center">
+      <View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="flex-row items-center justify-between"
+      >
+        <View className="flex-row items-center shrink">
           <s.Icon color={s.icon()} size={20} />
           <Text className={`text-sm font-semibold ml-2 ${s.label}`}>{label(tile)}</Text>
         </View>
-        {large ? <Text className="text-ink-muted text-xs">{content.hint}</Text> : null}
+        {large ? <Text className="text-ink-muted text-xs ml-2 shrink text-right">{content.hint}</Text> : null}
       </View>
       <View pointerEvents="box-none">
         {/* The time and the lines below it open its entry (the running or last one). */}
@@ -281,6 +318,9 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
           // Nothing to open yet ("No feeds yet"): taps go through to the tile.
           pointerEvents={content.entryId ? 'auto' : 'none'}
           hitSlop={8}
+          accessible={!!content.entryId}
+          accessibilityElementsHidden={!content.entryId}
+          importantForAccessibility={content.entryId ? 'yes' : 'no-hide-descendants'}
           accessibilityRole={content.entryId ? 'link' : undefined}
           accessibilityLabel={content.entryId ? t(OPEN_A11Y[tile]) : undefined}
           className="self-start"
@@ -295,6 +335,7 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
             style={{ fontVariant: ['tabular-nums'] }}
             numberOfLines={1}
             adjustsFontSizeToFit
+            maxFontSizeMultiplier={1.4}
           >
             {content.value}
           </Text>
@@ -326,7 +367,13 @@ function SleepSub({ large, asleep, height }: { large?: boolean; asleep: boolean;
     );
   }
   return (
-    <View pointerEvents="none" className="absolute" style={[{ opacity: 0.08 }, large ? { right: -18, bottom: -14 } : { right: -8, top: 6 }]}>
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="absolute"
+      style={[{ opacity: 0.08 }, large ? { right: -18, bottom: -14 } : { right: -8, top: 6 }]}
+    >
       <SubMono width={large ? 170 : 64} color={colors.violetStrong} />
     </View>
   );
@@ -335,7 +382,7 @@ function SleepSub({ large, asleep, height }: { large?: boolean; asleep: boolean;
 /** A row under "up next" that opens a screen: icon, label, an optional note and the chevron. */
 function LinkRow({ icon, label, note, onPress, last }: { icon: React.ReactNode; label: string; note?: string; onPress: () => void; last?: boolean }) {
   return (
-    <Pressable onPress={onPress} className={`flex-row items-center px-3.5 py-3 ${last ? '' : 'border-b border-line'}`}>
+    <Pressable onPress={onPress} accessibilityRole="button" className={`flex-row items-center px-3.5 py-3 ${last ? '' : 'border-b border-line'}`}>
       {icon}
       <Text className="flex-1 text-ink text-sm ml-2.5">{label}</Text>
       {note ? <Text className="text-ink-muted text-xs mr-1">{note}</Text> : null}
@@ -402,7 +449,12 @@ function UpNext({ logs, now, offerUndo }: { logs: LogEntry[]; now: number; offer
                 ? t('home.dueTomorrow', { time: formatTime(dueAt) })
                 : t('home.dueAt', { time: formatTime(dueAt) })}
           </Text>
-          <Pressable onPress={onPress} accessibilityLabel={t('home.dueAction', { action, name: label })} className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}>
+          <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.dueAction', { action, name: label })}
+            className={`ml-3 px-3.5 py-1.5 rounded-lg border ${bg}`}
+          >
             <Text className="text-ink text-[13px] font-semibold">{action}</Text>
           </Pressable>
         </View>

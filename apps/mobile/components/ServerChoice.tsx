@@ -15,7 +15,15 @@ export function useServerChoice({ customOnly = false } = {}) {
   const field = custom ? (
     <View className="mt-2">
       <FieldLabel>{t('server.yours')}</FieldLabel>
-      <TextField value={address} onChangeText={setAddress} placeholder="https://sync.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+      <TextField
+        value={address}
+        onChangeText={setAddress}
+        accessibilityLabel={t('server.yours')}
+        placeholder="https://sync.example.com"
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+      />
     </View>
   ) : null;
 

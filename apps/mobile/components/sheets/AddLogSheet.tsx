@@ -23,11 +23,12 @@ export default function AddLogSheet({ at }: { at?: number }) {
             else if (request.kind === 'log') open({ ...request, at });
             else open({ kind: 'log', type: 'feed', at }); // the feed tile's own sheet
           }}
-          className={`items-center justify-center rounded-2xl border py-4 ${bg}`}
+          accessibilityRole="button"
+          className={`items-center justify-center rounded-2xl border py-4 px-1 ${bg}`}
           style={{ width: '30.5%' }}
         >
           <Icon color={color} size={24} />
-          <Text className="text-ink text-xs font-medium mt-2">{label}</Text>
+          <Text className="text-ink text-xs font-medium mt-2 text-center">{label}</Text>
         </Pressable>
       ))}
     </View>

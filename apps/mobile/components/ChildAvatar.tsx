@@ -33,7 +33,7 @@ export default function ChildAvatar({
   const showPhoto = child.photoUri && failed !== child.photoUri;
 
   return (
-    <View style={style}>
+    <View style={style} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {showPhoto ? (
         <Image
           source={{ uri: photoFile(child.photoUri!) }}
@@ -42,7 +42,7 @@ export default function ChildAvatar({
         />
       ) : (
         <View style={{ flex: 1, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: fg, fontSize: size * 0.42, fontWeight: '700' }}>
+          <Text allowFontScaling={false} style={{ color: fg, fontSize: size * 0.42, fontWeight: '700' }}>
             {child.name.trim().charAt(0).toUpperCase() || '?'}
           </Text>
         </View>

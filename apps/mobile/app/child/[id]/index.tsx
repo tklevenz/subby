@@ -132,8 +132,15 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
       {showPhoto ? (
         <Image source={{ uri: photoFile(child.photoUri!) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" onError={() => setFailed(child.photoUri)} />
       ) : (
-        <Pressable onPress={onPhoto} className="flex-1 items-center justify-center">
-          <Text style={{ color: fg, fontSize: 120, fontWeight: '700', opacity: 0.5 }}>{child.name.trim().charAt(0).toUpperCase() || '?'}</Text>
+        <Pressable onPress={onPhoto} accessibilityRole="button" className="flex-1 items-center justify-center">
+          <Text
+            allowFontScaling={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            style={{ color: fg, fontSize: 120, fontWeight: '700', opacity: 0.5 }}
+          >
+            {child.name.trim().charAt(0).toUpperCase() || '?'}
+          </Text>
           <View className="flex-row items-center mt-2 px-3.5 py-2 rounded-full bg-ground/50">
             <Camera color={colors.ink} size={16} />
             <Text className="text-ink text-sm font-medium ml-2">{t('profile.addPhoto')}</Text>
@@ -142,23 +149,46 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
       )}
 
       <View style={{ top: insets.top + 8 }} className="absolute left-4 right-4 flex-row justify-between">
-        <Pressable onPress={() => router.back()} accessibilityLabel={t('common.back')} hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+          hitSlop={8}
+          className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center"
+        >
           <AngleLeft color={colors.ink} size={22} />
         </Pressable>
         <View className="flex-row gap-2">
           {showPhoto ? (
-            <Pressable onPress={onPhoto} accessibilityLabel={t('childForm.changePhoto')} hitSlop={8} className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center">
+            <Pressable
+              onPress={onPhoto}
+              accessibilityRole="button"
+              accessibilityLabel={t('childForm.changePhoto')}
+              hitSlop={8}
+              className="w-10 h-10 rounded-full bg-ground/55 items-center justify-center"
+            >
               <Camera color={colors.ink} size={18} />
             </Pressable>
           ) : null}
-          <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} hitSlop={8} className="h-10 px-4 rounded-full bg-ground/55 items-center justify-center">
+          <Pressable
+            onPress={() => router.push(`/child/${child.id}/edit`)}
+            accessibilityRole="button"
+            hitSlop={8}
+            className="min-h-10 py-1.5 px-4 rounded-full bg-ground/55 items-center justify-center"
+          >
             <Text className="text-ink text-[15px] font-medium">{t('profile.edit')}</Text>
           </Pressable>
         </View>
       </View>
 
       {/* Fades the bottom of the photo into the page; a flat translucent band let busy photos streak through behind the text. */}
-      <Svg style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} width="100%" height={120}>
+      <Svg
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}
+        width="100%"
+        height={120}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         <Defs>
           <LinearGradient id="coverFade" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={colors.ground} stopOpacity={0} />
@@ -170,7 +200,9 @@ function Cover({ child, isActive, onPhoto }: { child: Child; isActive: boolean; 
       </Svg>
       <View className="absolute left-0 right-0 bottom-0 px-5 pt-4 pb-4 flex-row items-end justify-between">
         <View className="flex-1">
-          <Text style={textOnPhoto} className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1}>{child.name}</Text>
+          <Text accessibilityRole="header" style={textOnPhoto} className="text-ink text-[34px] leading-[38px] font-bold" numberOfLines={1} adjustsFontSizeToFit>
+            {child.name}
+          </Text>
           <Text style={textOnPhoto} className="text-violet-pale text-[15px] mt-0.5">
             {t('profile.ageBorn', { age: formatAgeLong(child.birthDate, Date.now()), date: fmtDate(fromIsoDate(child.birthDate), { day: 'numeric', month: 'short' }) })}
           </Text>
@@ -203,7 +235,7 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
     <>
       <View className="flex-row items-center justify-between mt-6 mb-2 mr-1">
         <SectionLabel className="">{t('profile.growth')}</SectionLabel>
-        <Pressable onPress={openGrowth} hitSlop={8} className="flex-row items-center">
+        <Pressable onPress={openGrowth} hitSlop={8} accessibilityRole="button" className="flex-row items-center">
           <Text className="text-violet-soft text-[13px] mr-1">{t('profile.allCharts')}</Text>
           <AngleRight color={colors.violetSoft} size={10} />
         </Pressable>
@@ -217,7 +249,17 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
               {pct !== null ? <Text className="text-violet-soft text-sm font-semibold">{t('percentile.long', { value: formatPercentile(pct) })}</Text> : null}
             </View>
             <View className="mt-2">
-              <GrowthChart measure={measure} sex={sex} points={points} units={units} height={180} />
+              <GrowthChart
+                measure={measure}
+                sex={sex}
+                points={points}
+                units={units}
+                height={180}
+                accessibilityLabel={t('growth.chartA11y', {
+                  chart: growthMeasures().find((m) => m.value === measure)?.label ?? t('profile.growth'),
+                  count: points.length,
+                })}
+              />
             </View>
             <Text className="text-ink-muted text-xs mt-2">
               {t(sex === 'female' ? 'profile.lastMeasuredGirls' : sex ? 'profile.lastMeasuredBoys' : 'profile.lastMeasured', { date: fmtDate(last.at) })}
@@ -228,7 +270,7 @@ function Growth({ child, logs, isActive }: { child: Child; logs: LogEntry[]; isA
         )}
       </View>
       {!sex ? (
-        <Pressable onPress={() => router.push(`/child/${child.id}/edit`)}>
+        <Pressable onPress={() => router.push(`/child/${child.id}/edit`)} accessibilityRole="button">
           <Hint className="ml-1">{t('profile.setSex')}</Hint>
         </Pressable>
       ) : null}
@@ -249,8 +291,8 @@ function StoryRow({ item, child, last }: { item: StoryItem; child: Child; last: 
     item.kind === 'birth'
       ? fmtDate(item.at, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
       : t('profile.storyWhen', { date: fmtDate(item.at), age: formatAgeLong(child.birthDate, item.at) });
-  return (
-    <Pressable disabled={!item.logId} onPress={() => item.logId && router.push(`/entry/${item.logId}`)} className="flex-row" style={{ minHeight: 62 }}>
+  const body = (
+    <>
       <View className="w-7 items-center">
         <View className={`w-7 h-7 rounded-full border items-center justify-center ${s.box}`}>
           <s.Icon color={s.color()} size={14} />
@@ -266,6 +308,18 @@ function StoryRow({ item, child, last }: { item: StoryItem; child: Child; last: 
           <AngleRight color={colors.inkGhost} size={14} />
         </View>
       ) : null}
+    </>
+  );
+  if (!item.logId) {
+    return (
+      <View className="flex-row" style={{ minHeight: 62 }}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Pressable onPress={() => router.push(`/entry/${item.logId}`)} accessibilityRole="button" className="flex-row" style={{ minHeight: 62 }}>
+      {body}
     </Pressable>
   );
 }

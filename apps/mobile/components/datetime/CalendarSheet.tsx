@@ -1,6 +1,7 @@
 import { formatDate, t } from '@subby/shared/i18n';
 import React, { useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { startOfDay } from '@subby/shared';
 import { useLogQuery } from '../../store/queries';
@@ -26,6 +27,7 @@ export default function CalendarSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
   const today = startOfDay(Date.now());
   const [month, setMonth] = useState(() => {
     const d = new Date(value);
@@ -59,82 +61,90 @@ export default function CalendarSheet({
   ).current;
 
   return (
-    <Modal transparent animationType="slide" visible statusBarTranslucent onRequestClose={onClose}>
+    <Modal transparent animationType={reduced ? 'none' : 'slide'} visible statusBarTranslucent onRequestClose={onClose}>
       {/* The scrim lies behind the sheet too, so its rounded corners show the dimmed screen. */}
       <View className="flex-1 justify-end">
-      <Pressable onPress={onClose} className="absolute inset-0 bg-scrim/50" />
-      <View className="bg-surface border-t border-line-strong/50 rounded-t-2xl px-4 pt-4" style={{ paddingBottom: insets.bottom + 12 }}>
-        <View className="flex-row items-center justify-between">
-          <MonthButton label={t('picker.prevMonth')} onPress={() => shift(-1)} icon={<AngleLeft color={colors.inkSoft} size={16} />} />
-          <Text className="text-ink text-lg font-bold">
-            {formatDate(first, { month: 'long', year: 'numeric' })}
-          </Text>
-          <MonthButton
-            label={t('picker.nextMonth')}
-            onPress={() => shift(1)}
-            disabled={atLatest}
-            icon={<AngleRight color={atLatest ? colors.lineStrong : colors.inkSoft} size={16} />}
-          />
-        </View>
-
-        <View className="flex-row mt-4">
-          {weekdays().map((d, i) => (
-            <Text key={i} className="flex-1 text-center text-ink-faint text-xs font-semibold">
-              {d}
+        <Pressable onPress={onClose} accessible={false} importantForAccessibility="no" className="absolute inset-0 bg-scrim/50" />
+        <View
+          accessibilityViewIsModal
+          onAccessibilityEscape={onClose}
+          className="bg-surface border-t border-line-strong/50 rounded-t-2xl px-4 pt-4"
+          style={{ paddingBottom: insets.bottom + 12 }}
+        >
+          <View className="flex-row items-center justify-between">
+            <MonthButton label={t('picker.prevMonth')} onPress={() => shift(-1)} icon={<AngleLeft color={colors.inkSoft} size={16} />} />
+            <Text accessibilityRole="header" className="text-ink text-lg font-bold text-center flex-1 mx-2">
+              {formatDate(first, { month: 'long', year: 'numeric' })}
             </Text>
-          ))}
-        </View>
+            <MonthButton
+              label={t('picker.nextMonth')}
+              onPress={() => shift(1)}
+              disabled={atLatest}
+              icon={<AngleRight color={atLatest ? colors.lineStrong : colors.inkSoft} size={16} />}
+            />
+          </View>
 
-        <View {...swipe.panHandlers} className="mt-1">
-          {weeks.map((week, w) => (
-            <View key={w} className="flex-row">
-              {week.map((day, i) => {
-                if (day === null) return <View key={i} className="flex-1 h-12" />;
-                const future = day > today;
-                const isSelected = day === selected;
-                const isToday = day === today;
-                return (
-                  <Pressable
-                    key={i}
-                    disabled={future}
-                    onPress={() => onPick(day)}
-                    accessibilityRole="button"
-                    accessibilityLabel={formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}
-                    accessibilityState={{ selected: isSelected, disabled: future }}
-                    className="flex-1 h-12 items-center justify-center"
-                  >
-                    <View
-                      className={`w-10 h-10 rounded-full items-center justify-center ${
-                        isSelected ? 'bg-violet-deep' : isToday ? 'border border-violet-strong' : ''
-                      }`}
+          <View className="flex-row mt-4" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {weekdays().map((d, i) => (
+              <Text key={i} maxFontSizeMultiplier={1.4} className="flex-1 text-center text-ink-faint text-xs font-semibold">
+                {d}
+              </Text>
+            ))}
+          </View>
+
+          <View {...swipe.panHandlers} className="mt-1">
+            {weeks.map((week, w) => (
+              <View key={w} className="flex-row">
+                {week.map((day, i) => {
+                  if (day === null) return <View key={i} className="flex-1 h-12" />;
+                  const future = day > today;
+                  const isSelected = day === selected;
+                  const isToday = day === today;
+                  const hasEntries = logged.has(day);
+                  const dateLabel = formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' });
+                  return (
+                    <Pressable
+                      key={i}
+                      disabled={future}
+                      onPress={() => onPick(day)}
+                      accessibilityRole="button"
+                      accessibilityLabel={hasEntries ? t('picker.dayHasEntriesA11y', { date: dateLabel }) : dateLabel}
+                      accessibilityState={{ selected: isSelected, disabled: future }}
+                      className="flex-1 h-12 items-center justify-center"
                     >
-                      <Text
-                        className={`text-[15px] ${isSelected ? 'text-ink font-bold' : future ? 'text-ink-ghost' : 'text-ink'}`}
-                        style={{ fontVariant: ['tabular-nums'] }}
+                      <View
+                        className={`w-10 h-10 rounded-full items-center justify-center ${
+                          isSelected ? 'bg-violet-deep' : isToday ? 'border border-violet-strong' : ''
+                        }`}
                       >
-                        {new Date(day).getDate()}
-                      </Text>
-                      {/* Something was logged this day. */}
-                      {logged.has(day) && !isSelected ? <View className="absolute bottom-1 w-1 h-1 rounded-full bg-violet-soft" /> : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+                        <Text
+                          maxFontSizeMultiplier={1.4}
+                          className={`text-[15px] ${isSelected ? 'text-ink font-bold' : future ? 'text-ink-ghost' : 'text-ink'}`}
+                          style={{ fontVariant: ['tabular-nums'] }}
+                        >
+                          {new Date(day).getDate()}
+                        </Text>
+                        {/* Something was logged this day. */}
+                        {hasEntries && !isSelected ? <View className="absolute bottom-1 w-1 h-1 rounded-full bg-violet-soft" /> : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
 
-        <View className="flex-row justify-between mt-2">
-          <Pressable onPress={onClose} className="py-3 px-2">
-            <Text className="text-ink text-base font-semibold">{t('common.cancel')}</Text>
-          </Pressable>
-          {selected !== today ? (
-            <Pressable onPress={() => onPick(today)} className="py-3 px-2">
-              <Text className="text-violet-soft text-base font-semibold">{t('day.today')}</Text>
+          <View className="flex-row justify-between mt-2">
+            <Pressable onPress={onClose} accessibilityRole="button" className="py-3 px-2">
+              <Text className="text-ink text-base font-semibold">{t('common.cancel')}</Text>
             </Pressable>
-          ) : null}
+            {selected !== today ? (
+              <Pressable onPress={() => onPick(today)} accessibilityRole="button" className="py-3 px-2">
+                <Text className="text-violet-soft text-base font-semibold">{t('day.today')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
-      </View>
       </View>
     </Modal>
   );
@@ -148,6 +158,7 @@ function MonthButton({ label, icon, onPress, disabled }: { label: string; icon: 
       hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       className="w-10 h-10 rounded-full border border-line items-center justify-center"
     >
       {icon}

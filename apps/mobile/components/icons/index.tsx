@@ -15,7 +15,14 @@ function FaIcon({ name, color, size = 24, style }: IconProps & { name: FaName })
   const { w, h, d } = FA_PATHS[name];
   const box = Math.max(w, h) / SCALE;
   return (
-    <Svg width={size} height={size} viewBox={`${(w - box) / 2} ${(h - box) / 2} ${box} ${box}`} style={style}>
+    <Svg
+      width={size}
+      height={size}
+      viewBox={`${(w - box) / 2} ${(h - box) / 2} ${box} ${box}`}
+      style={style}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <Path d={d} fill={color ?? colors.ink} />
     </Svg>
   );
@@ -79,7 +86,7 @@ export function PoopDroplet({ color, dropColor, size = 24, style }: IconProps & 
   const dropScale = 11 / drop.h;
   const dropX = 18.5 - (drop.w * dropScale) / 2;
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" style={style} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Defs>
         <Mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
           <Rect x="0" y="0" width="24" height="24" fill="white" />

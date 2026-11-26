@@ -62,6 +62,7 @@ export default function RecoverScreen() {
             <TextField
               value={words}
               onChangeText={setWords}
+              accessibilityLabel={t('recover.words')}
               multiline
               {...SECRET_INPUT}
               style={{ minHeight: 120, textAlignVertical: 'top' }}

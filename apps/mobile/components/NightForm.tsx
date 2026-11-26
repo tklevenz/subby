@@ -152,7 +152,7 @@ export default function NightForm({ night }: { night: Night }) {
           <FieldLabel>{t('night.wakings')}</FieldLabel>
           <View className="bg-surface border border-line rounded-2xl">
             {rows.map((w, i) => (
-              <View key={w.key} className="flex-row items-center gap-2 px-3 py-2.5 border-b border-line">
+              <View key={w.key} className="flex-row flex-wrap items-center gap-2 px-3 py-2.5 border-b border-line">
                 <DateTimeField value={w.start} onChange={(start) => setWaking(i, { start })} title={t('night.awakeFrom')} timeOnly />
                 <Text className="text-ink-muted">–</Text>
                 <DateTimeField value={w.end} onChange={(end) => setWaking(i, { end })} title={t('night.backAsleep')} timeOnly />
@@ -162,6 +162,7 @@ export default function NightForm({ night }: { night: Night }) {
                 <Pressable
                   onPress={() => setRows((cur) => cur.filter((_, j) => j !== i))}
                   hitSlop={8}
+                  accessibilityRole="button"
                   accessibilityLabel={t('night.removeWaking')}
                   className="w-8 h-8 rounded-full border border-line-strong items-center justify-center"
                 >

@@ -77,11 +77,19 @@ export default function GrowthScreen() {
 
       {/* Captured as the shared image, so it carries its own title. */}
       <View ref={chartRef} collapsable={false} className="mt-4 bg-ground py-3">
-        <Text className="text-ink font-semibold text-base">{t('growth.chartTitle', { name: child.name, chart: title(measure) })}</Text>
+        <Text accessibilityRole="header" className="text-ink font-semibold text-base">
+          {t('growth.chartTitle', { name: child.name, chart: title(measure) })}
+        </Text>
         <Text className="text-ink-faint text-xs mb-3">
           {t(sex === 'female' ? 'growth.byAgeGirls' : sex ? 'growth.byAgeBoys' : 'growth.byAge', { unit: chartUnitLabel(measure, units) })}
         </Text>
-        <GrowthChart measure={measure} sex={sex} points={points} units={units} />
+        <GrowthChart
+          measure={measure}
+          sex={sex}
+          points={points}
+          units={units}
+          accessibilityLabel={t('growth.chartA11y', { chart: title(measure), count: points.length })}
+        />
         <View className="flex-row items-center mt-2">
           <Text className="text-ink-ghost text-[10px]">{t('growth.source')}</Text>
           <SubMono width={14} color={colors.inkFaint} />
@@ -103,7 +111,7 @@ export default function GrowthScreen() {
             {[...points].reverse().map((p) => {
               const pct = growthPercentile(measure, child.sex, p.months, p.value);
               return (
-                <Pressable key={p.id} onPress={() => router.push(`/entry/${p.id}`)} className="flex-row items-center px-4 py-3 border-b border-line">
+                <Pressable key={p.id} onPress={() => router.push(`/entry/${p.id}`)} accessibilityRole="button" className="flex-row items-center px-4 py-3 border-b border-line">
                   <View className="flex-1">
                     <Text className="text-ink">{format(p.value)}</Text>
                     <Text className="text-ink-faint text-xs">

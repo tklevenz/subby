@@ -94,7 +94,13 @@ export default function LogSheet({
           <View className="flex-row items-center gap-3">
             <DateTimeField value={end} onChange={setEnd} maximumDate={new Date()} title={t('logSheet.endTime')} placeholder={t('logSheet.setEnd')} />
             {end !== null ? (
-              <Pressable onPress={() => setEnd(null)} className="rounded-full border border-line-strong px-3 py-2" hitSlop={6}>
+              <Pressable
+                onPress={() => setEnd(null)}
+                accessibilityRole="button"
+                accessibilityLabel={t('logSheet.clearEndA11y')}
+                className="rounded-full border border-line-strong px-3 py-2"
+                hitSlop={6}
+              >
                 <Text className="text-ink-muted text-sm">{t('logSheet.clear')}</Text>
               </Pressable>
             ) : null}

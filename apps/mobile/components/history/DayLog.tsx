@@ -1,6 +1,6 @@
 import { formatDate, formatNumber, t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import {
   dayTimeline,
@@ -40,9 +40,14 @@ export function DayTotals({ stats, units }: { stats: DayStats; units: UnitSystem
       {items.map((i, n) => (
         <React.Fragment key={i.label}>
           {n ? <View className="w-px self-stretch bg-line" /> : null}
-          <View className="flex-1 min-w-0">
+          <View accessible className="flex-1 min-w-0">
             <Text className={`text-xs font-semibold ${i.className}`}>{i.label}</Text>
-            <Text className="text-ink text-[22px] leading-[26px] font-bold" style={{ fontVariant: ['tabular-nums'] }}>
+            <Text
+              className="text-ink text-[22px] leading-[26px] font-bold"
+              style={{ fontVariant: ['tabular-nums'] }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {i.value}
             </Text>
             <Text className="text-ink-muted text-xs" numberOfLines={1}>
@@ -77,10 +82,11 @@ export function DayLog({ logs, day, now }: { logs: LogEntry[]; day: number; now:
   );
 }
 
-/** The times' column: "16:31" fits 48, "4:31 PM" needs more, or it wraps. */
+/** The times' column: "16:31" fits 48, "4:31 PM" needs more, or it wraps. Scales with system font size. */
 function useTimeColumn() {
   const clock = useSettingsStore((s) => s.clock);
-  return { width: clock === '12h' ? 64 : 48 };
+  const scale = Math.min(Math.max(useWindowDimensions().fontScale, 1), 1.6);
+  return { width: Math.round((clock === '12h' ? 64 : 48) * scale) };
 }
 
 function AwakeRow({ item }: { item: Extract<TimelineItem, { kind: 'awake' }> }) {
@@ -136,11 +142,17 @@ function NightRow({ night, day, now }: { night: Night; day: number; now: number 
                 {t(running ? 'day.nightAsleepSoFar' : 'day.nightAsleep', { span: formatHoursMinutes(night.asleepMs) })}
               </Text>
             </Pressable>
-            <Pressable onPress={() => setOpen(!open)} hitSlop={8} accessibilityRole="button" className="px-3.5 pt-3 pb-2">
+            <Pressable
+              onPress={() => setOpen(!open)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: open }}
+              className="px-3.5 pt-3 pb-2"
+            >
               <Text className="text-violet-soft text-[13px]">{open ? t('day.hide') : t('day.wakings', { count: n })}</Text>
             </Pressable>
           </View>
-          <Pressable onPress={edit} className="px-3.5 pb-3">
+          <Pressable onPress={edit} accessibilityRole="button" accessibilityLabel={t('day.openNightA11y')} className="px-3.5 pb-3">
             <NightBar stretches={stretchesOf(night.pieces, now)} />
             <View className="flex-row justify-between mt-1.5">
               <Text className="text-ink-muted text-xs">{formatTime(night.start)}</Text>

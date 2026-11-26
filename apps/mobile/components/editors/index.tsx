@@ -32,10 +32,30 @@ type EditorProps<T extends LogPayload['type']> = {
 };
 
 /** A quantity entered in the phone's unit system (ml or oz, kg or lb, cm or in, °C or °F); the value is canonical. */
-function MeasureField({ measure, value, onChange }: { measure: Measure; value?: number; onChange: (canonical?: number) => void }) {
+function MeasureField({
+  measure,
+  value,
+  onChange,
+  accessibilityLabel,
+}: {
+  measure: Measure;
+  value?: number;
+  onChange: (canonical?: number) => void;
+  accessibilityLabel?: string;
+}) {
   const units = useSettingsStore((s) => s.units);
   const m = MEASURES[measure][units];
-  return <UnitNumberField value={value} onChange={onChange} toDisplay={m.to} fromDisplay={m.from} suffix={m.suffix} decimals={m.decimals} />;
+  return (
+    <UnitNumberField
+      value={value}
+      onChange={onChange}
+      toDisplay={m.to}
+      fromDisplay={m.from}
+      suffix={m.suffix}
+      decimals={m.decimals}
+      accessibilityLabel={accessibilityLabel}
+    />
+  );
 }
 
 function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
@@ -67,15 +87,15 @@ function FeedEditor({ payload: p, onChange }: EditorProps<'feed'>) {
             onChange={(milkType) => onChange({ milkType })}
           />
           <FieldLabel>{t('feedSheet.amount')}</FieldLabel>
-          <MeasureField measure="volume" value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
+          <MeasureField measure="volume" value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} accessibilityLabel={t('feedSheet.amount')} />
         </>
       ) : null}
       {p.method === 'breast' ? (
         <>
           <FieldLabel>{t('editor.leftMinutes')}</FieldLabel>
-          <NumberField value={toMin(p.leftSeconds)} onChange={(v) => onChange({ leftSeconds: toSec(v) })} suffix={t('editor.min')} />
+          <NumberField value={toMin(p.leftSeconds)} onChange={(v) => onChange({ leftSeconds: toSec(v) })} suffix={t('editor.min')} accessibilityLabel={t('editor.leftMinutes')} />
           <FieldLabel>{t('editor.rightMinutes')}</FieldLabel>
-          <NumberField value={toMin(p.rightSeconds)} onChange={(v) => onChange({ rightSeconds: toSec(v) })} suffix={t('editor.min')} />
+          <NumberField value={toMin(p.rightSeconds)} onChange={(v) => onChange({ rightSeconds: toSec(v) })} suffix={t('editor.min')} accessibilityLabel={t('editor.rightMinutes')} />
           <FieldLabel>{t('editor.finishedOn')}</FieldLabel>
           <Segmented
             options={[{ value: 'left', label: t('editor.left') }, { value: 'right', label: t('editor.right') }]}
@@ -149,11 +169,11 @@ function PumpingEditor({ payload: p, onChange }: EditorProps<'pumping'>) {
   return (
     <View>
       <FieldLabel>{t('editor.left')}</FieldLabel>
-      <MeasureField measure="volume" value={p.leftMl} onChange={(v) => setSide('leftMl', v)} />
+      <MeasureField measure="volume" value={p.leftMl} onChange={(v) => setSide('leftMl', v)} accessibilityLabel={t('editor.left')} />
       <FieldLabel>{t('editor.right')}</FieldLabel>
-      <MeasureField measure="volume" value={p.rightMl} onChange={(v) => setSide('rightMl', v)} />
+      <MeasureField measure="volume" value={p.rightMl} onChange={(v) => setSide('rightMl', v)} accessibilityLabel={t('editor.right')} />
       <FieldLabel>{t('editor.total')}</FieldLabel>
-      <MeasureField measure="volume" value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} />
+      <MeasureField measure="volume" value={p.amountMl} onChange={(amountMl) => onChange({ amountMl })} accessibilityLabel={t('editor.total')} />
     </View>
   );
 }
@@ -162,11 +182,11 @@ function GrowthEditor({ payload: p, onChange }: EditorProps<'growth'>) {
   return (
     <View>
       <FieldLabel>{t('editor.weight')}</FieldLabel>
-      <MeasureField measure="weight" value={p.weightG} onChange={(weightG) => onChange({ weightG })} />
+      <MeasureField measure="weight" value={p.weightG} onChange={(weightG) => onChange({ weightG })} accessibilityLabel={t('editor.weight')} />
       <FieldLabel>{t('editor.height')}</FieldLabel>
-      <MeasureField measure="length" value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} />
+      <MeasureField measure="length" value={p.heightCm} onChange={(heightCm) => onChange({ heightCm })} accessibilityLabel={t('editor.height')} />
       <FieldLabel>{t('editor.head')}</FieldLabel>
-      <MeasureField measure="length" value={p.headCm} onChange={(headCm) => onChange({ headCm })} />
+      <MeasureField measure="length" value={p.headCm} onChange={(headCm) => onChange({ headCm })} accessibilityLabel={t('editor.head')} />
     </View>
   );
 }
@@ -176,7 +196,7 @@ function TemperatureEditor({ payload: p, onChange }: EditorProps<'temperature'>)
   return (
     <View>
       <FieldLabel>{t('editor.temperature')}</FieldLabel>
-      <MeasureField measure="temperature" value={p.celsius} onChange={set} />
+      <MeasureField measure="temperature" value={p.celsius} onChange={set} accessibilityLabel={t('editor.temperature')} />
     </View>
   );
 }
@@ -206,9 +226,9 @@ function MedicationEditor({ payload: p, onChange }: EditorProps<'medication'>) {
         </>
       ) : null}
       <FieldLabel>{t('editor.name')}</FieldLabel>
-      <TextField value={p.name} onChangeText={(name) => onChange({ name })} placeholder={t('editor.medicationPlaceholder')} />
+      <TextField value={p.name} onChangeText={(name) => onChange({ name })} accessibilityLabel={t('editor.name')} placeholder={t('editor.medicationPlaceholder')} />
       <FieldLabel>{t('editor.dose')}</FieldLabel>
-      <NumberField value={p.dose} onChange={(dose) => onChange({ dose })} />
+      <NumberField value={p.dose} onChange={(dose) => onChange({ dose })} accessibilityLabel={t('editor.dose')} />
       <View className="mt-2">
         <Segmented options={MEDICATION_UNITS.map((u) => ({ value: u, label: medicationUnit(u, p.dose ?? 2) }))} value={p.unit} onChange={(unit) => onChange({ unit })} />
       </View>
@@ -248,7 +268,7 @@ function PottyEditor({ payload: p, onChange }: EditorProps<'potty'>) {
       />
       <View className="flex-row items-center justify-between mt-4">
         <Text className="text-ink-soft text-base">{t('editor.accident')}</Text>
-        <Toggle value={p.accident ?? false} onValueChange={(accident) => onChange({ accident: accident || undefined })} />
+        <Toggle accessibilityLabel={t('editor.accident')} value={p.accident ?? false} onValueChange={(accident) => onChange({ accident: accident || undefined })} />
       </View>
     </View>
   );
@@ -260,7 +280,12 @@ function ActivityEditor({ payload: p, onChange }: EditorProps<'activity'>) {
       <FieldLabel>{t('editor.activity')}</FieldLabel>
       <Segmented options={ACTIVITY_KINDS.map((k) => ({ value: k, label: activityLabel(k) }))} value={p.kind} onChange={(kind) => onChange({ kind })} />
       <FieldLabel>{t('editor.highlight')}</FieldLabel>
-      <TextField value={p.milestone ?? ''} onChangeText={(m) => onChange({ milestone: m || undefined })} placeholder={t('editor.highlightPlaceholder')} />
+      <TextField
+        value={p.milestone ?? ''}
+        onChangeText={(m) => onChange({ milestone: m || undefined })}
+        accessibilityLabel={t('editor.highlight')}
+        placeholder={t('editor.highlightPlaceholder')}
+      />
     </View>
   );
 }
@@ -282,10 +307,13 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
             <Pressable
               key={m.key}
               onPress={() => onChange({ key: selected ? undefined : m.key, custom: undefined })}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={done ? t('editor.milestoneDoneA11y', { label: m.label }) : undefined}
               className={`flex-row items-center px-3 py-2.5 rounded-xl border ${selected ? 'bg-orange/20 border-orange-strong/60' : 'bg-raised border-line-strong'}`}
             >
               <Text className={`flex-1 ${done ? 'text-ink-faint line-through' : 'text-ink'}`}>{m.label}</Text>
-              <Text className="text-ink-faint text-xs">{t('editor.milestoneAge', { count: m.months })}</Text>
+              <Text className="text-ink-faint text-xs ml-2">{t('editor.milestoneAge', { count: m.months })}</Text>
             </Pressable>
           );
         })}
@@ -294,6 +322,7 @@ function MilestoneEditor({ payload: p, onChange }: EditorProps<'milestone'>) {
       <TextField
         value={p.custom ?? ''}
         onChangeText={(custom) => onChange({ custom: custom || undefined, key: custom ? undefined : p.key })}
+        accessibilityLabel={t('editor.somethingElse')}
         placeholder={t('editor.somethingElsePlaceholder')}
       />
     </View>
@@ -307,6 +336,7 @@ function NoteEditor({ payload: p, onChange }: EditorProps<'note'>) {
       <TextField
         value={p.text}
         onChangeText={(text) => onChange({ text })}
+        accessibilityLabel={t('editor.note')}
         placeholder={t('editor.notePlaceholder')}
         multiline
         style={{ minHeight: 96, textAlignVertical: 'top' }}

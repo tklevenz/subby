@@ -40,7 +40,7 @@ export default function BarChart({
   const labelEvery = Math.ceil(bars.length / 8);
 
   return (
-    <View>
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View className="flex-row justify-end">
         <Text className="text-ink-faint text-[10px]">{formatValue(max)}</Text>
       </View>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { LOCALES, LOCALE_NAMES, t } from '@subby/shared/i18n';
 import { Check } from './icons';
 import { systemLocale, type LanguageChoice } from '../features/i18n';
@@ -21,10 +22,17 @@ export default function LanguagePicker({
   onPick: (choice: LanguageChoice) => void;
   onClose: () => void;
 }) {
+  const reduced = useReducedMotion();
   const choices: LanguageChoice[] = ['system', ...LOCALES];
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-scrim/60 justify-center px-8" onPress={onClose}>
+    <Modal transparent visible={visible} animationType={reduced ? 'none' : 'fade'} onRequestClose={onClose}>
+      <View onAccessibilityEscape={onClose} className="flex-1 justify-center px-8">
+        <Pressable
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+          className="absolute inset-0 bg-scrim/60"
+        />
         <View className="bg-surface rounded-2xl border border-line-strong overflow-hidden max-h-[80%]">
           <ScrollView>
             {choices.map((c, i) => (
@@ -41,7 +49,7 @@ export default function LanguagePicker({
             ))}
           </ScrollView>
         </View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }

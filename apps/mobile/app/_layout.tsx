@@ -3,6 +3,7 @@ import { errorMessage } from '../features/errorMessage';
 import { t } from '@subby/shared/i18n';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { useLocales } from 'expo-localization';
 import * as SplashScreen from 'expo-splash-screen';
@@ -46,6 +47,7 @@ export default function RootLayout() {
   const loadLogs = useLogStore((s) => s.loadLogs);
   const locale = useLocale((s) => s.locale);
   const language = useSettingsStore((s) => s.language);
+  const reduced = useReducedMotion();
   // The phone's language changed while the app was open (Android may keep the activity).
   const systemLocales = useLocales();
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function RootLayout() {
         key={locale}
         screenOptions={{
           headerShown: false,
+          animation: reduced ? 'none' : 'default',
           contentStyle: { backgroundColor: colors.ground },
           headerStyle: { backgroundColor: colors.ground },
           headerTintColor: colors.inkLight,

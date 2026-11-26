@@ -83,7 +83,9 @@ function DeleteChild({ child }: { child: Child }) {
 
   return (
     <View className="mt-10 rounded-2xl border border-red/40 bg-red/10 p-4">
-      <Text className="text-red-soft font-semibold text-base">{t('childEdit.deleteTitle', { name: child.name })}</Text>
+      <Text accessibilityRole="header" className="text-red-soft font-semibold text-base">
+        {t('childEdit.deleteTitle', { name: child.name })}
+      </Text>
       <Text className="text-ink-soft mt-2 leading-5">
         {counts === null
           ? t('childEdit.counting')
@@ -98,7 +100,14 @@ function DeleteChild({ child }: { child: Child }) {
       ) : null}
 
       <FieldLabel>{t('childEdit.typeName', { name: child.name })}</FieldLabel>
-      <TextField value={confirm} onChangeText={setConfirm} placeholder={child.name} autoCapitalize="none" autoCorrect={false} />
+      <TextField
+        value={confirm}
+        onChangeText={setConfirm}
+        accessibilityLabel={t('childEdit.typeName', { name: child.name })}
+        placeholder={child.name}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
       <Button label={t(deleting ? 'childEdit.deleting' : 'childEdit.deleteForever')} variant="danger" disabled={!matches || deleting || counts === null} onPress={onDelete} />
       <Button
         label={t('common.cancel')}

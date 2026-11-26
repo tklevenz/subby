@@ -21,7 +21,9 @@ export default function Onboarding() {
       keyboardShouldPersistTaps="handled"
     >
       <SubTile size={64} />
-      <Text className="text-3xl font-bold text-ink mt-4">{t('onboarding.welcome')}</Text>
+      <Text accessibilityRole="header" className="text-3xl font-bold text-ink mt-4">
+        {t('onboarding.welcome')}
+      </Text>
       <Lead className="mt-2">
         {t('onboarding.lead')}
       </Lead>

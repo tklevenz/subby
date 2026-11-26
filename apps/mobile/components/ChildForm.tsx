@@ -45,7 +45,7 @@ export default function ChildForm({
 
   return (
     <View>
-      <Pressable onPress={() => setMenu(true)} className="items-center mt-2 mb-2">
+      <Pressable onPress={() => setMenu(true)} accessibilityRole="button" className="items-center mt-2 mb-2">
         <ChildAvatar child={{ id: initial?.id ?? 'new', name: name || '?', photoUri }} size={96} />
         <View className="flex-row items-center mt-2">
           <Camera color={colors.violetStrong} size={14} />
@@ -55,7 +55,7 @@ export default function ChildForm({
       <PhotoMenu visible={menu} hasPhoto={photoUri !== null} onClose={() => setMenu(false)} onChange={setPhotoUri} />
 
       <FieldLabel>{t('childForm.name')}</FieldLabel>
-      <TextField value={name} onChangeText={setName} placeholder={t('childForm.namePlaceholder')} autoFocus={autoFocus} />
+      <TextField value={name} onChangeText={setName} accessibilityLabel={t('childForm.name')} placeholder={t('childForm.namePlaceholder')} autoFocus={autoFocus} />
 
       <FieldLabel>{t('childForm.birthDate')}</FieldLabel>
       <DateTimeField

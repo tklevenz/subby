@@ -327,7 +327,7 @@ export function AccessBanner() {
       ? t('access.bannerReadOnly')
       : t(joinedAfterTrial(entitlement) ? 'access.bannerGraceLate' : 'access.bannerGrace', { until: formatUntil(entitlement?.graceEndsAt ?? now, now) });
   return (
-    <Pressable onPress={() => router.push('/sync')} className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
+    <Pressable onPress={() => router.push('/sync')} accessibilityRole="button" className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
       <Text className="text-ink text-sm leading-5">{text}</Text>
     </Pressable>
   );
