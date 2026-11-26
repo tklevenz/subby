@@ -26,7 +26,7 @@ else
   [ ${#filters[@]} -eq 0 ] && exit 0
 fi
 
-out=$(NO_COLOR=1 FORCE_COLOR=0 pnpm turbo run typecheck lint "${filters[@]}" --output-logs=errors-only 2>&1) && exit 0
+out=$(NO_COLOR=1 FORCE_COLOR=0 pnpm turbo run typecheck lint ${filters[@]+"${filters[@]}"} --output-logs=errors-only 2>&1) && exit 0
 log=$(grep -vE '^\s*$|ELIFECYCLE|^ +(Tasks|Cached|Time):|^ +• ' <<<"$out" | tail -n 80)
 
 if [ "$(jq -r '.stop_hook_active // false' <<<"$input")" = true ]; then
