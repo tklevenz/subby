@@ -74,7 +74,7 @@ export default function JoinScreen() {
     await syncNow().catch(() => {});
     // A new phone or a reinstall: the store account's unlock comes along if no other phone in use holds it.
     const settings = useSettingsStore.getState().sync;
-    if (settings) void restoreQuietly(sessionFor(settings)).then((moved) => (moved ? syncNow().catch(() => {}) : undefined));
+    if (settings) void restoreQuietly(sessionFor(settings)).then((outcome) => (outcome === 'moved' ? syncNow().catch(() => {}) : undefined));
     router.replace('/');
   };
 

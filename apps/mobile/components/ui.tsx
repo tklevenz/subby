@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, TextInput, Platform, Switch, type SwitchProps, type TextInputProps, type TextProps } from 'react-native';
 import { AngleRight } from './icons';
-import { SubLoader } from './brand/loaders';
+import { SubLoader, SubSpinner } from './brand/loaders';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 
@@ -109,6 +109,29 @@ export function Button({
       className={`${bg} rounded-xl py-3.5 px-5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
     >
       <Text className={`${variant === 'dangerQuiet' ? 'text-red-soft' : 'text-ink'} font-semibold text-base`}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * A quiet text action, centered under a `Button` ("Restore a purchase"). Its touch target is the full width and
+ * 48 dp tall, so a tap on the text never lands on the button above it (hitSlop alone left it ~33 dp, 7 px away).
+ */
+export function LinkButton({ label, onPress, disabled, busy }: { label: string; onPress: () => void; disabled?: boolean; busy?: boolean }) {
+  return (
+    <Pressable
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      disabled={disabled || busy}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled, busy: !!busy }}
+      className="min-h-[48px] items-center justify-center active:opacity-60"
+    >
+      {/* `busy`: this action is the one running (its neighbours are only disabled, which looks the same). */}
+      {busy ? <SubSpinner size={20} /> : <Text className={`text-violet-soft text-sm ${disabled ? 'opacity-40' : ''}`}>{label}</Text>}
     </Pressable>
   );
 }

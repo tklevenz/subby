@@ -89,6 +89,13 @@ describe('isValidBody', () => {
     expect(isValidBody('log', null)).toBe(false);
   });
 
+  it('keeps a phone name whose tag is malformed, without the tag', () => {
+    const tag = 'a'.repeat(64);
+    expect(validBody('device', { name: 'Pixel 7', tag })).toEqual({ name: 'Pixel 7', tag });
+    expect(validBody('device', { name: 'Pixel 7', tag: 'not a hash' })).toEqual({ name: 'Pixel 7' });
+    expect(validBody('device', { name: 'Pixel 7', tag: 42 })).toEqual({ name: 'Pixel 7' });
+  });
+
   it('checks payload field types, not values', () => {
     const log = (payload: object) => ({ ...logToBody(note), logType: (payload as { type: string }).type, payload });
     // What a screen would crash on: a name that isn't a string, foods that aren't a list, a required field missing.

@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { errorMessage } from './errorMessage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import * as Application from 'expo-application';
 import { and, count, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { db, dbEncrypted, schema } from '../db/client';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -43,7 +44,7 @@ export async function diagnostics(now = Date.now()): Promise<string> {
   const [childPhotos] = await db.select({ n: count() }).from(schema.childrenTable).where(and(eq(schema.childrenTable.isDeleted, false), isNotNull(schema.childrenTable.photoUri)));
 
   const lines = [
-    `Subby ${Constants.expoConfig?.version ?? '?'} (${Constants.nativeBuildVersion ?? '?'}, ${env})`,
+    `Subby ${Constants.expoConfig?.version ?? '?'} (${Application.nativeBuildVersion ?? '?'}, ${env})`,
     `${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Platform.Version}`,
     `Report made ${new Date(now).toISOString()}, time zone UTC${utcOffset(now)}`,
     '',

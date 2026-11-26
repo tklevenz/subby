@@ -31,6 +31,11 @@ export type Settings = {
    * shows 3 days later), or `done` once dismissed or once sync was set up: it's shown at most once, ever.
    */
   shareNudge: number | 'done' | null;
+  /**
+   * Device-local: the store account's unlock is held by another phone and the Sync screen offered to move it here,
+   * and the user said no. The holder's device id (`other` for a phone in another family): not offered again for it.
+   */
+  unlockOfferDeclined: string | null;
 };
 
 export type SyncSettings = {
@@ -44,6 +49,8 @@ export type SyncSettings = {
   names?: Record<string, string>;
   /** The version of each name taken (`applyDeviceNames`), so an older one is never applied over it. */
   nameVersions?: Record<string, { updatedAt: number; deviceId: string }>;
+  /** Each phone's `installTag`, only as published on its own `device` record (`formerSelves`). */
+  tags?: Record<string, string>;
   /** Devices this phone has already seen in the family, to point out new ones. */
   knownDevices?: string[];
   /** Whether the server wakes this phone with push when others write (hosted Subby Sync does). */
@@ -98,6 +105,7 @@ const DEFAULTS: Settings = {
   keptOverlaps: [],
   sync: null,
   shareNudge: null,
+  unlockOfferDeclined: null,
 };
 
 interface SettingsState extends Settings {

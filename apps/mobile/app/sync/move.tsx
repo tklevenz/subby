@@ -65,7 +65,7 @@ export default function MoveScreen() {
           {step.kind === 'error' ? <ErrorText className="mt-4">{step.message}</ErrorText> : null}
           <Button label={t(custom ? 'move.toThis' : 'move.toOfficial')} onPress={confirm} disabled={!ready} />
           <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
-            {custom ? t('move.ownFree') : t('move.trial', { price })}
+            {custom ? t('move.ownFree') : (price ? t('move.trial', { price }) : t('move.trialNoPrice'))}
           </Text>
           {toggle}
         </>

@@ -6,10 +6,11 @@ import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { GRACE_MS, type EntitlementResponse, type SyncAccess } from '@subby/shared/sync';
-import { Button, Card, Row, Segmented, SectionLabel, Hint } from './ui';
-import { UnlockInUse, buy, canBuy, refundLastTest, restore, useAccess, useAccessStore, useDevTools, usePrice, useStoreUnavailable } from '../features/sync/access';
+import { Button, Card, Row, Segmented, SectionLabel, Hint, LinkButton } from './ui';
+import { UnlockInUse, buy, canBuy, refundLastTest, restore, restoreQuietly, useAccess, useAccessStore, useCanBuy, useDevTools, usePrice, useStoreUnavailable } from '../features/sync/access';
 import { PurchaseCancelled, PurchasePending, requestSandboxRefund, sandboxUnlock } from '../features/sync/store';
 import { syncNow } from '../features/sync/engine';
+import { removeDevice } from '../features/sync/family';
 import { sessionFor, useSyncStore } from '../features/sync/state';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useFormatTime, useNow, weekdayDate } from '../store/timeHelpers';
@@ -45,15 +46,75 @@ function useStoreAction() {
  * The store account's unlock is used by another phone (a partner on the same Apple ID or Google account, or this
  * phone before a reinstall): move it only when asked, and offer a gift for this phone instead when it would get it.
  */
-function askToMove(e: UnlockInUse, giftPrice: string, run: (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => Promise<unknown>) {
+function askToMove(
+  e: UnlockInUse,
+  giftPrice: string | null,
+  run: (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => Promise<unknown>,
+  onCancel?: () => void,
+) {
   const name = e.deviceId ? useSettingsStore.getState().sync?.names?.[e.deviceId] : undefined;
   const gift = canBuy('slot') && nextGiftIsMine();
   const text = (name ? t('access.inUseNamed', { name }) : t('access.inUseOther')) + (gift ? t('access.inUseGift') : '');
-  Alert.alert(t('access.inUseTitle'), text, [
-    { text: t('common.cancel'), style: 'cancel' },
-    ...(gift ? [{ text: t('access.inUseGiftButton', { price: giftPrice }), onPress: () => void run((api) => buy(api, 'slot')) }] : []),
-    { text: t('access.inUseMove'), style: 'destructive' as const, onPress: () => void run((api) => restore(api, { move: true })) },
+  Alert.alert(
+    t('access.inUseTitle'),
+    text,
+    [
+      { text: t('common.cancel'), style: 'cancel', onPress: onCancel },
+      ...(gift ? [{ text: giftPrice ? t('access.inUseGiftButton', { price: giftPrice }) : t('access.inUseGiftButtonNoPrice'), onPress: () => void run((api) => buy(api, 'slot')) }] : []),
+      {
+        text: t('access.inUseMove'),
+        style: 'destructive' as const,
+        onPress: () =>
+          void run(async (api) => {
+            await restore(api, { move: true });
+            if (e.deviceId) askToRemoveOld(e.deviceId, name ?? t('syncScreen.phone'));
+          }),
+      },
+    ],
+    { cancelable: true, onDismiss: onCancel },
+  );
+}
+
+/**
+ * The unlock moved here from a phone in this family. Often that's this phone before a reset or reinstall, which
+ * joined again as a new phone: its old entry stays in the list until removed, and gifts go to it first.
+ */
+function askToRemoveOld(deviceId: string, name: string) {
+  Alert.alert(t('access.oldPhoneTitle', { name }), t('access.oldPhoneText'), [
+    { text: t('access.oldPhoneKeep'), style: 'cancel' },
+    {
+      text: t('syncScreen.remove'),
+      style: 'destructive',
+      onPress: () => void removeDevice(deviceId).catch((err: unknown) => Alert.alert(t('syncScreen.removeFailed'), errorMessage(err))),
+    },
   ]);
+}
+
+/** The Sync screen checks the store account once per app run (`useOfferRestore`). */
+let offeredThisRun = false;
+
+/**
+ * Opening the Sync screen on a phone without an unlock: the store account's unlock moves here by itself when no
+ * other phone holds it, so nobody has to find "Restore a purchase". Held by another phone: the move is offered
+ * (never done silently: it may be a partner's phone on the same account), once per holder.
+ */
+function useOfferRestore(offerable: boolean, run: (action: (api: ReturnType<typeof sessionFor>) => Promise<unknown>) => Promise<unknown>) {
+  const giftPrice = usePrice('slot');
+  React.useEffect(() => {
+    const settings = useSettingsStore.getState().sync;
+    if (!offerable || offeredThisRun || !settings) return;
+    offeredThisRun = true;
+    void restoreQuietly(sessionFor(settings)).then((outcome) => {
+      if (outcome === 'moved') return void syncNow().catch(() => {});
+      if (!(outcome instanceof UnlockInUse)) return;
+      const holder = outcome.deviceId ?? 'other';
+      const { unlockOfferDeclined, set } = useSettingsStore.getState();
+      if (unlockOfferDeclined === holder) return;
+      askToMove(outcome, giftPrice, run, () => void set('unlockOfferDeclined', holder));
+    });
+    // `run` and the price change every render; the check runs once, when it becomes possible.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerable]);
 }
 
 /**
@@ -88,6 +149,7 @@ export function GiftNewPhone({ deviceId }: { deviceId: string }) {
   const entitlement = useAccessStore((s) => s.entitlement);
   const { busy, run } = useStoreAction();
   const price = usePrice('slot');
+  const buyable = useCanBuy('slot');
   const now = useNow(MINUTE_MS);
   if (!entitlement?.trialEndsAt || entitlement.trialStartsOnJoin || now < entitlement.trialEndsAt || entitlement.freeSlots) return null;
   const others = entitlement.devices.filter((d) => d.id !== deviceId);
@@ -96,7 +158,7 @@ export function GiftNewPhone({ deviceId }: { deviceId: string }) {
   return (
     <>
       <Hint className="mt-6 leading-4">{t('add.giftText')}</Hint>
-      <Button label={t('access.giftButton', { price })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy('slot')} />
+      <Button label={price ? t('access.giftButton', { price }) : t('access.giftButtonNoPrice')} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !buyable} />
     </>
   );
 }
@@ -161,9 +223,13 @@ export function AccessCard() {
   const formatUntil = useFormatUntil();
   const now = useNow(MINUTE_MS);
   const { busy, run } = useStoreAction();
+  const [restoring, setRestoring] = React.useState(false);
   const price = usePrice('unlock');
+  const buyable = useCanBuy('unlock');
   const unavailable = useStoreUnavailable();
   const testStore = useAccessStore((s) => s.testPurchases);
+  const needsUnlock = access === 'trial' || access === 'grace' || access === 'readOnly';
+  useOfferRestore(needsUnlock && buyable, run);
   if (!access || access === 'free') return null;
 
   // A few minutes' slack: `now` ticks once a minute and clocks differ, so a fresh 14-day trial doesn't read 15.
@@ -173,7 +239,7 @@ export function AccessCard() {
   const copy: Record<Exclude<SyncAccess, 'free'>, { title: string; body: string; tone: 'calm' | 'warn' }> = {
     trial: {
       title: daysLeft ? t('access.trialLeft', { count: daysLeft }) : t('access.trialTitle'),
-      body: t('access.trialBody', { price }),
+      body: price ? t('access.trialBody', { price }) : t('access.trialBodyNoPrice'),
       tone: 'calm',
     },
     grace: late
@@ -188,7 +254,10 @@ export function AccessCard() {
     slot: { title: t('access.slotTitle'), body: t('access.slotBody'), tone: 'calm' },
   };
   const { title, body, tone } = copy[access];
-  const needsUnlock = access === 'trial' || access === 'grace' || access === 'readOnly';
+  const restorePurchase = () => {
+    setRestoring(true);
+    void run((api) => restore(api)).finally(() => setRestoring(false));
+  };
 
   return (
     <View className={`rounded-2xl px-4 py-4 mt-6 border ${tone === 'warn' ? 'bg-amber/10 border-amber/40' : 'bg-surface border-line'}`}>
@@ -196,10 +265,8 @@ export function AccessCard() {
       <Text className="text-ink-soft text-[15px] leading-[22px] mt-1">{body}</Text>
       {needsUnlock ? (
         <>
-          <Button label={t('access.unlockButton', { price })} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy('unlock')} />
-          <Pressable onPress={() => run((api) => restore(api))} disabled={busy || !canBuy('unlock')} className="items-center mt-3" hitSlop={8}>
-            <Text className={`text-violet-soft text-sm ${canBuy('unlock') ? '' : 'opacity-40'}`}>{t('access.restore')}</Text>
-          </Pressable>
+          <Button label={price ? t('access.unlockButton', { price }) : t('access.unlockButtonNoPrice')} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !buyable} />
+          <LinkButton label={t('access.restore')} onPress={restorePurchase} disabled={busy || !buyable} busy={busy && restoring} />
           {testStore || unavailable ? (
             <Text className="text-ink-faint text-xs text-center mt-2">{t(testStore ? 'access.testStore' : 'access.storeUnavailable')}</Text>
           ) : null}
@@ -215,6 +282,7 @@ export function GiftSlot() {
   const entitlement = useAccessStore((s) => s.entitlement);
   const { busy, run } = useStoreAction();
   const price = usePrice('slot');
+  const buyable = useCanBuy('slot');
   if (!access || access === 'free' || !entitlement) return null;
   const waiting = entitlement.devices.filter((d) => !hasUnlock(d.access)).length;
   const free = entitlement.freeSlots;
@@ -227,7 +295,7 @@ export function GiftSlot() {
             ? t('access.giftWaiting')
             : t('access.giftNext')}
       </Hint>
-      <Button label={t('access.giftButton', { price })} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !canBuy('slot')} />
+      <Button label={price ? t('access.giftButton', { price }) : t('access.giftButtonNoPrice')} variant="ghost" onPress={() => run((api) => buy(api, 'slot'))} disabled={busy || !buyable} />
     </>
   );
 }

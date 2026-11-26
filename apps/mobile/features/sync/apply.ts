@@ -9,7 +9,8 @@ import { bodyToChild, bodyToLog, childTombstone, validBody, type ChildBody, type
 import { saveSync, syncSettings } from './state';
 
 /** A phone's display name, as its encrypted `device` record (id = that phone's device id). */
-export type DeviceBody = { name: string };
+/** `tag`: the phone's `installTag`, on its own record only (Android; older apps leave it out). */
+export type DeviceBody = { name: string; tag?: string };
 
 /** Entries other phones wrote, applied during this run (for `notifyFamily`). */
 let pulledLogs: PulledLog[] = [];
@@ -127,15 +128,26 @@ async function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]
   if (!records.length) return;
   const names = { ...syncSettings()?.names };
   const versions = { ...syncSettings()?.nameVersions };
+  const tags = { ...syncSettings()?.tags };
   for (const { record, body } of records) {
     // Never back to an older name (a server replaying one): names have no row to compare with, so keep the version.
     const seen = versions[record.id];
     if (seen && compareVersions(record, seen) <= 0) continue;
     versions[record.id] = { updatedAt: record.updatedAt, deviceId: record.deviceId };
-    if (record.deleted) delete names[record.id];
-    else names[record.id] = (body as DeviceBody).name;
+    if (record.deleted) {
+      delete names[record.id];
+      delete tags[record.id];
+      continue;
+    }
+    names[record.id] = (body as DeviceBody).name;
+    // A tag counts only from the phone itself (another phone's record about it, after a move, keeps the old one).
+    if (record.deviceId === record.id) {
+      const tag = (body as DeviceBody).tag;
+      if (tag) tags[record.id] = tag;
+      else delete tags[record.id];
+    }
   }
-  await saveSync({ names, nameVersions: versions });
+  await saveSync({ names, nameVersions: versions, tags });
 }
 
 /** Another phone moved the family to another server: remember where, and follow on the next round (`followMove`). */

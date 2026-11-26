@@ -6,3 +6,4 @@ export * from './recovery';
 export * from './pairing';
 export * from './deviceLog';
 export * from './files';
+export * from './formerSelf';

@@ -97,13 +97,14 @@ export async function finish(p: Purchase, kind: ProductKind) {
 }
 
 /**
- * This store account's unlock, if it has one (for Restore). `quiet`: without asking the store to sync first, which
- * can ask for the Apple ID password on iOS (only for a check nobody asked for).
+ * This store account's unlock, if it has one (for Restore). `quiet`: on iOS, without asking the store to sync
+ * first, which can ask for the Apple ID password (only for a check nobody asked for). Android always asks Play
+ * first: without it, the quiet check after a rejoin found no unlock that Restore then found.
  */
 export async function ownedUnlock({ quiet = false } = {}): Promise<Purchase | undefined> {
   if (!(await connect())) throw new Error(t('access.storeUnavailable'));
   const m = iap()!;
-  if (!quiet) await m.restorePurchases().catch(() => {});
+  if (!quiet || Platform.OS === 'android') await m.restorePurchases().catch(() => {});
   const owned = await m.getAvailablePurchases();
   return owned.find((p) => p.productId === PRODUCTS.unlock && p.purchaseState === 'purchased' && p.purchaseToken);
 }

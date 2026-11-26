@@ -18,7 +18,8 @@ const BODY_SCHEMAS: Record<RecordKind, z.ZodTypeAny> = {
   log: LogEntrySchema.pick({ childId: true, logType: true, startedAt: true, endedAt: true, createdBy: true })
     .extend({ payload: LenientPayloadSchema })
     .refine((l) => l.payload.type === l.logType),
-  device: z.object({ name: z.string().min(1).max(100) }),
+  // A malformed tag is dropped, never the name with it.
+  device: z.object({ name: z.string().min(1).max(100), tag: z.string().regex(/^[0-9a-f]{64}$/).optional().catch(undefined) }),
   // The server: an address, maybe with a path, but no user info (`https://sync.subby.baby@evil.example` would show
   // as the first), query or fragment.
   moved: z.object({ server: z.string().regex(/^https?:\/\/[^\s/@?#]+(\/[^\s@?#]*)?$/i).max(300), familyId: z.uuid(), from: z.uuid(), seq: z.number().int().nonnegative(), entries: z.number().int().positive().max(10_000).optional() }),

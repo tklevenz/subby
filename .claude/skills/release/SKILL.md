@@ -30,7 +30,7 @@ SUBBY_SIGNING=$HOME/subby-signing/upload.properties npx expo prebuild --clean --
 ```
 Output: `android/app/build/outputs/bundle/release/app-release.aab`. Check it before handing it over:
 - Signer is the upload key: `keytool -printcert -jarfile <aab> | grep SHA256` must show `12:4F:FF:24:…:59:A7`. Anything else (the debug key) and Play rejects it.
-- Manifest: `M=$(find android/app/build/intermediates -path '*release*' -name AndroidManifest.xml | grep -E 'bundle_manifest|packaged_manifests|merged_manifest' | head -1)`, then `grep -oE 'com.android.vending.BILLING|usesCleartextTraffic="[a-z]+"|android:versionCode="[0-9]+"|android:versionName="[^"]+"' "$M"`: BILLING present, no `usesCleartextTraffic="true"`, the version from step 2.
+- Manifest: `M=$(find android/app/build/intermediates -path '*release*' -name AndroidManifest.xml | grep -E 'bundle_manifest|packaged_manifests|merged_manifest' | head -1)`, then `grep -oE 'com.android.vending.BILLING|usesCleartextTraffic="[a-z]+"|android:versionCode="[0-9]+"|android:versionName="[^"]+"' "$M"`: BILLING present, no `usesCleartextTraffic="true"`, the version from step 2. Also no `RECORD_AUDIO` or `SYSTEM_ALERT_WINDOW` (`grep -c 'RECORD_AUDIO\|SYSTEM_ALERT_WINDOW' "$M"` is 0): `expo-image-picker` and Expo's template add them, and `android.blockedPermissions` in app.json takes them out (they'd show on the Play listing and in Data safety).
 - Push: the prebuild must not print `has no Android app baby.subby.app; building without push` (`google-services.json` missing or wrong).
 
 The user uploads it: Play Console → Testing (internal/closed) or Production → Create release.

@@ -1,6 +1,8 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../errorMessage';
 import * as Device from 'expo-device';
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
 import { and, count, eq, gt, notInArray } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { uuidv7 } from 'uuidv7';
@@ -12,7 +14,9 @@ import {
   belowFloors,
   pulledEpochs,
   entriesToRestore,
+  formerSelves,
   fromBase64,
+  installTag,
   newSymmetricKey,
   openFamilyKey,
   verifyDeviceLog,
@@ -35,9 +39,10 @@ import { requestNotifications } from '../reminders/scheduler';
 import { IdentityLostError, clearSyncSecrets, deviceIdentity, ensureDeviceIdentity, hasDeviceIdentity, loadFamilyKeys, saveFamilyKeys } from './keystore';
 import { blobIdsOf, childToBody, logToBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
-import { canWrite, forgetAccess, refreshEntitlement, useAccessStore } from './access';
+import { canWrite, forgetAccess, refreshEntitlement, restoreQuietly, useAccessStore } from './access';
 import { cancelInactivityWarning, planInactivityWarning } from './inactivity';
 import { followMove } from './move';
+import { removeDevices } from './family';
 import { applyOpened, applyPage, openAll, quietNextRun, takePulledLogs, type DeviceBody } from './apply';
 import { closeLive } from './live';
 import { INITIAL_STATUS, dropSession, newSyncSettings, saveSync, sessionFor, syncSettings, useSyncStore } from './state';
@@ -218,8 +223,18 @@ async function runOnce(): Promise<boolean> {
     const applied = pulled.applied || pushed.applied || merged;
     restarted ||= pulled.again;
     const photos = await downloadPhotos(api, (done) => useSyncStore.setState({ progress: { label: t('sync.progress.photos'), done } }));
-    // Phones set up before names existed (or whose name record was lost) name themselves once.
-    if (!syncSettings()?.names?.[settings.deviceId] && canWrite()) await pushDeviceName(defaultDeviceName());
+    // Phones set up before names (or tags) existed, whose name record was lost, or last written by another phone
+    // (a move): publish their own once.
+    const own = syncSettings();
+    const tag = thisInstallTag();
+    if (
+      canWrite() &&
+      (!own?.names?.[settings.deviceId] || own.nameVersions?.[settings.deviceId]?.deviceId !== settings.deviceId || (tag && own.tags?.[settings.deviceId] !== tag))
+    ) {
+      await pushDeviceName(own?.names?.[settings.deviceId] ?? defaultDeviceName());
+    }
+    // After the names: an earlier entry of this phone in the family goes.
+    restarted = (await removeFormerSelves(api, state, settings.deviceId).catch((e) => void console.warn('[sync] removing an earlier entry failed', e))) || restarted;
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
     syncEvent(`run ok in ${Date.now() - startedAt} ms: pulled ${pulled.applied ? 'new' : 'nothing'}, lastSeq ${syncSettings()?.lastSeq}${applied || photos ? ', stores reloaded' : ''}`); // TEMPORARY (A16)
@@ -561,6 +576,32 @@ async function resyncAfterRestore(api: SyncSession, floor: RestoreFloor, gen: nu
   quietNextRun();
   await saveSync({ lastSeq: 0, restoreGen: gen, floors: [...(settings.floors ?? []), floor], resyncedAt: Date.now() });
 }
+let ownTag: string | null | undefined;
+/** This phone's `installTag` (Android), or null (iOS: `formerSelves` goes by the signing key there; Expo Go). */
+function thisInstallTag(): string | null {
+  if (ownTag === undefined) {
+    try {
+      ownTag = Platform.OS === 'android' ? installTag(Application.getAndroidId()) : null;
+    } catch {
+      ownTag = null;
+    }
+  }
+  return ownTag;
+}
+
+/**
+ * This phone's entry from before a reset or reinstall (`formerSelves`) can never sync again: remove it, so it
+ * doesn't hold this store account's unlock, wait for a gift or sit in the list. Then the unlock follows quietly.
+ */
+async function removeFormerSelves(api: SyncSession, state: DeviceLogState, deviceId: string): Promise<boolean> {
+  const former = formerSelves(state, deviceId, thisInstallTag(), syncSettings()?.tags ?? {});
+  if (!former.length) return false;
+  syncEvent(`removing ${former.length} earlier entr${former.length === 1 ? 'y' : 'ies'} of this phone`); // TEMPORARY (A16)
+  await removeDevices(former);
+  void restoreQuietly(api).then((outcome) => outcome === 'moved' && requestSync(0, 'unlock'));
+  return true;
+}
+
 /** A sensible default name for this phone in the family's list, e.g. "Pixel 10". */
 export const defaultDeviceName = () => Device.modelName ?? Device.deviceName ?? t('sync.phone');
 
@@ -571,11 +612,13 @@ export async function pushDeviceName(name: string, deviceId?: string) {
   const api = sessionFor(settings);
   const { keys, epoch } = await refreshKeys(api);
   const id = deviceId ?? settings.deviceId;
+  const tag = id === settings.deviceId ? thisInstallTag() : null;
   const meta = { id, kind: 'device' as const, updatedAt: Date.now(), deviceId: settings.deviceId, deleted: false };
-  await api.push([sealRecord(keys.get(epoch)!, epoch, meta, { name } satisfies DeviceBody)]);
+  await api.push([sealRecord(keys.get(epoch)!, epoch, meta, { name, ...(tag ? { tag } : {}) } satisfies DeviceBody)]);
   await saveSync({
     names: { ...settings.names, [id]: name },
     nameVersions: { ...settings.nameVersions, [id]: { updatedAt: meta.updatedAt, deviceId: meta.deviceId } },
+    ...(tag ? { tags: { ...settings.tags, [id]: tag } } : {}),
   });
 }
 

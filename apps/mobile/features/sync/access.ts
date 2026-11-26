@@ -1,4 +1,5 @@
 import { t } from '@subby/shared/i18n';
+import { MINUTE_MS } from '@subby/shared';
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import * as Crypto from 'expo-crypto';
@@ -6,6 +7,7 @@ import { AppState } from 'react-native';
 import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess, type UnlockInUseResponse } from '@subby/shared/sync';
 import type { Purchase } from 'expo-iap';
 import { isHttpError, checkServer, isOfficialServer, type SyncSession } from './api';
+import { syncEvent } from './debugLog'; // TEMPORARY (A16)
 import { AlreadyOwned, PurchasePending, finish, ownedUnlock, purchase, storeName, storePrices, unsentPurchases } from './store';
 
 /**
@@ -49,7 +51,7 @@ export async function refreshEntitlement(api: SyncSession) {
     if (entitlement.access === 'free' || testPurchases) return;
     // Real store purchases belong to the official server only: a purchase token moves the unlock to whoever presents
     // it, so another server (misconfigured or hostile) must never see one.
-    if (isOfficialServer(api.server)) await checkStore(api);
+    if (isOfficialServer(api.server)) startStoreCheck(api);
     else {
       useAccessStore.setState({ prices: {} }); // nothing to buy there (`useStoreUnavailable`)
       storeAsked = false; // asked again on the official server
@@ -83,13 +85,31 @@ async function checkStore(api: SyncSession) {
     if (AppState.currentState !== 'active') return;
     for (const { purchase: p, kind } of await unsentPurchases(api.deviceId)) await send(api, p, kind);
   } catch (e) {
+    storeFailedAt = Date.now();
     console.warn('Store check failed', e); // i18n-ignore
   }
 }
 
+/** After a failed store check, how long until the next one. */
+const STORE_RETRY_MS = 10 * MINUTE_MS;
+let storeCheck: Promise<void> | null = null;
+let storeFailedAt: number | null = null;
+
+/**
+ * `checkStore` without waiting for it, one at a time. Play Billing that's missing or not answering takes ~30 s
+ * per call (seen on an emulator); awaited, it held up every sync run, and joining waited for three of them.
+ * After a failure it's left alone for `STORE_RETRY_MS`.
+ */
+function startStoreCheck(api: SyncSession) {
+  if (storeCheck || (storeFailedAt !== null && Math.abs(Date.now() - storeFailedAt) < STORE_RETRY_MS)) return;
+  storeCheck = checkStore(api).finally(() => {
+    storeCheck = null;
+  });
+}
+
 /**
  * Before sync is set up (or when moving to Subby Sync): the store's prices, so the price shown is in the account's
- * currency from the start. Once per app run, like `checkStore`; nothing on failure (`PRICE` is shown then).
+ * currency from the start. Once per app run, like `checkStore`; nothing on failure (no price is shown then).
  */
 export async function ensurePrices() {
   if (storeAsked || useAccessStore.getState().prices) return;
@@ -110,17 +130,27 @@ export function useStorePrice(kind: ProductKind) {
   return usePrice(kind);
 }
 
-/** The price shown before the stores tell us theirs (and in their place in the test store). */
-export const PRICE = '€6.99';
+/** The test store's price (nothing is charged there). */
+const TEST_PRICE = '€6.99';
 
-/** The price to show for `kind`: the store's, in the account's currency, else ours. */
-export const usePrice = (kind: ProductKind) => useAccessStore((s) => (s.testPurchases ? PRICE : (s.prices?.[kind] ?? PRICE)));
+/**
+ * The price to show for `kind`: the store's, in the account's currency. Null until the store answers (or where it
+ * can't sell): the screens then say it without a price, never a guess in another currency.
+ */
+export const usePrice = (kind: ProductKind): string | null => useAccessStore((s) => (s.testPurchases ? TEST_PRICE : (s.prices?.[kind] ?? null)));
 
 /** Whether buying works here: the test store on a server that takes it, or a store that knows the product. */
 export const canBuy = (kind: ProductKind = 'unlock') => {
   const { testPurchases, prices } = useAccessStore.getState();
   return testPurchases || Boolean(prices?.[kind]);
 };
+
+/**
+ * `canBuy` for rendering: re-renders when the store's prices arrive. Reading `canBuy()` while rendering didn't:
+ * the store's price was often the same text as the placeholder shown before it, so nothing else on the screen
+ * changed and the buttons stayed disabled.
+ */
+export const useCanBuy = (kind: ProductKind = 'unlock') => useAccessStore((s) => s.testPurchases || Boolean(s.prices?.[kind]));
 
 /** `canBuy`, and never the real store on another server than the official one (see `refreshEntitlement`). */
 const canBuyOn = (api: SyncSession, kind: ProductKind = 'unlock') =>
@@ -158,6 +188,8 @@ async function sendOnce(api: SyncSession, p: Purchase, kind: ProductKind, move: 
       throw taken;
     }
     if (isHttpError(e, 409) && /isn.t through/.test(e.message)) throw new PurchasePending(); // i18n-ignore
+    // Refunded or cancelled (Google keeps a refunded unlock "owned" on the phone, so Restore still finds it).
+    if (isHttpError(e, 403) && /cancelled|refunded/.test(e.message)) throw new Error(t('access.refunded')); // i18n-ignore
     if (!isHttpError(e) || e.status === 0 || e.status >= 500) throw new Error(t('access.sendLater'));
     throw e;
   }
@@ -229,20 +261,25 @@ export async function restore(api: SyncSession, { move = false } = {}) {
 }
 
 /**
- * Right after joining (a new phone, a reinstall): if this store account already has an unlock that no other phone
- * in use holds, it moves here without asking. In use elsewhere (a partner sharing the account), offline, or no
- * store: nothing; "Restore a purchase" on the Sync screen asks.
+ * After joining, and when the Sync screen opens on a phone without an unlock: if this store account already has an
+ * unlock that no other phone in use holds, it moves here without asking. In use elsewhere (a partner sharing the
+ * account, or this phone before a reinstall): the `UnlockInUse`, and the Sync screen asks once per holder. Offline,
+ * refunded or no store: nothing.
  */
-export async function restoreQuietly(api: SyncSession): Promise<boolean> {
+export async function restoreQuietly(api: SyncSession): Promise<'moved' | UnlockInUse | null> {
   try {
     const { testPurchases, entitlement } = useAccessStore.getState();
-    if (testPurchases || !canBuyOn(api) || !entitlement || entitlement.access === 'free' || entitlement.access === 'unlock') return false;
+    // Background runs don't open the billing connection.
+    if (AppState.currentState !== 'active' || testPurchases || !canBuyOn(api) || !entitlement || entitlement.access === 'free' || entitlement.access === 'unlock') return null;
     const owned = await ownedUnlock({ quiet: true });
-    if (!owned) return false;
+    syncEvent(`quiet restore: ${owned ? 'unlock found' : 'no unlock'}`); // TEMPORARY (A16)
+    if (!owned) return null;
     await send(api, owned, 'unlock');
-    return true;
-  } catch {
-    return false; // see above
+    return 'moved';
+  } catch (e) {
+    syncEvent(`quiet restore: ${e instanceof UnlockInUse ? 'in use' : 'failed'}`); // TEMPORARY (A16)
+    // In use elsewhere: the caller may ask (the Sync screen does). Refunded, offline, no store: nothing.
+    return e instanceof UnlockInUse ? e : null;
   }
 }
 

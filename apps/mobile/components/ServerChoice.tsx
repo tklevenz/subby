@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { FieldLabel, TextField } from './ui';
+import { View } from 'react-native';
+import { FieldLabel, LinkButton, TextField } from './ui';
 import { OFFICIAL_SERVER } from '../features/sync/api';
 
 /**
@@ -20,9 +20,9 @@ export function useServerChoice({ customOnly = false } = {}) {
   ) : null;
 
   const toggle = customOnly ? null : (
-    <Pressable onPress={() => setCustom(!custom)} hitSlop={8} className="items-center mt-4">
-      <Text className="text-violet-soft text-sm">{t(custom ? 'server.useOfficial' : 'server.useOwn')}</Text>
-    </Pressable>
+    <View className="mt-1">
+      <LinkButton label={t(custom ? 'server.useOfficial' : 'server.useOwn')} onPress={() => setCustom(!custom)} />
+    </View>
   );
 
   return { server: custom ? address : OFFICIAL_SERVER, ready: !custom || address.trim().length > 0, custom, field, toggle };

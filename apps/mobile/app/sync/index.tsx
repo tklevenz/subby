@@ -61,7 +61,7 @@ function SetUp() {
       <Button label={t(busy ? 'syncScreen.settingUp' : 'syncScreen.setUp')} onPress={start} disabled={busy || !ready} />
       <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
         {t('syncScreen.firstPhone')}
-        {custom ? t('syncScreen.ownFree') : t('syncScreen.trial', { price })}
+        {custom ? t('syncScreen.ownFree') : (price ? t('syncScreen.trial', { price }) : t('syncScreen.trialNoPrice'))}
       </Text>
       {toggle}
     </>
