@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Pressable, View, type AccessibilityActionEvent } from 'react-native';
+import { Animated, Pressable, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -143,15 +143,19 @@ export default function WheelColumn({
           const scale = scrollY.interpolate({ inputRange: range, outputRange: [0.82, 1, 0.82], extrapolate: 'clamp' });
           return (
             <Pressable onPress={() => tap(i)} accessible={false}>
-              <Animated.Text
-                className="text-ink text-[22px]"
-                style={{ height: ITEM_HEIGHT, lineHeight: ITEM_HEIGHT, textAlign: align, opacity, transform: [{ scale }], fontVariant: ['tabular-nums'] }}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                maxFontSizeMultiplier={1.35}
-              >
-                {item}
-              </Animated.Text>
+              {/* The row's height is fixed, so the text is centered in it rather than given a line height: a scaled
+                  line height overflowed the row and adjustsFontSizeToFit shrank the text to nothing. */}
+              <Animated.View style={{ height: ITEM_HEIGHT, justifyContent: 'center', opacity, transform: [{ scale }] }}>
+                <Text
+                  className="text-ink text-[22px]"
+                  style={{ textAlign: align, fontVariant: ['tabular-nums'] }}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  maxFontSizeMultiplier={1.35}
+                >
+                  {item}
+                </Text>
+              </Animated.View>
             </Pressable>
           );
         }}

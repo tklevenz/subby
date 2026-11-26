@@ -75,6 +75,16 @@ export default function HomeTiles({ child }: { child: Child }) {
     ]);
   };
 
+  // Home only scrolls at large text sizes. Then the undo bar would cover the end of "up next", so the content makes
+  // room for it; when everything fits, the tiles keep their size (room for the bar would shrink them while it shows).
+  const [viewport, setViewport] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [barHeight, setBarHeight] = useState(0);
+  const [room, setRoom] = useState(0);
+  const scrolls = contentHeight - room > viewport + 1;
+  const wantRoom = offer && scrolls ? barHeight + 12 : 0;
+  useEffect(() => setRoom(wantRoom), [wantRoom]);
+
   const others = TILES.filter((t) => t !== top);
   return (
     <View className="flex-1">
@@ -83,7 +93,9 @@ export default function HomeTiles({ child }: { child: Child }) {
         bounces={false}
         alwaysBounceVertical={false}
         overScrollMode="never"
-        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingBottom: 12, gap: 10 }}
+        onLayout={(e) => setViewport(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, h) => setContentHeight(h)}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingBottom: 12 + room, gap: 10 }}
       >
         <Tile tile={top} large content={content[top]} onLongPress={() => longPress(top)} />
         <View className="flex-1 flex-row gap-2.5">
@@ -96,6 +108,7 @@ export default function HomeTiles({ child }: { child: Child }) {
       {offer ? (
         <View
           accessibilityLiveRegion="polite"
+          onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
           className="absolute left-4 right-4 bottom-3 flex-row items-center bg-raised border border-line-strong rounded-xl pl-4 pr-1.5 py-1.5"
         >
           {offer.sub ? (
