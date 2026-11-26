@@ -250,8 +250,9 @@ function Tile({ tile, content, large, onLongPress }: { tile: HomeTile; content: 
   const s = STYLE[tile];
   const [height, setHeight] = useState(0);
   const { fontScale } = useWindowDimensions();
-  // Only enforce a floor at large system text sizes so small phones stay unscrollable at normal scale.
-  const minHeight = fontScale > 1.2 ? (large ? 172 : 144) : undefined;
+  // Only enforce a floor at large system text sizes so small phones stay unscrollable at normal scale;
+  // scale the floor with fontScale so tiles don't clip at Android's 2× or iOS's accessibility sizes.
+  const minHeight = fontScale > 1.2 ? Math.round((large ? 172 : 144) * Math.min(fontScale, 2.5)) : undefined;
   // Discard sits in the bottom-right; a small tile has room only for a round ✕ beside the lines.
   const discard = content.onDiscard ? (
     <Pressable
