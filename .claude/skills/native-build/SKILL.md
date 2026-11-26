@@ -12,6 +12,8 @@ description: Build and install Subby's native Android/iOS apps locally (no EAS) 
 
 ## Android release builds
 - **Release builds don't notice changes in `packages/shared` alone**: Gradle's JS bundle task only watches the app, so after a shared-only change run `./gradlew :app:createBundleReleaseJsAndAssets --rerun` first (or the APK ships the old bundle).
+- **Gradle out of memory:** a fresh prebuild (e.g. in a new worktree, which has no `android/` of its own) can kill the daemon with "running out of JVM Metaspace" and no APK. Pass more on the command line instead of editing the generated `gradle.properties`: `./gradlew "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1536m" assembleRelease …`.
+- **`INSTALL_FAILED_VERSION_DOWNGRADE`:** the device has a higher versionCode (`install -d` doesn't help on a user build). To keep its data, set `android.versionCode` in `app.json` to the installed one, run `npx expo prebuild --platform android` (no `--clean`), put `app.json` back, then build.
 - `./gradlew assembleRelease`: Gradle runs the Expo CLI directly, without pnpm's `NODE_PATH`, so Babel resolves presets from `apps/mobile/node_modules`. That's why `babel-preset-expo` and `@babel/plugin-transform-react-jsx` (named by NativeWind's preset) are direct devDependencies; keep them.
 - **Standalone builds for a LAN server**: `app.config.js` adds `usesCleartextTraffic` (via `expo-build-properties`) only when `SUBBY_ALLOW_HTTP=1` is set during prebuild:
   `SUBBY_ALLOW_HTTP=1 npx expo prebuild --clean --platform android && (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a)`

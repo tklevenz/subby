@@ -48,6 +48,14 @@ paths:
   - `datetime` mode: day ("Today", "Yesterday", "Sat, Oct 24"…, a year back or to the value), hour and minute, plus AM/PM on a 12-hour clock.
   - `date` mode (birth date): day, month and year.
   - A value past `maximumDate` saves as the maximum.
+  - Each wheel is one `adjustable` control for screen readers (label "Hour", value "4", increment/decrement); its rows are hidden from them.
+
+## Accessibility (A12)
+- Every `Pressable` gets `accessibilityRole`; an icon-only one also an `accessibilityLabel` (`…A11y` keys). `TextField`s and `Toggle`s get the label of the `FieldLabel`/row they sit in. Decorative SVGs (icons, brand subs, chart drawings) are hidden (`accessibilityElementsHidden` + `importantForAccessibility="no-hide-descendants"`); a chart that matters gets a summary label instead.
+- Modals: a scrim that is the only way out is a labelled Close button; otherwise it's hidden, and the sheet has `onAccessibilityEscape`. Don't put `accessibilityViewIsModal` beside the only Close control (VoiceOver can't reach it); a RN `Modal` already shuts out the screen behind.
+- Reduced motion: `useReducedMotion()` (Reanimated) sets `animationType="none"` on modals, the stack's `animation`, and skips sheet slides and wheel scroll animations.
+- Font scaling: no fixed heights around text (`min-h-*`), `adjustsFontSizeToFit` only on single lines whose box isn't a fixed height with a matching `lineHeight` (the scaled line height overflows and the text shrinks to nothing: the wheel's rows did). Home scrolls only when the content doesn't fit; the tiles' minimum height applies above 1.2× text.
+- Check on the emulator with `adb shell settings put system font_scale 2.0` and `uiautomator dump --compressed` (what TalkBack reads). adb taps and key presses don't drive TalkBack, so gestures need a person.
 
 ## Brand
 - The design canvas row "Subby 1 in the app" maps where the brand goes on every screen; on Home the brand lives only in the sleep tile and its Undo bar (canvas row "Subby on Home").
