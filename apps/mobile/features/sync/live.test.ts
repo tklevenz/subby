@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// TEMPORARY (A16): the sync event log writes to the database.
-vi.mock('./debugLog', () => ({ syncEvent: () => {} }));
 vi.mock('./state', () => ({
   syncSettings: () => ({ server: 'https://sync.example.com' }),
   sessionFor: () => ({ live: async () => ({ url: 'wss://sync.example.com/v1/live', token: 'tok' }) }),

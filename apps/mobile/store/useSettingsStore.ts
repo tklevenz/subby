@@ -121,6 +121,11 @@ export const useSettingsStore = create<SettingsState>((setState) => ({
   hydrate: async () => {
     const rows = await db.select().from(schema.settingsTable);
     const stored = Object.fromEntries(rows.map((r) => [r.key, r.value])) as Partial<Settings>;
+    // The dogfooding sync event log (until versionCode 10) left its row on those phones.
+    if ('debugSyncLog' in stored) {
+      delete (stored as Record<string, unknown>).debugSyncLog;
+      await db.delete(schema.settingsTable).where(eq(schema.settingsTable.key, 'debugSyncLog'));
+    }
     // Nested defaults, so reminder kinds added later get their defaults too.
     const reminders = { ...DEFAULTS.reminders, ...stored.reminders };
     const familyAlerts = { ...DEFAULTS.familyAlerts, ...stored.familyAlerts };

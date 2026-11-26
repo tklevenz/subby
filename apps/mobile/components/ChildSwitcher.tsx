@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AngleDown, AngleRight, Check, Plus } from './icons';
 import { formatAge } from '@subby/shared';
+import { useNow } from '../store/timeHelpers';
 import { useChildStore } from '../store/useChildStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useActiveChild } from '../store/useActiveChild';
@@ -17,6 +18,8 @@ export default function ChildSwitcher() {
   const setSetting = useSettingsStore((s) => s.set);
   const active = useActiveChild();
   const [open, setOpen] = useState(false);
+  // Home can stay open past midnight: the age moves on without a redraw from anything else.
+  const now = useNow(60_000);
 
   const choose = (id: string) => {
     void Haptics.selectionAsync();
@@ -42,7 +45,7 @@ export default function ChildSwitcher() {
             <Text className="text-xl font-bold text-ink">{active?.name ?? 'Subby'}</Text>
             <AngleDown color={colors.inkFaint} size={16} style={{ marginLeft: 4 }} />
           </View>
-          {active ? <Text className="text-[13px] text-ink-muted">{formatAge(active.birthDate, Date.now())}</Text> : null}
+          {active ? <Text className="text-[13px] text-ink-muted">{formatAge(active.birthDate, now)}</Text> : null}
         </Pressable>
       </View>
 
@@ -55,7 +58,7 @@ export default function ChildSwitcher() {
                   <ChildAvatar child={c} size={36} />
                   <View className="flex-1 ml-3">
                     <Text className="text-ink text-base">{c.name}</Text>
-                    <Text className="text-ink-faint text-xs">{formatAge(c.birthDate, Date.now())}</Text>
+                    <Text className="text-ink-faint text-xs">{formatAge(c.birthDate, now)}</Text>
                   </View>
                   {c.id === active?.id ? <Check color={colors.violetStrong} size={18} /> : null}
                 </Pressable>

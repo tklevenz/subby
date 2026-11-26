@@ -7,7 +7,6 @@ import { AppState } from 'react-native';
 import { PRODUCTS, type EntitlementResponse, type ProductKind, type SyncAccess, type UnlockInUseResponse } from '@subby/shared/sync';
 import type { Purchase } from 'expo-iap';
 import { isHttpError, checkServer, isOfficialServer, type SyncSession } from './api';
-import { syncEvent } from './debugLog'; // TEMPORARY (A16)
 import { AlreadyOwned, PurchasePending, finish, ownedUnlock, purchase, storeName, storePrices, unsentPurchases } from './store';
 
 /**
@@ -272,12 +271,10 @@ export async function restoreQuietly(api: SyncSession): Promise<'moved' | Unlock
     // Background runs don't open the billing connection.
     if (AppState.currentState !== 'active' || testPurchases || !canBuyOn(api) || !entitlement || entitlement.access === 'free' || entitlement.access === 'unlock') return null;
     const owned = await ownedUnlock({ quiet: true });
-    syncEvent(`quiet restore: ${owned ? 'unlock found' : 'no unlock'}`); // TEMPORARY (A16)
     if (!owned) return null;
     await send(api, owned, 'unlock');
     return 'moved';
   } catch (e) {
-    syncEvent(`quiet restore: ${e instanceof UnlockInUse ? 'in use' : 'failed'}`); // TEMPORARY (A16)
     // In use elsewhere: the caller may ask (the Sync screen does). Refunded, offline, no store: nothing.
     return e instanceof UnlockInUse ? e : null;
   }

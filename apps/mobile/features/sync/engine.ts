@@ -30,7 +30,6 @@ import { db, schema } from '../../db/client';
 import { markAllPending } from './pending';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
-import { syncEvent } from './debugLog'; // TEMPORARY (A16)
 import { activeChildOf } from '../../store/useActiveChild';
 import { useSettingsStore, type SyncSettings } from '../../store/useSettingsStore';
 import { checkServer, createFamily, isHttpError, normalizeServerUrl, sealEpochs, sealTo, SyncHttpError, SyncSession } from './api';
@@ -160,9 +159,8 @@ export function syncNow(): Promise<void> {
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 /** Debounced trigger for local writes, app foreground and live notifications. */
-export function requestSync(delayMs = 1500, why = 'write') {
+export function requestSync(delayMs = 1500) {
   if (!syncSettings()) return;
-  syncEvent(`sync requested (${why})`); // TEMPORARY (A16)
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = null;
@@ -178,8 +176,6 @@ async function runOnce(): Promise<boolean> {
     return false;
   }
   useSyncStore.setState({ phase: 'syncing', error: null });
-  const startedAt = Date.now(); // TEMPORARY (A16)
-  syncEvent(`run start, lastSeq ${settings.lastSeq}`); // TEMPORARY (A16)
   try {
     // Another phone moved the family: follow it before anything else touches the old one.
     if (settings.move) {
@@ -237,7 +233,6 @@ async function runOnce(): Promise<boolean> {
     restarted = (await removeFormerSelves(api, state, settings.deviceId).catch((e) => void console.warn('[sync] removing an earlier entry failed', e))) || restarted;
     await saveSync({ lastSyncedAt: Date.now() });
     if (applied || photos) await reloadStores();
-    syncEvent(`run ok in ${Date.now() - startedAt} ms: pulled ${pulled.applied ? 'new' : 'nothing'}, lastSeq ${syncSettings()?.lastSeq}${applied || photos ? ', stores reloaded' : ''}`); // TEMPORARY (A16)
     await notifyFamily(takePulledLogs()).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
     await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e)); // i18n-ignore
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, identityLost: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
@@ -252,7 +247,6 @@ async function runOnce(): Promise<boolean> {
     const identityLost = e instanceof IdentityLostError;
     const removed = !identityLost && isRemoved(e);
     const message = removed ? t('sync.error.removed') : errorMessage(e);
-    syncEvent(`run failed after ${Date.now() - startedAt} ms: ${message}`); // TEMPORARY (A16)
     useSyncStore.setState({ phase: 'error', error: message, lastError: { message, at: Date.now() }, removed, identityLost, progress: null, pending: await pendingCount() });
     if (removed && !syncSettings()?.removedNotified) {
       await notifyRemoved().catch((n) => console.warn('Removed notification failed', n)); // i18n-ignore
@@ -448,7 +442,6 @@ async function pushAll(api: SyncSession, settings: SyncSettings, { keys, epoch, 
     // The server takes at most MAX_REQUEST_BYTES per request: a batch of large notes goes up in several.
     for (const chunk of pushChunks(records)) {
       const res = await api.push(chunk);
-      syncEvent(`pushed ${chunk.length}`); // TEMPORARY (A16)
 
       // The winning versions the server sent back for stale ones, of any epoch we hold, unless the log closed that
       // epoch before them. A stale row is settled only if one of them beats it; it's replaced below. Otherwise
@@ -596,9 +589,8 @@ function thisInstallTag(): string | null {
 async function removeFormerSelves(api: SyncSession, state: DeviceLogState, deviceId: string): Promise<boolean> {
   const former = formerSelves(state, deviceId, thisInstallTag(), syncSettings()?.tags ?? {});
   if (!former.length) return false;
-  syncEvent(`removing ${former.length} earlier entr${former.length === 1 ? 'y' : 'ies'} of this phone`); // TEMPORARY (A16)
   await removeDevices(former);
-  void restoreQuietly(api).then((outcome) => outcome === 'moved' && requestSync(0, 'unlock'));
+  void restoreQuietly(api).then((outcome) => outcome === 'moved' && requestSync(0));
   return true;
 }
 

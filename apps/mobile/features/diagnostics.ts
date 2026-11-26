@@ -11,7 +11,6 @@ import { isOfficialServer } from './sync/api';
 import { useSyncStore } from './sync/state';
 import { useAccessStore } from './sync/access';
 import { backgroundStatus } from './sync/background';
-import { syncEvents } from './sync/debugLog'; // TEMPORARY (A16)
 
 const when = (ms: number | null | undefined, now: number) => {
   if (!ms) return 'never';
@@ -75,9 +74,6 @@ export async function diagnostics(now = Date.now()): Promise<string> {
       if (access.photoLimit) lines.push(`Photos on the server: ${Math.round(access.photoBytes / 1e6)} of ${Math.round(access.photoLimit / 1e6)} MB`);
     }
   }
-  // TEMPORARY (A16): the sync event log, newest first. Remove with features/sync/debugLog.ts before the store release.
-  const events = await safely(syncEvents, 'unreadable');
-  lines.push('', 'Sync events (temporary, newest first):', ...(typeof events === 'string' ? [events] : events.reverse()));
   return lines.join('\n');
 }
 

@@ -1,7 +1,6 @@
 import type { LiveMessage } from '@subby/shared/sync';
 import { LIVE_HEARTBEAT_MS } from '@subby/shared/sync';
 import { sessionFor, syncSettings } from './state';
-import { syncEvent } from './debugLog'; // TEMPORARY (A16)
 
 let socket: WebSocket | null = null;
 let retry: ReturnType<typeof setTimeout> | null = null;
@@ -28,7 +27,6 @@ function stopWatchdog() {
 
 function scheduleRetry(onNotify: () => void) {
   missed = true;
-  syncEvent(`live: retry in ${Math.min(30_000, 1000 * 2 ** attempts)} ms`); // TEMPORARY (A16)
   retry = setTimeout(() => void openLive(onNotify), Math.min(30_000, 1000 * 2 ** attempts++));
 }
 
@@ -57,7 +55,6 @@ export async function openLive(onNotify: () => void, inUrl?: boolean) {
     // server counts as URL-only once the socket with the token in the URL has stayed open for a while. Otherwise a
     // stale token, refused either way, would mark a current server as URL-only.
     ws.onopen = () => {
-      syncEvent('live: open'); // TEMPORARY (A16)
       attempts = 0;
       if (legacy) confirm = setTimeout(() => tokenInUrl.add(settings.server), URL_ONLY_AFTER_MS);
       if (missed) {
@@ -77,7 +74,6 @@ export async function openLive(onNotify: () => void, inUrl?: boolean) {
         stopWatchdog();
         watchdog = setTimeout(() => {
           if (socket !== ws) return;
-          syncEvent('live: no heartbeat, reconnecting'); // TEMPORARY (A16)
           drop();
           missed = true;
           attempts = 0;
@@ -85,12 +81,9 @@ export async function openLive(onNotify: () => void, inUrl?: boolean) {
         }, STALE_AFTER_MS);
       }
       if (message?.type === 'ping') return;
-      syncEvent(`live: message ${typeof m.data === 'string' ? m.data.slice(0, 60) : ''}`); // TEMPORARY (A16)
       onNotify();
     };
-    ws.onerror = (e) => syncEvent(`live: error ${(e as { message?: string }).message ?? ''}`); // TEMPORARY (A16)
     ws.onclose = (e) => {
-      syncEvent(`live: closed ${e.code} ${e.reason ?? ''}`); // TEMPORARY (A16)
       if (socket !== ws) return;
       if (confirm) clearTimeout(confirm);
       confirm = null;
@@ -103,7 +96,6 @@ export async function openLive(onNotify: () => void, inUrl?: boolean) {
     };
   } catch (e) {
     if (gen !== generation) return;
-    syncEvent(`live: connect failed ${e instanceof Error ? e.message : ''}`); // TEMPORARY (A16)
     scheduleRetry(onNotify);
   } finally {
     opening = false;
@@ -128,6 +120,5 @@ export function closeLive() {
   if (retry) clearTimeout(retry);
   retry = null;
   missed = false; // coming back to the foreground syncs anyway
-  syncEvent(`live: closing (app left)${socket ? '' : ', no socket'}`); // TEMPORARY (A16)
   drop();
 }
