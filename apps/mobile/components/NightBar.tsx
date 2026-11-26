@@ -12,7 +12,11 @@ export default function NightBar({ stretches }: { stretches: { start: number; en
     parts.push({ asleep: true, ms: s.end - s.start });
   });
   return (
-    <View className="flex-row h-2.5 rounded-full overflow-hidden gap-0.5">
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="flex-row h-2.5 rounded-full overflow-hidden gap-0.5"
+    >
       {parts.map((part, i) => (
         <View key={i} className={part.asleep ? 'bg-violet-deep' : 'bg-amber-pale'} style={{ flex: Math.max(part.ms, 1) }} />
       ))}

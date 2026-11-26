@@ -50,8 +50,8 @@ export default function HistoryScreen() {
       {/* The day and its totals stay put; only the timeline scrolls. */}
       <View className="px-4">
         <View className="flex-row items-center justify-between my-2">
-          <NavButton icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -1))} />
-          <View className="items-center">
+          <NavButton label={t('history.prevDay')} icon={<AngleLeft color={colors.inkSoft} size={20} />} onPress={() => setAnchor(addDays(anchor, -1))} />
+          <View className="items-center flex-1 mx-2">
             {/* The date opens a month calendar to jump to any day. */}
             <Pressable
               onPress={() => setPicking(true)}
@@ -60,18 +60,19 @@ export default function HistoryScreen() {
               accessibilityLabel={t('history.pickDay', { day: title })}
               className="flex-row items-center"
             >
-              <Text className="text-ink font-semibold text-base">{title}</Text>
+              <Text className="text-ink font-semibold text-base text-center">{title}</Text>
               <AngleDown color={colors.inkFaint} size={12} style={{ marginLeft: 6 }} />
             </Pressable>
             {anchor === today ? (
-              subtitle ? <Text className="text-ink-muted text-xs">{subtitle}</Text> : null
+              subtitle ? <Text className="text-ink-muted text-xs text-center">{subtitle}</Text> : null
             ) : (
-              <Pressable onPress={() => setAnchor(today)} hitSlop={8}>
+              <Pressable onPress={() => setAnchor(today)} hitSlop={8} accessibilityRole="button">
                 <Text className="text-violet-soft text-xs font-semibold">{t('history.backToToday')}</Text>
               </Pressable>
             )}
           </View>
           <NavButton
+            label={t('history.nextDay')}
             icon={<AngleRight color={anchor >= today ? colors.lineStrong : colors.inkSoft} size={20} />}
             disabled={anchor >= today}
             onPress={() => setAnchor(Math.min(addDays(anchor, 1), today))}
@@ -105,9 +106,17 @@ function atTimeOfDay(day: number, now: number): number {
   return d.getTime();
 }
 
-function NavButton({ icon, onPress, disabled }: { icon: React.ReactNode; onPress: () => void; disabled?: boolean }) {
+function NavButton({ label, icon, onPress, disabled }: { label: string; icon: React.ReactNode; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={10} className="w-9 h-9 rounded-full bg-surface items-center justify-center">
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      className="w-9 h-9 rounded-full bg-surface items-center justify-center"
+    >
       {icon}
     </Pressable>
   );

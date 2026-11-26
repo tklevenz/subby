@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Pressable, TextInput, Platform, Switch, type SwitchProps, type TextInputProps, type TextProps } from 'react-native';
+import React, { useEffect } from 'react';
+import { AccessibilityInfo, View, Text, Pressable, TextInput, Platform, Switch, type SwitchProps, type TextInputProps, type TextProps } from 'react-native';
 import { AngleRight } from './icons';
 import { SubLoader } from './brand/loaders';
 import * as Haptics from 'expo-haptics';
@@ -10,12 +10,14 @@ export function Chip({
   selected,
   onPress,
   icon,
+  accessibilityLabel,
 }: {
   /** Shown before the label. */
   icon?: React.ReactNode;
   label: string;
   selected: boolean;
   onPress: () => void;
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
@@ -23,6 +25,9 @@ export function Chip({
         void Haptics.selectionAsync();
         onPress();
       }}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ selected }}
       className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full border ${
         selected ? 'bg-violet/30 border-violet-strong/60' : 'bg-raised border-line-strong'
       }`}
@@ -102,13 +107,15 @@ export function Button({
   return (
     <Pressable
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       onPress={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
       className={`${bg} rounded-xl py-3.5 px-5 items-center mt-4 ${disabled ? 'opacity-40' : ''}`}
     >
-      <Text className={`${variant === 'dangerQuiet' ? 'text-red-soft' : 'text-ink'} font-semibold text-base`}>{label}</Text>
+      <Text className={`${variant === 'dangerQuiet' ? 'text-red-soft' : 'text-ink'} font-semibold text-base text-center`}>{label}</Text>
     </Pressable>
   );
 }
@@ -127,7 +134,11 @@ export function Toggle(props: SwitchProps) {
 
 /** The uppercase label above a group of cards. */
 export function SectionLabel({ children, className = 'mt-6 mb-2' }: { children: React.ReactNode; className?: string }) {
-  return <Text className={`text-xs font-semibold text-ink-muted uppercase ml-1 ${className}`}>{children}</Text>;
+  return (
+    <Text accessibilityRole="header" className={`text-xs font-semibold text-ink-muted uppercase ml-1 ${className}`}>
+      {children}
+    </Text>
+  );
 }
 
 /** A screen's opening paragraph. */
@@ -136,8 +147,16 @@ export function Lead({ className = '', ...props }: TextProps & { className?: str
 }
 
 /** Something went wrong. */
-export function ErrorText({ className = 'mt-3', ...props }: TextProps & { className?: string }) {
-  return <Text {...props} className={`text-red-soft text-sm leading-5 ${className}`} />;
+export function ErrorText({ className = 'mt-3', children, ...props }: TextProps & { className?: string }) {
+  const text = typeof children === 'string' ? children : undefined;
+  useEffect(() => {
+    if (Platform.OS === 'ios' && text) AccessibilityInfo.announceForAccessibility(text);
+  }, [text]);
+  return (
+    <Text accessibilityLiveRegion="polite" accessibilityRole="alert" {...props} className={`text-red-soft text-sm leading-5 ${className}`}>
+      {children}
+    </Text>
+  );
 }
 
 /** Worth knowing before going on. */
@@ -147,7 +166,7 @@ export function WarningText({ className = 'mt-3', ...props }: TextProps & { clas
 
 /** A step's heading on the pairing, recovery, backup and similar screens. */
 export function ScreenTitle({ className = '', ...props }: TextProps & { className?: string }) {
-  return <Text {...props} className={`text-ink text-xl font-bold ${className}`} />;
+  return <Text accessibilityRole="header" {...props} className={`text-ink text-xl font-bold ${className}`} />;
 }
 
 /** The small footnote under a card or button. */
@@ -159,7 +178,7 @@ export function Hint({ className = '', ...props }: TextProps & { className?: str
 export function Notice({ onPress, className = '', children }: { onPress?: () => void; className?: string; children: React.ReactNode }) {
   const box = `rounded-xl border border-amber/40 bg-amber/10 p-3 ${className}`;
   return onPress ? (
-    <Pressable onPress={onPress} className={box}>
+    <Pressable onPress={onPress} accessibilityRole="button" className={box}>
       {children}
     </Pressable>
   ) : (
@@ -221,22 +240,29 @@ export function Row({ label, value, onPress, right, action, last }: RowProps) {
   const content = (
     <>
       <Text className="flex-1 text-ink text-base">{label}</Text>
-      {value ? <Text className="text-ink-muted text-base">{value}</Text> : null}
+      {value ? <Text className="text-ink-muted text-base text-right shrink">{value}</Text> : null}
       {right}
     </>
   );
   if (action) {
     return (
       <View className={`flex-row items-center ${line}`}>
-        <Pressable onPress={onPress} disabled={!onPress} className="flex-1 flex-row items-center pl-4 py-3.5">
-          {content}
-        </Pressable>
+        {onPress ? (
+          <Pressable onPress={onPress} accessibilityRole="button" className="flex-1 flex-row items-center gap-2 pl-4 py-3.5">
+            {content}
+          </Pressable>
+        ) : (
+          <View className="flex-1 flex-row items-center gap-2 pl-4 py-3.5">{content}</View>
+        )}
         <View className="px-4">{action}</View>
       </View>
     );
   }
+  if (!onPress) {
+    return <View className={`flex-row items-center gap-2 px-4 py-3.5 ${line}`}>{content}</View>;
+  }
   return (
-    <Pressable onPress={onPress} disabled={!onPress} className={`flex-row items-center px-4 py-3.5 ${line}`}>
+    <Pressable onPress={onPress} accessibilityRole="button" className={`flex-row items-center gap-2 px-4 py-3.5 ${line}`}>
       {content}
     </Pressable>
   );

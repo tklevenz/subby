@@ -26,7 +26,7 @@ export default function LicensesScreen() {
         const last = index === PACKAGES.length - 1;
         return (
           <View className={`bg-surface border-line border-x ${first ? 'border-t rounded-t-2xl' : ''} ${last ? 'border-b rounded-b-2xl' : 'border-b'}`}>
-            <Pressable onPress={() => setOpen(shown ? null : item.name)} className="px-4 py-3" accessibilityState={{ expanded: shown }}>
+            <Pressable onPress={() => setOpen(shown ? null : item.name)} accessibilityRole="button" className="px-4 py-3" accessibilityState={{ expanded: shown }}>
               <Text className="text-ink text-base">{item.name}</Text>
               <Text className="text-ink-muted text-sm mt-0.5">
                 {item.version} · {item.license}

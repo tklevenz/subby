@@ -197,7 +197,14 @@ export function AccessCard() {
       {needsUnlock ? (
         <>
           <Button label={t('access.unlockButton', { price })} variant={access === 'trial' ? 'ghost' : 'primary'} onPress={() => run((api) => buy(api, 'unlock'))} disabled={busy || !canBuy('unlock')} />
-          <Pressable onPress={() => run((api) => restore(api))} disabled={busy || !canBuy('unlock')} className="items-center mt-3" hitSlop={8}>
+          <Pressable
+            onPress={() => run((api) => restore(api))}
+            disabled={busy || !canBuy('unlock')}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy || !canBuy('unlock') }}
+            className="items-center mt-3"
+            hitSlop={8}
+          >
             <Text className={`text-violet-soft text-sm ${canBuy('unlock') ? '' : 'opacity-40'}`}>{t('access.restore')}</Text>
           </Pressable>
           {testStore || unavailable ? (
@@ -259,7 +266,7 @@ export function AccessBanner() {
       ? t('access.bannerReadOnly')
       : t(joinedAfterTrial(entitlement) ? 'access.bannerGraceLate' : 'access.bannerGrace', { until: formatUntil(entitlement?.graceEndsAt ?? now, now) });
   return (
-    <Pressable onPress={() => router.push('/sync')} className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
+    <Pressable onPress={() => router.push('/sync')} accessibilityRole="button" className="mx-4 mb-2 rounded-xl px-4 py-3 bg-amber/10 border border-amber/40">
       <Text className="text-ink text-sm leading-5">{text}</Text>
     </Pressable>
   );

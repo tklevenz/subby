@@ -12,6 +12,7 @@ export function CommonFields({ payload, onChange }: { payload: LogPayload; onCha
       <TextField
         value={payload.notes ?? ''}
         onChangeText={(notes) => onChange({ notes: notes || undefined })}
+        accessibilityLabel={t('logSheet.notes')}
         placeholder={t('logSheet.optional')}
         multiline
         style={{ minHeight: 56, textAlignVertical: 'top' }}

@@ -71,12 +71,9 @@ export default function RemindersScreen() {
           </Text>
         </Notice>
       ) : blocked ? (
-        <Notice className="mb-4">
+        <Notice className="mb-4" onPress={() => void Linking.openSettings()}>
           <Text className="text-amber-pale text-sm leading-5">
-            {t('reminders.off')}{' '}
-            <Text className="underline" onPress={() => Linking.openSettings()}>
-              {t('reminders.openSettings')}
-            </Text>
+            {t('reminders.off')} <Text className="underline">{t('reminders.openSettings')}</Text>
             {t('reminders.toAllow')}
           </Text>
         </Notice>
@@ -89,7 +86,12 @@ export default function RemindersScreen() {
             <Text className="text-ink text-base font-semibold">{t('reminders.allow')}</Text>
             <Text className="text-ink-muted text-xs mt-1 leading-4">{t('reminders.allowHint')}</Text>
           </View>
-          <Toggle value={reminders.enabled} onValueChange={(on) => setRemindersEnabled(on).then(replanAndRefresh)} disabled={!remindersAvailable} />
+          <Toggle
+            accessibilityLabel={t('reminders.allow')}
+            value={reminders.enabled}
+            onValueChange={(on) => setRemindersEnabled(on).then(replanAndRefresh)}
+            disabled={!remindersAvailable}
+          />
         </View>
       ) : null}
 
@@ -209,7 +211,7 @@ function Section({
           <Text className="text-ink text-base font-semibold">{title}</Text>
           <Text className="text-ink-muted text-xs mt-1 leading-4">{description}</Text>
         </View>
-        <Toggle value={enabled} onValueChange={onToggle} disabled={!remindersAvailable} />
+        <Toggle accessibilityLabel={title} value={enabled} onValueChange={onToggle} disabled={!remindersAvailable} />
       </View>
       {enabled && children ? <View className="mt-3">{children}</View> : null}
     </View>

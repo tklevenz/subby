@@ -210,11 +210,13 @@ function Section({
     <View className="mt-5 bg-surface border border-line rounded-2xl p-4">
       <View className="flex-row items-center gap-2 mb-3">
         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-        <Text className="text-ink font-semibold text-base">{title}</Text>
+        <Text accessibilityRole="header" className="text-ink font-semibold text-base">
+          {title}
+        </Text>
       </View>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2 mb-4">
         {stats.map(([label, value, dot]) => (
-          <View key={label}>
+          <View key={label} accessible>
             <View className="flex-row items-center gap-1">
               {dot ? <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dot }} /> : null}
               <Text className="text-ink-faint text-[11px]">{label}</Text>

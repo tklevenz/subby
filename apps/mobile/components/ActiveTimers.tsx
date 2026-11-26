@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -25,22 +26,24 @@ export default function ActiveTimers() {
 
   return (
     <View className="mx-4 mt-2 gap-2">
-      {timers.map((t) => {
-        const d = logDisplay(t, units, formatTime);
+      {timers.map((entry) => {
+        const d = logDisplay(entry, units, formatTime);
         return (
-          <View key={t.id} className={`flex-row items-center rounded-xl border ${d.bg}`}>
-            <Pressable onPress={() => router.push(`/entry/${t.id}`)} className="flex-1 flex-row items-center pl-3 py-2.5">
+          <View key={entry.id} className={`flex-row items-center rounded-xl border ${d.bg}`}>
+            <Pressable onPress={() => router.push(`/entry/${entry.id}`)} accessibilityRole="button" className="flex-1 flex-row items-center pl-3 py-2.5">
               {d.icon}
               <Text className="text-ink font-medium ml-2 flex-1">{d.label}</Text>
-              <Text className="text-ink font-semibold mr-3">{formatDuration(now - t.startedAt)}</Text>
+              <Text className="text-ink font-semibold mr-3">{formatDuration(now - entry.startedAt)}</Text>
             </Pressable>
             <Pressable
               hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('timers.stopA11y', { label: d.label })}
               onPress={once(async () => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                await stopTimer(t.id);
+                await stopTimer(entry.id);
                 // Pumped amount is only known at the end: go straight to the editor (once, on a double tap too).
-                if (t.payload.type === 'pumping') router.push(`/entry/${t.id}`);
+                if (entry.payload.type === 'pumping') router.push(`/entry/${entry.id}`);
               })}
               className="bg-raised rounded-full p-2 mr-3"
             >

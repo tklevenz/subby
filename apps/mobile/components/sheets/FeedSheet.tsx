@@ -41,13 +41,17 @@ function SideButton({ side, secs, active, hint, onPress }: { side: Side; secs: n
   return (
     <Pressable
       onPress={onPress}
-      className={`flex-1 items-center rounded-2xl border py-6 ${active ? 'bg-cyan/30 border-cyan-soft' : 'bg-raised border-line-strong'}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      className={`flex-1 items-center rounded-2xl border py-6 px-2 ${active ? 'bg-cyan/30 border-cyan-soft' : 'bg-raised border-line-strong'}`}
     >
       <Text className="text-ink-soft text-sm font-medium">{t(side === 'left' ? 'feed.left' : 'feed.right')}</Text>
-      <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }}>{formatTimerFace(secs)}</Text>
-      <View className="flex-row items-center mt-1 h-4">
+      <Text className="text-ink text-3xl font-bold mt-1" style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
+        {formatTimerFace(secs)}
+      </Text>
+      <View className="flex-row items-center mt-1 min-h-4">
         {active ? <Pause color={colors.cyanPale} size={12} /> : null}
-        <Text className="text-xs text-cyan-pale ml-1">{active ? t('feedSheet.tapToPause') : hint ? t('feedSheet.suggested') : ''}</Text>
+        <Text className="text-xs text-cyan-pale ml-1 text-center">{active ? t('feedSheet.tapToPause') : hint ? t('feedSheet.suggested') : ''}</Text>
       </View>
     </Pressable>
   );
@@ -150,13 +154,25 @@ function BottleTab({ onDone }: { onDone: () => void }) {
         ))}
       </View>
       <View className="flex-row items-center justify-center mt-3 gap-4">
-        <Pressable onPress={() => setAmountMl((a) => Math.max(step, a - step))} className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center">
+        <Pressable
+          onPress={() => setAmountMl((a) => Math.max(step, a - step))}
+          accessibilityRole="button"
+          accessibilityLabel={t('feedSheet.decreaseAmount')}
+          hitSlop={6}
+          className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center"
+        >
           <Minus color={colors.inkMuted} size={18} />
         </Pressable>
-        <Text className="text-lg font-bold text-ink w-24 text-center">
+        <Text accessibilityLiveRegion="polite" className="text-lg font-bold text-ink min-w-24 px-1 text-center">
           {formatVolume(amountMl, units)}
         </Text>
-        <Pressable onPress={() => setAmountMl((a) => a + step)} className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center">
+        <Pressable
+          onPress={() => setAmountMl((a) => a + step)}
+          accessibilityRole="button"
+          accessibilityLabel={t('feedSheet.increaseAmount')}
+          hitSlop={6}
+          className="w-10 h-10 rounded-full bg-raised border border-line-strong items-center justify-center"
+        >
           <Plus color={colors.inkMuted} size={18} />
         </Pressable>
       </View>

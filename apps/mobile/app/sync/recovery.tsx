@@ -1,7 +1,7 @@
 import { t } from '@subby/shared/i18n';
 import { errorMessage } from '../../features/errorMessage';
 import React, { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { newRecoveryWords, normalizeRecoveryWords } from '@subby/shared/crypto';
 import { setRecoveryKey } from '../../features/sync/family';
@@ -98,21 +98,29 @@ export default function RecoveryKeyScreen() {
 }
 
 function Words({ words }: { words: string[] }) {
+  const { fontScale } = useWindowDimensions();
+  const single = fontScale >= 1.4;
   const half = Math.ceil(words.length / 2);
-  const column = (start: number) => (
+  const column = (start: number, count: number) => (
     <View className="flex-1">
-      {words.slice(start, start + half).map((w, i) => (
-        <View key={start + i} className="flex-row items-baseline py-1.5">
-          <Text className="text-ink-faint text-sm w-7 text-right mr-3">{start + i + 1}</Text>
-          <Text className="text-ink text-[17px] font-semibold">{w}</Text>
+      {words.slice(start, start + count).map((w, i) => (
+        <View key={start + i} accessible className="flex-row items-baseline py-1.5">
+          <Text className="text-ink-faint text-sm min-w-7 text-right mr-3">{start + i + 1}</Text>
+          <Text className="text-ink text-[17px] font-semibold shrink">{w}</Text>
         </View>
       ))}
     </View>
   );
   return (
     <View className="flex-row bg-surface border border-line rounded-2xl px-3 py-3 mt-6">
-      {column(0)}
-      {column(half)}
+      {single ? (
+        column(0, words.length)
+      ) : (
+        <>
+          {column(0, half)}
+          {column(half, words.length - half)}
+        </>
+      )}
     </View>
   );
 }
@@ -153,6 +161,7 @@ function Check({ words, error, onBack, onOk }: { words: string[]; error: string 
           <TextField
             value={answers[i]}
             onChangeText={(text) => setAnswers((a) => a.map((v, j) => (j === i ? text : v)))}
+            accessibilityLabel={t('recovery.word', { n: n + 1 })}
             {...SECRET_INPUT}
           />
         </View>

@@ -53,7 +53,7 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
       <View className="pt-1 pb-2">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-ink-muted text-sm">{t('diaperSheet.now', { time: formatTime(now) })}</Text>
-          <Pressable hitSlop={10} onPress={() => open({ kind: 'log', type: 'diaper' })}>
+          <Pressable hitSlop={10} accessibilityRole="button" onPress={() => open({ kind: 'log', type: 'diaper' })}>
             <Text className="text-violet-soft text-sm">{t('diaperSheet.earlier')}</Text>
           </Pressable>
         </View>
@@ -62,10 +62,11 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
             <Pressable
               key={k.condition}
               onPress={() => log(k.condition)}
-              className={`flex-1 h-24 rounded-2xl border items-center justify-center ${k.className}`}
+              accessibilityRole="button"
+              className={`flex-1 min-h-24 py-3 px-1 rounded-2xl border items-center justify-center ${k.className}`}
             >
               <k.Icon size={28} />
-              <Text className="text-ink text-base font-semibold mt-2">{k.label}</Text>
+              <Text className="text-ink text-base font-semibold mt-2 text-center">{k.label}</Text>
             </Pressable>
           ))}
         </View>
@@ -94,7 +95,9 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
           <Check color={colors.greenSoft} size={20} />
         </View>
         <View className="flex-1 ml-3">
-          <Text className="text-ink text-base font-semibold">{t('diaperSheet.logged', { kind: label })}</Text>
+          <Text accessibilityLiveRegion="polite" className="text-ink text-base font-semibold">
+            {t('diaperSheet.logged', { kind: label })}
+          </Text>
           <Text className="text-ink-muted text-xs">
             {formatTime(logged.startedAt)}
             {p.color ? ` · ${tOption('diaperColor', p.color)}` : ''}
@@ -102,7 +105,8 @@ export default function DiaperSheet({ onClose }: { onClose: () => void }) {
         </View>
         <Pressable
           onPress={undo}
-          className="h-9 px-4 rounded-full border border-line-strong bg-raised items-center justify-center"
+          accessibilityRole="button"
+          className="min-h-9 py-1.5 px-4 rounded-full border border-line-strong bg-raised items-center justify-center"
         >
           <Text className="text-ink text-sm">{t('common.undo')}</Text>
         </Pressable>

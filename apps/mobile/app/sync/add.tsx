@@ -113,7 +113,12 @@ export default function AddPhoneScreen() {
       {step.kind === 'confirm' ? (
         <>
           <ScreenTitle>{t('add.sameCode')}</ScreenTitle>
-          <Text className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-8">
+          <Text
+            accessibilityLabel={step.code.split('').join(' ')}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-8"
+          >
             {step.code.slice(0, 3)} {step.code.slice(3)}
           </Text>
           <Text className="text-ink-soft text-[15px] leading-[22px] mt-6">

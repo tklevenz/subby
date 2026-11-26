@@ -36,7 +36,8 @@ function ChildCard({
   return (
     <Pressable
       onPress={onPress}
-      className={`items-center w-28 py-4 px-2 rounded-2xl border ${dashed ? 'border-dashed border-line-strong' : 'bg-surface border-line'}`}
+      accessibilityRole="button"
+      className={`items-center min-w-28 max-w-36 py-4 px-2 rounded-2xl border ${dashed ? 'border-dashed border-line-strong' : 'bg-surface border-line'}`}
     >
       <View className="w-16 h-16">{avatar}</View>
       <Text className={`font-semibold mt-2 ${dashed ? 'text-ink-soft' : 'text-ink'}`} numberOfLines={1}>{title}</Text>
@@ -83,7 +84,9 @@ export default function SettingsScreen() {
 
   return (
     <View className="flex-1 bg-ground" style={{ paddingTop: insets.top }}>
-      <Text className="text-xl font-bold text-ink mx-4 mt-2 mb-2">{t('tabs.settings')}</Text>
+      <Text accessibilityRole="header" className="text-xl font-bold text-ink mx-4 mt-2 mb-2">
+        {t('tabs.settings')}
+      </Text>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
 
       {/* Each child has their own profile page; this screen is for app-wide settings. */}
@@ -140,17 +143,37 @@ export default function SettingsScreen() {
           <Card>
             <Row
               label={t('settings.familySleep')}
-              right={<Toggle value={familyAlerts.enabled} onValueChange={(enabled) => setFamilyAlerts({ enabled })} disabled={!remindersAvailable} />}
+              right={
+                <Toggle
+                  accessibilityLabel={t('settings.familySleep')}
+                  value={familyAlerts.enabled}
+                  onValueChange={(enabled) => setFamilyAlerts({ enabled })}
+                  disabled={!remindersAvailable}
+                />
+              }
             />
             {familyAlerts.enabled ? (
               <>
-                <Row label={t('settings.familyWake')} right={<Toggle value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />} />
-                <Row label={t('settings.familyNights')} right={<Toggle value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />} />
+                <Row
+                  label={t('settings.familyWake')}
+                  right={<Toggle accessibilityLabel={t('settings.familyWake')} value={familyAlerts.wakeUps} onValueChange={(wakeUps) => setFamilyAlerts({ wakeUps })} />}
+                />
+                <Row
+                  label={t('settings.familyNights')}
+                  right={<Toggle accessibilityLabel={t('settings.familyNights')} value={familyAlerts.nights} onValueChange={(nights) => setFamilyAlerts({ nights })} />}
+                />
               </>
             ) : null}
             <Row
               label={t('settings.familyMeds')}
-              right={<Toggle value={familyAlerts.medications} onValueChange={(medications) => setFamilyAlerts({ medications })} disabled={!remindersAvailable} />}
+              right={
+                <Toggle
+                  accessibilityLabel={t('settings.familyMeds')}
+                  value={familyAlerts.medications}
+                  onValueChange={(medications) => setFamilyAlerts({ medications })}
+                  disabled={!remindersAvailable}
+                />
+              }
             />
           </Card>
           <Text className="text-ink-ghost text-xs mt-2 mx-1 leading-5">

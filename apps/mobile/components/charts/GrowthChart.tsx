@@ -42,12 +42,14 @@ export default function GrowthChart({
   points,
   units,
   height = 280,
+  accessibilityLabel,
 }: {
   measure: GrowthMeasure;
   sex: WhoSex | null;
   points: GrowthPoint[];
   units: UnitSystem;
   height?: number;
+  accessibilityLabel?: string;
 }) {
   const [width, setWidth] = useState(0);
   const lastMonths = points.length ? points[points.length - 1].months : 0;
@@ -82,9 +84,17 @@ export default function GrowthChart({
   for (let m = Math.ceil(xMin / xStep) * xStep; m <= xMax; m += xStep) monthTicks.push(m);
 
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height }}>
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={{ height }}
+      accessible={!!accessibilityLabel}
+      accessibilityRole={accessibilityLabel ? 'image' : undefined}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityElementsHidden={!accessibilityLabel}
+      importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}
+    >
       {width > 0 ? (
-        <Svg width={width} height={height}>
+        <Svg width={width} height={height} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {ticks(yMin, yMax, 5).map((v) => (
             <G key={`y${v}`}>
               <Line x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={colors.line} />

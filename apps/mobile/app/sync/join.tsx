@@ -88,7 +88,12 @@ export default function JoinScreen() {
         <>
           <ScreenTitle>{t('join.confirmThere')}</ScreenTitle>
           <Lead className="mt-2">{t('join.confirmText')}</Lead>
-          <Text className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-10">
+          <Text
+            accessibilityLabel={step.join.code.split('').join(' ')}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            className="text-ink text-[44px] font-bold text-center tracking-[6px] mt-10"
+          >
             {step.join.code.slice(0, 3)} {step.join.code.slice(3)}
           </Text>
           <LoaderBlock className="mt-10" loader={<PeriscopeLoader width={72} />} label={t('join.waiting')} />
@@ -164,7 +169,7 @@ function Scan({ onCode }: { onCode: (text: string) => void }) {
 
       <View className="mt-8">
         <FieldLabel>{t('join.paste')}</FieldLabel>
-        <TextField value={pasted} onChangeText={setPasted} placeholder="subby:…" autoCapitalize="none" autoCorrect={false} />
+        <TextField value={pasted} onChangeText={setPasted} accessibilityLabel={t('join.paste')} placeholder="subby:…" autoCapitalize="none" autoCorrect={false} />
         <Button label={t('join.useCode')} variant="ghost" onPress={() => onCode(pasted)} disabled={!pasted.trim()} />
       </View>
 

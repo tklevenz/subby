@@ -1,4 +1,6 @@
+import { t } from '@subby/shared/i18n';
 import React, { useMemo } from 'react';
+import { View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import QRCode from 'qrcode';
 
@@ -16,9 +18,11 @@ export default function QrCode({ value, size }: { value: string; size: number })
   }, [value]);
 
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${count} ${count}`}>
-      <Rect x={0} y={0} width={count} height={count} fill="white" />
-      <Path d={path} fill="black" />
-    </Svg>
+    <View accessible accessibilityRole="image" accessibilityLabel={t('add.qrA11y')}>
+      <Svg width={size} height={size} viewBox={`0 0 ${count} ${count}`} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Rect x={0} y={0} width={count} height={count} fill="white" />
+        <Path d={path} fill="black" />
+      </Svg>
+    </View>
   );
 }

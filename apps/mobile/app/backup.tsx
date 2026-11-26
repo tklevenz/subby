@@ -168,11 +168,20 @@ function BackUp({
       </Lead>
 
       <FieldLabel>{t('backup.passphraseOptional')}</FieldLabel>
-      <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder={t('backup.encryptPlaceholder')} />
+      <TextField
+        value={passphrase}
+        onChangeText={setPassphrase}
+        accessibilityLabel={t('backup.passphraseOptional')}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder={t('backup.encryptPlaceholder')}
+      />
       {passphrase ? (
         <TextField
           value={confirm}
           onChangeText={setConfirm}
+          accessibilityLabel={t('backup.again')}
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
@@ -212,7 +221,7 @@ function Unlock({
       <ScreenTitle>{t('backup.encrypted')}</ScreenTitle>
       <Lead className="mt-2">{name}</Lead>
       <FieldLabel>{t('backup.passphrase')}</FieldLabel>
-      <TextField value={passphrase} onChangeText={setPassphrase} secureTextEntry autoCapitalize="none" autoCorrect={false} autoFocus />
+      <TextField value={passphrase} onChangeText={setPassphrase} accessibilityLabel={t('backup.passphrase')} secureTextEntry autoCapitalize="none" autoCorrect={false} autoFocus />
       {error ? <ErrorText className="mt-3">{error}</ErrorText> : null}
       <Button label={t('backup.unlock')} onPress={() => onUnlock(passphrase)} disabled={!passphrase} />
       <Button label={t('common.cancel')} variant="ghost" onPress={onCancel} />
@@ -272,7 +281,7 @@ function Preview({
         <View className="bg-surface rounded-2xl border border-line px-4 py-3 mt-3">
           <View className="flex-row items-center">
             <Text className="flex-1 text-ink">{t('backup.bringBack')}</Text>
-            <Toggle value={step.revive} onValueChange={onRevive} />
+            <Toggle accessibilityLabel={t('backup.bringBack')} value={step.revive} onValueChange={onRevive} />
           </View>
           {syncing ? <Hint>{t('backup.bringBackSync')}</Hint> : null}
         </View>

@@ -226,7 +226,7 @@ function Phones() {
         {members.map((m) =>
           m.isMe && editing ? (
             <View key={m.id} className="px-4 py-2.5 border-b border-line">
-              <TextField value={name} onChangeText={setName} autoFocus onBlur={rename} onSubmitEditing={rename} returnKeyType="done" />
+              <TextField value={name} onChangeText={setName} accessibilityLabel={t('syncScreen.phone')} autoFocus onBlur={rename} onSubmitEditing={rename} returnKeyType="done" />
             </View>
           ) : (
             <Row
@@ -243,7 +243,12 @@ function Phones() {
               }
               action={
                 m.isMe ? undefined : (
-                  <Pressable onPress={() => confirmRemove(m.id)} hitSlop={8}>
+                  <Pressable
+                    onPress={() => confirmRemove(m.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('syncScreen.removePhoneA11y', { name: nameOf(m.id) })}
+                    hitSlop={8}
+                  >
                     <Text className="text-red-soft text-sm">{t('syncScreen.remove')}</Text>
                   </Pressable>
                 )

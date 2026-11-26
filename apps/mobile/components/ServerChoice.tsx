@@ -15,12 +15,20 @@ export function useServerChoice({ customOnly = false } = {}) {
   const field = custom ? (
     <View className="mt-2">
       <FieldLabel>{t('server.yours')}</FieldLabel>
-      <TextField value={address} onChangeText={setAddress} placeholder="https://sync.example.com" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+      <TextField
+        value={address}
+        onChangeText={setAddress}
+        accessibilityLabel={t('server.yours')}
+        placeholder="https://sync.example.com"
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+      />
     </View>
   ) : null;
 
   const toggle = customOnly ? null : (
-    <Pressable onPress={() => setCustom(!custom)} hitSlop={8} className="items-center mt-4">
+    <Pressable onPress={() => setCustom(!custom)} hitSlop={8} accessibilityRole="button" className="items-center mt-4">
       <Text className="text-violet-soft text-sm">{t(custom ? 'server.useOfficial' : 'server.useOwn')}</Text>
     </Pressable>
   );

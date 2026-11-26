@@ -29,7 +29,11 @@ function useLoop(duration: number, { reverse = false, delay = 0, easing = Easing
   const t = useSharedValue(0);
   const reduced = useReducedMotion();
   useEffect(() => {
-    if (reduced) return;
+    if (reduced) {
+      cancelAnimation(t);
+      t.value = 0;
+      return;
+    }
     // From 0, so a restart can't begin at the end and repeat 1 → 1.
     t.value = 0;
     t.value = withDelay(delay, withRepeat(withTiming(1, { duration, easing }), -1, reverse));
@@ -66,7 +70,7 @@ export function SubLoader({ width = 112 }: { width?: number }) {
   }));
   const s = width / 100;
   return (
-    <View style={{ width, height: width * 0.9 }} accessibilityRole="progressbar" accessibilityLabel={tr('loader.loading')}>
+    <View style={{ width, height: width * 0.9 }} accessible accessibilityRole="progressbar" accessibilityLabel={tr('loader.loading')}>
       <Bubble x={84 * s} y={30 * s} r={3 * s} delay={0} />
       <Bubble x={91 * s} y={36 * s} r={2.2 * s} delay={800} />
       <Bubble x={80 * s} y={38 * s} r={1.8 * s} delay={1600} />
@@ -84,7 +88,11 @@ function Z({ x, y, size, delay }: { x: number; y: number; size: number; delay: n
     opacity: reduced ? 0.6 : interpolate(t.value, [0, 0.25, 1], [0, 0.9, 0]),
     transform: [{ translateX: 14 * t.value }, { translateY: -34 * t.value }, { scale: 0.7 + 0.45 * t.value }],
   }));
-  return <Animated.Text style={[{ position: 'absolute', left: x, top: y, fontSize: size, fontWeight: '700', color: colors.subBubble }, style]}>z</Animated.Text>;
+  return (
+    <Animated.Text allowFontScaling={false} style={[{ position: 'absolute', left: x, top: y, fontSize: size, fontWeight: '700', color: colors.subBubble }, style]}>
+      z
+    </Animated.Text>
+  );
 }
 
 /** The sub asleep: bobbing slowly while z's drift up (and bubbles rise, when there's room). Home's running sleep. */
@@ -116,15 +124,16 @@ export function DozingSub({ width, bubbles = true }: { width: number; bubbles?: 
 /** Waiting on the other phone: up periscope, look left and right. */
 export function PeriscopeLoader({ width = 112 }: { width?: number }) {
   const t = useLoop(4000);
+  const reduced = useReducedMotion();
   const s = width / SUB_VIEWBOX.w;
-  const up = useAnimatedStyle(() => ({ transform: [{ translateY: interpolate(t.value, [0, 0.2, 0.8, 1], [11, 0, 0, 11]) * s }] }));
-  const look = useAnimatedStyle(() => ({ transform: [{ scaleX: interpolate(t.value, [0, 0.35, 0.45, 0.65, 0.75, 1], [1, 1, -1, -1, 1, 1]) }] }));
+  const up = useAnimatedStyle(() => ({ transform: [{ translateY: (reduced ? 0 : interpolate(t.value, [0, 0.2, 0.8, 1], [11, 0, 0, 11])) * s }] }));
+  const look = useAnimatedStyle(() => ({ transform: [{ scaleX: reduced ? 1 : interpolate(t.value, [0, 0.35, 0.45, 0.65, 0.75, 1], [1, 1, -1, -1, 1, 1]) }] }));
   // The periscope's box is centered on its pole (x 54), so flipping it turns it around the pole.
   return (
-    <View style={{ width, height: SUB_VIEWBOX.h * s }} accessibilityRole="progressbar" accessibilityLabel={tr('loader.waiting')}>
+    <View style={{ width, height: SUB_VIEWBOX.h * s }} accessible accessibilityRole="progressbar" accessibilityLabel={tr('loader.waiting')}>
       <Animated.View style={[{ position: 'absolute', left: (46 - SUB_VIEWBOX.x) * s, top: 0 }, up]}>
         <Animated.View style={look}>
-          <Svg width={16 * s} height={26 * s} viewBox="46 16 16 26">
+          <Svg width={16 * s} height={26 * s} viewBox="46 16 16 26" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <Periscope />
           </Svg>
         </Animated.View>
@@ -142,7 +151,7 @@ export function SubSpinner({ size = 24 }: { size?: number }) {
   const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${360 * t.value}deg` }] }));
   const sub = size * 0.5;
   return (
-    <Animated.View style={[{ width: size, height: size }, style]} accessibilityRole="progressbar" accessibilityLabel={tr('loader.loading')}>
+    <Animated.View style={[{ width: size, height: size }, style]} accessible accessibilityRole="progressbar" accessibilityLabel={tr('loader.loading')}>
       <View style={{ position: 'absolute', top: 0, left: (size - sub) / 2 }}>
         <Sub width={sub} />
       </View>
@@ -153,18 +162,26 @@ export function SubSpinner({ size = 24 }: { size?: number }) {
 /** Progress from 0 to 1: the sub travels along the bar. */
 export function SubProgress({ progress }: { progress: number }) {
   const [track, setTrack] = useState(0);
-  const p = useSharedValue(progress);
-  const { t } = useBob();
+  const clamped = Math.min(1, Math.max(0, progress));
+  const p = useSharedValue(clamped);
+  const { t, reduced } = useBob();
   useEffect(() => {
-    p.value = withTiming(Math.min(1, Math.max(0, progress)), { duration: 300 });
-  }, [progress, p]);
+    p.value = reduced ? clamped : withTiming(clamped, { duration: 300 });
+  }, [clamped, reduced, p]);
   const subWidth = 44;
   const fill = useAnimatedStyle(() => ({ width: track * p.value }));
   const sub = useAnimatedStyle(() => ({
     transform: [{ translateX: (track - subWidth) * p.value }, { translateY: -2 * t.value }],
   }));
   return (
-    <View className="self-stretch" style={{ height: 44 }} onLayout={(e: LayoutChangeEvent) => setTrack(e.nativeEvent.layout.width)}>
+    <View
+      className="self-stretch"
+      style={{ height: 44 }}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped * 100) }}
+      onLayout={(e: LayoutChangeEvent) => setTrack(e.nativeEvent.layout.width)}
+    >
       <View className="absolute left-0 right-0 bg-raised rounded-full" style={{ bottom: 4, height: 6 }} />
       <Animated.View className="absolute left-0 rounded-full" style={[{ bottom: 4, height: 6, backgroundColor: colors.subAmber }, fill]} />
       <Animated.View style={[{ position: 'absolute', left: 0, bottom: 8 }, sub]}>
@@ -197,7 +214,11 @@ export function SyncPing({ size = 24 }: { size?: number }) {
     b.value = withDelay(500, withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }));
   }, [reduced, a, b]);
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       {reduced ? null : (
         <>
           <Ring t={a} size={size} />

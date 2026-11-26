@@ -1,3 +1,4 @@
+import { t } from '@subby/shared/i18n';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
@@ -12,6 +13,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Xmark } from './icons';
 import { colors } from '../theme/colors';
@@ -39,21 +41,32 @@ export default function BottomSheet({
 }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const reduced = useReducedMotion();
   const slideY = useRef(new Animated.Value(height)).current;
 
   /** Moves the sheet to `toValue` (0 is open, `height` is away). */
-  const slideTo = (toValue: number, duration: number, easing?: (t: number) => number, done?: () => void) =>
+  const slideTo = (toValue: number, duration: number, easing?: (t: number) => number, done?: () => void) => {
+    if (reduced) {
+      slideY.setValue(toValue);
+      done?.();
+      return;
+    }
     Animated.timing(slideY, { toValue, duration, easing, useNativeDriver: true }).start(done);
+  };
   const settle = () => slideTo(0, 180, Easing.out(Easing.cubic));
 
   useEffect(() => {
     if (!visible) return;
+    if (reduced) {
+      slideY.setValue(0);
+      return;
+    }
     slideY.setValue(height);
     // Not a spring: an underdamped one overshot and then crept to rest for most of a second, and a tap landing while
     // the sheet still moved under the finger was cancelled (the Diaper sheet's "first tap does nothing").
     slideTo(0, 240, Easing.out(Easing.cubic));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- slideTo only closes over slideY, which is stable
-  }, [visible, slideY, height]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- slideTo only closes over slideY and reduced
+  }, [visible, slideY, height, reduced]);
 
   const dismiss = () => slideTo(height, 220, undefined, onClose);
 
@@ -80,9 +93,11 @@ export default function BottomSheet({
   return (
     <Modal transparent animationType="none" visible={visible} statusBarTranslucent onRequestClose={dismiss}>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={dismiss} className="absolute inset-0 bg-scrim/60" />
+        <Pressable onPress={dismiss} accessible={false} importantForAccessibility="no" className="absolute inset-0 bg-scrim/60" />
 
         <Animated.View
+          accessibilityViewIsModal
+          onAccessibilityEscape={dismiss}
           style={{ transform: [{ translateY: slideY }], maxHeight: height * 0.9 }}
           className="bg-surface border-t border-line-strong/50 rounded-t-2xl"
         >
@@ -92,11 +107,13 @@ export default function BottomSheet({
             </View>
 
             <View className="flex-row items-center justify-between px-5 pb-2">
-              <View className="flex-row items-center">
+              <View className="flex-row items-center flex-1 mr-3">
                 {icon}
-                <Text className="text-lg font-bold text-ink ml-2">{title}</Text>
+                <Text accessibilityRole="header" className="text-lg font-bold text-ink ml-2 shrink">
+                  {title}
+                </Text>
               </View>
-              <Pressable onPress={dismiss} hitSlop={10}>
+              <Pressable onPress={dismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
                 <Xmark color={colors.inkMuted} size={22} />
               </Pressable>
             </View>
