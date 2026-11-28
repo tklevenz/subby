@@ -9,7 +9,6 @@ import { flushSync, pendingCount, requestSync } from './engine';
 import { closeLive, openLive } from './live';
 import { useSyncStore } from './state';
 import { setUpBackgroundSync, stopBackgroundSync } from './background';
-import { serverLabel } from './api';
 
 /**
  * Keeps this phone in sync while the app runs: on start, on every local write (debounced), when the app
@@ -54,15 +53,6 @@ export function useSyncEngine(ready: boolean) {
           { text: t('common.ok') },
           { text: t('sync.newPhone.review'), onPress: () => router.push('/sync') },
         ]);
-      }),
-    );
-    // Another phone moved the family and this one followed: say so once.
-    unsubs.push(
-      useSyncStore.subscribe((s) => {
-        if (s.phase !== 'idle' || !s.movedTo) return;
-        const to = serverLabel(s.movedTo);
-        useSyncStore.setState({ movedTo: null });
-        Alert.alert(t('sync.moved.title'), t('sync.moved.body', { server: to }));
       }),
     );
     const appState = AppState.addEventListener('change', (state) => {

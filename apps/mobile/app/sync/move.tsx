@@ -1,75 +1,31 @@
 import { t } from '@subby/shared/i18n';
-import { errorMessage } from '../../features/errorMessage';
-import React, { useState } from 'react';
-import { Alert, Text } from 'react-native';
-import { router } from 'expo-router';
-import { useSettingsStore } from '../../store/useSettingsStore';
-import { useSyncStore } from '../../features/sync/state';
-import { moveToServer } from '../../features/sync/move';
-import { isOfficialServer, serverLabel } from '../../features/sync/api';
-import { useStorePrice } from '../../features/sync/access';
-import { Button, ErrorText, Lead, Hint, LoaderBlock } from '../../components/ui';
-import { useServerChoice } from '../../components/ServerChoice';
+import React from 'react';
+import { Text, View } from 'react-native';
+import { Hint, Lead } from '../../components/ui';
 import { ScreenScroll } from '../../components/ScreenScroll';
 
-type Step = { kind: 'choose' } | { kind: 'working'; label: string } | { kind: 'error'; message: string };
-
-
-/** Moves the family to another server (Subby Sync or your own); the other phones follow by themselves. */
+/**
+ * How to move the family to another server by hand: turn sync off everywhere, set up on the new server, add the
+ * other phones. The app doesn't move families itself (LAUNCH.md A18); every move involves a self-hosted server,
+ * so someone in the family runs one.
+ */
 export default function MoveScreen() {
-  const sync = useSettingsStore((s) => s.sync);
-  const members = useSyncStore((s) => s.members.length);
-  const onOfficial = sync ? isOfficialServer(sync.server) : false;
-  const { server, ready, custom, field, toggle } = useServerChoice({ customOnly: onOfficial });
-  const price = useStorePrice('unlock');
-  const [step, setStep] = useState<Step>({ kind: 'choose' });
-
-  if (!sync) return null;
-  const from = serverLabel(sync.server);
-
-  const run = async () => {
-    setStep({ kind: 'working', label: t('move.ready') });
-    try {
-      await moveToServer(server, (label) => setStep({ kind: 'working', label }));
-      Alert.alert(
-        t('move.moved'),
-        t(members > 1 ? 'move.movedOthers' : 'move.movedAlone', { server: serverLabel(server) }),
-      );
-      router.back();
-    } catch (e) {
-      setStep({ kind: 'error', message: errorMessage(e) });
-    }
-  };
-
-  const confirm = () =>
-    Alert.alert(t('move.confirmTitle', { server: serverLabel(server) }), t('move.confirmText', { from }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('move.move'), onPress: run },
-    ]);
-
+  const steps = [
+    t('move.step.off', { sync: t('screen.sync'), off: t('syncScreen.turnOffHere') }),
+    t('move.step.setUp', { setUp: t('syncScreen.setUp'), own: t('server.useOwn') }),
+    t('move.step.add', { add: t('syncScreen.addPhone'), join: t('syncScreen.joinWithCode'), merge: t('join.merge') }),
+    t('move.step.recovery'),
+  ];
   return (
-    <ScreenScroll keyboardShouldPersistTaps="handled">
-      {step.kind === 'working' ? (
-        <LoaderBlock label={step.label}>
-          <Hint className="text-center">{t('move.keepOpen')}</Hint>
-        </LoaderBlock>
-      ) : (
-        <>
-          <Lead>
-            {t('move.lead', { from })}
-            {members > 1 ? t('move.leadOthers') : ''}
-            {t('move.leadEnd', { from })}
-          </Lead>
-
-          {field}
-          {step.kind === 'error' ? <ErrorText className="mt-4">{step.message}</ErrorText> : null}
-          <Button label={t(custom ? 'move.toThis' : 'move.toOfficial')} onPress={confirm} disabled={!ready} />
-          <Text className="text-ink-faint text-xs text-center mt-3 leading-4">
-            {custom ? t('move.ownFree') : (price ? t('move.trial', { price }) : t('move.trialNoPrice'))}
-          </Text>
-          {toggle}
-        </>
-      )}
+    <ScreenScroll>
+      <Lead>{t('move.lead')}</Lead>
+      {steps.map((step, i) => (
+        <View key={i} accessible className="flex-row mt-4">
+          <Text className="text-violet-soft text-[15px] leading-[22px] font-bold w-6">{i + 1}</Text>
+          <Text className="flex-1 text-ink text-[15px] leading-[22px]">{step}</Text>
+        </View>
+      ))}
+      <Hint className="mt-6">{t('move.oldServer')}</Hint>
     </ScreenScroll>
   );
 }

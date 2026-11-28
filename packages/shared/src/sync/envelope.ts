@@ -3,16 +3,10 @@ import { decrypt, encrypt } from '../crypto/aead';
 
 /**
  * What the server stores per record. It sees the id, kind, key epoch, version and size, never the content.
- * `child` and `log` are app rows; `device` holds a device's display name (names stay off the device log);
- * `moved` tells the family's phones it moved to another server (`MovedBody`), so they follow without pairing again.
+ * `child` and `log` are app rows; `device` holds a device's display name (names stay off the device log).
+ * (`moved`, from apps that could move a family to another server, is gone: neither server nor app takes it.)
  */
-export const RECORD_KINDS = ['child', 'log', 'device', 'moved'] as const;
-
-/**
- * Inside a `moved` record (id = the new family's id): where the family went, who moved it, how far it had pulled,
- * and how many entries of the new device log it wrote (`verifyMovedLog`; missing from older apps).
- */
-export type MovedBody = { server: string; familyId: string; from: string; seq: number; entries?: number };
+export const RECORD_KINDS = ['child', 'log', 'device'] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
 export type SyncRecord = {

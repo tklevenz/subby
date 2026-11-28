@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_FAMILY_ALERTS, DEFAULT_REMINDERS, type FamilyAlertSettings, type ReminderSettings, type UnitSystem } from '@subby/shared';
 import type { DeviceLogEntry, LogSeen, RestoreFloor } from '@subby/shared/crypto';
-import type { MovedBody } from '@subby/shared/sync';
 import { db, schema } from '../db/client';
 import { getCalendars, getLocales } from 'expo-localization';
 import { applyLanguage, type LanguageChoice } from '../features/i18n';
@@ -77,11 +76,7 @@ export type SyncSettings = {
   pulledEpochs?: number;
   /** When this phone last synced everything again after a restore (`resyncAfterRestore`, at most every 6 hours). */
   resyncedAt?: number;
-  /** Another phone moved the family to another server (a `moved` record): this phone follows on its next sync run. */
-  move?: MovedBody;
-  /** New families of moves this phone refused to follow (they didn't check out): never taken up again. */
-  refusedMoves?: string[];
-  /** When this phone started syncing with this family (set up, joined or recovered); kept across a server move. */
+  /** When this phone started syncing with this family (set up, joined or recovered). */
   since?: number;
   /** The Home card suggesting a recovery key was dismissed (per family: joining another one shows it again). */
   recoveryNudgeDismissed?: boolean;

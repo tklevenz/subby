@@ -42,7 +42,7 @@ A zero-knowledge sync relay: NestJS 12 on Fastify 5, PostgreSQL via Drizzle (`dr
 - **Match the router's route pattern** (`request.routeOptions.url`), never the URL, for open routes and rate limits: the router stops at `#` and decodes escapes, and re-parsing the URL once let `/v1/families#x` past the limits.
 - Rate limits (`common/rateLimit.ts`): per rule and client (IPv6 by /64), plus a per-phone bucket; 429 with `Retry-After`. WebSocket upgrades skip Fastify's hooks, so `LiveGateway` limits them itself. `RATE_LIMIT=off` only for the e2e suite (every simulated phone is 127.0.0.1).
 - `TRUST_PROXY=true` is refused (any client could pick its IP); name the proxy's addresses or ranges.
-- Caps live in `protocol.ts` (field lengths, list sizes, 32-bit epochs and indexes) and as constants (family records and bytes, moves per device, log entries, transfers): new inputs get bounds too. Busy queues and transfers answer 429, never 503, so `monitor.sh`'s 5xx alert can't be set off at will.
+- Caps live in `protocol.ts` (field lengths, list sizes, 32-bit epochs and indexes) and as constants (family records and bytes, log entries, transfers): new inputs get bounds too. Busy queues and transfers answer 429, never 503, so `monitor.sh`'s 5xx alert can't be set off at will.
 
 ## Housekeeping and tests
 - Housekeeping (hourly): expired sessions and invites; hosted, families without a pull for 365 days are deleted like `DELETE families/me`, with a weekly push to their phones from day 335.

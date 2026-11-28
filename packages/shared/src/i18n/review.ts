@@ -38,7 +38,7 @@ export const REVIEW_KEYS: readonly string[] = [
   'syncScreen.removedText',
   'join.replace',
   'join.replaceNote',
-  'move.confirmText',
+  'move.step.',
   'sync.inactive.',
   'sync.newPhone.body',
   'backup.forget',

@@ -70,7 +70,7 @@ function SetUp() {
 
 function Status() {
   const sync = useSettingsStore((s) => s.sync)!;
-  // Only the fields shown, so a change to the others (lastError, movedTo) doesn't re-render the screen.
+  // Only the fields shown, so a change to the others (lastError, newDevices) doesn't re-render the screen.
   const { phase, error, pending: waiting, progress, removed, identityLost, tooLarge, clockOff, members } = useSyncStore(
     useShallow((s) => ({ phase: s.phase, error: s.error, pending: s.pending, progress: s.progress, removed: s.removed, identityLost: s.identityLost, tooLarge: s.tooLarge, clockOff: s.clockOff, members: s.members })),
   );

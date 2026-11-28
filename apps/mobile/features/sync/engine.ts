@@ -40,7 +40,6 @@ import { blobIdsOf, childToBody, logToBody } from './records';
 import { downloadPhotos, forgetPhotoUploads, queueUnsyncedPhotos, uploadPhotos, uploadPhotosAsTheyAre } from './photos';
 import { canWrite, forgetAccess, refreshEntitlement, restoreQuietly, useAccessStore } from './access';
 import { cancelInactivityWarning, planInactivityWarning } from './inactivity';
-import { followMove } from './move';
 import { removeDevices } from './family';
 import { applyOpened, applyPage, openAll, quietNextRun, takePulledLogs, type DeviceBody } from './apply';
 import { closeLive } from './live';
@@ -105,18 +104,13 @@ export async function turnOffSync() {
   await forgetSync();
 }
 
-/** After switching servers (a move): the next request logs in to the new one, and live reconnects there. */
-export function forgetSession() {
-  closeLive();
-  forgetAccess();
-  dropSession();
-}
-
 async function forgetSync() {
   // A sync asked for just before doesn't run after.
   if (timer) clearTimeout(timer);
   timer = null;
-  forgetSession();
+  closeLive();
+  forgetAccess();
+  dropSession();
   await cancelInactivityWarning();
   await useSettingsStore.getState().set('sync', null);
   await clearSyncSecrets();
@@ -191,7 +185,7 @@ export function flushSync() {
   syncNow().catch(() => {});
 }
 
-/** One run. Returns whether another should follow right away (it followed a move, noted one, or restarted after a restore). */
+/** One run. Returns whether another should follow right away (it restarted after a restore). */
 async function runOnce(): Promise<boolean> {
   const settings = syncSettings();
   if (!settings) {
@@ -200,12 +194,6 @@ async function runOnce(): Promise<boolean> {
   }
   useSyncStore.setState({ phase: 'syncing', error: null });
   try {
-    // Another phone moved the family: follow it before anything else touches the old one.
-    if (settings.move) {
-      useSyncStore.setState({ progress: { label: t('sync.progress.moving'), done: 0 } });
-      await followMove(settings, settings.move);
-      return true;
-    }
     if (!hasDeviceIdentity()) throw new IdentityLostError();
     const api = sessionFor(settings);
     let { entries, state } = await refreshMembers(api, settings);
@@ -259,8 +247,7 @@ async function runOnce(): Promise<boolean> {
     await notifyFamily(takePulledLogs()).catch((e) => console.warn('Family notifications failed', e)); // i18n-ignore
     await planInactivityWarning(useAccessStore.getState().entitlement?.inactiveDays).catch((e) => console.warn('Planning the inactivity warning failed', e)); // i18n-ignore
     useSyncStore.setState({ phase: 'idle', error: null, removed: false, identityLost: false, progress: null, pending: await pendingCount(), tooLarge: pushed.tooLarge });
-    // A pulled `moved` record: the next round follows it.
-    return restarted || Boolean(syncSettings()?.move);
+    return restarted;
   } catch (e) {
     // Sync was turned off while this run was going: its failure (the session went with it) isn't news.
     if (!syncSettings()) {

@@ -116,17 +116,10 @@ describe('isValidBody', () => {
   });
 });
 
-describe('moved records', () => {
-  it('checks the body, and skips kinds this app doesn’t know', () => {
-    const moved = { server: 'https://sync.subby.baby', familyId: '01a1aff5-1af5-7274-9206-349143438004', from: '01a1aff5-1af5-7274-9206-34904232e045', seq: 12 };
-    expect(validBody('moved', moved)).toEqual(moved);
-    expect(validBody('moved', { ...moved, server: 'javascript:alert(1)' })).toBeNull();
-    // No user info (it would show as the host before the @), query or fragment; a path and a port are fine.
-    for (const server of ['https://sync.subby.baby@evil.example', 'https://user:pw@sync.example.com', 'https://sync.example.com/?x=1', 'https://sync.example.com#a', 'https://'])
-      expect(validBody('moved', { ...moved, server })).toBeNull();
-    for (const server of ['https://sync.example.com/subby', 'http://192.168.1.20:8787', 'https://[2001:db8::1]:8443'])
-      expect(validBody('moved', { ...moved, server })).not.toBeNull();
-    expect(validBody('moved', { ...moved, seq: -1 })).toBeNull();
+describe('kinds this app doesn’t know', () => {
+  it('are skipped, including `moved` from apps that still had Move', () => {
     expect(validBody('somethingNew' as never, { name: 'x' })).toBeNull();
+    const moved = { server: 'https://sync.subby.baby', familyId: '01a1aff5-1af5-7274-9206-349143438004', from: '01a1aff5-1af5-7274-9206-34904232e045', seq: 12 };
+    expect(validBody('moved' as never, moved)).toBeNull();
   });
 });

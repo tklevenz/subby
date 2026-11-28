@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { notePhoto, type Child, type LogEntry } from '@subby/shared';
-import { UnsealedRecordError, clientApplies, compareVersions, newestOnly, openRecord, type MovedBody, type SyncRecord } from '@subby/shared/sync';
+import { UnsealedRecordError, clientApplies, compareVersions, newestOnly, openRecord, type SyncRecord } from '@subby/shared/sync';
 import { db, schema } from '../../db/client';
 import { deletedLog, deletedLogs } from '../../db/tombstone';
 import { deletePhoto } from '../photos';
@@ -14,7 +14,7 @@ export type DeviceBody = { name: string; tag?: string };
 
 /** Entries other phones wrote, applied during this run (for `notifyFamily`). */
 let pulledLogs: PulledLog[] = [];
-/** The first run after a move pulls everything again, all of it already here: no family notifications for it. */
+/** The first run after a restore pulls everything again, all of it already here: no family notifications for it. */
 let quiet = false;
 export const quietNextRun = () => {
   quiet = true;
@@ -26,7 +26,7 @@ export async function applyPage(records: SyncRecord[], keys: ReadonlyMap<number,
   return applyOpened(openAll(records, keys), ownDeviceId);
 }
 
-export type Opened = { record: SyncRecord; body: ChildBody | LogBody | DeviceBody | MovedBody | null };
+export type Opened = { record: SyncRecord; body: ChildBody | LogBody | DeviceBody | null };
 
 /**
  * Decrypts and checks records, before anything is written. A record of an epoch we have no key for throws, failing
@@ -61,7 +61,6 @@ export async function applyOpened(all: Opened[], ownDeviceId: string): Promise<b
   // same page would win. An honest server sends one per id; a hostile one could replay an old one this way.
   const opened = newestOnly(all);
   await applyDeviceNames(opened.filter((o) => o.record.kind === 'device'));
-  await noteMove(opened.filter((o) => o.record.kind === 'moved'), ownDeviceId);
   const photos: (string | null | undefined)[] = [];
   let changed = false;
 
@@ -76,7 +75,7 @@ export async function applyOpened(all: Opened[], ownDeviceId: string): Promise<b
     );
 
     for (const { record: r, body } of opened) {
-      if (r.kind === 'device' || r.kind === 'moved') continue; // applied above
+      if (r.kind === 'device') continue; // applied above
       const local: Child | LogEntry | undefined = r.kind === 'child' ? localChildren.get(r.id) : localLogs.get(r.id);
       // Our own upload coming back: already applied.
       if (local && r.deviceId === ownDeviceId && local.updatedAt === r.updatedAt) continue;
@@ -148,17 +147,6 @@ async function applyDeviceNames(records: { record: SyncRecord; body: unknown }[]
     }
   }
   await saveSync({ names, nameVersions: versions, tags });
-}
-
-/** Another phone moved the family to another server: remember where, and follow on the next round (`followMove`). */
-async function noteMove(records: Opened[], ownDeviceId: string) {
-  const current = syncSettings();
-  for (const { record, body } of records) {
-    const moved = body as MovedBody | null;
-    if (record.deleted || !moved || !current || record.deviceId === ownDeviceId || moved.from !== record.deviceId || moved.familyId === current.familyId) continue;
-    if (current.refusedMoves?.includes(moved.familyId)) continue; // checked once and refused (`followMove`)
-    await saveSync({ move: moved });
-  }
 }
 
 /** The entries other phones wrote since the last call, for `notifyFamily`; none for a run made quiet by `quietNextRun`. */
