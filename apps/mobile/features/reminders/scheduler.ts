@@ -159,13 +159,25 @@ function queueSync(): Promise<void> {
 /** Re-plans now and resolves when done (background tasks, which may be stopped right after). */
 export function replanReminders(): Promise<void> {
   clearTimeout(timer);
+  timer = undefined;
   return queueSync();
 }
 
 /** Debounced, serialized re-plan. Call after anything that could move a reminder. */
 export function scheduleReminderSync(delayMs = 1000) {
   clearTimeout(timer);
-  timer = setTimeout(() => void queueSync(), delayMs);
+  timer = setTimeout(() => {
+    timer = undefined;
+    void queueSync();
+  }, delayMs);
+}
+
+/** Leaving the foreground: a waiting re-plan runs now (Android stops JS timers while the app is paused). */
+function flushReminderSync() {
+  if (timer === undefined) return;
+  clearTimeout(timer);
+  timer = undefined;
+  void queueSync();
 }
 
 /** Pending reminders, soonest first (for the settings screen). */
@@ -199,7 +211,7 @@ export function useReminderSync(ready: boolean) {
           scheduleReminderSync(0),
       ),
     ];
-    const appState = AppState.addEventListener('change', (state) => state === 'active' && scheduleReminderSync());
+    const appState = AppState.addEventListener('change', (state) => (state === 'active' ? scheduleReminderSync() : flushReminderSync()));
     const tap = Notifications.addNotificationResponseReceivedListener(async (res) => {
       const { childId, entryId, route } = res.notification.request.content.data ?? {};
       if (typeof childId === 'string' && useChildStore.getState().children.some((c) => c.id === childId)) {

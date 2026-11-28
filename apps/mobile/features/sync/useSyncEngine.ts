@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useChildStore } from '../../store/useChildStore';
 import { useLogStore } from '../../store/useLogStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { pendingCount, requestSync } from './engine';
+import { flushSync, pendingCount, requestSync } from './engine';
 import { closeLive, openLive } from './live';
 import { useSyncStore } from './state';
 import { setUpBackgroundSync, stopBackgroundSync } from './background';
@@ -13,7 +13,8 @@ import { serverLabel } from './api';
 
 /**
  * Keeps this phone in sync while the app runs: on start, on every local write (debounced), when the app
- * comes to the foreground, and on live notifications from the server while it's open.
+ * comes to the foreground, and on live notifications from the server while it's open. Leaving the foreground runs a
+ * requested sync at once (Android stops JS timers while the app is paused).
  */
 export function useSyncEngine(ready: boolean) {
   useEffect(() => {
@@ -66,7 +67,10 @@ export function useSyncEngine(ready: boolean) {
     );
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') start();
-      else closeLive();
+      else {
+        flushSync();
+        closeLive();
+      }
     });
     return () => {
       unsubs.forEach((u) => u());

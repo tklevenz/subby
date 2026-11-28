@@ -136,6 +136,9 @@ async function leaveFamily(settings: SyncSettings) {
 
 let running: Promise<void> | null = null;
 let again = false; // a request that came in during a run: one more run after it
+/** Failed runs in a row, and how long to wait before the next try after each. */
+let failures = 0;
+const RETRY_MS = [5_000, 15_000, 60_000, 5 * 60_000];
 
 /** Runs a sync now, or once more right after the current one finishes. */
 export function syncNow(): Promise<void> {
@@ -150,6 +153,14 @@ export function syncNow(): Promise<void> {
         again = false;
         repeat = (await runOnce()) || again;
       }
+      failures = 0;
+    } catch (e) {
+      // No connection, or the server is busy or down for a moment: try again soon, not only on the next write,
+      // foreground or background run (at best 15 minutes away). Other errors need something to change first.
+      if (isHttpError(e) && (e.status === 0 || e.status === 429 || e.status >= 500)) {
+        requestSync(RETRY_MS[Math.min(failures++, RETRY_MS.length - 1)]);
+      }
+      throw e;
     } finally {
       running = null;
     }
@@ -166,6 +177,18 @@ export function requestSync(delayMs = 1500) {
     timer = null;
     syncNow().catch(() => {});
   }, delayMs);
+}
+
+/**
+ * The app is leaving the foreground: a requested run starts now instead of after its delay. Android stops JS timers
+ * while the app is paused, so an entry logged right before the screen locked (or a retry) would wait for the next
+ * foreground or background run. Promises and native calls keep going, so the run itself finishes.
+ */
+export function flushSync() {
+  if (!timer) return;
+  clearTimeout(timer);
+  timer = null;
+  syncNow().catch(() => {});
 }
 
 /** One run. Returns whether another should follow right away (it followed a move, noted one, or restarted after a restore). */
