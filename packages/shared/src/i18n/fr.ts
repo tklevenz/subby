@@ -445,7 +445,6 @@ export const fr: Translation = {
   'screen.sync': 'Synchronisation',
   'screen.addPhone': 'Ajouter un téléphone',
   'screen.recoveryKey': 'Clé de récupération',
-  'screen.move': 'Changer de serveur',
   'screen.import': 'Importer',
   'screen.backup': 'Sauvegarde',
   'screen.join': 'Rejoindre une famille',
@@ -874,7 +873,6 @@ export const fr: Translation = {
   'syncScreen.lastSynced': 'Dernière synchronisation',
   'syncScreen.notYet': 'Pas encore',
   'syncScreen.server': 'Serveur',
-  'syncScreen.move': 'Changer de serveur',
   'syncScreen.tooLarge': { one: '{count} entrée est trop volumineuse pour être synchronisée (une note très longue ?) et reste sur ce téléphone. La raccourcir permet de la synchroniser.', other: '{count} entrées sont trop volumineuses pour être synchronisées (une note très longue ?) et restent sur ce téléphone. Les raccourcir permet de les synchroniser.' },
   'syncScreen.syncNow': 'Synchroniser maintenant',
   'syncScreen.familyId': 'Identifiant de la famille',
@@ -1036,12 +1034,6 @@ export const fr: Translation = {
   'recover.removePhones': 'Retirer les téléphones',
   'recover.keep': 'Les garder pour l’instant',
   'recover.later': 'Vous pourrez retirer des téléphones plus tard dans Réglages → Synchronisation.',
-  'move.lead': 'Subby ne déplace pas une famille vers un autre serveur tout seul. À la main, cela prend quelques minutes et rien n’est perdu : chaque téléphone garde tout tant que la synchronisation est désactivée.',
-  'move.step.off': 'Sur chaque téléphone, ouvrez {sync} et touchez « {off} ».',
-  'move.step.setUp': 'Sur un téléphone, touchez « {setUp} » et choisissez le nouveau serveur (« {own} » pour un serveur à vous).',
-  'move.step.add': 'Sur ce téléphone, touchez « {add} » pour chacun des autres, et « {join} » sur l’autre téléphone. Quand il demande quoi faire de ses propres entrées, choisissez « {merge} » : ce qu’il a noté entre-temps est aussi transféré.',
-  'move.step.recovery': 'Créez une nouvelle clé de récupération : les anciens mots ne fonctionnent que sur l’ancien serveur.',
-  'move.oldServer': 'L’ancien serveur supprime votre famille dès que le dernier téléphone y a désactivé la synchronisation.',
 
   'family.anotherPhone': 'un autre téléphone',
 

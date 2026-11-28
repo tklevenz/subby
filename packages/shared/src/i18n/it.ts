@@ -445,7 +445,6 @@ export const it: Translation = {
   'screen.sync': 'Sincronizzazione',
   'screen.addPhone': 'Aggiungi un telefono',
   'screen.recoveryKey': 'Chiave di recupero',
-  'screen.move': 'Passa a un altro server',
   'screen.import': 'Importa',
   'screen.backup': 'Backup',
   'screen.join': 'Unisciti a una famiglia',
@@ -874,7 +873,6 @@ export const it: Translation = {
   'syncScreen.lastSynced': 'Ultima sincronizzazione',
   'syncScreen.notYet': 'Non ancora',
   'syncScreen.server': 'Server',
-  'syncScreen.move': 'Passa a un altro server',
   'syncScreen.tooLarge': { one: '{count} voce è troppo grande da sincronizzare (una nota molto lunga?) e resta solo su questo telefono. Accorciandola si sincronizzerà.', other: '{count} voci sono troppo grandi da sincronizzare (una nota molto lunga?) e restano solo su questo telefono. Accorciandole si sincronizzeranno.' },
   'syncScreen.syncNow': 'Sincronizza ora',
   'syncScreen.familyId': 'ID della famiglia',
@@ -1036,12 +1034,6 @@ export const it: Translation = {
   'recover.removePhones': 'Rimuovi telefoni',
   'recover.keep': 'Tienili per ora',
   'recover.later': 'Puoi rimuovere i telefoni più tardi in Impostazioni → Sincronizzazione.',
-  'move.lead': 'Subby non sposta da solo una famiglia su un altro server. A mano ci vogliono pochi minuti e non si perde nulla: ogni telefono conserva tutto mentre la sincronizzazione è disattivata.',
-  'move.step.off': 'Su ogni telefono, apri {sync} e tocca «{off}».',
-  'move.step.setUp': 'Su un telefono, tocca «{setUp}» e scegli il nuovo server («{own}» per un server tuo).',
-  'move.step.add': 'Su quel telefono, tocca «{add}» per ciascuno degli altri, e «{join}» sull’altro telefono. Quando chiede delle sue voci, scegli «{merge}»: anche quello che ha registrato nel frattempo viene incluso.',
-  'move.step.recovery': 'Crea una nuova chiave di recupero: le vecchie parole funzionano solo sul vecchio server.',
-  'move.oldServer': 'Il vecchio server elimina la tua famiglia quando l’ultimo telefono vi ha disattivato la sincronizzazione.',
 
   'family.anotherPhone': 'un altro telefono',
 

@@ -445,7 +445,6 @@ export const es: Translation = {
   'screen.sync': 'Sincronización',
   'screen.addPhone': 'Añadir un teléfono',
   'screen.recoveryKey': 'Clave de recuperación',
-  'screen.move': 'Cambiar de servidor',
   'screen.import': 'Importar',
   'screen.backup': 'Copia de seguridad',
   'screen.join': 'Unirse a una familia',
@@ -874,7 +873,6 @@ export const es: Translation = {
   'syncScreen.lastSynced': 'Última sincronización',
   'syncScreen.notYet': 'Aún no',
   'syncScreen.server': 'Servidor',
-  'syncScreen.move': 'Cambiar de servidor',
   'syncScreen.tooLarge': { one: '{count} registro es demasiado grande para sincronizar (¿una nota muy larga?) y se queda solo en este teléfono. Si lo acortas, se sincronizará.', other: '{count} registros son demasiado grandes para sincronizar (¿una nota muy larga?) y se quedan solo en este teléfono. Si los acortas, se sincronizarán.' },
   'syncScreen.syncNow': 'Sincronizar ahora',
   'syncScreen.familyId': 'ID de la familia',
@@ -1036,12 +1034,6 @@ export const es: Translation = {
   'recover.removePhones': 'Quitar teléfonos',
   'recover.keep': 'Dejarlos por ahora',
   'recover.later': 'Puedes quitar teléfonos más tarde en Ajustes → Sincronización.',
-  'move.lead': 'Subby no cambia una familia de servidor por sí solo. A mano se tarda unos minutos y no se pierde nada: cada teléfono conserva todo mientras la sincronización está desactivada.',
-  'move.step.off': 'En cada teléfono, abre {sync} y toca «{off}».',
-  'move.step.setUp': 'En un teléfono, toca «{setUp}» y elige el nuevo servidor («{own}» si es uno propio).',
-  'move.step.add': 'En ese teléfono, toca «{add}» para cada uno de los demás, y «{join}» en el otro teléfono. Cuando pregunte por sus propios registros, elige «{merge}»: lo que haya registrado mientras tanto también se incluye.',
-  'move.step.recovery': 'Crea una nueva clave de recuperación: las palabras antiguas solo funcionan en el servidor antiguo.',
-  'move.oldServer': 'El servidor antiguo elimina tu familia cuando el último teléfono desactiva allí la sincronización.',
 
   'family.anotherPhone': 'otro teléfono',
 

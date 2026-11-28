@@ -445,7 +445,6 @@ export const ptBR: Translation = {
   'screen.sync': 'Sincronização',
   'screen.addPhone': 'Adicionar um celular',
   'screen.recoveryKey': 'Chave de recuperação',
-  'screen.move': 'Mudar de servidor',
   'screen.import': 'Importar',
   'screen.backup': 'Backup',
   'screen.join': 'Entrar em uma família',
@@ -874,7 +873,6 @@ export const ptBR: Translation = {
   'syncScreen.lastSynced': 'Última sincronização',
   'syncScreen.notYet': 'Ainda não',
   'syncScreen.server': 'Servidor',
-  'syncScreen.move': 'Mudar de servidor',
   'syncScreen.tooLarge': { one: '{count} registro é grande demais para sincronizar (uma nota muito longa?) e fica só neste celular. Encurte-o para que sincronize.', other: '{count} registros são grandes demais para sincronizar (uma nota muito longa?) e ficam só neste celular. Encurte-os para que sincronizem.' },
   'syncScreen.syncNow': 'Sincronizar agora',
   'syncScreen.familyId': 'ID da família',
@@ -1036,12 +1034,6 @@ export const ptBR: Translation = {
   'recover.removePhones': 'Remover celulares',
   'recover.keep': 'Manter por enquanto',
   'recover.later': 'Você pode remover celulares depois em Ajustes → Sincronização.',
-  'move.lead': 'O Subby não muda uma família de servidor sozinho. À mão leva alguns minutos e nada se perde: cada celular guarda tudo enquanto a sincronização está desligada.',
-  'move.step.off': 'Em cada celular, abra {sync} e toque em “{off}”.',
-  'move.step.setUp': 'Em um celular, toque em “{setUp}” e escolha o novo servidor (“{own}” para um servidor seu).',
-  'move.step.add': 'Nesse celular, toque em “{add}” para cada um dos outros, e em “{join}” no outro celular. Quando ele perguntar sobre os próprios registros, escolha “{merge}”: o que foi registrado nesse meio-tempo vai junto.',
-  'move.step.recovery': 'Crie uma nova chave de recuperação: as palavras antigas só funcionam no servidor antigo.',
-  'move.oldServer': 'O servidor antigo exclui sua família assim que o último celular desliga a sincronização lá.',
 
   'family.anotherPhone': 'outro celular',
 

@@ -483,7 +483,6 @@ export const en = {
   'screen.sync': 'Sync',
   'screen.addPhone': 'Add a phone',
   'screen.recoveryKey': 'Recovery key',
-  'screen.move': 'Move to another server',
   'screen.import': 'Import',
   'screen.backup': 'Backup',
   'screen.join': 'Join a family',
@@ -930,7 +929,6 @@ export const en = {
   'syncScreen.lastSynced': 'Last synced',
   'syncScreen.notYet': 'Not yet',
   'syncScreen.server': 'Server',
-  'syncScreen.move': 'Move to another server',
   'syncScreen.tooLarge': { one: '{count} entry is too large to sync (a very long note?) and stays on this phone only. Shortening it lets it sync.', other: '{count} entries are too large to sync (a very long note?) and stay on this phone only. Shortening them lets them sync.' },
   'syncScreen.syncNow': 'Sync now',
   'syncScreen.familyId': 'Family id',
@@ -1099,12 +1097,6 @@ export const en = {
   'recover.later': 'You can remove phones later under Settings → Sync.',
 
   // Move to another server.
-  'move.lead': "Subby doesn't move a family to another server by itself. By hand it takes a few minutes, and nothing is lost: each phone keeps everything while sync is off.",
-  'move.step.off': 'On every phone, open {sync} and tap “{off}”.',
-  'move.step.setUp': 'On one phone, tap “{setUp}” and pick the new server (“{own}” for a server of your own).',
-  'move.step.add': 'On that phone, tap “{add}” for each of the others, and “{join}” on the other phone. When it asks about its own entries, choose “{merge}”: what it logged in the meantime comes along.',
-  'move.step.recovery': 'Make a new recovery key: the old words only work on the old server.',
-  'move.oldServer': 'The old server deletes your family once the last phone there has turned sync off.',
   'family.anotherPhone': 'another phone',
 
   // Accessibility labels.

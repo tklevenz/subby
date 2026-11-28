@@ -445,7 +445,6 @@ export const de: Translation = {
   'screen.sync': 'Sync',
   'screen.addPhone': 'Handy hinzufügen',
   'screen.recoveryKey': 'Wiederherstellungsschlüssel',
-  'screen.move': 'Auf einen anderen Server umziehen',
   'screen.import': 'Import',
   'screen.backup': 'Sicherung',
   'screen.join': 'Familie beitreten',
@@ -874,7 +873,6 @@ export const de: Translation = {
   'syncScreen.lastSynced': 'Zuletzt synchronisiert',
   'syncScreen.notYet': 'Noch nicht',
   'syncScreen.server': 'Server',
-  'syncScreen.move': 'Auf einen anderen Server umziehen',
   'syncScreen.tooLarge': { one: '{count} Eintrag ist zu groß zum Synchronisieren (eine sehr lange Notiz?) und bleibt nur auf diesem Handy. Kürzt du ihn, wird er synchronisiert.', other: '{count} Einträge sind zu groß zum Synchronisieren (eine sehr lange Notiz?) und bleiben nur auf diesem Handy. Kürzt du sie, werden sie synchronisiert.' },
   'syncScreen.syncNow': 'Jetzt synchronisieren',
   'syncScreen.familyId': 'Familien-ID',
@@ -1036,12 +1034,6 @@ export const de: Translation = {
   'recover.removePhones': 'Handys entfernen',
   'recover.keep': 'Vorerst behalten',
   'recover.later': 'Du kannst Handys später unter Einstellungen → Sync entfernen.',
-  'move.lead': 'Subby zieht eine Familie nicht von selbst auf einen anderen Server um. Von Hand dauert es ein paar Minuten, und nichts geht verloren: Jedes Handy behält alles, solange Sync aus ist.',
-  'move.step.off': 'Öffne auf jedem Handy {sync} und tippe auf „{off}“.',
-  'move.step.setUp': 'Tippe auf einem Handy auf „{setUp}“ und wähle den neuen Server („{own}“ für einen eigenen).',
-  'move.step.add': 'Tippe auf diesem Handy für jedes andere auf „{add}“ und auf dem anderen auf „{join}“. Fragt es nach seinen eigenen Einträgen, wähle „{merge}“: Was es in der Zwischenzeit eingetragen hat, kommt mit.',
-  'move.step.recovery': 'Lege einen neuen Wiederherstellungsschlüssel an: Die alten Wörter gelten nur auf dem alten Server.',
-  'move.oldServer': 'Der alte Server löscht deine Familie, sobald dort das letzte Handy Sync ausgeschaltet hat.',
 
   'family.anotherPhone': 'einem anderen Handy',
 

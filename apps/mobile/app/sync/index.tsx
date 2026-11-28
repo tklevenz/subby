@@ -135,7 +135,6 @@ function Status() {
         <Row label={t('syncScreen.lastSynced')} value={sync.lastSyncedAt ? formatTime(sync.lastSyncedAt) : t('syncScreen.notYet')} />
         <Row label={t('syncScreen.server')} value={serverLabel(sync.server)} />
         <PhotoStorage />
-        <Row label={t('syncScreen.move')} onPress={() => router.push('/sync/move')} right={<Chevron />} />
       </Card>
       {phase === 'error' && error ? <ErrorText className="mt-3 ml-1">{error}</ErrorText> : null}
       {clockOff !== null ? <WarningText className="mt-3 ml-1">{clockOffText(clockOff)}</WarningText> : null}

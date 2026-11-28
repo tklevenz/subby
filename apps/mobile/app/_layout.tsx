@@ -110,7 +110,6 @@ export default function RootLayout() {
           <Stack.Screen name="sync/index" options={header(t('screen.sync'))} />
           <Stack.Screen name="sync/add" options={header(t('screen.addPhone'))} />
           <Stack.Screen name="sync/recovery" options={header(t('screen.recoveryKey'))} />
-          <Stack.Screen name="sync/move" options={header(t('screen.move'))} />
         </Stack.Protected>
         <Stack.Protected guard={!hasChild}>
           <Stack.Screen name="onboarding" />

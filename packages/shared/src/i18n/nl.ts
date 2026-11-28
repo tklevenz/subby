@@ -445,7 +445,6 @@ export const nl: Translation = {
   'screen.sync': 'Synchronisatie',
   'screen.addPhone': 'Telefoon toevoegen',
   'screen.recoveryKey': 'Herstelsleutel',
-  'screen.move': 'Naar een andere server',
   'screen.import': 'Importeren',
   'screen.backup': 'Back-up',
   'screen.join': 'Aansluiten bij een gezin',
@@ -874,7 +873,6 @@ export const nl: Translation = {
   'syncScreen.lastSynced': 'Laatst gesynchroniseerd',
   'syncScreen.notYet': 'Nog niet',
   'syncScreen.server': 'Server',
-  'syncScreen.move': 'Naar een andere server',
   'syncScreen.tooLarge': { one: '{count} item is te groot om te synchroniseren (een heel lange notitie?) en blijft alleen op deze telefoon. Kort je het in, dan synchroniseert het wel.', other: '{count} items zijn te groot om te synchroniseren (een heel lange notitie?) en blijven alleen op deze telefoon. Kort je ze in, dan synchroniseren ze wel.' },
   'syncScreen.syncNow': 'Nu synchroniseren',
   'syncScreen.familyId': 'Gezins-id',
@@ -1036,12 +1034,6 @@ export const nl: Translation = {
   'recover.removePhones': 'Telefoons verwijderen',
   'recover.keep': 'Voorlopig houden',
   'recover.later': 'Je kunt telefoons later verwijderen onder Instellingen → Synchronisatie.',
-  'move.lead': 'Subby verhuist een gezin niet zelf naar een andere server. Met de hand kost het een paar minuten, en er gaat niets verloren: elke telefoon houdt alles zolang synchronisatie uit staat.',
-  'move.step.off': 'Open op elke telefoon {sync} en tik op „{off}”.',
-  'move.step.setUp': 'Tik op één telefoon op „{setUp}” en kies de nieuwe server („{own}” voor een eigen server).',
-  'move.step.add': 'Tik op die telefoon voor elke andere op „{add}”, en op de andere telefoon op „{join}”. Vraagt die naar zijn eigen items, kies dan „{merge}”: wat er intussen gelogd is, gaat mee.',
-  'move.step.recovery': 'Maak een nieuwe herstelsleutel: de oude woorden werken alleen op de oude server.',
-  'move.oldServer': 'De oude server verwijdert je gezin zodra de laatste telefoon daar synchronisatie heeft uitgezet.',
 
   'family.anotherPhone': 'een andere telefoon',
 
